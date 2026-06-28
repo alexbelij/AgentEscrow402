@@ -1,0 +1,3 @@
+[workspace]
+members = ["escrow", "tests"]
+resolver = "2"
