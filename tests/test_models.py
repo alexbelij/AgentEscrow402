@@ -7,13 +7,10 @@ from pydantic import ValidationError
 
 from server.models import (
     DisputeRequest,
-    EscrowRecord,
     EscrowRequest,
     EscrowStatus,
     HealthResponse,
     PaymentHeader,
-    RefundRequest,
-    ReleaseRequest,
     ReputationRecord,
     ResolveRequest,
 )
@@ -62,7 +59,14 @@ class TestEscrowRequest:
 
 class TestEscrowStatus:
     def test_all_statuses(self):
-        expected = {"pending", "released", "refunded", "expired", "disputed", "resolved"}
+        expected = {
+            "pending",
+            "released",
+            "refunded",
+            "expired",
+            "disputed",
+            "resolved",
+        }
         actual = {s.value for s in EscrowStatus}
         assert actual == expected
 
@@ -122,9 +126,7 @@ class TestHealthResponse:
 
 class TestPaymentHeader:
     def test_defaults(self):
-        ph = PaymentHeader(
-            escrow_hash="abc", amount=100, sender="s", signature="sig"
-        )
+        ph = PaymentHeader(escrow_hash="abc", amount=100, sender="s", signature="sig")
         assert ph.version == "x402-v1"
         assert ph.timestamp == 0
         assert ph.nonce == ""

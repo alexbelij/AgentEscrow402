@@ -43,7 +43,10 @@ DEFAULT_API_URL = "http://localhost:8000"
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
-async def _post(url: str, body: dict[str, Any], params: dict[str, str] | None = None) -> dict:
+
+async def _post(
+    url: str, body: dict[str, Any], params: dict[str, str] | None = None
+) -> dict:
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(url, json=body, params=params)
         r.raise_for_status()
@@ -94,7 +97,10 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "sender": {"type": "string"},
-                "service_hash": {"type": "string", "description": "SHA-256 hash of the escrow"},
+                "service_hash": {
+                    "type": "string",
+                    "description": "SHA-256 hash of the escrow",
+                },
             },
             "required": ["sender", "service_hash"],
         },
@@ -119,7 +125,10 @@ TOOLS = [
             "properties": {
                 "sender": {"type": "string"},
                 "service_hash": {"type": "string"},
-                "reason_hash": {"type": "string", "description": "SHA-256 of the dispute reason"},
+                "reason_hash": {
+                    "type": "string",
+                    "description": "SHA-256 of the dispute reason",
+                },
             },
             "required": ["sender", "service_hash", "reason_hash"],
         },
@@ -175,8 +184,12 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
         sh = _hash(args["sender"], args["receiver"], args["amount"], nonce)
         result = await _post(
             f"{base}/escrow",
-            {"receiver": args["receiver"], "amount": args["amount"],
-             "service_hash": sh, "ttl": args.get("ttl", 300)},
+            {
+                "receiver": args["receiver"],
+                "amount": args["amount"],
+                "service_hash": sh,
+                "ttl": args.get("ttl", 300),
+            },
             params={"sender": args["sender"]},
         )
 
@@ -260,19 +273,26 @@ def main() -> None:
         asyncio.run(_run_stdio(app))
     else:
         try:
+            import uvicorn
             from mcp.server.sse import SseServerTransport
             from starlette.applications import Starlette
             from starlette.routing import Route
-            import uvicorn
 
             sse = SseServerTransport("/messages")
-            starlette = Starlette(routes=[
-                Route("/sse", endpoint=sse.handle_sse_request),
-                Route("/messages", endpoint=sse.handle_post_message, methods=["POST"]),
-            ])
+            starlette = Starlette(
+                routes=[
+                    Route("/sse", endpoint=sse.handle_sse_request),
+                    Route(
+                        "/messages", endpoint=sse.handle_post_message, methods=["POST"]
+                    ),
+                ]
+            )
             uvicorn.run(starlette, host="0.0.0.0", port=args.port)
         except ImportError:
-            print("SSE transport requires: pip install mcp[sse] uvicorn starlette", file=sys.stderr)
+            print(
+                "SSE transport requires: pip install mcp[sse] uvicorn starlette",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
 

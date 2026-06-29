@@ -47,11 +47,14 @@ class TestHealthEndpoint:
 class TestEscrowEndpoint:
     def test_create_escrow(self, client):
         h = _hash("svc-001")
-        resp = client.post("/escrow", json={
-            "receiver": "receiver-001",
-            "amount": 5000,
-            "service_hash": h,
-        })
+        resp = client.post(
+            "/escrow",
+            json={
+                "receiver": "receiver-001",
+                "amount": 5000,
+                "service_hash": h,
+            },
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["amount"] == 5000
@@ -59,26 +62,46 @@ class TestEscrowEndpoint:
 
     def test_create_duplicate_escrow_returns_409(self, client):
         h = _hash("svc-dup")
-        client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        })
-        resp = client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        })
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+        )
+        resp = client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+        )
         assert resp.status_code == 409
 
     def test_create_escrow_invalid_amount(self, client):
         h = _hash("invalid")
-        resp = client.post("/escrow", json={
-            "receiver": "r", "amount": 0, "service_hash": h,
-        })
+        resp = client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 0,
+                "service_hash": h,
+            },
+        )
         assert resp.status_code == 422
 
     def test_get_escrow(self, client):
         h = _hash("get-test")
-        client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        })
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+        )
         resp = client.get(f"/escrow/{h}")
         assert resp.status_code == 200
         assert resp.json()["service_hash"] == h
@@ -91,31 +114,54 @@ class TestEscrowEndpoint:
 class TestReleaseEndpoint:
     def test_release(self, client):
         h = _hash("release-test")
-        client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        }, params={"sender": "alice"})
-        resp = client.post("/release", json={
-            "service_hash": h,
-        }, params={"sender": "alice"})
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+            params={"sender": "alice"},
+        )
+        resp = client.post(
+            "/release",
+            json={
+                "service_hash": h,
+            },
+            params={"sender": "alice"},
+        )
         assert resp.status_code == 200
         assert resp.json()["status"] == "released"
 
     def test_release_nonexistent(self, client):
-        resp = client.post("/release", json={
-            "service_hash": _hash("no-such"),
-        })
+        resp = client.post(
+            "/release",
+            json={
+                "service_hash": _hash("no-such"),
+            },
+        )
         assert resp.status_code == 404
 
 
 class TestRefundEndpoint:
     def test_refund(self, client):
         h = _hash("refund-test")
-        client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        }, params={"sender": "bob"})
-        resp = client.post("/refund", json={
-            "service_hash": h,
-        }, params={"sender": "bob"})
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+            params={"sender": "bob"},
+        )
+        resp = client.post(
+            "/refund",
+            json={
+                "service_hash": h,
+            },
+            params={"sender": "bob"},
+        )
         assert resp.status_code == 200
         assert resp.json()["status"] == "refunded"
 
@@ -123,21 +169,32 @@ class TestRefundEndpoint:
 class TestDisputeEndpoint:
     def test_dispute(self, client):
         h = _hash("dispute-test")
-        client.post("/escrow", json={
-            "receiver": "r", "amount": 100, "service_hash": h,
-        })
-        resp = client.post("/dispute", json={
-            "service_hash": h,
-            "reason_hash": "b" * 64,
-        })
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "r",
+                "amount": 100,
+                "service_hash": h,
+            },
+        )
+        resp = client.post(
+            "/dispute",
+            json={
+                "service_hash": h,
+                "reason_hash": "b" * 64,
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["status"] == "disputed"
 
     def test_dispute_nonexistent(self, client):
-        resp = client.post("/dispute", json={
-            "service_hash": _hash("gone"),
-            "reason_hash": "c" * 64,
-        })
+        resp = client.post(
+            "/dispute",
+            json={
+                "service_hash": _hash("gone"),
+                "reason_hash": "c" * 64,
+            },
+        )
         assert resp.status_code == 404
 
 
@@ -151,12 +208,22 @@ class TestReputationEndpoint:
 
     def test_reputation_increases_on_release(self, client):
         h = _hash("rep-test")
-        client.post("/escrow", json={
-            "receiver": "good-agent", "amount": 100, "service_hash": h,
-        }, params={"sender": "payer"})
-        client.post("/release", json={
-            "service_hash": h,
-        }, params={"sender": "payer"})
+        client.post(
+            "/escrow",
+            json={
+                "receiver": "good-agent",
+                "amount": 100,
+                "service_hash": h,
+            },
+            params={"sender": "payer"},
+        )
+        client.post(
+            "/release",
+            json={
+                "service_hash": h,
+            },
+            params={"sender": "payer"},
+        )
         resp = client.get("/reputation/good-agent")
         assert resp.json()["completed"] == 1
 

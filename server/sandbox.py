@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import hashlib
 import time
 from typing import Any
 
-from server.models import EscrowRecord, EscrowStatus, ReputationRecord
+from server.models import EscrowRecord, ReputationRecord
 
 
 class SandboxStore:

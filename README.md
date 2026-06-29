@@ -51,7 +51,11 @@ The [x402 protocol](https://www.x402.org/) defines how machines pay for API call
 
 No existing x402 implementation on any chain combines escrow + reputation + arbitration in one contract.
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## ⚙️ How it works
 
@@ -77,7 +81,11 @@ The x402 header format: `X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<sig
 
 Protected endpoints return `402 Payment Required` when the header is missing, with machine-readable payment terms.
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 🚀 Quickstart
 
@@ -132,7 +140,11 @@ async with EscrowClient("http://localhost:8000", sender="agent-A") as client:
 > [!TIP]
 > Sandbox mode stores everything in memory — no blockchain calls, no keys required. Switch to testnet by setting `CASPER_NODE_URL` and `DEPLOYER_KEY_PATH` in `.env`.
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 🧱 Architecture
 
@@ -174,7 +186,11 @@ flowchart LR
 
 Detailed diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 📜 Smart contract
 
@@ -200,7 +216,11 @@ cargo build --release --target wasm32-unknown-unknown --no-default-features
 
 Security audit: 18 findings identified and fixed. Risk score reduced from 6/10 to 2/10. Full report in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 🔌 SDK and integrations
 
@@ -230,7 +250,11 @@ python sdk/mcp_server.py
 # Exposes 7 tools via stdio or SSE transport
 ```
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 📡 API reference
 
@@ -257,7 +281,11 @@ python sdk/mcp_server.py
 }
 ```
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 🧪 Testing
 
@@ -282,7 +310,11 @@ cd contracts/tests && cargo test --release
 
 CI runs on every push: lint (ruff + black) → pytest → WASM build → cargo test.
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## ✅ Built today vs 🗺 Roadmap
 
@@ -300,7 +332,11 @@ CI runs on every push: lint (ruff + black) → pytest → WASM build → cargo t
 | Mainnet deployment | 🗺 Planned | Pending audit |
 | Agent discovery registry | 🗺 Planned | — |
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## ⚖️ Comparison
 
@@ -313,7 +349,11 @@ CI runs on every push: lint (ruff + black) → pytest → WASM build → cargo t
 | Casper Network | ✅ Native | ❌ EVM only | — |
 | *Where they're better* | — | ✅ Production-tested, wide adoption | ✅ No crypto dependency |
 
+<div align="right">
+
 [![][back-to-top]](#readme-top)
+
+</div>
 
 ## 📁 Project structure
 

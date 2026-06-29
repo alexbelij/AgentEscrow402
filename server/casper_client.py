@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import time
 from typing import Any
 
 import httpx
@@ -161,9 +160,7 @@ class CasperClient:
             deploy["header"]["body_hash"] = body_hash
 
             # Sign header
-            header_bytes = json.dumps(
-                deploy["header"], sort_keys=True
-            ).encode()
+            header_bytes = json.dumps(deploy["header"], sort_keys=True).encode()
             header_hash = hashlib.blake2b(header_bytes, digest_size=32).digest()
             signature = private_key.sign(header_hash)
             deploy["hash"] = header_hash.hex()
@@ -219,7 +216,14 @@ class CasperClient:
         parsed = raw.get("parsed")
         if not parsed:
             return None
-        status_map = ["pending", "released", "refunded", "expired", "disputed", "resolved"]
+        status_map = [
+            "pending",
+            "released",
+            "refunded",
+            "expired",
+            "disputed",
+            "resolved",
+        ]
         return EscrowRecord(
             sender=parsed[0],
             receiver=parsed[1],
@@ -259,6 +263,7 @@ class CasperClient:
     @staticmethod
     def _iso_now() -> str:
         from datetime import datetime, timezone
+
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     @staticmethod

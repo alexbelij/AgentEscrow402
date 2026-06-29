@@ -19,7 +19,6 @@ from server.models import (
     RefundRequest,
     ReleaseRequest,
     ReputationRecord,
-    ResolveRequest,
 )
 from server.sandbox import SandboxStore
 
@@ -93,7 +92,7 @@ async def create_escrow(
 
     if casper is None:
         raise HTTPException(status_code=503, detail="Casper client not configured")
-    deploy_hash = await casper.create_escrow(
+    await casper.create_escrow(
         sender=sender,
         receiver=req.receiver,
         amount=req.amount,

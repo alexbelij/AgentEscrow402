@@ -85,6 +85,7 @@ class TestClientInit:
         client = CasperClient(cfg)
         with pytest.raises(RuntimeError, match="contract_hash"):
             import asyncio
+
             asyncio.get_event_loop().run_until_complete(
                 client.deploy_transaction("test", {})
             )
@@ -94,6 +95,7 @@ class TestClientInit:
         client = CasperClient(cfg)
         with pytest.raises(RuntimeError, match="private key"):
             import asyncio
+
             asyncio.get_event_loop().run_until_complete(
                 client.deploy_transaction("test", {})
             )

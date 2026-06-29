@@ -6,7 +6,6 @@ import hashlib
 import time
 
 from server.middleware import (
-    X402_VERSION,
     _build_signing_payload,
     _check_replay,
     _used_nonces,
@@ -142,8 +141,12 @@ class TestSigningPayload:
 
     def test_payload_binds_path(self):
         ph = PaymentHeader(
-            escrow_hash="abc", amount=100, sender="s", signature="sig",
-            timestamp=0, nonce="n",
+            escrow_hash="abc",
+            amount=100,
+            sender="s",
+            signature="sig",
+            timestamp=0,
+            nonce="n",
         )
         p1 = _build_signing_payload(ph, method="POST", path="/escrow")
         p2 = _build_signing_payload(ph, method="POST", path="/release")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+
 import pytest
 
 from server.config import Config
