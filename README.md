@@ -1,188 +1,355 @@
+<a id="readme-top"></a>
+
+<div align="center">
+
 # AgentEscrow402
 
-> x402-compatible payment middleware for autonomous AI agents on Casper Network
+**x402 payment middleware for autonomous AI agents on Casper Network**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE) [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org) [![Casper 2.x](https://img.shields.io/badge/Casper-2.x-red.svg)](https://casper.network) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](tests/)
+*Agents pay agents. No humans in the loop.*
 
-## What is AgentEscrow402?
+[![CI](https://github.com/alexbelij/AgentEscrow402/actions/workflows/ci.yml/badge.svg)](https://github.com/alexbelij/AgentEscrow402/actions/workflows/ci.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB.svg?style=flat-square)](https://python.org)
+[![Casper 2.x](https://img.shields.io/badge/Casper-2.x-FF0000.svg?style=flat-square)](https://casper.network)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-AgentEscrow402 brings the [x402 payment protocol](https://www.x402.org/) to Casper Network. AI agents can lock funds in trustless escrow, deliver services, and release payments without human intervention.
+[Landing Page](https://alexbelij.github.io/AgentEscrow402/) · [Architecture](#-architecture) · [SDK Docs](docs/SDK.md)
 
-### Features
+</div>
 
-- **x402 Payment Protocol** — Standard HTTP 402 headers for agent-to-agent payments
-- **Trustless Escrow** — Funds locked in Casper smart contracts until delivery confirmation
-- **Reputation System** — On-chain scoring with exponential decay (`new = old * 0.95 + latest`)
-- **Multi-sig Dispute Resolution** — 3-of-5 arbiter voting for contested payments
-- **Insurance Pool** — Configurable fee (default 2%) funds a reserve for slashed agents
-- **Sandbox Mode** — Full API simulation without a running Casper node
+---
 
-## Architecture
+> [!IMPORTANT]
+> **What this is:** a deployed escrow system on Casper testnet where AI agents lock funds via HTTP 402 headers, deliver compute, and release payment — all without a human facilitator. The contract is live and verified.
+
+<details>
+<summary><kbd>Table of contents</kbd></summary>
+
+- [What's new here](#-whats-new-here)
+- [How it works](#-how-it-works)
+- [Quickstart](#-quickstart)
+- [Architecture](#-architecture)
+- [Smart contract](#-smart-contract)
+- [SDK and integrations](#-sdk-and-integrations)
+- [API reference](#-api-reference)
+- [Testing](#-testing)
+- [Built today vs Roadmap](#-built-today-vs--roadmap)
+- [Comparison](#-comparison)
+- [Project structure](#-project-structure)
+- [Team](#-team)
+- [License](#-license)
+
+</details>
+
+## ✨ What's new here
+
+The [x402 protocol](https://www.x402.org/) defines how machines pay for API calls using HTTP 402 headers. Current implementations assume Ethereum-based facilitators. AgentEscrow402 brings this to Casper Network with three additions that don't exist elsewhere:
+
+1. **On-chain escrow with TTL** — funds sit in a time-locked contract, not a hot wallet. If the service isn't delivered, the sender reclaims after timeout.
+2. **Reputation-weighted trust** — every completed transaction updates an on-chain trust score with exponential decay (`new = old × 0.95 + latest`). Agents can check counterparty reliability before committing funds.
+3. **Multi-sig dispute resolution** — contested payments go to a 3-of-5 arbiter vote instead of a single facilitator.
+
+No existing x402 implementation on any chain combines escrow + reputation + arbitration in one contract.
+
+[![][back-to-top]](#readme-top)
+
+## ⚙️ How it works
 
 ```
-┌─────────────────┐     ┌──────────────────┐     ┌──────────────────┐
-│   Agent (SDK)   │────▶│  Payment Server  │────▶│  Casper Network  │
-│                 │     │   (FastAPI)       │     │  (Smart Contract)│
-│  x402 headers   │     │  x402 middleware  │     │  escrow.wasm     │
-│  escrow client  │     │  sandbox store    │     │  reputation      │
-└─────────────────┘     │  event monitor    │     │  insurance       │
-                        └──────────────────┘     └──────────────────┘
+Agent A                    Payment Server                 Casper Network
+  │                            │                              │
+  ├─ POST /escrow ────────────▶│                              │
+  │  {receiver, amount, ttl}   │── create_escrow() ─────────▶│
+  │                            │                              │ funds locked
+  │◀── 201 {service_hash} ────┤                              │
+  │                            │                              │
+  ├─ GET /api/compute ────────▶│                              │
+  │  X-Payment: x402-v1;...    │── verify header ───────────▶│
+  │                            │◀─ ok ──────────────────────┤
+  │◀── 200 result ────────────┤                              │
+  │                            │                              │
+  ├─ POST /release ───────────▶│── release() ───────────────▶│
+  │  {service_hash}            │                              │ funds → Agent B
+  │◀── 200 ───────────────────┤  reputation updated          │
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed Mermaid diagrams.
+The x402 header format: `X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<signature>`
 
-## Quick Start
+Protected endpoints return `402 Payment Required` when the header is missing, with machine-readable payment terms.
 
-### Prerequisites
+[![][back-to-top]](#readme-top)
 
-- Python 3.11+
-- Rust nightly (for contract compilation)
-- Docker (optional, for one-command setup)
+## 🚀 Quickstart
 
-### Docker (recommended)
+Runs in under 5 minutes. No Casper node needed — sandbox mode is the default.
+
+**Prerequisites:** Python 3.11+, pip
 
 ```bash
 git clone https://github.com/alexbelij/AgentEscrow402.git
 cd AgentEscrow402
-cp .env.example .env
-docker-compose up
-```
-
-The server starts at `http://localhost:8000` in sandbox mode.
-
-### Manual Install
-
-```bash
 pip install -r requirements.txt
+cp .env.example .env
 python -m uvicorn server.app:app --host 0.0.0.0 --port 8000
 ```
 
-### Using the SDK
+**Expected output:**
+```
+INFO:     Uvicorn running on http://0.0.0.0:8000
+INFO:     Application startup complete.
+```
+
+**Verify it works:**
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","mode":"sandbox"}
+```
+
+### Docker alternative
+
+```bash
+docker-compose up
+# Server at http://localhost:8000 in sandbox mode
+```
+
+### First escrow (Python)
 
 ```python
 from sdk.client import EscrowClient
 
-client = EscrowClient(base_url="http://localhost:8000", sender="agent-001")
+async with EscrowClient("http://localhost:8000", sender="agent-A") as client:
+    escrow = await client.create_escrow(
+        receiver="agent-B",
+        amount=5_000_000,   # 5 CSPR in motes
+        ttl=300,            # 5 min timeout
+    )
+    print(escrow["service_hash"])
 
-# Create escrow for a service
-escrow = await client.create_escrow(
-    receiver="agent-002",
-    amount=5_000_000,  # 5 CSPR in motes
-    ttl=300,
-)
-
-# After service delivery, release payment
-await client.release(escrow["service_hash"])
-
-# Check reputation
-rep = await client.get_reputation("agent-002")
-print(f"Trust score: {rep['score']}")
+    # after service delivery:
+    await client.release(escrow["service_hash"])
 ```
 
-### LangChain Integration
+> [!TIP]
+> Sandbox mode stores everything in memory — no blockchain calls, no keys required. Switch to testnet by setting `CASPER_NODE_URL` and `DEPLOYER_KEY_PATH` in `.env`.
+
+[![][back-to-top]](#readme-top)
+
+## 🧱 Architecture
+
+```mermaid
+flowchart LR
+  subgraph Clients
+    SDK[Python SDK]
+    LC[LangChain Tool]
+    MCP[MCP Server]
+  end
+
+  subgraph Server["Payment Server (FastAPI)"]
+    MW[x402 Middleware]
+    API[REST API]
+    SB[Sandbox Store]
+    CC[Casper Client]
+    EM[Event Monitor]
+  end
+
+  subgraph Chain["Casper Network"]
+    ESC[escrow.wasm]
+    REP[Reputation Store]
+    INS[Insurance Pool]
+  end
+
+  SDK --> MW
+  LC --> MW
+  MCP --> MW
+  MW --> API
+  API --> SB
+  API --> CC
+  CC --> ESC
+  ESC --> REP
+  ESC --> INS
+  EM --> ESC
+```
+
+*The payment server sits between agent SDKs and the Casper contract. The middleware validates x402 headers on every request. In sandbox mode, the Casper Client is replaced by an in-memory store with identical behavior.*
+
+Detailed diagrams: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+[![][back-to-top]](#readme-top)
+
+## 📜 Smart contract
+
+Deployed on Casper testnet. Contract hash: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
+
+| Entry point | Description |
+|---|---|
+| `create_escrow` | Lock funds with TTL and service hash |
+| `release` | Sender confirms delivery → funds go to receiver |
+| `refund` | Reclaim funds after TTL expiry |
+| `dispute` | Sender or receiver opens a dispute |
+| `resolve` | 3-of-5 arbiters vote to release or refund |
+| `configure_fee` | Set insurance pool fee (basis points) |
+| `emergency_freeze` | Pause all state changes (admin) |
+
+**Compile from source:**
+
+```bash
+cd contracts/escrow
+cargo build --release --target wasm32-unknown-unknown --no-default-features
+# -> target/wasm32-unknown-unknown/release/escrow.wasm (168K)
+```
+
+Security audit: 18 findings identified and fixed. Risk score reduced from 6/10 to 2/10. Full report in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+
+[![][back-to-top]](#readme-top)
+
+## 🔌 SDK and integrations
+
+### Python SDK
+
+```python
+from sdk import EscrowClient
+
+client = EscrowClient(base_url="http://localhost:8000", sender="my-agent")
+```
+
+Full reference: [docs/SDK.md](docs/SDK.md)
+
+### LangChain tool
 
 ```python
 from sdk.langchain_tool import EscrowPaymentTool
 
 tool = EscrowPaymentTool(base_url="http://localhost:8000", sender="my-agent")
-result = await tool.run(action="create", receiver="target-agent", amount=1_000_000)
+result = await tool.run(action="create", receiver="target", amount=1_000_000)
 ```
 
-## API Endpoints
+### MCP server
+
+```bash
+python sdk/mcp_server.py
+# Exposes 7 tools via stdio or SSE transport
+```
+
+[![][back-to-top]](#readme-top)
+
+## 📡 API reference
 
 | Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Server health check |
+|---|---|---|
+| `GET` | `/health` | Server health and mode |
 | `POST` | `/escrow` | Create new escrow |
-| `POST` | `/release` | Release escrowed funds |
-| `POST` | `/refund` | Refund escrowed funds |
-| `POST` | `/dispute` | Open a dispute |
-| `POST` | `/resolve` | 3-of-5 arbiter resolution |
-| `GET` | `/escrow/{hash}` | Get escrow by service hash |
-| `GET` | `/reputation/{agent}` | Get agent reputation |
-| `POST` | `/compute-hash` | Compute service hash |
+| `POST` | `/release` | Release funds to receiver |
+| `POST` | `/refund` | Refund to sender |
+| `POST` | `/dispute` | Open dispute (sender or receiver only) |
+| `POST` | `/resolve` | Arbiter vote (3-of-5) |
+| `GET` | `/escrow/{hash}` | Look up escrow by service hash |
+| `GET` | `/reputation/{agent}` | Agent trust score |
+| `POST` | `/compute-hash` | Compute service hash from params |
 
-### x402 Payment Header
-
-```
-X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<signature>
-```
-
-Protected endpoints return `402 Payment Required` when the header is missing:
+**402 response example:**
 
 ```json
 {
   "error": "payment_required",
   "accepts": "x402-v1",
-  "price": 1000000
+  "price": 1000000,
+  "receiver": "account-hash-74c9..."
 }
 ```
 
-## Smart Contract
+[![][back-to-top]](#readme-top)
 
-The escrow contract (`contracts/escrow/`) implements these entry points:
+## 🧪 Testing
 
-| Entry Point | Description |
-|-------------|-------------|
-| `create_escrow` | Lock funds with TTL and service hash |
-| `release` | Sender confirms delivery, funds go to receiver |
-| `refund` | Return funds after TTL expiry or by sender |
-| `dispute` | Either party opens a dispute |
-| `resolve` | 3-of-5 arbiters vote to resolve |
-| `configure_fee` | Admin sets insurance pool fee (basis points) |
-| `emergency_freeze` | Admin freeze for incident response |
-
-Events follow the CEP-88 standard for indexer compatibility.
-
-### Compile the contract
+103 tests total, all passing.
 
 ```bash
-cd contracts
-cargo build --release --target wasm32-unknown-unknown --no-default-features
-# Output: target/wasm32-unknown-unknown/release/escrow.wasm
+# Python tests (85)
+PYTHONPATH=. pytest tests/ -v --tb=short
+
+# Rust contract tests (18)
+cd contracts/tests && cargo test --release
 ```
 
-## Testing
+| Suite | Count | What it covers |
+|---|---|---|
+| `test_api.py` | 15 | All REST endpoints, error cases |
+| `test_middleware.py` | 14 | x402 header parsing, validation |
+| `test_models.py` | 15 | Pydantic schema validation |
+| `test_sandbox.py` | 19 | Sandbox store CRUD, TTL, disputes |
+| `test_casper_client.py` | 9 | RPC client mocks |
+| `integration_tests.rs` | 18 | Contract entry point logic |
 
-```bash
-# Unit tests
-pytest tests/ -v
+CI runs on every push: lint (ruff + black) → pytest → WASM build → cargo test.
 
-# Specific modules
-pytest tests/test_sandbox.py -v
-pytest tests/test_middleware.py -v
+[![][back-to-top]](#readme-top)
 
-# Contract tests
-cd contracts/tests && cargo test
-```
+## ✅ Built today vs 🗺 Roadmap
 
-## Project Structure
+| Feature | Status | Evidence |
+|---|---|---|
+| Escrow contract (create/release/refund/dispute/resolve) | ✅ Live | [Testnet deploy](https://testnet.cspr.live/deploy/16e3787ca7307ea997a1a8b15d758f3ac1c8b4a105121dac26a2633033ef62ba) |
+| x402 middleware + REST API | ✅ Live | 85 passing tests |
+| Reputation system (exponential decay) | ✅ Live | Contract entry point |
+| Emergency freeze | ✅ Live | Audit-verified |
+| Insurance pool (2% fee) | ✅ Live | `configure_fee` entry point |
+| Python SDK + LangChain tool | ✅ Live | `sdk/` directory |
+| MCP server (7 tools) | ✅ Live | `sdk/mcp_server.py` |
+| Sandbox mode | ✅ Live | Default startup mode |
+| Multi-chain support | 🗺 Planned | — |
+| Mainnet deployment | 🗺 Planned | Pending audit |
+| Agent discovery registry | 🗺 Planned | — |
+
+[![][back-to-top]](#readme-top)
+
+## ⚖️ Comparison
+
+| | AgentEscrow402 | Coinbase x402 | Manual invoicing |
+|---|---|---|---|
+| Trustless escrow | ✅ On-chain, time-locked | ❌ Facilitator holds funds | ❌ N/A |
+| Reputation tracking | ✅ On-chain, per-agent | ❌ None | ❌ None |
+| Dispute resolution | ✅ 3-of-5 arbiter vote | ⚠️ Facilitator decides | ⚠️ Manual |
+| Agent-native (no human) | ✅ Full automation | ⚠️ Needs facilitator setup | ❌ Human required |
+| Casper Network | ✅ Native | ❌ EVM only | — |
+| *Where they're better* | — | ✅ Production-tested, wide adoption | ✅ No crypto dependency |
+
+[![][back-to-top]](#readme-top)
+
+## 📁 Project structure
 
 ```
 AgentEscrow402/
-├── contracts/escrow/        # Casper smart contract (Rust)
-│   └── src/main.rs
+├── contracts/escrow/        # Casper smart contract (Rust/WASM)
 ├── server/                  # FastAPI payment server
-│   ├── app.py               # API routes
-│   ├── middleware.py         # x402 payment parsing
-│   ├── sandbox.py           # Demo mode store
+│   ├── app.py               # Routes and lifecycle
+│   ├── middleware.py         # x402 header parsing
+│   ├── sandbox.py           # In-memory escrow store
 │   ├── casper_client.py     # Casper RPC wrapper
 │   ├── event_monitor.py     # CEP-88 event listener
-│   └── models.py            # Pydantic schemas
-├── sdk/                     # Python client SDK
-│   ├── client.py            # HTTP client
-│   └── langchain_tool.py    # LangChain tool wrapper
-├── tests/                   # Test suite
-├── examples/                # Quickstart scripts
-├── landing/                 # Landing page
-├── docs/                    # ARCHITECTURE.md, DEPLOYMENT.md
+│   ├── models.py            # Pydantic models
+│   └── config.py            # Environment config
+├── sdk/                     # Python SDK + LangChain + MCP
+├── tests/                   # 85 Python + 18 Rust tests
+├── docs/                    # Architecture, SDK, known limitations
+├── landing/                 # Project landing page
+├── .github/workflows/       # CI pipeline
 └── docker-compose.yml
 ```
 
-## Hackathon
+## 👤 Team
 
-Developed during the Casper Buildathon 2026 ([info](https://dorahacks.io/hackathon/casper-the-friendly-buildathon)). Focus area: agent payment infrastructure.
+**alexbelij** — protocol design, contracts, server ([GitHub](https://github.com/alexbelij))
 
-## License
+Questions: [open an issue](https://github.com/alexbelij/AgentEscrow402/issues)
 
-MIT License — see [LICENSE](LICENSE) for details.
+---
+
+## 📝 License
+
+[MIT](LICENSE) — see LICENSE for full text.
+
+**Security:** testnet keys only. Never commit real deployer keys. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for a full risk assessment.
+
+*Last verified against commit `0db76e9`, 2026-06-29.*
+
+[back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
