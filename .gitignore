@@ -24,3 +24,9 @@ target/
 *~
 .DS_Store
 Thumbs.db
+keys/
+landing/
+*.pem
+*.secret
+Cargo.lock
+*.bak

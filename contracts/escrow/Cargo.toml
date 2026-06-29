@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-casper-contract = "4"
-casper-types = "4"
+casper-contract = "5.1"
+casper-types = "6.0"
 
 [features]
 default = ["casper-contract/std", "casper-types/std"]

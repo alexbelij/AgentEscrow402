@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-casper-engine-test-support = "7"
-casper-execution-engine = "7"
-casper-types = "4"
+# casper-engine-test-support = "7"
+# casper-execution-engine = "7"
+# casper-types = "4"
 
 [[test]]
 name = "integration_tests"

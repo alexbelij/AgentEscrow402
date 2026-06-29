@@ -73,6 +73,8 @@ class PaymentHeader(BaseModel):
     amount: int
     sender: str
     signature: str
+    timestamp: int = 0
+    nonce: str = ""
 
 
 class HealthResponse(BaseModel):
