@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { background: #0a0a1a; overflow-x: hidden; }
+  :focus-visible { outline: 2px solid #6C5CE7; outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: #0a0a1a; }
+  ::-webkit-scrollbar-thumb { background: #1e1e3a; border-radius: 3px; }
+}
+
+@layer components {
+  .ae-section { @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .ae-card {
+    @apply bg-ae-card border border-ae-border rounded-xl p-6 transition-all duration-300;
+  }
+  .ae-card:hover {
+    border-color: rgba(108,92,231,0.3);
+    box-shadow: 0 0 24px rgba(108,92,231,0.08);
+  }
+  .ae-btn {
+    @apply inline-flex items-center gap-2 font-semibold px-6 py-3 rounded-full cursor-pointer transition-all duration-200;
+  }
+  .ae-btn-primary {
+    @apply ae-btn bg-ae-accent text-white;
+  }
+  .ae-btn-primary:hover {
+    @apply bg-ae-accent-bright;
+    box-shadow: 0 0 24px rgba(108,92,231,0.5);
+  }
+  .ae-btn-outline {
+    @apply ae-btn border border-ae-border text-white;
+  }
+  .ae-btn-outline:hover {
+    @apply border-ae-gray;
+    background: rgba(255,255,255,0.04);
+  }
+  .ae-gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-ae-accent to-ae-cyan;
+  }
+  .ae-icon {
+    @apply w-12 h-12 rounded-xl flex items-center justify-center shrink-0;
+    background: rgba(108,92,231,0.12);
+    border: 1px solid rgba(108,92,231,0.2);
+  }
+}
+
+/* Particle bg animation */
+@keyframes particleDrift {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 0.6; }
+  90% { opacity: 0.6; }
+  100% { transform: translateY(-100vh) translateX(40px); opacity: 0; }
+}
+.particle {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #6C5CE7;
+  border-radius: 50%;
+  animation: particleDrift linear infinite;
+  pointer-events: none;
+}
