@@ -15,8 +15,8 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install ruff black
-      - run: ruff check server/ tests/
-      - run: black --check server/ tests/
+      - run: ruff check server/ sdk/ tests/
+      - run: black --check server/ sdk/ tests/
 
   test-python:
     runs-on: ubuntu-latest
