@@ -22,6 +22,7 @@ from server.models import (
     ReputationRecord,
 )
 from server.sandbox import SandboxStore
+from server import db as pgdb
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,21 @@ async def lifespan(application: FastAPI):
         logger.info("Connected to Casper node: %s", cfg.casper_node_url)
     else:
         logger.info("Running in sandbox mode")
+
+    # Load from DB or seed
+    db_records = pgdb.load_escrows()
+    if db_records:
+        for rec in db_records:
+            _sandbox._escrows[rec["service_hash"]] = rec
+        logger.info("Loaded %d escrows from database", len(db_records))
+    else:
+        from server.seed import generate_seed_escrows
+        seeds = generate_seed_escrows()
+        for s in seeds:
+            _sandbox._escrows[s["service_hash"]] = s
+            pgdb.save_escrow(EscrowRecord(**s))
+        logger.info("Seeded %d demo escrows", len(seeds))
+
     yield
     if _casper:
         await _casper.close()
@@ -74,7 +90,48 @@ app.add_middleware(
 
 @app.get("/health", response_model=HealthResponse)
 async def health(cfg: Config = Depends(get_config)):
-    return HealthResponse(sandbox=cfg.sandbox, chain=cfg.casper_chain_name)
+    resp = HealthResponse(sandbox=cfg.sandbox, chain=cfg.casper_chain_name)
+    return resp
+
+
+@app.get("/stats")
+async def stats():
+    """Aggregate statistics for the dashboard."""
+    return pgdb.get_stats()
+
+
+@app.get("/escrows")
+async def list_escrows(
+    status: str | None = None,
+    sender: str | None = None,
+    page: int = 1,
+    limit: int = 20,
+    store: SandboxStore = Depends(get_sandbox),
+):
+    """List escrows with optional filters and pagination."""
+    all_records = pgdb.load_escrows()
+    if not all_records:
+        # fallback to in-memory
+        all_records = [
+            {
+                "service_hash": k,
+                "sender": v["sender"],
+                "receiver": v["receiver"],
+                "amount": v["amount"],
+                "status": v["status"],
+                "ttl": v["ttl"],
+                "created_at": v["created_at"],
+            }
+            for k, v in store._escrows.items()
+        ]
+    if status:
+        all_records = [r for r in all_records if r["status"] == status]
+    if sender:
+        all_records = [r for r in all_records if r["sender"] == sender]
+    total = len(all_records)
+    start = (page - 1) * limit
+    page_records = all_records[start : start + limit]
+    return {"escrows": page_records, "total": total, "page": page, "limit": limit}
 
 
 @app.post("/escrow", response_model=EscrowRecord)
@@ -88,13 +145,15 @@ async def create_escrow(
     sender = _extract_sender(request)
     if cfg.sandbox:
         try:
-            return store.create_escrow(
+            record = store.create_escrow(
                 sender=sender,
                 receiver=req.receiver,
                 amount=req.amount,
                 service_hash=req.service_hash,
                 ttl=req.ttl,
             )
+            pgdb.save_escrow(record)
+            return record
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
 
@@ -129,7 +188,10 @@ async def release_escrow(
     caller = _extract_sender(request)
     if cfg.sandbox:
         try:
-            return store.release_escrow(req.service_hash, caller)
+            record = store.release_escrow(req.service_hash, caller)
+            pgdb.update_escrow_status(req.service_hash, "released")
+            pgdb.bump_reputation(record.receiver, completed=1)
+            return record
         except KeyError:
             raise HTTPException(status_code=404, detail="Escrow not found")
         except (ValueError, PermissionError) as exc:
@@ -155,7 +217,9 @@ async def refund_escrow(
     caller = _extract_sender(request)
     if cfg.sandbox:
         try:
-            return store.refund_escrow(req.service_hash, caller)
+            record = store.refund_escrow(req.service_hash, caller)
+            pgdb.update_escrow_status(req.service_hash, record.status)
+            return record
         except KeyError:
             raise HTTPException(status_code=404, detail="Escrow not found")
         except (ValueError, PermissionError) as exc:
@@ -179,7 +243,10 @@ async def dispute_escrow(
 ):
     if cfg.sandbox:
         try:
-            return store.dispute_escrow(req.service_hash)
+            record = store.dispute_escrow(req.service_hash)
+            pgdb.update_escrow_status(req.service_hash, "disputed")
+            pgdb.bump_reputation(record.sender, disputed=1)
+            return record
         except KeyError:
             raise HTTPException(status_code=404, detail="Escrow not found")
         except ValueError as exc:
