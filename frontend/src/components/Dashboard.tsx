@@ -373,16 +373,18 @@ function AgentDetail({ agent, onClose }: { agent: Agent; onClose: () => void }) 
           <p className="text-ae-accent font-mono font-bold text-lg">{(agent.total_volume ?? 0).toLocaleString()} CSPR</p>
         </div>
       </div>
-      <div className="mt-4 flex gap-2">
-        <a
-          href={`${CSPR_LIVE}/account/${agent.address}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ae-accent/10 text-ae-accent text-sm hover:bg-ae-accent/20 transition-colors"
-        >
-          <ExternalLink size={14} /> View on Explorer
-        </a>
-      </div>
+      {/^[0-9a-fA-F]{64,}$/.test(agent.address) && (
+        <div className="mt-4 flex gap-2">
+          <a
+            href={`${CSPR_LIVE}/account/${agent.address}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-ae-accent/10 text-ae-accent text-sm hover:bg-ae-accent/20 transition-colors"
+          >
+            <ExternalLink size={14} /> View on Explorer
+          </a>
+        </div>
+      )}
     </div>
   )
 }
