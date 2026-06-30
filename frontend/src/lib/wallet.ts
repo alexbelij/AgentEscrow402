@@ -16,13 +16,13 @@ export interface WalletState {
 }
 
 export function detectCasperWallet(): boolean {
-  return typeof window !== 'undefined' && !!(window as Record<string, unknown>).CasperWalletProvider
+  return typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).CasperWalletProvider
 }
 
 export async function connectWallet(): Promise<WalletState> {
   if (detectCasperWallet()) {
     try {
-      const provider = (window as Record<string, unknown>).CasperWalletProvider as () => {
+      const provider = (window as unknown as Record<string, unknown>).CasperWalletProvider as () => {
         requestConnection: () => Promise<boolean>
         getActivePublicKey: () => Promise<string>
       }

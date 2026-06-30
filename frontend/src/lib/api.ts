@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+const API_BASE = 'https://agentescrow402-api.onrender.com'
 
 async function request<T>(path: string, opts?: RequestInit): Promise<T> {
   const url = `${API_BASE}${path}`
