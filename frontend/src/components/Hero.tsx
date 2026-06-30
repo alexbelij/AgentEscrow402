@@ -82,10 +82,10 @@ export default function Hero() {
       {/* Center glow */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-purple-600/15 blur-[80px] pointer-events-none" />
 
-      {/* Mascot - centered behind content conceptually, right side visually */}
-      <div className="absolute right-[3%] sm:right-[8%] top-[18%] sm:top-[14%] w-[48%] sm:w-[40%] lg:w-[34%] max-w-lg z-[5]">
+      {/* Mascot - hidden on mobile to avoid overlapping text, visible from md+ */}
+      <div className="absolute right-[3%] sm:right-[8%] top-[18%] sm:top-[14%] w-[40%] lg:w-[34%] max-w-lg z-[5] hidden md:block">
         <img
-          src="/images/mascot/maskot_portal.png"
+          src="/images/mascot/maskot_fly_casper.png"
           alt="AgentEscrow402"
           className="w-full relative z-10 animate-float-cat drop-shadow-[0_0_40px_rgba(108,92,231,0.3)]"
           loading="eager"
@@ -95,6 +95,16 @@ export default function Hero() {
       {/* Content - left side */}
       <div className="ae-section relative z-20 py-32">
         <div className="max-w-xl">
+          {/* Mobile mascot - small, inline, above text */}
+          <div className="md:hidden flex justify-center mb-6">
+            <img
+              src="/images/mascot/maskot_fly_casper.png"
+              alt="AgentEscrow402"
+              className="w-40 animate-float-cat drop-shadow-[0_0_30px_rgba(108,92,231,0.3)]"
+              loading="eager"
+            />
+          </div>
+
           <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-white leading-[1.08] mb-5 tracking-tight">
             The Payment Layer<br/>
             for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">AI Agents</span>
@@ -115,7 +125,7 @@ export default function Hero() {
           </div>
 
           {/* Stats row */}
-          <div className="flex gap-8">
+          <div className="flex gap-6 sm:gap-8 flex-wrap">
             {[
               { val: '596', label: 'Lines of Rust' },
               { val: '85+', label: 'Passing Tests' },
