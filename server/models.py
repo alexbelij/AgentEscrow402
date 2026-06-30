@@ -37,6 +37,7 @@ class EscrowRecord(BaseModel):
     status: EscrowStatus
     created_at: int
     ttl: int
+    deploy_hash: str | None = None
 
 
 class ReleaseRequest(BaseModel):
@@ -81,6 +82,8 @@ class PaymentHeader(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "0.1.0"
+    version: str = "0.2.0"
     sandbox: bool = True
     chain: str = ""
+    contract_hash: str = ""
+    db: str = "disconnected"

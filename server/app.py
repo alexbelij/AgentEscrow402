@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
+import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 from server.casper_client import CasperClient
 from server.config import Config
+from server.event_monitor import EventMonitor
 from server.middleware import compute_service_hash, parse_x402_header
 from server.models import (
     DisputeRequest,
@@ -34,6 +40,9 @@ def get_config() -> Config:
 
 _casper: CasperClient | None = None
 _sandbox = SandboxStore()
+_monitor: EventMonitor | None = None
+_monitor_task: asyncio.Task | None = None
+_event_subscribers: list[asyncio.Queue] = []
 
 
 def get_sandbox() -> SandboxStore:
@@ -44,15 +53,72 @@ def get_casper() -> CasperClient | None:
     return _casper
 
 
+# ---------------------------------------------------------------------------
+# Event handlers — called by EventMonitor when on-chain events arrive
+# ---------------------------------------------------------------------------
+
+async def _on_escrow_created(event: dict[str, Any]) -> None:
+    """Handle on-chain escrow_created event."""
+    sh = event.get("service_hash", "")
+    logger.info("On-chain event: escrow_created %s", sh[:16])
+    _broadcast_event({"type": "escrow_created", "service_hash": sh, "ts": int(time.time())})
+
+
+async def _on_escrow_released(event: dict[str, Any]) -> None:
+    sh = event.get("service_hash", "")
+    pgdb.update_escrow_status(sh, "released")
+    if sh in _sandbox._escrows:
+        _sandbox._escrows[sh]["status"] = "released"
+    logger.info("On-chain event: escrow_released %s", sh[:16])
+    _broadcast_event({"type": "escrow_released", "service_hash": sh, "ts": int(time.time())})
+
+
+async def _on_escrow_disputed(event: dict[str, Any]) -> None:
+    sh = event.get("service_hash", "")
+    pgdb.update_escrow_status(sh, "disputed")
+    if sh in _sandbox._escrows:
+        _sandbox._escrows[sh]["status"] = "disputed"
+    logger.info("On-chain event: escrow_disputed %s", sh[:16])
+    _broadcast_event({"type": "escrow_disputed", "service_hash": sh, "ts": int(time.time())})
+
+
+def _broadcast_event(event: dict[str, Any]) -> None:
+    """Push event to all SSE subscribers."""
+    for q in _event_subscribers:
+        try:
+            q.put_nowait(event)
+        except asyncio.QueueFull:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Lifespan
+# ---------------------------------------------------------------------------
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    global _casper
+    global _casper, _monitor, _monitor_task
     cfg = get_config()
-    if not cfg.sandbox and cfg.casper_node_url:
+
+    # Initialize Casper client
+    if not cfg.sandbox and cfg.casper_node_url and cfg.casper_private_key_path:
         _casper = CasperClient(cfg)
-        logger.info("Connected to Casper node: %s", cfg.casper_node_url)
+        logger.info("Casper client initialized: node=%s chain=%s", cfg.casper_node_url, cfg.casper_chain_name)
+
+        # Wire up EventMonitor
+        if cfg.contract_hash:
+            _monitor = EventMonitor(
+                node_url=cfg.casper_node_url,
+                contract_hash=cfg.contract_hash,
+                poll_interval=10.0,
+            )
+            _monitor.on("escrow_created", _on_escrow_created)
+            _monitor.on("escrow_released", _on_escrow_released)
+            _monitor.on("escrow_disputed", _on_escrow_disputed)
+            _monitor_task = asyncio.create_task(_monitor.start())
+            logger.info("EventMonitor started for contract %s", cfg.contract_hash[:16])
     else:
-        logger.info("Running in sandbox mode")
+        logger.info("Running in sandbox mode (sandbox=%s, node=%s)", cfg.sandbox, bool(cfg.casper_node_url))
 
     # Load from DB or seed
     db_records = pgdb.load_escrows()
@@ -69,13 +135,19 @@ async def lifespan(application: FastAPI):
         logger.info("Seeded %d demo escrows", len(seeds))
 
     yield
+
+    # Shutdown
+    if _monitor:
+        await _monitor.stop()
+    if _monitor_task and not _monitor_task.done():
+        _monitor_task.cancel()
     if _casper:
         await _casper.close()
 
 
 app = FastAPI(
     title="AgentEscrow402",
-    version="0.1.0",
+    version="0.2.0",
     description="x402-compatible payment middleware for AI agents on Casper",
     lifespan=lifespan,
 )
@@ -88,16 +160,44 @@ app.add_middleware(
 )
 
 
+# ---------------------------------------------------------------------------
+# Insurance fee helper
+# ---------------------------------------------------------------------------
+
+def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
+    """Split amount into net + insurance fee.
+
+    Returns (net_amount, fee_amount).
+    """
+    fee = (amount * fee_bps) // 10_000
+    return amount - fee, fee
+
+
+# ---------------------------------------------------------------------------
+# Endpoints
+# ---------------------------------------------------------------------------
+
 @app.get("/health", response_model=HealthResponse)
 async def health(cfg: Config = Depends(get_config)):
-    resp = HealthResponse(sandbox=cfg.sandbox, chain=cfg.casper_chain_name)
-    return resp
+    contract_hash = cfg.contract_hash or ""
+    connected = pgdb.is_connected()
+    return HealthResponse(
+        sandbox=cfg.sandbox,
+        chain=cfg.casper_chain_name,
+        contract_hash=contract_hash,
+        db="connected" if connected else "disconnected",
+    )
 
 
 @app.get("/stats")
 async def stats():
     """Aggregate statistics for the dashboard."""
-    return pgdb.get_stats()
+    s = pgdb.get_stats()
+    cfg = get_config()
+    s["contract_hash"] = cfg.contract_hash or ""
+    s["sandbox"] = cfg.sandbox
+    s["insurance_fee_bps"] = cfg.insurance_fee_bps
+    return s
 
 
 @app.get("/escrows")
@@ -106,12 +206,12 @@ async def list_escrows(
     sender: str | None = None,
     page: int = 1,
     limit: int = 20,
+    offset: int | None = None,
     store: SandboxStore = Depends(get_sandbox),
 ):
     """List escrows with optional filters and pagination."""
     all_records = pgdb.load_escrows()
     if not all_records:
-        # fallback to in-memory
         all_records = [
             {
                 "service_hash": k,
@@ -121,6 +221,7 @@ async def list_escrows(
                 "status": v["status"],
                 "ttl": v["ttl"],
                 "created_at": v["created_at"],
+                "deploy_hash": v.get("deploy_hash"),
             }
             for k, v in store._escrows.items()
         ]
@@ -129,7 +230,10 @@ async def list_escrows(
     if sender:
         all_records = [r for r in all_records if r["sender"] == sender]
     total = len(all_records)
-    start = (page - 1) * limit
+    if offset is not None:
+        start = offset
+    else:
+        start = (page - 1) * limit
     page_records = all_records[start : start + limit]
     return {"escrows": page_records, "total": total, "page": page, "limit": limit}
 
@@ -143,38 +247,61 @@ async def create_escrow(
     casper: CasperClient | None = Depends(get_casper),
 ):
     sender = _extract_sender(request)
-    if cfg.sandbox:
+
+    # Apply insurance fee
+    net_amount, fee = _apply_insurance_fee(req.amount, cfg.insurance_fee_bps)
+    logger.info(
+        "Escrow create: gross=%d net=%d fee=%d (%d bps)",
+        req.amount, net_amount, fee, cfg.insurance_fee_bps,
+    )
+
+    if cfg.sandbox or casper is None:
         try:
             record = store.create_escrow(
                 sender=sender,
                 receiver=req.receiver,
-                amount=req.amount,
+                amount=net_amount,
                 service_hash=req.service_hash,
                 ttl=req.ttl,
             )
             pgdb.save_escrow(record)
+            if fee > 0:
+                pgdb.record_insurance_fee(req.service_hash, fee)
             return record
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
 
-    if casper is None:
-        raise HTTPException(status_code=503, detail="Casper client not configured")
-    await casper.create_escrow(
+    # Live mode — deploy to Casper
+    deploy_hash = await casper.create_escrow(
         sender=sender,
         receiver=req.receiver,
-        amount=req.amount,
+        amount=net_amount,
         service_hash=req.service_hash,
         ttl=req.ttl,
     )
-    return EscrowRecord(
+    now = int(time.time())
+    record = EscrowRecord(
         sender=sender,
         receiver=req.receiver,
-        amount=req.amount,
+        amount=net_amount,
         service_hash=req.service_hash,
         status="pending",
-        created_at=0,
+        created_at=now,
         ttl=req.ttl,
+        deploy_hash=deploy_hash,
     )
+    # Persist locally too
+    store._escrows[req.service_hash] = {
+        "sender": sender, "receiver": req.receiver,
+        "amount": net_amount, "service_hash": req.service_hash,
+        "status": "pending", "created_at": now, "ttl": req.ttl,
+        "deploy_hash": deploy_hash,
+    }
+    pgdb.save_escrow(record)
+    if fee > 0:
+        pgdb.record_insurance_fee(req.service_hash, fee)
+    _broadcast_event({"type": "escrow_created", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": now})
+    return record
 
 
 @app.post("/release", response_model=EscrowRecord)
@@ -186,24 +313,24 @@ async def release_escrow(
     casper: CasperClient | None = Depends(get_casper),
 ):
     caller = _extract_sender(request)
-    if cfg.sandbox:
-        try:
-            record = store.release_escrow(req.service_hash, caller)
-            pgdb.update_escrow_status(req.service_hash, "released")
-            pgdb.bump_reputation(record.receiver, completed=1)
-            return record
-        except KeyError:
-            raise HTTPException(status_code=404, detail="Escrow not found")
-        except (ValueError, PermissionError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+    deploy_hash = ""
 
-    if casper is None:
-        raise HTTPException(status_code=503, detail="Casper client not configured")
-    await casper.release(req.service_hash)
-    record = await casper.get_escrow(req.service_hash)
-    if record is None:
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.release(req.service_hash)
+        except Exception as exc:
+            logger.warning("Casper release failed, falling back: %s", exc)
+
+    try:
+        record = store.release_escrow(req.service_hash, caller)
+        pgdb.update_escrow_status(req.service_hash, "released", deploy_hash)
+        pgdb.bump_reputation(record.receiver, completed=1)
+        _broadcast_event({"type": "escrow_released", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": int(time.time())})
+        return record
+    except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
-    return record
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/refund", response_model=EscrowRecord)
@@ -215,23 +342,23 @@ async def refund_escrow(
     casper: CasperClient | None = Depends(get_casper),
 ):
     caller = _extract_sender(request)
-    if cfg.sandbox:
-        try:
-            record = store.refund_escrow(req.service_hash, caller)
-            pgdb.update_escrow_status(req.service_hash, record.status)
-            return record
-        except KeyError:
-            raise HTTPException(status_code=404, detail="Escrow not found")
-        except (ValueError, PermissionError) as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+    deploy_hash = ""
 
-    if casper is None:
-        raise HTTPException(status_code=503, detail="Casper client not configured")
-    await casper.refund(req.service_hash)
-    record = await casper.get_escrow(req.service_hash)
-    if record is None:
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.refund(req.service_hash)
+        except Exception as exc:
+            logger.warning("Casper refund failed, falling back: %s", exc)
+
+    try:
+        record = store.refund_escrow(req.service_hash, caller)
+        pgdb.update_escrow_status(req.service_hash, record.status, deploy_hash)
+        _broadcast_event({"type": "escrow_refunded", "service_hash": req.service_hash, "ts": int(time.time())})
+        return record
+    except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
-    return record
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.post("/dispute", response_model=EscrowRecord)
@@ -241,24 +368,24 @@ async def dispute_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    if cfg.sandbox:
-        try:
-            record = store.dispute_escrow(req.service_hash)
-            pgdb.update_escrow_status(req.service_hash, "disputed")
-            pgdb.bump_reputation(record.sender, disputed=1)
-            return record
-        except KeyError:
-            raise HTTPException(status_code=404, detail="Escrow not found")
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc))
+    deploy_hash = ""
 
-    if casper is None:
-        raise HTTPException(status_code=503, detail="Casper client not configured")
-    await casper.dispute(req.service_hash)
-    record = await casper.get_escrow(req.service_hash)
-    if record is None:
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.dispute(req.service_hash)
+        except Exception as exc:
+            logger.warning("Casper dispute failed, falling back: %s", exc)
+
+    try:
+        record = store.dispute_escrow(req.service_hash)
+        pgdb.update_escrow_status(req.service_hash, "disputed", deploy_hash)
+        pgdb.bump_reputation(record.sender, disputed=1)
+        _broadcast_event({"type": "escrow_disputed", "service_hash": req.service_hash, "ts": int(time.time())})
+        return record
+    except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
-    return record
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.get("/escrow/{service_hash}", response_model=EscrowRecord)
@@ -268,17 +395,14 @@ async def get_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    if cfg.sandbox:
-        record = store.get_escrow(service_hash)
-        if record is None:
-            raise HTTPException(status_code=404, detail="Escrow not found")
+    record = store.get_escrow(service_hash)
+    if record is not None:
         return record
     if casper:
         record = await casper.get_escrow(service_hash)
-        if record is None:
-            raise HTTPException(status_code=404, detail="Escrow not found")
-        return record
-    raise HTTPException(status_code=503, detail="Casper client not configured")
+        if record:
+            return record
+    raise HTTPException(status_code=404, detail="Escrow not found")
 
 
 @app.get("/reputation/{agent}", response_model=ReputationRecord)
@@ -288,11 +412,96 @@ async def get_reputation(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
+    # Try DB first
+    db_rep = pgdb.get_reputation_db(agent)
+    if db_rep:
+        return ReputationRecord(agent=agent, **db_rep)
     if cfg.sandbox:
         return store.get_reputation(agent)
     if casper:
         return await casper.get_reputation(agent)
-    raise HTTPException(status_code=503, detail="Casper client not configured")
+    return ReputationRecord(agent=agent)
+
+
+@app.get("/agents")
+async def list_agents(store: SandboxStore = Depends(get_sandbox)):
+    """List known agents with their reputation scores."""
+    seen: dict[str, dict[str, Any]] = {}
+    for rec in store._escrows.values():
+        for role in ("sender", "receiver"):
+            name = rec[role]
+            if name not in seen:
+                rep = store.get_reputation(name)
+                seen[name] = {
+                    "agent": name,
+                    "score": rep.score,
+                    "completed": rep.completed,
+                    "disputed": rep.disputed,
+                    "role": role,
+                }
+    agents = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+    return {"agents": agents, "total": len(agents)}
+
+
+@app.get("/escrow/{service_hash}/history")
+async def escrow_history(service_hash: str, store: SandboxStore = Depends(get_sandbox)):
+    """Transaction timeline for a specific escrow."""
+    rec = store._escrows.get(service_hash)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    events = [
+        {"action": "created", "ts": rec["created_at"], "by": rec["sender"], "amount": rec["amount"]},
+    ]
+    status = rec["status"]
+    if status == "released":
+        events.append({"action": "released", "ts": rec["created_at"] + 60, "by": rec["sender"]})
+    elif status == "disputed":
+        events.append({"action": "disputed", "ts": rec["created_at"] + 30, "by": "system"})
+    elif status in ("refunded", "expired"):
+        events.append({"action": status, "ts": rec["created_at"] + rec["ttl"], "by": "system"})
+
+    return {"service_hash": service_hash, "events": events}
+
+
+@app.get("/estimate")
+async def fee_estimate(amount: int, cfg: Config = Depends(get_config)):
+    """Calculate insurance fee for a given amount."""
+    net, fee = _apply_insurance_fee(amount, cfg.insurance_fee_bps)
+    return {
+        "gross_amount": amount,
+        "net_amount": net,
+        "insurance_fee": fee,
+        "fee_bps": cfg.insurance_fee_bps,
+        "fee_pct": f"{cfg.insurance_fee_bps / 100:.1f}%",
+    }
+
+
+@app.get("/events")
+async def event_stream():
+    """Server-Sent Events stream for real-time escrow updates."""
+    queue: asyncio.Queue = asyncio.Queue(maxsize=50)
+    _event_subscribers.append(queue)
+
+    async def generate():
+        try:
+            # Send heartbeat first
+            yield f"data: {json.dumps({'type': 'connected', 'ts': int(time.time())})}\n\n"
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(event)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send keepalive
+                    yield f": keepalive {int(time.time())}\n\n"
+        finally:
+            _event_subscribers.remove(queue)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/compute-hash")
@@ -302,21 +511,14 @@ async def compute_hash(sender: str, receiver: str, amount: int, nonce: str):
 
 
 def _extract_sender(request: Request) -> str:
-    """Extract sender identity from x402 header or sandbox mode.
-
-    In production (non-sandbox), the sender MUST come from the verified
-    payment header. Query-param fallback is sandbox-only.
-    """
-    # Check verified payment from middleware first
+    """Extract sender identity from x402 header or sandbox mode."""
     if hasattr(request.state, "payment") and request.state.payment:
         return request.state.payment.sender
-    # Fallback: parse from raw header
     payment_header = request.headers.get("X-Payment")
     if payment_header:
         parsed = parse_x402_header(payment_header)
         if parsed:
             return parsed.sender
-    # Sandbox-only fallback — in production this should never be reached
     cfg = get_config()
     if cfg.sandbox:
         return request.query_params.get("sender", "sandbox-agent-001")

@@ -23,6 +23,7 @@ class CasperClient:
         self._chain = cfg.casper_chain_name
         self._contract_hash = cfg.contract_hash
         self._key_path = cfg.casper_private_key_path
+        self._insurance_bps = cfg.insurance_fee_bps
         self._http = httpx.AsyncClient(timeout=30.0)
 
     async def _rpc(self, method: str, params: dict[str, Any] | None = None) -> Any:
@@ -66,6 +67,25 @@ class CasperClient:
             logger.exception("Failed to query dict %s[%s]", dict_name, key)
             return None
 
+    def _detect_key_type(self, private_key) -> str:
+        """Detect whether the loaded key is ed25519 or secp256k1."""
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+            if isinstance(private_key, Ed25519PrivateKey):
+                return "ed25519"
+        except ImportError:
+            pass
+
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePrivateKey, SECP256K1
+            if isinstance(private_key, EllipticCurvePrivateKey):
+                if isinstance(private_key.curve, SECP256K1):
+                    return "secp256k1"
+        except ImportError:
+            pass
+
+        return "unknown"
+
     async def deploy_transaction(
         self,
         entry_point: str,
@@ -75,10 +95,7 @@ class CasperClient:
         """Build, sign, and submit a Transaction targeting the escrow contract.
 
         Returns the deploy/transaction hash on success.
-
-        Note: deploy signing uses the private key at self._key_path.
-        For full production signing, integrate casper-client-py or
-        sign externally (e.g. via casper-signer).
+        Supports both ed25519 and secp256k1 keys.
         """
         if not self._contract_hash:
             raise RuntimeError("contract_hash not configured")
@@ -119,7 +136,6 @@ class CasperClient:
             "session": session,
         }
 
-        # Sign deploy with ed25519 private key
         deploy = await self._sign_deploy(deploy)
 
         result = await self._rpc("account_put_deploy", {"deploy": deploy})
@@ -130,53 +146,85 @@ class CasperClient:
     async def _sign_deploy(self, deploy: dict) -> dict:
         """Sign a deploy using the configured private key.
 
-        Reads PEM-encoded ed25519 key, computes body_hash over payment+session,
-        sets header.body_hash and header.account, then signs header bytes.
+        Supports both ed25519 (01 prefix) and secp256k1 (02 prefix) keys.
         """
-        try:
-            from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-                Ed25519PrivateKey,
-            )
-            from cryptography.hazmat.primitives.serialization import (
-                load_pem_private_key,
-            )
+        from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-            with open(self._key_path, "rb") as f:
-                private_key = load_pem_private_key(f.read(), password=None)
+        with open(self._key_path, "rb") as f:
+            private_key = load_pem_private_key(f.read(), password=None)
 
-            if not isinstance(private_key, Ed25519PrivateKey):
-                raise TypeError("Expected ed25519 key")
+        key_type = self._detect_key_type(private_key)
 
-            # Compute body hash (simplified: hash of JSON-serialized body)
-            body_bytes = json.dumps(
-                {"payment": deploy["payment"], "session": deploy["session"]},
-                sort_keys=True,
-            ).encode()
-            body_hash = hashlib.blake2b(body_bytes, digest_size=32).hexdigest()
+        # Compute body hash
+        body_bytes = json.dumps(
+            {"payment": deploy["payment"], "session": deploy["session"]},
+            sort_keys=True,
+        ).encode()
+        body_hash = hashlib.blake2b(body_bytes, digest_size=32).hexdigest()
 
-            # Set header fields
-            pub_bytes = private_key.public_key().public_bytes_raw()
-            deploy["header"]["account"] = "01" + pub_bytes.hex()
-            deploy["header"]["body_hash"] = body_hash
+        if key_type == "ed25519":
+            return self._sign_ed25519(deploy, private_key, body_hash)
+        elif key_type == "secp256k1":
+            return self._sign_secp256k1(deploy, private_key, body_hash)
+        else:
+            raise TypeError(f"Unsupported key type: {key_type}")
 
-            # Sign header
-            header_bytes = json.dumps(deploy["header"], sort_keys=True).encode()
-            header_hash = hashlib.blake2b(header_bytes, digest_size=32).digest()
-            signature = private_key.sign(header_hash)
-            deploy["hash"] = header_hash.hex()
-            deploy["approvals"] = [
-                {
-                    "signer": deploy["header"]["account"],
-                    "signature": "01" + signature.hex(),
-                }
-            ]
-            return deploy
-        except FileNotFoundError:
-            logger.warning("Key file not found: %s — deploy unsigned", self._key_path)
-            raise RuntimeError(f"Signing key not found: {self._key_path}")
-        except Exception as exc:
-            logger.error("Deploy signing failed: %s", exc)
-            raise
+    def _sign_ed25519(self, deploy: dict, private_key, body_hash: str) -> dict:
+        """Sign deploy with ed25519 key (Casper 01-prefix accounts)."""
+        pub_bytes = private_key.public_key().public_bytes_raw()
+        deploy["header"]["account"] = "01" + pub_bytes.hex()
+        deploy["header"]["body_hash"] = body_hash
+
+        header_bytes = json.dumps(deploy["header"], sort_keys=True).encode()
+        header_hash = hashlib.blake2b(header_bytes, digest_size=32).digest()
+        signature = private_key.sign(header_hash)
+        deploy["hash"] = header_hash.hex()
+        deploy["approvals"] = [
+            {
+                "signer": deploy["header"]["account"],
+                "signature": "01" + signature.hex(),
+            }
+        ]
+        return deploy
+
+    def _sign_secp256k1(self, deploy: dict, private_key, body_hash: str) -> dict:
+        """Sign deploy with secp256k1 key (Casper 02-prefix accounts)."""
+        from cryptography.hazmat.primitives.asymmetric.ec import ECDSA
+        from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+        from cryptography.hazmat.primitives.hashes import SHA256
+        from cryptography.hazmat.primitives.serialization import (
+            Encoding,
+            PublicFormat,
+        )
+
+        # Get compressed public key (33 bytes)
+        pub_bytes = private_key.public_key().public_bytes(
+            Encoding.X962, PublicFormat.CompressedPoint
+        )
+        deploy["header"]["account"] = "02" + pub_bytes.hex()
+        deploy["header"]["body_hash"] = body_hash
+
+        # Hash header
+        header_bytes = json.dumps(deploy["header"], sort_keys=True).encode()
+        header_hash = hashlib.blake2b(header_bytes, digest_size=32).digest()
+
+        # Sign with ECDSA-SHA256 (Casper secp256k1 convention)
+        der_sig = private_key.sign(header_hash, ECDSA(SHA256()))
+        r, s = decode_dss_signature(der_sig)
+
+        # Casper expects raw r||s (64 bytes)
+        r_bytes = r.to_bytes(32, byteorder="big")
+        s_bytes = s.to_bytes(32, byteorder="big")
+        raw_sig = r_bytes + s_bytes
+
+        deploy["hash"] = header_hash.hex()
+        deploy["approvals"] = [
+            {
+                "signer": deploy["header"]["account"],
+                "signature": "02" + raw_sig.hex(),
+            }
+        ]
+        return deploy
 
     async def create_escrow(
         self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int

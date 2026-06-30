@@ -168,6 +168,25 @@ def bump_reputation(agent: str, completed: int = 0, disputed: int = 0) -> bool:
         return False
 
 
+def record_insurance_fee(service_hash: str, fee_amount: int) -> bool:
+    """Record insurance fee deducted from an escrow."""
+    pool = _get_pool()
+    if pool is None:
+        return False
+    try:
+        with pool.connection() as conn:
+            conn.execute(
+                """INSERT INTO insurance_pool (service_hash, fee_amount, collected_at)
+                   VALUES (%s, %s, %s)
+                   ON CONFLICT (service_hash) DO NOTHING""",
+                (service_hash, fee_amount, int(time.time())),
+            )
+        return True
+    except Exception as exc:
+        logger.warning("record_insurance_fee failed: %s", exc)
+        return False
+
+
 def get_reputation_db(agent: str) -> dict[str, Any] | None:
     pool = _get_pool()
     if pool is None:
