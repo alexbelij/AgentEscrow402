@@ -13,7 +13,7 @@
 [![Casper 2.x](https://img.shields.io/badge/Casper-2.x-FF0000.svg?style=flat-square)](https://casper.network)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg?style=flat-square)](LICENSE)
 
-[Landing Page](https://alexbelij.github.io/AgentEscrow402/) · [Architecture](#-architecture) · [SDK Docs](docs/SDK.md)
+[Landing Page](https://ae402.xyz) · [Architecture](#-architecture) · [SDK Docs](docs/SDK.md)
 
 </div>
 
@@ -390,6 +390,14 @@ Questions: [open an issue](https://github.com/alexbelij/AgentEscrow402/issues)
 
 **Security:** testnet keys only. Never commit real deployer keys. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for a full risk assessment.
 
-*Last verified against commit `0db76e9`, 2026-06-29.*
+---
+
+<div align="center">
+
+Built for [Casper Agentic Buildathon 2026](https://dorahacks.io/) · Deployed on [Casper Testnet](https://testnet.cspr.live/)
+
+*[ae402.xyz](https://ae402.xyz) · [API Docs](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md)*
+
+</div>
 
 [back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
