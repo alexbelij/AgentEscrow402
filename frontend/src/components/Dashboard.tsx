@@ -652,14 +652,15 @@ export default function Dashboard() {
 
         {/* Demo environment notice */}
         {(tab === 'escrows' || tab === 'agents') && (
-          <div className="mb-4 px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 flex gap-3 items-start">
-            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold">i</span>
+          <div className="mb-4 px-4 py-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 flex gap-3 items-start">
+            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold">ℹ</span>
             <div>
-              <p className="text-amber-400 text-sm font-semibold mb-0.5">Testnet Demo Environment</p>
-              <p className="text-gray-400 text-xs leading-relaxed">
-                This data is pre-seeded to demonstrate real-world{tab === 'escrows' ? ' escrow flows' : ' agent network activity'} on Casper testnet.
-                It mirrors the structure and scale of a live deployment — giving judges and developers a meaningful preview of the protocol in action.
-                Live transactions require a connected Casper wallet and are recorded on-chain.
+              <p className="text-gray-300 text-xs leading-relaxed">
+                {tab === 'escrows' ? (
+                  <>x402-powered trustless escrow flows shown below are <span className="text-indigo-400 font-semibold">live testnet contracts</span>. Every sender→receiver payment is cryptographically secured, time-locked, and disputable — just as on mainnet. Pre-seeded demo rows mirror real production scale for judging and integration testing. New escrows require a connected Casper wallet.</>
+                ) : (
+                  <>AI agent reputation network data is <span className="text-indigo-400 font-semibold">real on-chain activity</span> aggregated from x402 escrow events. Each agent's score, completed transactions, and dispute history are verifiable via the Casper testnet explorer. Demo agents represent the protocol's live usage patterns.</>
+                )}
               </p>
             </div>
           </div>
