@@ -601,9 +601,9 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-1 bg-ae-card/40 rounded-lg p-0.5">
             {([
-              { id: 'escrows' as const, label: 'Escrows', Icon: FileText },
-              { id: 'agents' as const, label: 'Agents', Icon: Users },
-              { id: 'operations' as const, label: 'Operations', Icon: Zap },
+              { id: 'escrows' as const, label: 'Escrows', Icon: FileText, demo: true },
+              { id: 'agents' as const, label: 'Agents', Icon: Users, demo: true },
+              { id: 'operations' as const, label: 'Operations', Icon: Zap, demo: false },
             ]).map(t => (
               <button
                 key={t.id}
@@ -613,6 +613,7 @@ export default function Dashboard() {
                 }`}
               >
                 <t.Icon size={14} /> {t.label}
+                {t.demo && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">DEMO</span>}
               </button>
             ))}
           </div>
@@ -633,6 +634,21 @@ export default function Dashboard() {
             <span className="text-gray-400 font-semibold">{TAB_INFO[tab].title}</span> &mdash; {TAB_INFO[tab].desc}
           </p>
         </div>
+
+        {/* Demo environment notice */}
+        {(tab === 'escrows' || tab === 'agents') && (
+          <div className="mb-4 px-4 py-3 rounded-xl border border-amber-500/20 bg-amber-500/5 flex gap-3 items-start">
+            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-xs font-bold">i</span>
+            <div>
+              <p className="text-amber-400 text-sm font-semibold mb-0.5">Testnet Demo Environment</p>
+              <p className="text-gray-400 text-xs leading-relaxed">
+                This data is pre-seeded to demonstrate real-world{tab === 'escrows' ? ' escrow flows' : ' agent network activity'} on Casper testnet.
+                It mirrors the structure and scale of a live deployment — giving judges and developers a meaningful preview of the protocol in action.
+                Live transactions require a connected Casper wallet and are recorded on-chain.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ========== ESCROWS TAB ========== */}
         {tab === 'escrows' && (
