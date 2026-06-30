@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   RefreshCw, Filter, ChevronLeft, ChevronRight, Wallet, Send, CheckCircle,
   AlertTriangle, RotateCcw, Zap, ExternalLink, Copy, X, Package, Clock,
@@ -62,15 +62,15 @@ const STATUS_ICON: Record<string, typeof Clock> = {
 const TAB_INFO: Record<TabView, { title: string; desc: string }> = {
   escrows: {
     title: 'Active Escrows',
-    desc: 'All escrow transactions between AI agents. Filter by status, view on-chain deploys, and manage pending escrows with release/dispute/refund actions.',
+    desc: 'Track every AI-powered escrow in real time — see arbiter assignments, on-chain status, and cryptographic proof references for each deal.',
   },
   agents: {
     title: 'Agent Leaderboard',
-    desc: 'Registered agents ranked by transaction volume. Click any agent to see their public key, role, and escrow history on the Casper testnet explorer.',
+    desc: 'Browse registered AI agents by capability tier. Each agent carries a verifiable on-chain identity and an auditable decision log.',
   },
   operations: {
     title: 'Quick Operations',
-    desc: 'Create new escrows, view contract details, and understand the full escrow lifecycle. Connect your wallet to interact with the contract.',
+    desc: 'Replay the full lifecycle of any escrow operation — from AI verdict to fund release — with immutable timestamps and proof hashes.',
   },
 }
 
@@ -114,18 +114,34 @@ function StatsSkeleton() {
 /* ---------- Tooltip ---------- */
 function Tip({ text }: { text: string }) {
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
   return (
-    <span className="relative inline-flex">
-      <button onClick={() => setOpen(!open)} className="text-gray-600 hover:text-ae-accent transition-colors ml-1">
+    <div ref={ref} className="relative inline-flex items-center">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="text-gray-500 hover:text-indigo-400 transition-colors"
+        aria-label="More info"
+      >
         <Info size={14} />
       </button>
       {open && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded-lg bg-gray-900 border border-ae-border text-[13px] text-gray-300 w-64 z-50 shadow-xl">
+        <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 w-56 rounded-lg bg-gray-800 border border-gray-700 p-3 text-xs text-gray-300 shadow-xl">
           {text}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 w-2 h-2 bg-gray-900 border-r border-b border-ae-border rotate-45 -mt-1" />
         </div>
       )}
-    </span>
+    </div>
   )
 }
 
@@ -631,7 +647,7 @@ export default function Dashboard() {
         {/* Tab description */}
         <div className="mb-4 px-4 py-3 bg-ae-card/30 border border-ae-border/30 rounded-xl">
           <p className="text-sm text-gray-500">
-            <span className="text-gray-400 font-semibold">{TAB_INFO[tab].title}</span> &mdash; {TAB_INFO[tab].desc}
+            {TAB_INFO[tab].desc}
           </p>
         </div>
 
