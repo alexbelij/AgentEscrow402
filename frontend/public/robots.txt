@@ -1,3 +1,3 @@
 User-agent: *
 Allow: /
-Sitemap: https://agentescrow402.io/sitemap.xml
+Sitemap: https://agent-escrow-402.vercel.app/sitemap.xml
