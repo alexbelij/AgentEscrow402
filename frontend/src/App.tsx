@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
@@ -43,7 +43,7 @@ export default function App() {
       <main className="flex-1 pt-14" onClick={mobileOpen ? closeMobile : undefined}>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/app" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>

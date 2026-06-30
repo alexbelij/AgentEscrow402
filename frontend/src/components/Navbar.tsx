@@ -1,26 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import { X, ExternalLink } from 'lucide-react'
+import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, BookOpen, Plug, FileCode, Activity } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { label: 'HOME', href: '/#home' },
-  { label: 'FLOW', href: '/#flow' },
-  { label: 'X402', href: '/#x402' },
-  { label: 'REPUTATION', href: '/#reputation' },
-  { label: 'SDK', href: '/#developers' },
-  { label: 'FAQ', href: '/#faq' },
+  { label: 'HOME', href: '/#home', icon: Home },
+  { label: 'FLOW', href: '/#flow', icon: Repeat },
+  { label: 'X402', href: '/#x402', icon: Shield },
+  { label: 'REPUTATION', href: '/#reputation', icon: Activity },
+  { label: 'SDK', href: '/#developers', icon: Code },
+  { label: 'FAQ', href: '/#faq', icon: HelpCircle },
+]
+
+const DASHBOARD_ITEMS = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Landing', href: '/', icon: Home },
 ]
 
 const EXTERNAL_LINKS = [
-  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
-  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
-  { label: 'MCP Server', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
-  { label: 'Contracts', href: 'https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451' },
+  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', icon: FileCode },
+  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: BookOpen },
+  { label: 'MCP Server', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: Plug },
+  { label: 'Contracts', href: 'https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451', icon: Shield },
 ]
 
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
   const location = useLocation()
   const isLanding = location.pathname === '/'
+  const isDashboard = location.pathname === '/dashboard'
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
@@ -41,6 +47,8 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
     return () => observer.disconnect()
   }, [isLanding])
 
+  const navItems = isDashboard ? DASHBOARD_ITEMS : NAV_ITEMS
+
   return (
     <>
       <nav className="fixed top-0 left-0 right-0 z-50 bg-ae-bg/80 backdrop-blur-lg border-b border-ae-border/40">
@@ -51,33 +59,54 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             <span className="font-bold text-white text-sm hidden sm:inline">AgentEscrow402</span>
           </a>
 
-          {/* Nav items — left-aligned, uppercase, underline active */}
-          {isLanding && (
-            <div className="hidden md:flex items-center gap-6 ml-8 flex-1">
-              {NAV_ITEMS.map(item => {
-                const sectionId = item.href.replace('/#', '')
-                const isActive = activeSection === sectionId
-                return (
-                  <a
-                    key={item.label}
-                    href={item.href}
-                    className={`text-[11px] tracking-[0.15em] font-semibold transition-all py-1 border-b-2 ${
-                      isActive
-                        ? 'text-ae-accent border-ae-accent'
-                        : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600'
-                    }`}
-                  >
-                    {item.label}
-                  </a>
-                )
-              })}
+          {/* Desktop nav — always visible */}
+          <div className="hidden md:flex items-center gap-6 ml-8 flex-1">
+            {navItems.map(item => {
+              const sectionId = item.href.replace('/#', '')
+              const isActive = isLanding && activeSection === sectionId
+              const Icon = item.icon
+              return (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  className={`text-[11px] tracking-[0.15em] font-semibold transition-all py-1 border-b-2 flex items-center gap-1.5 ${
+                    isActive
+                      ? 'text-ae-accent border-ae-accent'
+                      : 'text-gray-500 border-transparent hover:text-gray-300 hover:border-gray-600'
+                  }`}
+                >
+                  <Icon size={12} />
+                  {item.label}
+                </a>
+              )
+            })}
+          </div>
+
+          {/* Desktop external links (on dashboard page) */}
+          {isDashboard && (
+            <div className="hidden lg:flex items-center gap-3 mr-4">
+              {EXTERNAL_LINKS.slice(0, 2).map(link => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-ae-accent transition-colors"
+                >
+                  <link.icon size={10} />
+                  {link.label}
+                  <ExternalLink size={8} />
+                </a>
+              ))}
             </div>
           )}
 
           <div className="flex items-center gap-3">
-            <a href="/app" className="px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors">
-              Dashboard
-            </a>
+            {!isDashboard && (
+              <a href="/dashboard" className="px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors">
+                Dashboard
+              </a>
+            )}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden text-gray-400 hover:text-white"
@@ -112,7 +141,7 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             ))}
             <div className="w-16 h-px bg-ae-border my-4" />
             <a
-              href="/app"
+              href="/dashboard"
               onClick={() => setMobileOpen(false)}
               className="px-8 py-3 rounded-xl bg-ae-accent text-white font-semibold text-lg"
             >
