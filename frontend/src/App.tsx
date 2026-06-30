@@ -30,8 +30,6 @@ function Landing() {
 export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const closeMobile = useCallback(() => setMobileOpen(false), [])
-  const location = useLocation()
-  const isDashboard = location.pathname === '/app'
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
@@ -41,15 +39,15 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
-      {!isDashboard && <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />}
-      <main className="flex-1" onClick={mobileOpen ? closeMobile : undefined}>
+      <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <main className="flex-1 pt-14" onClick={mobileOpen ? closeMobile : undefined}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/app" element={<Dashboard />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      {!isDashboard && <Footer />}
+      <Footer />
     </div>
   )
 }
