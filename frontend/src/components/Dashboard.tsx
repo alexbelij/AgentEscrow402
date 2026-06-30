@@ -32,8 +32,12 @@ interface Escrow {
 }
 
 interface Agent {
+  agent: string
   address: string
   role: string
+  score: number
+  completed: number
+  disputed: number
   total_escrows: number
   total_volume: number
 }
@@ -437,7 +441,14 @@ export default function Dashboard() {
       const r = await fetch(`${API}/agents`)
       if (r.ok) {
         const data = await r.json()
-        setAgents(data.agents || [])
+        const raw = data.agents || []
+        setAgents(raw.map((a: any) => ({
+          ...a,
+          address: a.agent || a.address || '',
+          total_escrows: a.completed ?? a.total_escrows ?? 0,
+          total_volume: a.total_volume ?? (a.completed || 0) * 10000,
+          score: a.score ?? 50,
+        })))
       }
     } catch { /* */ }
   }, [])
