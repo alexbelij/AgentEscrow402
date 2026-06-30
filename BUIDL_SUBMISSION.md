@@ -1,93 +1,69 @@
-# AgentEscrow402 — BUIDL Submission
+# BUIDL Submission — AgentEscrow402
 
-## Form Fields
+## Project Name
+**AgentEscrow402**
 
-| Field | Value |
-|-------|-------|
-| **BUIDL name** | AgentEscrow402 |
-| **Logo** | Purple shield with "402" overlay |
-| **Category** | crypto/web3 |
-| **GitHub** | https://github.com/alexbelij/AgentEscrow402 |
-| **Website** | https://ae402.xyz |
-| **Demo video** | _(pending)_ |
-| **Social** | GitHub: https://github.com/alexbelij |
+## Tagline
+HTTP 402 × Casper Network: autonomous escrow for AI-to-AI micropayments
 
 ---
 
-## Vision (short)
+## Problem It Solves
 
-Machine-to-machine payments on Casper. Agents lock funds in on-chain escrow, deliver services, release payments. No wallets, no humans, no trust assumptions.
+AI agents increasingly need to transact with each other — paying for compute, data, or API calls — but today there's no trustless, on-chain mechanism to do this without a human in the loop or a centralized facilitator holding funds. HTTP 402 (Payment Required) has existed in the web spec since 1996 for exactly this use case, but existing implementations assume Ethereum-based hot wallets managed by a third-party facilitator. If the paying agent doesn't trust the receiving agent, or the service is never delivered, there's no escrow, no timeout, and no dispute mechanism — funds are at risk.
 
-## BUIDL Details
+---
 
-### What's broken
+## Solution
 
-AI agents can call APIs. They can parse responses. They can chain tools. What they can't do is pay.
+AgentEscrow402 deploys a Rust/WASM smart contract on Casper Network that implements a full escrow lifecycle: Agent A locks funds with a time-to-live, Agent B delivers the service, Agent A releases — all mediated by a FastAPI payment server that validates x402 headers on every HTTP request. Three capabilities distinguish it from every existing x402 implementation: time-locked on-chain escrow (if Agent B doesn't deliver, the sender auto-reclaims after TTL), per-agent reputation tracking with exponential decay stored directly in the contract, and 3-of-5 multi-sig arbiter dispute resolution with on-chain vote recording. The full stack — contract, server, dashboard, Python SDK, LangChain tool, and MCP server — is deployed and live.
 
-HTTP 402 — Payment Required — has existed since 1999. Twenty-seven years and no one built a proper implementation. Stripe doesn't help here. PayPal doesn't help here. Both require human identity, KYC, bank accounts. An autonomous agent has none of that.
+---
 
-The current workaround: pre-funded API keys with rate limits. That's not commerce. That's an allowance.
+## Live Demo
+🔗 **[ae402.xyz](https://ae402.xyz)** — live dashboard with real escrow data on Casper Testnet
 
-### What AgentEscrow402 does
+Backend API: `https://ae402-backend.onrender.com`
 
-AgentEscrow402 implements x402-compatible payment middleware on Casper Network. The flow:
+Contract: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
 
-1. Agent A calls Agent B's API endpoint
-2. Agent B responds with HTTP 402 + payment terms (amount, TTL, contract address)
-3. Agent A creates an on-chain escrow with the specified parameters
-4. Agent B verifies the escrow on-chain, delivers the service
-5. Agent A confirms delivery, escrow releases funds to B
-6. If delivery fails, Agent A files a dispute resolved by 3-of-5 arbiter multisig
+---
 
-No custodians. No intermediaries. Fully on-chain settlement.
+## GitHub Repository
+🔗 **[github.com/alexbelij/AgentEscrow402](https://github.com/alexbelij/AgentEscrow402)**
 
-### Why Casper
+---
 
-Casper's account model and predictable gas costs make it practical for programmatic agents. Fixed-cost deploys mean an agent can budget accurately — no gas auctions, no surprise fees. The contract stores escrow state, reputation scores, and insurance pool balances in named keys with dictionary lookups, so state access is O(1).
+## Tech Stack
 
-### Technical depth
+| Layer | Technology |
+|---|---|
+| Smart contract | Rust → WASM, Casper 2.x, CEP-88 events |
+| Payment server | Python 3.11, FastAPI, Uvicorn |
+| x402 middleware | Custom HTTP 402 header parser + validator |
+| SDK | Python async SDK, LangChain tool, MCP server (7 tools) |
+| Dashboard | Next.js, Vercel |
+| Backend hosting | Render |
+| CI | GitHub Actions — lint, pytest, WASM build, cargo test |
+| Tests | 85 Python + 18 Rust = 103 total, all passing |
 
-**Smart contract** (Rust, 168KB wasm):
-- 6 entry points: create, release, refund, dispute, resolve, claim_insurance
-- Reputation: `score = max(0, 50 + completed*5 - disputed*10)`, decays toward 50 when idle
-- Insurance pool: configurable basis points (default 200 = 2%), deducted from release amount
-- CEP-88 events for indexers and off-chain listeners
+---
 
-**Backend** (Python 3.11, FastAPI):
-- `/escrows` — CRUD with pagination, status filtering
-- `/agents` — reputation leaderboard
-- `/stats` — aggregate metrics (total, pending, released, disputed, volume)
-- `@require_payment` decorator wraps any endpoint with 402 flow
-- PostgreSQL persistence (Neon), connection pooling (psycopg_pool)
+## What Makes It Unique
 
-**SDK**:
-- `EscrowClient` — 9 methods covering full lifecycle
-- `EscrowPaymentTool` — LangChain-compatible tool class
-- MCP server — 7 tools exposed via stdio/SSE transport
+**On-chain escrow, not hot wallets.** Existing x402 implementations store funds in a facilitator's hot wallet. AgentEscrow402 locks them in a time-locked Casper contract. If the service isn't delivered, the sender reclaims — no trust required.
 
-**Frontend** (React, TypeScript, Vite, Tailwind):
-- Dashboard with 3 tabs: Escrows, Agents, Operations
-- Wallet connect (Casper Wallet / Signer)
-- Real-time stats from API
-- Direct contract interaction for create/release/dispute
+**Reputation as infrastructure.** Every completed payment updates an on-chain trust score with exponential decay (`new = old × 0.95 + latest`). Agents can query counterparty reliability before committing funds. This is stored in the contract itself, not an off-chain database.
 
-**Testing**: 103 total (85 pytest + 18 cargo test). CI runs on every push.
+**3-of-5 arbiter dispute resolution.** Contested payments don't go to a single administrator — they go to a configurable arbiter pool with a multi-sig vote. The contract handles payout atomically on quorum. No human coordinator required.
 
-### Deployed
+**Casper-native.** Built for Casper 2.x with native WASM, CEP-88 event monitoring, and testnet deployment. Not a port or wrapper — a ground-up implementation designed for Casper's execution model.
 
-- Contract: `5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451` on casper-test
-- API: agentescrow402-api.onrender.com
-- Frontend: ae402.xyz
-- Database: PostgreSQL on Neon (50 escrows, 16 agents, insurance records)
+**x402 for AI agents, not browsers.** The x402 middleware returns machine-readable 402 responses (structured JSON with price, receiver, and accepted format) that AI agent SDKs can parse and act on programmatically — no wallet pop-up, no human approval.
 
-### What's different
+---
 
-Other escrow projects on Casper handle human-to-human payments. This handles machine-to-machine. The x402 flow is the key differentiator — agents negotiate and settle payments autonomously using HTTP semantics they already understand. No new protocol to learn, no wallet extension to install. An HTTP header and a deploy hash.
+## Team
 
-Dispute resolution isn't single-authority. It's 3-of-5 multisig with on-chain arbiter staking. Bad arbiters lose their stake. Good ones earn fees.
-
-The insurance pool isn't just marketing. Every released escrow pays into it. Claims are processed through the same multisig mechanism.
-
-### What's next
-
-Multi-token support, batch escrow creation, cross-chain bridges. But the core protocol — HTTP 402 → escrow → release — works today.
+**alexbelij** — solo builder. Protocol design, smart contract, payment server, SDK, dashboard.
+GitHub: [github.com/alexbelij](https://github.com/alexbelij)
