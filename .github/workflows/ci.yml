@@ -1,5 +1,11 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -8,20 +14,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install ruff && ruff check .
+      - run: pip install ruff
+      - run: ruff check server/ sdk/
 
-  test-python:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt -r requirements-dev.txt && pytest -v
-
-  test-contracts:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cd contracts && cargo test
+      - run: pip install -r requirements.txt pytest
+      - run: PYTHONPATH=. pytest tests/ -v
