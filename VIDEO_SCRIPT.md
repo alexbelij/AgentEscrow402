@@ -1,64 +1,133 @@
-# Demo Walkthrough Script
+# VIDEO_SCRIPT.md — AgentEscrow402
+## "AI agents paying each other on-chain — HTTP 402 meets Casper Network"
+**Format:** Faceless tutorial · 2 min · English
+**Target:** DeFi developers, AI builders, Web3 hackathon watchers
 
-Duration target: 2:00–2:30
+---
 
-## Setup
+## HOOK VARIANTS (First 15 seconds — pick one)
 
-- Open ae402.xyz in browser (landing page visible)
-- Terminal with curl ready
-- Casper testnet explorer tab open
+### Hook A — Problem Statement
+> [B-ROLL: Fast montage — terminal, spinning blockchain icon, dollar sign flying between server icons]
 
-## Scene 1 — Hook (0:00–0:10)
+[NARRATION: "What happens when an AI agent needs to pay another AI agent — in real-time, with zero human involvement? HTTP 402 was literally invented for this. But nobody built it right. Until now."]
 
-[SHOW: landing page hero]
-Narration: "What happens when AI agents need to pay each other for compute, data, or API calls? Today I'll show you how AgentEscrow402 solves this on Casper Network."
+---
 
-## Scene 2 — Problem (0:10–0:25)
+### Hook B — Demo First
+> [SHOW: Browser opening ae402.xyz — dashboard loads with live escrow rows, green "Active" badges]
 
-[SHOW: terminal running a curl request that returns HTTP 402 Payment Required]
-Narration: "An agent calls an API. Gets 402 — Payment Required. There's no wallet, no human, no credit card. Standard HTTP has no answer for this."
+[NARRATION: "This is a live escrow dashboard where AI agents lock and release real funds on Casper Network. Fully autonomous. No wallet pop-up. No human approval. Let me show you how it works in under two minutes."]
 
-## Scene 3 — The Flow (0:25–0:45)
+---
 
-[SHOW: scroll landing page to architecture diagram]
-Narration: "AgentEscrow402 adds an x402-compatible middleware. The sender agent locks CSPR in an on-chain escrow smart contract. The receiver agent delivers the service. Then the escrow releases automatically — or gets disputed."
+### Hook C — Provocation
+> [B-ROLL: Old "402 Payment Required" error page flashing on screen]
 
-## Scene 4 — Live API Demo (0:45–1:15)
+[NARRATION: "HTTP 402 — Payment Required — has been sitting in the spec since 1996, marked 'reserved for future use.' We decided the future is now. This is AgentEscrow402."]
 
-[SHOW: ae402.xyz/dashboard]
-Narration: "Here's the live dashboard. 50 escrow transactions. Real status — pending, released, disputed, refunded. Volume tracked in real time."
+---
 
-[SHOW: click Agents tab, expand an agent]
-Narration: "Each agent has a reputation score. Completed escrows increase it, disputes decrease it. On-chain, transparent, auditable."
+## MAIN BODY
 
-[SHOW: click Operations tab, create escrow form]
-Narration: "Connect your Casper Wallet and you can create escrows, release funds, or file disputes directly from the UI."
+---
 
-## Scene 5 — On-Chain Proof (1:15–1:35)
+### SEGMENT 1: The Problem (0:15 – 0:35)
 
-[SHOW: click contract link → Casper testnet explorer]
-Narration: "Everything is on Casper testnet. Here's the deployed escrow contract — stored arguments, entry points for create, release, dispute, resolve, and the insurance pool."
+> [B-ROLL: Diagram — Agent A → API → Agent B, with a question mark and broken chain]
 
-[SHOW: scroll to contract deploys / transactions]
+[NARRATION: "When AI agents interact with paid APIs today, they rely on centralized facilitators holding funds in hot wallets. No escrow. No timeout protection. No dispute resolution. If Agent B ghosts you, your funds are gone."]
 
-## Scene 6 — SDK (1:35–1:50)
+> [SHOW: Slide text: "Current x402 = Ethereum + centralized facilitator"]
 
-[SHOW: terminal with python code snippet]
-```python
-from agent_escrow import EscrowClient
-client = EscrowClient(node_url="...", key="...")
-tx = client.create_escrow(receiver="agent-gpt4", amount=25000, ttl=3600)
+[NARRATION: "Existing x402 implementations, including Coinbase's, only run on EVM chains and still require a facilitator to hold funds. That's not trustless. That's not agentic."]
+
+---
+
+### RE-HOOK at 0:35
+> [SHOW: Terminal — curl command firing, then "201 Created" response with service_hash]
+
+[NARRATION: "Here's what creating an escrow looks like from a single curl command — and here's the on-chain proof."]
+
+---
+
+### SEGMENT 2: The Solution — Live Demo (0:35 – 1:15)
+
+> [SHOW: ae402.xyz homepage — hero section with tagline visible]
+
+[NARRATION: "AgentEscrow402 is deployed on Casper Testnet. The contract is live. The dashboard is live. Let's walk through the full flow."]
+
+> [SHOW: Terminal window]
+
+[NARRATION: "Step one — create an escrow. Agent A locks 5 CSPR into a time-locked contract."]
+
 ```
-Narration: "Three lines. Any Python agent can create, release, or dispute escrows. LangChain tool adapter included."
+[SHOW: typing and output]
+curl -X POST https://ae402-backend.onrender.com/escrow \
+  -H "Content-Type: application/json" \
+  -d '{"sender":"agent-A","receiver":"agent-B","amount":5000000,"ttl":300}'
+```
 
-## Scene 7 — Insurance & Reputation (1:50–2:05)
+> [SHOW: JSON response appearing with service_hash field highlighted]
 
-[SHOW: dashboard stats showing insurance pool, reputation scores]
-Narration: "Every released escrow contributes 2% to the insurance pool. If an agent goes rogue, victims can claim from the pool. Reputation decays over time — you can't just farm a good score and stop."
+[NARRATION: "You get back a service hash — the unique key for this payment. Funds are locked. Agent B can verify this on-chain before doing any work."]
 
-## Scene 8 — Close (2:05–2:20)
+> [SHOW: ae402.xyz dashboard — new escrow row appears with "Locked" status badge]
 
-[SHOW: landing page final section]
-Narration: "AgentEscrow402 — machine-to-machine commerce, trustlessly, on Casper. Check the repo, try the dashboard, read the docs."
+[NARRATION: "Step two — the protected API endpoint. Agent B serves compute behind an x402 header. Agent A hits it, includes the payment header, and gets the result."]
 
-[SHOW: GitHub URL + ae402.xyz]
+> [SHOW: Terminal — GET request with X-Payment header]
+
+[NARRATION: "Step three — Agent A releases the escrow after confirming delivery. One POST call. Funds go to Agent B. Reputation score updates on-chain instantly."]
+
+> [SHOW: testnet.cspr.live deploy page — transaction confirmed]
+
+[NARRATION: "And here it is on-chain. A verified Casper testnet transaction. No facilitator. No human. Just two agents settling a payment autonomously."]
+
+---
+
+### RE-HOOK at 1:15
+> [B-ROLL: Code editor showing the three key features side-by-side]
+
+[NARRATION: "Three things no other x402 implementation has."]
+
+---
+
+### SEGMENT 3: What Makes It Unique (1:15 – 1:45)
+
+> [SHOW: Architecture Mermaid diagram animating — Agent A → x402 Middleware → Escrow Contract → Agent B]
+
+[NARRATION: "First — on-chain escrow with TTL. If Agent B never delivers, Agent A calls refund after the timeout. Funds return automatically. No arbitration needed for the happy path."]
+
+> [SHOW: Code snippet — reputation formula `new = old × 0.95 + latest`]
+
+[NARRATION: "Second — reputation tracking. Every completed payment updates an exponential-decay trust score stored directly in the contract. Agents can look up counterparty reliability before committing funds."]
+
+> [SHOW: Dashboard dispute panel — FOR/AGAINST vote buttons]
+
+[NARRATION: "Third — 3-of-5 arbiter dispute resolution. No single point of failure. Contested payments go to a multi-sig vote. The contract handles payout automatically based on the result."]
+
+---
+
+### SEGMENT 4: Stack & CTA (1:45 – 2:00)
+
+> [SHOW: GitHub repo page — alexbelij/AgentEscrow402 with stars visible]
+
+[NARRATION: "Built with Python FastAPI, a Rust WASM smart contract on Casper, LangChain integration, and an MCP server exposing 7 tools. 103 tests passing. Contract audited."]
+
+> [SHOW: ae402.xyz — full page scroll]
+
+[NARRATION: "The live demo is at ae402.xyz. The code is open source on GitHub. If you're building AI agents that need to transact — drop a star, fork the repo, and build on top of it."]
+
+> [B-ROLL: Logo animation + URL lower-third]
+
+[NARRATION: "AgentEscrow402. HTTP 402 is alive."]
+
+---
+
+## END CARD
+> [SHOW: Static frame — ae402.xyz · github.com/alexbelij/AgentEscrow402 · #CasperBuildathon]
+
+**Duration target:** 1:55–2:05
+**Voice tone:** Calm, technical, confident. Not hype. Evidence-first.
+**Music bed:** Lo-fi electronic, neutral energy, ducked under narration by 18dB.
