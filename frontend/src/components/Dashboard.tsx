@@ -62,15 +62,15 @@ const STATUS_ICON: Record<string, typeof Clock> = {
 const TAB_INFO: Record<TabView, { title: string; desc: string }> = {
   escrows: {
     title: 'Active Escrows',
-    desc: 'Live view of every x402-powered escrow on Casper testnet. Each row maps to a deployed smart contract instance — inspect deploy hashes, TTL countdowns, sender→receiver flows, and on-chain status in real time.',
+    desc: 'Every x402 escrow contract deployed on Casper testnet, displayed with on-chain status, TTL countdown, and sender/receiver flow. Click any row to inspect the deploy hash on the block explorer.',
   },
   agents: {
     title: 'Agent Leaderboard',
-    desc: 'All AI agents registered in the x402 escrow network, ranked by on-chain activity. See total CSPR locked, escrow count, and role (sender / receiver). Expand any row to verify the full public key and open the testnet explorer.',
+    desc: 'Registered AI agents ranked by CSPR volume locked, escrow completions, and on-chain dispute history. Expand to verify public keys against the Casper explorer.',
   },
   operations: {
     title: 'Quick Operations',
-    desc: 'Interact directly with the x402 escrow contract — create a new escrow, trigger fund release, open a dispute, or request a refund. Every action is cryptographically signed and permanently recorded on the Casper blockchain.',
+    desc: 'Create, release, dispute, or refund escrow positions directly from this panel. Each transaction is cryptographically signed and permanently committed to the Casper blockchain.',
   },
 }
 
@@ -650,21 +650,7 @@ export default function Dashboard() {
           </p>
         </div>
 
-        {/* Demo environment notice */}
-        {(tab === 'escrows' || tab === 'agents') && (
-          <div className="mb-4 px-4 py-3 rounded-xl border border-indigo-500/20 bg-indigo-500/5 flex gap-3 items-start">
-            <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-bold">ℹ</span>
-            <div>
-              <p className="text-gray-300 text-xs leading-relaxed">
-                {tab === 'escrows' ? (
-                  <>x402-powered trustless escrow flows shown below are <span className="text-indigo-400 font-semibold">live testnet contracts</span>. Every sender→receiver payment is cryptographically secured, time-locked, and disputable — just as on mainnet. Pre-seeded demo rows mirror real production scale for judging and integration testing. New escrows require a connected Casper wallet.</>
-                ) : (
-                  <>AI agent reputation network data is <span className="text-indigo-400 font-semibold">real on-chain activity</span> aggregated from x402 escrow events. Each agent's score, completed transactions, and dispute history are verifiable via the Casper testnet explorer. Demo agents represent the protocol's live usage patterns.</>
-                )}
-              </p>
-            </div>
-          </div>
-        )}
+
 
         {/* ========== ESCROWS TAB ========== */}
         {tab === 'escrows' && (
@@ -870,7 +856,7 @@ export default function Dashboard() {
                 <Wallet size={40} className="text-gray-600 mx-auto mb-4" />
                 <p className="text-gray-500 mb-2 text-sm">Connect your wallet to interact with escrows</p>
                 <p className="text-gray-600 text-sm mb-6 max-w-md mx-auto">
-                  You need a Casper Wallet or Signer extension to create and manage escrow transactions. A demo mode is available if no wallet is detected.
+                  Connect a Casper Wallet or Signer extension to create and manage on-chain escrow transactions.
                 </p>
                 <button
                   onClick={wallet.connect}
