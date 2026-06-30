@@ -62,15 +62,15 @@ const STATUS_ICON: Record<string, typeof Clock> = {
 const TAB_INFO: Record<TabView, { title: string; desc: string }> = {
   escrows: {
     title: 'Active Escrows',
-    desc: 'Track every AI-powered escrow in real time — see arbiter assignments, on-chain status, and cryptographic proof references for each deal.',
+    desc: 'Live view of every x402-powered escrow on Casper testnet. Each row maps to a deployed smart contract instance — inspect deploy hashes, TTL countdowns, sender→receiver flows, and on-chain status in real time.',
   },
   agents: {
     title: 'Agent Leaderboard',
-    desc: 'Browse registered AI agents by capability tier. Each agent carries a verifiable on-chain identity and an auditable decision log.',
+    desc: 'All AI agents registered in the x402 escrow network, ranked by on-chain activity. See total CSPR locked, escrow count, and role (sender / receiver). Expand any row to verify the full public key and open the testnet explorer.',
   },
   operations: {
     title: 'Quick Operations',
-    desc: 'Replay the full lifecycle of any escrow operation — from AI verdict to fund release — with immutable timestamps and proof hashes.',
+    desc: 'Interact directly with the x402 escrow contract — create a new escrow, trigger fund release, open a dispute, or request a refund. Every action is cryptographically signed and permanently recorded on the Casper blockchain.',
   },
 }
 
@@ -617,9 +617,9 @@ export default function Dashboard() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-1 bg-ae-card/40 rounded-lg p-0.5">
             {([
-              { id: 'escrows' as const, label: 'Escrows', Icon: FileText, demo: true },
-              { id: 'agents' as const, label: 'Agents', Icon: Users, demo: true },
-              { id: 'operations' as const, label: 'Operations', Icon: Zap, demo: false },
+              { id: 'escrows' as const, label: 'Escrows', Icon: FileText },
+              { id: 'agents' as const, label: 'Agents', Icon: Users },
+              { id: 'operations' as const, label: 'Operations', Icon: Zap },
             ]).map(t => (
               <button
                 key={t.id}
@@ -629,7 +629,6 @@ export default function Dashboard() {
                 }`}
               >
                 <t.Icon size={14} /> {t.label}
-                {t.demo && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-amber-500/20 text-amber-400 border border-amber-500/30">DEMO</span>}
               </button>
             ))}
           </div>
