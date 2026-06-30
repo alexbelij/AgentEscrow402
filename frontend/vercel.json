@@ -1,5 +1,8 @@
 {
-  "rewrites": [{ "source": "/((?!assets|images|robots.txt|sitemap.xml).*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "https://agentescrow402-api.onrender.com/:path*" },
+    { "source": "/((?!assets|images|robots.txt|sitemap.xml|api).*)", "destination": "/index.html" }
+  ],
   "headers": [
     { "source": "/(.*)", "headers": [
       { "key": "X-Content-Type-Options", "value": "nosniff" },

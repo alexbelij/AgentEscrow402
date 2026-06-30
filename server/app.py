@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from server.casper_client import CasperClient
 from server.config import Config
@@ -61,6 +62,13 @@ app = FastAPI(
     version="0.1.0",
     description="x402-compatible payment middleware for AI agents on Casper",
     lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
