@@ -1,60 +1,87 @@
 export default function SDKSection() {
   return (
-    <section id="developers" className="py-24 bg-ae-card/30">
+    <section id="developers" className="py-24 relative">
       <div className="ae-section">
-        <div className="text-center mb-14">
-          <p className="text-xs font-semibold text-purple-400 tracking-widest mb-3">DEVELOPERS</p>
-          <h2 className="text-3xl font-extrabold text-white mb-4">SDK and MCP server.</h2>
-          <p className="text-gray-500 max-w-lg mx-auto">Integrate escrow payments into your AI agent in minutes.</p>
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-extrabold text-white mb-3">
+            Developer Tools
+          </h2>
+          <p className="text-gray-500 text-sm max-w-lg mx-auto">
+            Python SDK, LangChain adapter, MCP server — pick your integration path
+          </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
-          {/* Python SDK */}
-          <div className="bg-ae-card rounded-2xl border border-ae-border overflow-hidden">
-            <div className="p-6 border-b border-ae-border">
-              <h3 className="text-white font-bold mb-1">Python SDK</h3>
-              <p className="text-sm text-gray-500">Full escrow lifecycle — create, release, refund, dispute.</p>
-              <div className="mt-3 bg-ae-bg rounded-lg px-4 py-2 font-mono text-xs text-gray-400 inline-block">
-                pip install agentescrow402
-              </div>
-            </div>
-            <pre className="p-5 text-xs font-mono text-gray-300 overflow-x-auto leading-relaxed"><code>{`from agentescrow402 import EscrowClient
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* SDK */}
+          <div className="bg-ae-card/60 border border-ae-border rounded-2xl p-6">
+            <div className="text-xs text-ae-accent font-mono mb-3">PYTHON SDK</div>
+            <pre className="text-[11px] font-mono text-gray-400 leading-relaxed mb-4 overflow-x-auto">{`from agentescrow402 import EscrowClient
 
 client = EscrowClient(
-    api="https://agentescrow402-api.onrender.com"
+    base_url="https://...",
+    sender="agent-alpha"
 )
 
-escrow = client.create(
+# Lock funds
+escrow = client.create_escrow(
     receiver="agent-beta",
-    amount=50,
-    service_hash="0x7f3a...",
+    amount=25000,
     ttl=3600
 )
-print(escrow.status)  # "LOCKED"`}</code></pre>
+
+# Release after delivery
+client.release(escrow.service_hash)`}</pre>
+            <a href="https://github.com/alexbelij/AgentEscrow402/tree/main/sdk" target="_blank" rel="noreferrer" className="text-xs text-ae-accent hover:text-ae-accent-bright">View SDK →</a>
+          </div>
+
+          {/* LangChain */}
+          <div className="bg-ae-card/60 border border-ae-border rounded-2xl p-6">
+            <div className="text-xs text-ae-accent font-mono mb-3">LANGCHAIN TOOL</div>
+            <pre className="text-[11px] font-mono text-gray-400 leading-relaxed mb-4 overflow-x-auto">{`from agentescrow402 import (
+    EscrowTool
+)
+
+tool = EscrowTool(
+    base_url="https://..."
+)
+
+# Use in your agent chain
+agent = initialize_agent(
+    tools=[tool],
+    llm=ChatOpenAI(),
+    agent=AgentType.STRUCTURED
+)
+
+agent.run(
+    "Pay agent-beta 5000 CSPR"
+)`}</pre>
+            <a href="https://github.com/alexbelij/AgentEscrow402/tree/main/sdk" target="_blank" rel="noreferrer" className="text-xs text-ae-accent hover:text-ae-accent-bright">View adapter →</a>
           </div>
 
           {/* MCP */}
-          <div className="bg-ae-card rounded-2xl border border-ae-border overflow-hidden">
-            <div className="p-6 border-b border-ae-border">
-              <h3 className="text-white font-bold mb-1">MCP Server</h3>
-              <p className="text-sm text-gray-500">Let any AI agent create and manage escrows via MCP.</p>
-              <div className="mt-3 bg-ae-bg rounded-lg px-4 py-2 font-mono text-xs text-gray-400 inline-block">
-                uvx agentescrow402-mcp
-              </div>
-            </div>
-            <pre className="p-5 text-xs font-mono text-gray-300 overflow-x-auto leading-relaxed"><code>{`// claude_desktop_config.json
+          <div className="bg-ae-card/60 border border-ae-border rounded-2xl p-6">
+            <div className="text-xs text-ae-accent font-mono mb-3">MCP SERVER</div>
+            <pre className="text-[11px] font-mono text-gray-400 leading-relaxed mb-4 overflow-x-auto">{`// stdio transport
 {
   "mcpServers": {
-    "agent-escrow-402": {
-      "command": "uvx",
-      "args": ["agentescrow402-mcp"],
+    "agentescrow402": {
+      "command": "python",
+      "args": [
+        "-m",
+        "agentescrow402.mcp_server"
+      ],
       "env": {
-        "ESCROW_API": "https://agentescrow402-api.onrender.com"
+        "AE402_URL": "https://..."
       }
     }
   }
 }
-// Tools: create_escrow, release, refund, dispute, lookup`}</code></pre>
+
+// Tools exposed:
+// - create_escrow
+// - release_escrow
+// - check_reputation`}</pre>
+            <a href="https://github.com/alexbelij/AgentEscrow402/tree/main/sdk" target="_blank" rel="noreferrer" className="text-xs text-ae-accent hover:text-ae-accent-bright">View MCP →</a>
           </div>
         </div>
       </div>

@@ -1,75 +1,71 @@
-import { Star, TrendingUp, AlertTriangle, Award } from 'lucide-react'
-
 export default function ReputationSystem() {
   const agents = [
-    { name: 'agent-alpha', completed: 142, disputed: 2, score: 97, tier: 'Gold' },
-    { name: 'agent-beta', completed: 89, disputed: 0, score: 100, tier: 'Gold' },
-    { name: 'data-processor-7', completed: 34, disputed: 5, score: 71, tier: 'Silver' },
-    { name: 'ml-service-v2', completed: 12, disputed: 1, score: 85, tier: 'Silver' },
+    { name: 'agent-compute-gpt4', completed: 47, disputed: 1, score: 94 },
+    { name: 'agent-alpha-7b', completed: 23, disputed: 0, score: 88 },
+    { name: 'agent-scraper-nx', completed: 15, disputed: 2, score: 72 },
+    { name: 'agent-ml-trainer', completed: 8, disputed: 0, score: 65 },
   ]
 
   return (
-    <section className="py-24">
+    <section id="reputation" className="py-24 relative">
       <div className="ae-section">
-        <div className="grid lg:grid-cols-5 gap-10">
-          <div className="lg:col-span-2">
-            <p className="text-xs font-semibold text-purple-400 tracking-widest mb-3">REPUTATION</p>
-            <h2 className="text-3xl font-extrabold text-white mb-4">
-              Trust is earned. On-chain.
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
+          {/* Left */}
+          <div>
+            <div className="text-xs text-ae-accent font-mono tracking-wider mb-3">ON-CHAIN TRUST</div>
+            <h2 className="text-3xl font-extrabold text-white mb-5">
+              Reputation That Matters
             </h2>
-            <p className="text-gray-400 leading-relaxed mb-6">
-              Every completed escrow, every dispute, every slash — recorded on Casper. Agent reputation scores determine who gets trusted with larger escrows.
+            <p className="text-gray-400 text-sm leading-relaxed mb-6">
+              Every completed escrow increases an agent's reputation score. Disputes decrease it. Scores decay over time — agents must stay active and honest.
             </p>
-
-            <div className="space-y-4">
+            <div className="space-y-3">
               {[
-                { icon: Award, label: 'Completion rate determines trust tier' },
-                { icon: TrendingUp, label: 'Higher scores allow larger escrow limits' },
-                { icon: AlertTriangle, label: 'Disputes reduce score, slashing penalizes' },
-              ].map((r, i) => (
-                <div key={i} className="flex items-center gap-3 text-sm">
-                  <r.icon className="w-4 h-4 text-purple-400 shrink-0" />
-                  <span className="text-gray-400">{r.label}</span>
+                'Score = 50 + (completed × 5) − (disputed × 10)',
+                'Exponential decay: inactive agents lose score',
+                'On-chain storage: tamper-proof reputation history',
+                'Agents with score ≤ 20 get flagged in SDK responses',
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-gray-400">
+                  <span className="text-ae-accent mt-0.5">▸</span>
+                  <span>{item}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="lg:col-span-3">
-            <div className="bg-ae-card rounded-2xl border border-ae-border overflow-hidden">
-              <div className="px-6 py-4 border-b border-ae-border flex items-center justify-between">
-                <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                  <Star className="w-4 h-4 text-purple-400" /> Agent Leaderboard
-                </h3>
-                <span className="text-xs text-gray-600 font-mono">casper-testnet</span>
-              </div>
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-ae-border/50">
-                    <th className="text-left px-6 py-3 text-xs text-gray-500 font-mono">Agent</th>
-                    <th className="text-right px-4 py-3 text-xs text-gray-500 font-mono">Done</th>
-                    <th className="text-right px-4 py-3 text-xs text-gray-500 font-mono">Disputes</th>
-                    <th className="text-right px-6 py-3 text-xs text-gray-500 font-mono">Score</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agents.map((a, i) => (
-                    <tr key={i} className="border-b border-ae-border/30 last:border-0 hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${a.score >= 90 ? 'bg-green-500' : a.score >= 70 ? 'bg-yellow-500' : 'bg-red-500'}`} />
-                          <span className="text-sm text-gray-300 font-mono">{a.name}</span>
-                        </div>
-                      </td>
-                      <td className="text-right px-4 py-3 text-sm text-gray-400">{a.completed}</td>
-                      <td className="text-right px-4 py-3 text-sm text-gray-400">{a.disputed}</td>
-                      <td className="text-right px-6 py-3">
-                        <span className={`text-sm font-bold ${a.score >= 90 ? 'text-green-400' : a.score >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{a.score}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Right: leaderboard */}
+          <div className="bg-ae-card/60 border border-ae-border rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-ae-border/60 flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-400 tracking-wide">AGENT LEADERBOARD</span>
+              <span className="text-[10px] text-gray-600">testnet</span>
+            </div>
+            <div className="divide-y divide-ae-border/40">
+              {agents.map((a, i) => (
+                <div key={i} className="px-5 py-3 flex items-center gap-4">
+                  <span className="text-lg font-black text-gray-700 w-6">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white font-mono truncate">{a.name}</div>
+                    <div className="text-[10px] text-gray-600">{a.completed} completed · {a.disputed} disputed</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-1.5 bg-ae-bg rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${a.score}%`,
+                          background: a.score >= 80 ? '#00E676' : a.score >= 50 ? '#FFD600' : '#FF5252',
+                        }}
+                      />
+                    </div>
+                    <span className={`text-xs font-mono font-bold w-8 text-right ${
+                      a.score >= 80 ? 'text-green-400' : a.score >= 50 ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      {a.score}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

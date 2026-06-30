@@ -1,46 +1,40 @@
+import { ExternalLink } from 'lucide-react'
+
+const LINKS = [
+  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
+  { label: 'SDK', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
+  { label: 'MCP', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
+  { label: 'Contract', href: 'https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451' },
+]
+
 export default function Footer() {
   return (
-    <footer className="bg-ae-bg border-t border-ae-border/50 py-14">
+    <footer className="border-t border-ae-border/40 py-8">
       <div className="ae-section">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <img src="/images/logo.webp" alt="AgentEscrow402" className="h-6 w-auto" />
-              <span className="font-bold text-white">AgentEscrow402</span>
-            </div>
-            <p className="text-sm text-gray-500 leading-relaxed">
-              x402-compatible escrow payments for autonomous AI agents on Casper Network.
-            </p>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <img src="/images/logo.webp" alt="AE402" className="h-5 w-auto brightness-150 hue-rotate-[20deg]" />
+            <span className="text-sm text-gray-500">&copy; 2026 AgentEscrow402</span>
           </div>
-          <div>
-            <h4 className="text-gray-300 font-semibold mb-3 text-sm">Product</h4>
-            <ul className="space-y-2 text-sm text-gray-500">
-              <li><a href="#flow" className="hover:text-gray-300 transition-colors">How It Works</a></li>
-              <li><a href="#x402" className="hover:text-gray-300 transition-colors">x402 Protocol</a></li>
-              <li><a href="/app" className="hover:text-gray-300 transition-colors">Dashboard</a></li>
-            </ul>
+
+          <div className="flex items-center gap-5">
+            {LINKS.map(l => (
+              <a
+                key={l.label}
+                href={l.href}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-ae-accent transition-colors"
+              >
+                {l.label} <ExternalLink size={10} />
+              </a>
+            ))}
           </div>
-          <div>
-            <h4 className="text-gray-300 font-semibold mb-3 text-sm">Developers</h4>
-            <ul className="space-y-2 text-sm text-gray-500">
-              <li><a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="hover:text-gray-300 transition-colors">GitHub</a></li>
-              <li><a href="#developers" className="hover:text-gray-300 transition-colors">Python SDK</a></li>
-              <li><a href="#developers" className="hover:text-gray-300 transition-colors">MCP Server</a></li>
-              <li><a href="#faq" className="hover:text-gray-300 transition-colors">FAQ</a></li>
-            </ul>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-gray-600 tracking-wide">BUILT ON</span>
+            <img src="/images/casper-logo.png" alt="Casper" className="h-4 w-auto brightness-200" />
           </div>
-          <div>
-            <h4 className="text-gray-300 font-semibold mb-3 text-sm">Built On</h4>
-            <div className="flex items-center gap-2 mb-3">
-              <img src="/images/casper-logo.png" alt="Casper" className="h-5 w-auto" />
-              <span className="text-sm text-gray-400">Casper Network</span>
-            </div>
-            <p className="text-xs text-gray-600">2 smart contracts on Casper testnet. Escrow registry and reputation module.</p>
-          </div>
-        </div>
-        <div className="border-t border-ae-border/50 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
-          <p className="text-xs text-gray-600">&copy; 2026 AgentEscrow402. MIT License.</p>
-          <p className="text-xs text-gray-600">Casper Agentic Buildathon 2026</p>
         </div>
       </div>
     </footer>

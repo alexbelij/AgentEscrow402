@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
@@ -6,10 +6,10 @@ import PaymentFlow from './components/PaymentFlow'
 import X402Protocol from './components/X402Protocol'
 import ReputationSystem from './components/ReputationSystem'
 import SDKSection from './components/SDKSection'
+import Scenarios from './components/Scenarios'
 import FAQ from './components/FAQ'
-import CtaFooter from './components/CtaFooter'
 import Footer from './components/Footer'
-import ScrollProgress from './components/ScrollProgress'
+import ScrollToTop from './components/ScrollToTop'
 import NotFound from './components/NotFound'
 import Dashboard from './components/Dashboard'
 
@@ -19,10 +19,10 @@ function Landing() {
       <Hero />
       <PaymentFlow />
       <X402Protocol />
+      <Scenarios />
       <ReputationSystem />
       <SDKSection />
       <FAQ />
-      <CtaFooter />
     </>
   )
 }
@@ -30,6 +30,9 @@ function Landing() {
 export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const closeMobile = useCallback(() => setMobileOpen(false), [])
+  const location = useLocation()
+  const isDashboard = location.pathname === '/app'
+
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
@@ -37,8 +40,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <ScrollProgress />
-      <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
+      <ScrollToTop />
+      {!isDashboard && <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />}
       <main className="flex-1" onClick={mobileOpen ? closeMobile : undefined}>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -46,7 +49,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <Footer />
+      {!isDashboard && <Footer />}
     </div>
   )
 }

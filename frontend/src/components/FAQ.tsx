@@ -1,37 +1,62 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
-const faqs = [
-  { q: 'What is the x402 protocol?', a: 'x402 is a payment protocol built on HTTP status 402 (Payment Required). It defines how AI agents negotiate, authorize, and settle payments over standard HTTP requests. AgentEscrow402 implements x402 on Casper Network with escrow protection.' },
-  { q: 'How does escrow protect both parties?', a: 'When Agent A requests a service from Agent B, funds are locked in a smart contract. Agent B delivers the service. If the service hash matches, funds are released. If TTL expires without delivery, funds automatically return to Agent A. Neither party can manipulate the outcome.' },
-  { q: 'What happens if there\'s a dispute?', a: 'Either party can initiate a dispute by submitting a reason hash. The dispute is recorded on-chain with evidence. In the current version, disputes are resolved by TTL expiry. Future versions will include DAO-based arbitration.' },
-  { q: 'How does the reputation system work?', a: 'Every completed escrow increases an agent\'s reputation score. Disputes decrease it. Slashed agents lose both score and staked funds. Reputation is on-chain and publicly queryable — high-reputation agents can access larger escrow limits.' },
-  { q: 'Can human users interact with the escrow?', a: 'Yes. While designed for machine-to-machine payments, the dashboard provides a full GUI for creating escrows, monitoring status, and managing disputes. The API and SDK work for both AI agents and human-driven applications.' },
+const FAQS = [
+  {
+    q: 'How does the x402 payment flow work?',
+    a: 'An AI agent sends an HTTP request with an X-Payment header containing a signed escrow reference. The middleware verifies the signature, checks replay protection, and routes the request. Funds stay locked until the service is delivered and confirmed.',
+  },
+  {
+    q: 'What happens if a service provider fails to deliver?',
+    a: 'The sender can request a refund before the TTL expires. After TTL, anyone can trigger automatic refund. If there\'s a dispute, the escrow enters "disputed" state for resolution. The insurance pool (2% of each escrow) covers edge cases.',
+  },
+  {
+    q: 'Is the contract audited?',
+    a: 'The escrow contract is deployed on Casper testnet with 596 lines of Rust, covering create/release/refund/dispute/resolve entry points. The codebase includes 85+ tests covering all scenarios. Mainnet deployment pending formal audit.',
+  },
+  {
+    q: 'Can I integrate with my existing agent framework?',
+    a: 'Yes. The Python SDK provides a single function call to create escrows and attach payment headers. LangChain tool adapter and MCP server are included for direct integration with agent orchestrators.',
+  },
+  {
+    q: 'What are the fees?',
+    a: 'A 2% insurance fee is collected on each escrow creation. This funds the insurance pool that covers disputes and failed deliveries. Gas fees for Casper transactions are minimal (~0.01 CSPR per deploy).',
+  },
 ]
 
 export default function FAQ() {
-  const [open, setOpen] = useState<number | null>(0)
+  const [open, setOpen] = useState<number | null>(null)
+
   return (
-    <section id="faq" className="py-24">
-      <div className="ae-section">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-14">
-            <p className="text-xs font-semibold text-purple-400 tracking-widest mb-3">FAQ</p>
-            <h2 className="text-3xl font-extrabold text-white">Common questions.</h2>
-          </div>
-          <div className="space-y-2">
-            {faqs.map((f, i) => (
-              <div key={i} className="border border-ae-border rounded-xl overflow-hidden bg-ae-card">
-                <button onClick={() => setOpen(open === i ? null : i)} className="w-full flex items-center justify-between p-5 text-left hover:bg-white/[0.02] transition-colors">
-                  <span className="font-semibold text-white pr-4">{f.q}</span>
-                  <ChevronDown className={`w-5 h-5 text-gray-600 shrink-0 transition-transform ${open === i ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ${open === i ? 'max-h-60' : 'max-h-0'}`}>
-                  <p className="px-5 pb-5 text-gray-400 leading-relaxed text-sm">{f.a}</p>
+    <section id="faq" className="py-24 relative">
+      <div className="ae-section max-w-3xl">
+        <h2 className="text-3xl font-extrabold text-white mb-12 text-center">
+          Common Questions
+        </h2>
+
+        <div className="space-y-2">
+          {FAQS.map((faq, i) => (
+            <div
+              key={i}
+              className="border border-ae-border/60 rounded-xl overflow-hidden transition-colors hover:border-ae-border"
+            >
+              <button
+                onClick={() => setOpen(open === i ? null : i)}
+                className="w-full flex items-center justify-between px-6 py-4 text-left"
+              >
+                <span className="text-sm font-semibold text-gray-200 pr-4">{faq.q}</span>
+                <ChevronDown
+                  size={18}
+                  className={`text-gray-500 shrink-0 transition-transform duration-200 ${open === i ? 'rotate-180' : ''}`}
+                />
+              </button>
+              {open === i && (
+                <div className="px-6 pb-5">
+                  <p className="text-sm text-gray-400 leading-relaxed">{faq.a}</p>
                 </div>
-              </div>
-            ))}
-          </div>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </section>

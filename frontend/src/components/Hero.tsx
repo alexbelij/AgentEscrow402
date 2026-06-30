@@ -3,81 +3,91 @@ import { useEffect, useRef } from 'react'
 export default function Hero() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  // Purple particle trail behind cat
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    const dpr = 2
-    canvas.width = canvas.offsetWidth * dpr
-    canvas.height = canvas.offsetHeight * dpr
-    ctx.scale(dpr, dpr)
-    const W = canvas.offsetWidth, H = canvas.offsetHeight
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = canvas.offsetWidth * dpr
+      canvas.height = canvas.offsetHeight * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+    const W = () => canvas.offsetWidth
+    const H = () => canvas.offsetHeight
 
-    const particles: {x:number,y:number,vx:number,vy:number,life:number,size:number,hue:number}[] = []
-    // Cat position: right side
-    const catX = W * 0.62, catY = H * 0.42
+    // Orbital rings behind the mascot
+    const orbitals: { angle: number; speed: number; rx: number; ry: number; size: number; hue: number }[] = []
+    for (let i = 0; i < 40; i++) {
+      orbitals.push({
+        angle: Math.random() * Math.PI * 2,
+        speed: 0.003 + Math.random() * 0.008,
+        rx: 120 + Math.random() * 100,
+        ry: 60 + Math.random() * 50,
+        size: 1.5 + Math.random() * 3,
+        hue: 250 + Math.random() * 40,
+      })
+    }
 
     let raf: number
     const draw = () => {
-      ctx.clearRect(0, 0, W, H)
-      // Emit from behind the cat (left side of cat)
-      if (Math.random() < 0.4) {
-        particles.push({
-          x: catX - 30 + Math.random() * 20,
-          y: catY + (Math.random() - 0.5) * 40,
-          vx: -(2 + Math.random() * 3),
-          vy: (Math.random() - 0.5) * 1.5,
-          life: 1,
-          size: 2 + Math.random() * 4,
-          hue: 260 + Math.random() * 30,
-        })
-      }
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i]
-        p.x += p.vx; p.y += p.vy; p.life -= 0.02
-        if (p.life <= 0) { particles.splice(i, 1); continue }
+      const w = W(), h = H()
+      ctx.clearRect(0, 0, w, h)
+      const cx = w * 0.55, cy = h * 0.45
+
+      // Draw orbital paths (faint)
+      ctx.strokeStyle = 'rgba(108,92,231,0.06)'
+      ctx.lineWidth = 1
+      for (const r of [140, 180, 220]) {
         ctx.beginPath()
-        ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2)
-        ctx.fillStyle = `hsla(${p.hue}, 80%, 60%, ${p.life * 0.5})`
+        ctx.ellipse(cx, cy, r, r * 0.5, 0.3, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
+      // Particles orbiting
+      for (const o of orbitals) {
+        o.angle += o.speed
+        const x = cx + Math.cos(o.angle) * o.rx
+        const y = cy + Math.sin(o.angle) * o.ry * 0.55
+        const depth = Math.sin(o.angle)
+        const alpha = 0.3 + depth * 0.4
+        ctx.beginPath()
+        ctx.arc(x, y, o.size * (0.6 + depth * 0.4), 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${o.hue}, 70%, 65%, ${Math.max(0.1, alpha)})`
         ctx.fill()
       }
+
       raf = requestAnimationFrame(draw)
     }
     draw()
-    return () => cancelAnimationFrame(raf)
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', resize) }
   }, [])
 
   return (
     <section id="home" className="relative min-h-screen flex items-center overflow-hidden">
-      {/* Deep space background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0a0a1a] via-[#0f0a2a] to-[#0a0a1a]" />
 
-      {/* Subtle grid */}
-      <div className="absolute inset-0 opacity-[0.04]" style={{
-        backgroundImage: 'radial-gradient(circle, #6C5CE7 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
+      {/* Subtle hex grid */}
+      <div className="absolute inset-0 opacity-[0.03]" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L55 20 L55 40 L30 55 L5 40 L5 20 Z' fill='none' stroke='%236C5CE7' stroke-width='0.5'/%3E%3C/svg%3E")`,
+        backgroundSize: '60px 60px',
       }} />
 
-      {/* Portal glow behind cat */}
-      <div className="absolute right-[10%] top-[20%] w-[400px] h-[400px] rounded-full bg-gradient-radial from-purple-600/20 to-transparent blur-[60px] animate-portal-pulse pointer-events-none" />
+      {/* Orbital canvas behind mascot */}
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-[3]" />
 
-      {/* Particle canvas */}
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-10" />
+      {/* Center glow */}
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full bg-purple-600/15 blur-[80px] pointer-events-none" />
 
-      {/* Cat mascot - flying left to right, positioned right */}
-      <div className="absolute right-[5%] sm:right-[10%] top-[15%] sm:top-[12%] w-[45%] sm:w-[38%] lg:w-[32%] max-w-md z-[5]">
-        {/* Purple rocket flame trail */}
-        <div className="absolute left-[-20%] top-[35%] w-[50%] h-[30%] z-0">
-          <div className="w-full h-full bg-gradient-to-l from-purple-500/60 via-purple-600/30 to-transparent rounded-full blur-[20px] animate-rocket-flame" />
-          <div className="absolute inset-0 w-[80%] h-[60%] mx-auto my-auto bg-gradient-to-l from-white/20 via-purple-300/20 to-transparent rounded-full blur-[10px] animate-rocket-flame" style={{ animationDelay: '-0.5s' }} />
-        </div>
+      {/* Mascot - centered behind content conceptually, right side visually */}
+      <div className="absolute right-[3%] sm:right-[8%] top-[18%] sm:top-[14%] w-[48%] sm:w-[40%] lg:w-[34%] max-w-lg z-[5]">
         <img
-          src="/images/mascot/maskot_fly_casper.png"
-          alt="AgentEscrow402 Cat"
-          className="w-full relative z-10 animate-float-cat"
-          style={{ transform: 'scaleX(-1)' }}
+          src="/images/mascot/maskot_portal.png"
+          alt="AgentEscrow402"
+          className="w-full relative z-10 animate-float-cat drop-shadow-[0_0_40px_rgba(108,92,231,0.3)]"
           loading="eager"
         />
       </div>
@@ -85,11 +95,6 @@ export default function Hero() {
       {/* Content - left side */}
       <div className="ae-section relative z-20 py-32">
         <div className="max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-semibold tracking-wide">
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
-            BUILT FOR AI &middot; BACKED BY CASPER
-          </div>
-
           <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-white leading-[1.08] mb-5 tracking-tight">
             The Payment Layer<br/>
             for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">AI Agents</span>
@@ -101,25 +106,25 @@ export default function Hero() {
 
           <div className="flex flex-wrap gap-3 mb-14">
             <a href="/app" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-ae-accent text-white font-semibold shadow-lg shadow-purple-600/20 hover:bg-ae-accent-bright hover:shadow-purple-600/30 transition-all">
-              Start Building
+              Launch App
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             </a>
             <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-ae-border text-gray-300 font-medium hover:border-gray-500 hover:text-white transition-colors">
-              Read Docs
+              GitHub
             </a>
           </div>
 
-          {/* Feature pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Stats row */}
+          <div className="flex gap-8">
             {[
-              { title: 'x402 Compatible', desc: 'Native x402 protocol support for AI payments' },
-              { title: 'Escrow by Design', desc: 'Funds held until conditions are met' },
-              { title: 'Built on Casper', desc: 'Enterprise-grade finality and security' },
-              { title: 'M2M Commerce', desc: 'Agents transact at machine speed' },
-            ].map((f, i) => (
-              <div key={i} className="bg-ae-card/60 backdrop-blur border border-ae-border rounded-xl p-3.5 hover:border-purple-500/30 transition-all">
-                <h3 className="text-white text-xs font-bold mb-1">{f.title}</h3>
-                <p className="text-[10px] text-gray-500 leading-relaxed">{f.desc}</p>
+              { val: '596', label: 'Lines of Rust' },
+              { val: '85+', label: 'Passing Tests' },
+              { val: '2%', label: 'Insurance Fee' },
+              { val: 'x402', label: 'Protocol' },
+            ].map((s, i) => (
+              <div key={i} className="text-center">
+                <div className="text-2xl font-bold text-white font-mono">{s.val}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{s.label}</div>
               </div>
             ))}
           </div>
