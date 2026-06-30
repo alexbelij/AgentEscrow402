@@ -31,6 +31,7 @@
 - [How it works](#-how-it-works)
 - [Quickstart](#-quickstart)
 - [Architecture](#-architecture)
+- [Screenshots](#-screenshots)
 - [Smart contract](#-smart-contract)
 - [API reference](#-api-reference)
 - [SDK and integrations](#-sdk-and-integrations)
@@ -175,9 +176,19 @@ flowchart LR
 
 *The payment server mediates between agent SDKs and the Casper contract. In sandbox mode the Casper client is replaced by an in-memory store with identical behavior.*
 
-> **Screenshots:** `/docs/screenshots/` (see repo for dashboard, transaction, and dispute flow captures)
-
 Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+<div align="right"><a href="#readme-top">↑ back to top</a></div>
+
+---
+
+## 📸 Screenshots
+
+| Homepage — HTTP 402 flow | Dashboard — escrow table | Escrow detail — release flow |
+|---|---|---|
+| ![Homepage](docs/screenshots/01-homepage.png) | ![Dashboard](docs/screenshots/02-dashboard.png) | ![Escrow detail](docs/screenshots/03-escrow-detail.png) |
+
+> Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/dashboard](https://ae402.xyz/dashboard)
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -307,7 +318,7 @@ cd contracts/tests && cargo test --release
 
 ## 👤 Team
 
-**alexbelij** — protocol design, smart contracts, backend ([GitHub](https://github.com/alexbelij))
+**alexbelij** — full-stack builder specializing in blockchain protocol design, smart contract development in Rust/WASM, and Python backend systems. Built AgentEscrow402 end-to-end: the Casper WASM escrow contract, x402 middleware, FastAPI payment server, Python async SDK, LangChain integration, and the Next.js dashboard. Previously contributed to agentic payment infrastructure and open-source Casper tooling. ([GitHub](https://github.com/alexbelij))
 
 Questions → [open an issue](https://github.com/alexbelij/AgentEscrow402/issues)
 
