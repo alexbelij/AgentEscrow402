@@ -34,6 +34,11 @@ Contract: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d38683
 
 ---
 
+## Video
+[Video](TBD)
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -65,5 +70,6 @@ Contract: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d38683
 
 ## Team
 
-**alexbelij** — solo builder. Protocol design, smart contract, payment server, SDK, dashboard.
+**alexbelij** — Solo builder bringing x402 to Casper Network. Designed the protocol, architected the escrow smart contract, built the payment server with 402 middleware, developed the Python SDK with LangChain and MCP integrations, and deployed the full stack end-to-end. Background in distributed systems and protocol design; focus on machine-to-machine payment infrastructure for the agentic economy.
+
 GitHub: [github.com/alexbelij](https://github.com/alexbelij)
