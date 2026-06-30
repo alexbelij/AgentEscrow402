@@ -744,7 +744,7 @@ export default function Dashboard() {
                             <Clock size={12} /> {esc.ttl >= 86400 ? `${Math.floor(esc.ttl / 86400)}d` : esc.ttl >= 3600 ? `${Math.floor(esc.ttl / 3600)}h` : `${Math.floor(esc.ttl / 60)}m`}
                           </span>
                           <span>{formatAge(esc.created_at)}</span>
-                          {esc.deploy_hash && (
+                          {esc.deploy_hash ? (
                             <a
                               href={`${CSPR_LIVE}/deploy/${esc.deploy_hash}`}
                               target="_blank"
@@ -752,6 +752,16 @@ export default function Dashboard() {
                               className="text-ae-accent hover:text-ae-accent-bright flex items-center gap-1"
                             >
                               On-chain <ExternalLink size={10} />
+                            </a>
+                          ) : (
+                            <a
+                              href={`${CSPR_LIVE}/contract/${CONTRACT_HASH}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-gray-500 hover:text-ae-accent flex items-center gap-1"
+                              title="View contract"
+                            >
+                              Contract <ExternalLink size={10} />
                             </a>
                           )}
                         </div>
