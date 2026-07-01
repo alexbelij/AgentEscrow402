@@ -15,9 +15,7 @@ class SandboxStore:
         self._escrows: dict[str, dict[str, Any]] = {}
         self._reputation: dict[str, dict[str, int]] = {}
 
-    def create_escrow(
-        self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int
-    ) -> EscrowRecord:
+    def create_escrow(self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int) -> EscrowRecord:
         if service_hash in self._escrows:
             raise ValueError(f"Escrow {service_hash} already exists")
         now = int(time.time())
@@ -88,12 +86,8 @@ class SandboxStore:
             raise KeyError(f"Escrow {service_hash} not found")
         return rec
 
-    def _bump_reputation(
-        self, agent: str, completed: int = 0, disputed: int = 0
-    ) -> None:
-        rep = self._reputation.setdefault(
-            agent, {"completed": 0, "disputed": 0, "slashed": 0, "last_active": 0}
-        )
+    def _bump_reputation(self, agent: str, completed: int = 0, disputed: int = 0) -> None:
+        rep = self._reputation.setdefault(agent, {"completed": 0, "disputed": 0, "slashed": 0, "last_active": 0})
         rep["completed"] += completed
         rep["disputed"] += disputed
         rep["last_active"] = int(time.time())

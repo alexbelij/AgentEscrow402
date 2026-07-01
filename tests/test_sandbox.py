@@ -34,16 +34,12 @@ class TestSandboxEscrow:
         rec = sandbox.release_escrow(service_hash, sender)
         assert rec.status.value == "released"
 
-    def test_release_by_non_sender_raises(
-        self, sandbox, sender, receiver, service_hash
-    ):
+    def test_release_by_non_sender_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         with pytest.raises(PermissionError, match="Only sender"):
             sandbox.release_escrow(service_hash, "some-other-account")
 
-    def test_release_already_released_raises(
-        self, sandbox, sender, receiver, service_hash
-    ):
+    def test_release_already_released_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.release_escrow(service_hash, sender)
         with pytest.raises(ValueError, match="Cannot release"):
@@ -54,9 +50,7 @@ class TestSandboxEscrow:
         rec = sandbox.refund_escrow(service_hash, sender)
         assert rec.status.value == "refunded"
 
-    def test_refund_by_non_sender_not_expired(
-        self, sandbox, sender, receiver, service_hash
-    ):
+    def test_refund_by_non_sender_not_expired(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         with pytest.raises(PermissionError):
             sandbox.refund_escrow(service_hash, "stranger")
@@ -66,9 +60,7 @@ class TestSandboxEscrow:
         rec = sandbox.dispute_escrow(service_hash)
         assert rec.status.value == "disputed"
 
-    def test_dispute_already_released_raises(
-        self, sandbox, sender, receiver, service_hash
-    ):
+    def test_dispute_already_released_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.release_escrow(service_hash, sender)
         with pytest.raises(ValueError, match="Cannot dispute"):
@@ -84,9 +76,7 @@ class TestSandboxEscrow:
         assert rec is not None
         assert rec.amount == 500
 
-    def test_refund_disputed_escrow_raises(
-        self, sandbox, sender, receiver, service_hash
-    ):
+    def test_refund_disputed_escrow_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.dispute_escrow(service_hash)
         with pytest.raises(ValueError, match="Cannot refund"):

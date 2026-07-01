@@ -7,7 +7,7 @@ import os
 import time
 from typing import Any
 
-from server.models import EscrowRecord, EscrowStatus, ReputationRecord
+from server.models import EscrowRecord, EscrowStatus
 
 logger = logging.getLogger(__name__)
 
@@ -105,16 +105,18 @@ def load_escrows() -> list[dict[str, Any]]:
             ).fetchall()
         result = []
         for r in rows:
-            result.append({
-                "service_hash": r[0],
-                "sender": r[1],
-                "receiver": r[2],
-                "amount": r[3],
-                "status": r[4],
-                "ttl": r[5],
-                "created_at": r[6],
-                "deploy_hash": r[7],
-            })
+            result.append(
+                {
+                    "service_hash": r[0],
+                    "sender": r[1],
+                    "receiver": r[2],
+                    "amount": r[3],
+                    "status": r[4],
+                    "ttl": r[5],
+                    "created_at": r[6],
+                    "deploy_hash": r[7],
+                }
+            )
         return result
     except Exception as exc:
         logger.warning("load_escrows failed: %s", exc)
@@ -159,7 +161,9 @@ def bump_reputation(agent: str, completed: int = 0, disputed: int = 0) -> bool:
                      completed = reputation.completed + EXCLUDED.completed,
                      disputed = reputation.disputed + EXCLUDED.disputed,
                      last_active = EXCLUDED.last_active,
-                     score = GREATEST(0, LEAST(100, 50 + (reputation.completed + EXCLUDED.completed) * 5 - (reputation.disputed + EXCLUDED.disputed) * 10))""",
+                     score = GREATEST(0, LEAST(100,
+                       50 + (reputation.completed + EXCLUDED.completed) * 5
+                       - (reputation.disputed + EXCLUDED.disputed) * 10))""",
                 (agent, completed, disputed, now, max(0, min(100, 50 + completed * 5 - disputed * 10))),
             )
         return True

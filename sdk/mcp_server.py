@@ -44,9 +44,7 @@ DEFAULT_API_URL = "http://localhost:8000"
 # ---------------------------------------------------------------------------
 
 
-async def _post(
-    url: str, body: dict[str, Any], params: dict[str, str] | None = None
-) -> dict:
+async def _post(url: str, body: dict[str, Any], params: dict[str, str] | None = None) -> dict:
     async with httpx.AsyncClient(timeout=30) as c:
         r = await c.post(url, json=body, params=params)
         r.raise_for_status()
@@ -282,9 +280,7 @@ def main() -> None:
             starlette = Starlette(
                 routes=[
                     Route("/sse", endpoint=sse.handle_sse_request),
-                    Route(
-                        "/messages", endpoint=sse.handle_post_message, methods=["POST"]
-                    ),
+                    Route("/messages", endpoint=sse.handle_post_message, methods=["POST"]),
                 ]
             )
             uvicorn.run(starlette, host="0.0.0.0", port=args.port)

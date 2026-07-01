@@ -14,6 +14,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
+from server import db as pgdb
 from server.casper_client import CasperClient
 from server.config import Config
 from server.event_monitor import EventMonitor
@@ -28,7 +29,6 @@ from server.models import (
     ReputationRecord,
 )
 from server.sandbox import SandboxStore
-from server import db as pgdb
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ def get_casper() -> CasperClient | None:
 # ---------------------------------------------------------------------------
 # Event handlers — called by EventMonitor when on-chain events arrive
 # ---------------------------------------------------------------------------
+
 
 async def _on_escrow_created(event: dict[str, Any]) -> None:
     """Handle on-chain escrow_created event."""
@@ -95,6 +96,7 @@ def _broadcast_event(event: dict[str, Any]) -> None:
 # Lifespan
 # ---------------------------------------------------------------------------
 
+
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     global _casper, _monitor, _monitor_task
@@ -128,6 +130,7 @@ async def lifespan(application: FastAPI):
         logger.info("Loaded %d escrows from database", len(db_records))
     else:
         from server.seed import generate_seed_escrows
+
         seeds = generate_seed_escrows()
         for s in seeds:
             _sandbox._escrows[s["service_hash"]] = s
@@ -164,6 +167,7 @@ app.add_middleware(
 # Insurance fee helper
 # ---------------------------------------------------------------------------
 
+
 def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
     """Split amount into net + insurance fee.
 
@@ -176,6 +180,7 @@ def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.get("/health", response_model=HealthResponse)
 async def health(cfg: Config = Depends(get_config)):
@@ -252,7 +257,10 @@ async def create_escrow(
     net_amount, fee = _apply_insurance_fee(req.amount, cfg.insurance_fee_bps)
     logger.info(
         "Escrow create: gross=%d net=%d fee=%d (%d bps)",
-        req.amount, net_amount, fee, cfg.insurance_fee_bps,
+        req.amount,
+        net_amount,
+        fee,
+        cfg.insurance_fee_bps,
     )
 
     if cfg.sandbox or casper is None:
@@ -292,15 +300,21 @@ async def create_escrow(
     )
     # Persist locally too
     store._escrows[req.service_hash] = {
-        "sender": sender, "receiver": req.receiver,
-        "amount": net_amount, "service_hash": req.service_hash,
-        "status": "pending", "created_at": now, "ttl": req.ttl,
+        "sender": sender,
+        "receiver": req.receiver,
+        "amount": net_amount,
+        "service_hash": req.service_hash,
+        "status": "pending",
+        "created_at": now,
+        "ttl": req.ttl,
         "deploy_hash": deploy_hash,
     }
     pgdb.save_escrow(record)
     if fee > 0:
         pgdb.record_insurance_fee(req.service_hash, fee)
-    _broadcast_event({"type": "escrow_created", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": now})
+    _broadcast_event(
+        {"type": "escrow_created", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": now}
+    )
     return record
 
 
@@ -325,7 +339,14 @@ async def release_escrow(
         record = store.release_escrow(req.service_hash, caller)
         pgdb.update_escrow_status(req.service_hash, "released", deploy_hash)
         pgdb.bump_reputation(record.receiver, completed=1)
-        _broadcast_event({"type": "escrow_released", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": int(time.time())})
+        _broadcast_event(
+            {
+                "type": "escrow_released",
+                "service_hash": req.service_hash,
+                "deploy_hash": deploy_hash,
+                "ts": int(time.time()),
+            }
+        )
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")

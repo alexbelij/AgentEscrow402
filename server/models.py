@@ -22,9 +22,7 @@ class EscrowRequest(BaseModel):
     receiver: str = Field(..., description="Casper account hash of the receiver")
     amount: int = Field(..., gt=0, description="Amount in motes")
     service_hash: str = Field(..., min_length=64, max_length=64)
-    ttl: int = Field(
-        default=300, ge=60, le=86400, description="Time-to-live in seconds"
-    )
+    ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
 
 
 class EscrowRecord(BaseModel):

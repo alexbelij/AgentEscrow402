@@ -44,9 +44,7 @@ class EscrowPaymentTool:
             ),
             "release": lambda: self._client.release(kwargs["service_hash"]),
             "refund": lambda: self._client.refund(kwargs["service_hash"]),
-            "dispute": lambda: self._client.dispute(
-                kwargs["service_hash"], kwargs["reason_hash"]
-            ),
+            "dispute": lambda: self._client.dispute(kwargs["service_hash"], kwargs["reason_hash"]),
             "status": lambda: self._client.get_escrow(kwargs["service_hash"]),
             "reputation": lambda: self._client.get_reputation(kwargs["agent"]),
         }

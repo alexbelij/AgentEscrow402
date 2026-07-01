@@ -90,9 +90,7 @@ def parse_x402_header(raw: str) -> PaymentHeader | None:
     )
 
 
-def _build_signing_payload(
-    payment: PaymentHeader, method: str = "", path: str = ""
-) -> bytes:
+def _build_signing_payload(payment: PaymentHeader, method: str = "", path: str = "") -> bytes:
     """Canonical bytes that the sender must sign.
 
     Binds the signature to: version, escrow_hash, amount, sender,

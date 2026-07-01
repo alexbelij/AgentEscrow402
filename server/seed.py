@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import time
-from server.models import EscrowRecord
 
 
 def generate_seed_escrows() -> list[dict]:
