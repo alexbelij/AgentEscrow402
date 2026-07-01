@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -14,6 +15,7 @@ class SandboxStore:
     def __init__(self) -> None:
         self._escrows: dict[str, dict[str, Any]] = {}
         self._reputation: dict[str, dict[str, int]] = {}
+        self._lock = asyncio.Lock()
 
     def create_escrow(self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int) -> EscrowRecord:
         if service_hash in self._escrows:

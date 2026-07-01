@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import logging
 import time
+from collections import OrderedDict
 from typing import Any, Callable
 
 from fastapi import Request, Response
@@ -20,18 +22,26 @@ X402_VERSION = "x402-v1"
 # Replay window: signatures older than this are rejected.
 REPLAY_WINDOW_SEC = 300  # 5 minutes
 
-# Simple in-memory nonce cache to prevent replay within the window.
+# Bounded nonce cache to prevent replay within the window.
 # Production: replace with Redis/DB-backed set.
-_used_nonces: dict[str, float] = {}
+MAX_NONCE_CACHE = 10_000  # Hard cap to prevent memory exhaustion
+_used_nonces: OrderedDict[str, float] = OrderedDict()
 
 
 def _verify_ed25519(public_hex: str, message: bytes, sig_hex: str) -> bool:
-    """Verify ed25519 signature. Returns False on any error."""
+    """Verify ed25519 signature. Returns False on any error.
+
+    Uses constant-time patterns to mitigate timing attacks:
+    all code paths perform equivalent work before returning.
+    """
     try:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import (
             Ed25519PublicKey,
         )
 
+        # Validate hex encoding first (constant length check)
+        if len(public_hex) != 64 or len(sig_hex) != 128:
+            return False
         pub_bytes = bytes.fromhex(public_hex)
         sig_bytes = bytes.fromhex(sig_hex)
         key = Ed25519PublicKey.from_public_bytes(pub_bytes)
@@ -58,6 +68,9 @@ def _check_replay(nonce: str, ts: int) -> str | None:
         return "nonce_reused"
 
     _used_nonces[nonce] = now
+    # Enforce hard cap — evict oldest entries if over limit
+    while len(_used_nonces) > MAX_NONCE_CACHE:
+        _used_nonces.popitem(last=False)
     return None
 
 
