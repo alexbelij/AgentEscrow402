@@ -1,0 +1,15 @@
+[package]
+name = "escrow-manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+casper-contract = "4.0.0"
+casper-types = "4.0.1"
+
+[lib]
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "escrow-manager"
+path = "src/main.rs"
