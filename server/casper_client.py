@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 
 
 class CasperClient:
-    """Thin wrapper around the Casper JSON-RPC API."""
+    """Thin wrapper around the Casper JSON-RPC API.
+
+    Supports NOWNodes as primary RPC provider with automatic fallback
+    to the default node URL when NOWNodes is unavailable.
+    """
+
+    NOWNODES_URL = "https://casper.nownodes.io/rpc"
 
     def __init__(self, cfg: Config) -> None:
         self._node_url = cfg.casper_node_url
@@ -24,7 +30,10 @@ class CasperClient:
         self._contract_hash = cfg.contract_hash
         self._key_path = cfg.casper_private_key_path
         self._insurance_bps = cfg.insurance_fee_bps
+        self._nownodes_key = cfg.nownodes_api_key
         self._http = httpx.AsyncClient(timeout=30.0)
+        if self._nownodes_key:
+            logger.info("NOWNodes RPC configured as primary provider")
 
     async def _rpc(self, method: str, params: dict[str, Any] | None = None) -> Any:
         payload = {
@@ -33,6 +42,23 @@ class CasperClient:
             "method": method,
             "params": params or {},
         }
+        # Try NOWNodes first if configured
+        if self._nownodes_key:
+            try:
+                resp = await self._http.post(
+                    self.NOWNODES_URL,
+                    json=payload,
+                    headers={"api-key": self._nownodes_key},
+                )
+                resp.raise_for_status()
+                body = resp.json()
+                if "error" not in body:
+                    return body.get("result")
+                logger.warning("NOWNodes RPC error, falling back: %s", body["error"])
+            except Exception as exc:
+                logger.warning("NOWNodes unavailable (%s), falling back to default node", exc)
+
+        # Fallback to default node
         resp = await self._http.post(self._node_url + "/rpc", json=payload)
         resp.raise_for_status()
         body = resp.json()

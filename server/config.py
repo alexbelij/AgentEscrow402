@@ -12,6 +12,7 @@ from dataclasses import dataclass
 class Config:
     casper_node_url: str = ""
     casper_chain_name: str = "casper-test"
+    nownodes_api_key: str = ""
     casper_private_key_path: str = ""
     host: str = "0.0.0.0"
     port: int = 8000
@@ -39,6 +40,7 @@ class Config:
         return cls(
             casper_node_url=os.getenv("CASPER_NODE_URL", ""),
             casper_chain_name=os.getenv("CASPER_CHAIN_NAME", os.getenv("CASPER_CHAIN", "casper-test")),
+            nownodes_api_key=os.getenv("NOWNODES_API_KEY", ""),
             casper_private_key_path=key_path,
             host=os.getenv("HOST", "0.0.0.0"),
             port=int(os.getenv("PORT", "8000")),
