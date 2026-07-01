@@ -144,7 +144,7 @@ def get_stats() -> dict[str, Any]:
         }
     except Exception as exc:
         logger.warning("get_stats failed: %s", exc)
-        return {"total": 0, "db": "error", "detail": str(exc)}
+        return {"total": 0, "db": "error"}
 
 
 def bump_reputation(agent: str, completed: int = 0, disputed: int = 0) -> bool:

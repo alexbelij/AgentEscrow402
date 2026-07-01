@@ -210,11 +210,12 @@ async def list_escrows(
     status: str | None = None,
     sender: str | None = None,
     page: int = 1,
-    limit: int = 20,
+    limit: int = 20,  # capped at 100 below
     offset: int | None = None,
     store: SandboxStore = Depends(get_sandbox),
 ):
     """List escrows with optional filters and pagination."""
+    limit = min(limit, 100)  # hard cap to prevent excessive queries
     all_records = pgdb.load_escrows()
     if not all_records:
         all_records = [
@@ -277,7 +278,8 @@ async def create_escrow(
                 pgdb.record_insurance_fee(req.service_hash, fee)
             return record
         except ValueError as exc:
-            raise HTTPException(status_code=409, detail=str(exc))
+            logger.warning("create_escrow validation failed: %s", exc)
+            raise HTTPException(status_code=409, detail="Escrow creation conflict")
 
     # Live mode — deploy to Casper
     deploy_hash = await casper.create_escrow(
@@ -333,7 +335,11 @@ async def release_escrow(
         try:
             deploy_hash = await casper.release(req.service_hash)
         except Exception as exc:
-            logger.warning("Casper release failed, falling back: %s", exc)
+            logger.error("Casper release failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain release transaction failed; local state unchanged",
+            )
 
     try:
         record = store.release_escrow(req.service_hash, caller)
@@ -369,7 +375,11 @@ async def refund_escrow(
         try:
             deploy_hash = await casper.refund(req.service_hash)
         except Exception as exc:
-            logger.warning("Casper refund failed, falling back: %s", exc)
+            logger.error("Casper refund failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain refund transaction failed; local state unchanged",
+            )
 
     try:
         record = store.refund_escrow(req.service_hash, caller)
@@ -395,7 +405,11 @@ async def dispute_escrow(
         try:
             deploy_hash = await casper.dispute(req.service_hash)
         except Exception as exc:
-            logger.warning("Casper dispute failed, falling back: %s", exc)
+            logger.error("Casper dispute failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain dispute transaction failed; local state unchanged",
+            )
 
     try:
         record = store.dispute_escrow(req.service_hash)
