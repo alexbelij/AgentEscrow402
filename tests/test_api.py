@@ -41,7 +41,7 @@ class TestHealthEndpoint:
 
     def test_health_version(self, client):
         resp = client.get("/health")
-        assert resp.json()["version"] == "0.1.0"
+        assert resp.json()["version"] == "0.2.0"
 
 
 class TestEscrowEndpoint:
@@ -57,7 +57,7 @@ class TestEscrowEndpoint:
         )
         assert resp.status_code == 200
         body = resp.json()
-        assert body["amount"] == 5000
+        assert body["amount"] == 4900  # net after 2% insurance fee
         assert body["status"] == "pending"
 
     def test_create_duplicate_escrow_returns_409(self, client):
