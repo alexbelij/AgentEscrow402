@@ -1,20 +1,13 @@
-[project]
-name = "agentescrow402"
-version = "0.1.0"
-description = "x402-compatible payment middleware for AI agents on Casper"
-requires-python = ">=3.11"
-
-[tool.black]
-line-length = 88
-target-version = ["py311"]
-
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+[tool.ruff.lint.isort]
+known-first-party = ["server", "sdk"]
+
+[tool.black]
+line-length = 120
+target-version = ["py311"]

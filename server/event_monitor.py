@@ -134,10 +134,7 @@ class EventMonitor:
             return
 
         transforms = (
-            deploy_processed.get("execution_result", {})
-            .get("Success", {})
-            .get("effect", {})
-            .get("transforms", [])
+            deploy_processed.get("execution_result", {}).get("Success", {}).get("effect", {}).get("transforms", [])
         )
         for transform in transforms:
             written = transform.get("transform", {})

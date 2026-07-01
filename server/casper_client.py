@@ -44,9 +44,7 @@ class CasperClient:
         result = await self._rpc("chain_get_state_root_hash")
         return result["state_root_hash"]
 
-    async def query_contract_dict(
-        self, dict_name: str, key: str
-    ) -> dict[str, Any] | None:
+    async def query_contract_dict(self, dict_name: str, key: str) -> dict[str, Any] | None:
         try:
             srh = await self.get_state_root_hash()
             result = await self._rpc(
@@ -71,13 +69,15 @@ class CasperClient:
         """Detect whether the loaded key is ed25519 or secp256k1."""
         try:
             from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
             if isinstance(private_key, Ed25519PrivateKey):
                 return "ed25519"
         except ImportError:
             pass
 
         try:
-            from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePrivateKey, SECP256K1
+            from cryptography.hazmat.primitives.asymmetric.ec import SECP256K1, EllipticCurvePrivateKey
+
             if isinstance(private_key, EllipticCurvePrivateKey):
                 if isinstance(private_key.curve, SECP256K1):
                     return "secp256k1"
@@ -198,9 +198,7 @@ class CasperClient:
         )
 
         # Get compressed public key (33 bytes)
-        pub_bytes = private_key.public_key().public_bytes(
-            Encoding.X962, PublicFormat.CompressedPoint
-        )
+        pub_bytes = private_key.public_key().public_bytes(Encoding.X962, PublicFormat.CompressedPoint)
         deploy["header"]["account"] = "02" + pub_bytes.hex()
         deploy["header"]["body_hash"] = body_hash
 
@@ -226,9 +224,7 @@ class CasperClient:
         ]
         return deploy
 
-    async def create_escrow(
-        self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int
-    ) -> str:
+    async def create_escrow(self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int) -> str:
         return await self.deploy_transaction(
             "create_escrow",
             {

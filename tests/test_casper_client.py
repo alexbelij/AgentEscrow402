@@ -86,9 +86,7 @@ class TestClientInit:
         with pytest.raises(RuntimeError, match="contract_hash"):
             import asyncio
 
-            asyncio.get_event_loop().run_until_complete(
-                client.deploy_transaction("test", {})
-            )
+            asyncio.get_event_loop().run_until_complete(client.deploy_transaction("test", {}))
 
     def test_deploy_without_key_raises(self):
         cfg = Config(contract_hash="abc", casper_private_key_path="")
@@ -96,6 +94,4 @@ class TestClientInit:
         with pytest.raises(RuntimeError, match="private key"):
             import asyncio
 
-            asyncio.get_event_loop().run_until_complete(
-                client.deploy_transaction("test", {})
-            )
+            asyncio.get_event_loop().run_until_complete(client.deploy_transaction("test", {}))
