@@ -166,6 +166,80 @@ TOOLS = [
             "required": ["sender", "receiver", "amount"],
         },
     ),
+    Tool(
+        name="list_escrows",
+        description="List all escrows with optional status filter.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "description": "Filter by status (active, completed, disputed, expired)",
+                },
+                "limit": {"type": "integer", "description": "Max results", "default": 50},
+            },
+        },
+    ),
+    Tool(
+        name="get_stats",
+        description="Get aggregate escrow statistics: total count, volume, success rate.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="estimate_fee",
+        description="Estimate fees and insurance cost for a given escrow amount.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "amount": {"type": "integer", "description": "Escrow amount in motes"},
+            },
+            "required": ["amount"],
+        },
+    ),
+    Tool(
+        name="get_escrow_history",
+        description="Get the full state change history of an escrow.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "service_hash": {"type": "string"},
+            },
+            "required": ["service_hash"],
+        },
+    ),
+    Tool(
+        name="list_agents",
+        description="List all known agents with their reputation scores.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
+    Tool(
+        name="get_events",
+        description="Get recent escrow events (creates, releases, disputes).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "description": "Max events", "default": 20},
+            },
+        },
+    ),
+    Tool(
+        name="compute_hash",
+        description="Compute the service hash for a sender-receiver-amount tuple.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "sender": {"type": "string"},
+                "receiver": {"type": "string"},
+                "amount": {"type": "integer"},
+            },
+            "required": ["sender", "receiver", "amount"],
+        },
+    ),
+    Tool(
+        name="health_check",
+        description="Check API and blockchain connection health status.",
+        inputSchema={"type": "object", "properties": {}},
+    ),
 ]
 
 # ---------------------------------------------------------------------------
@@ -227,6 +301,41 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
             "service_hash": sh,
             "nonce": nonce,
         }
+
+    elif name == "list_escrows":
+        params = []
+        if "status" in args:
+            params.append(f"status={args['status']}")
+        if "limit" in args:
+            params.append(f"limit={args['limit']}")
+        qs = f"?{'&'.join(params)}" if params else ""
+        result = await _get(f"{base}/escrows{qs}")
+
+    elif name == "get_stats":
+        result = await _get(f"{base}/stats")
+
+    elif name == "estimate_fee":
+        result = await _get(f"{base}/estimate?amount={args['amount']}")
+
+    elif name == "get_escrow_history":
+        result = await _get(f"{base}/escrow/{args['service_hash']}/history")
+
+    elif name == "list_agents":
+        result = await _get(f"{base}/agents")
+
+    elif name == "get_events":
+        limit = args.get("limit", 20)
+        result = await _get(f"{base}/events?limit={limit}")
+
+    elif name == "compute_hash":
+        result = await _post(f"{base}/compute-hash", {
+            "sender": args["sender"],
+            "receiver": args["receiver"],
+            "amount": args["amount"],
+        })
+
+    elif name == "health_check":
+        result = await _get(f"{base}/health")
 
     else:
         result = {"error": f"Unknown tool: {name}"}
