@@ -31,12 +31,58 @@ except ImportError:
     HAS_MCP = False
 
 import httpx
+import re
+import urllib.parse
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
 DEFAULT_API_URL = "http://localhost:8000"
+MAX_AMOUNT = 10**18  # max 1 quintillion motes
+MAX_TTL = 86400
+MIN_TTL = 60
+MAX_LIMIT = 500
+SHA256_RE = re.compile(r"^[a-f0-9]{64}$")
+ID_RE = re.compile(r"^[a-zA-Z0-9_\-.:]{1,128}$")
+
+# ---------------------------------------------------------------------------
+# Validation helpers
+# ---------------------------------------------------------------------------
+
+
+def _validate_amount(v: Any) -> int:
+    """Validate numeric amount is positive and bounded."""
+    val = int(v)
+    if val <= 0:
+        raise ValueError("amount must be positive")
+    if val > MAX_AMOUNT:
+        raise ValueError(f"amount exceeds maximum ({MAX_AMOUNT})")
+    return val
+
+
+def _validate_limit(v: Any, default: int = 20) -> int:
+    val = int(v) if v is not None else default
+    return max(1, min(val, MAX_LIMIT))
+
+
+def _validate_id(v: str, name: str = "id") -> str:
+    s = str(v).strip()
+    if not ID_RE.match(s):
+        raise ValueError(f"invalid {name}: must be 1-128 alphanumeric chars")
+    return s
+
+
+def _validate_hash(v: str, name: str = "hash") -> str:
+    s = str(v).strip().lower()
+    if not SHA256_RE.match(s):
+        raise ValueError(f"invalid {name}: must be 64 hex chars")
+    return s
+
+
+def _safe_path(segment: str) -> str:
+    """URL-encode a path segment to prevent injection."""
+    return urllib.parse.quote(str(segment), safe="")
 
 
 # ---------------------------------------------------------------------------
@@ -51,9 +97,9 @@ async def _post(url: str, body: dict[str, Any], params: dict[str, str] | None = 
         return r.json()
 
 
-async def _get(url: str) -> dict:
+async def _get(url: str, params: dict[str, Any] | None = None) -> dict:
     async with httpx.AsyncClient(timeout=30) as c:
-        r = await c.get(url)
+        r = await c.get(url, params=params)
         r.raise_for_status()
         return r.json()
 
@@ -386,122 +432,147 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
     """Route a tool call to the API and return JSON."""
     base = api_url.rstrip("/")
 
-    if name == "create_escrow":
-        nonce = uuid.uuid4().hex
-        sh = _hash(args["sender"], args["receiver"], args["amount"], nonce)
-        result = await _post(
-            f"{base}/escrow",
-            {"receiver": args["receiver"], "amount": args["amount"], "service_hash": sh, "ttl": args.get("ttl", 300)},
-            params={"sender": args["sender"]},
-        )
+    try:
+        if name == "create_escrow":
+            sender = _validate_id(args["sender"], "sender")
+            receiver = _validate_id(args["receiver"], "receiver")
+            amount = _validate_amount(args["amount"])
+            ttl_raw = args.get("ttl", 300)
+            ttl = max(MIN_TTL, min(int(ttl_raw), MAX_TTL))
+            nonce = uuid.uuid4().hex
+            sh = _hash(sender, receiver, amount, nonce)
+            result = await _post(
+                f"{base}/escrow",
+                {"receiver": receiver, "amount": amount, "service_hash": sh, "ttl": ttl},
+                params={"sender": sender},
+            )
 
-    elif name == "release_escrow":
-        result = await _post(f"{base}/release", {"service_hash": args["service_hash"]}, params={"sender": args["sender"]})
+        elif name == "release_escrow":
+            result = await _post(f"{base}/release", {"service_hash": _validate_hash(args["service_hash"], "service_hash")}, params={"sender": _validate_id(args["sender"], "sender")})
 
-    elif name == "refund_escrow":
-        result = await _post(f"{base}/refund", {"service_hash": args["service_hash"]}, params={"sender": args["sender"]})
+        elif name == "refund_escrow":
+            result = await _post(f"{base}/refund", {"service_hash": _validate_hash(args["service_hash"], "service_hash")}, params={"sender": _validate_id(args["sender"], "sender")})
 
-    elif name == "dispute_escrow":
-        result = await _post(
-            f"{base}/dispute",
-            {"service_hash": args["service_hash"], "reason_hash": args["reason_hash"]},
-            params={"sender": args["sender"]},
-        )
+        elif name == "dispute_escrow":
+            result = await _post(
+                f"{base}/dispute",
+                {"service_hash": _validate_hash(args["service_hash"], "service_hash"), "reason_hash": _validate_hash(args["reason_hash"], "reason_hash")},
+                params={"sender": _validate_id(args["sender"], "sender")},
+            )
 
-    elif name == "get_escrow":
-        result = await _get(f"{base}/escrow/{args['service_hash']}")
+        elif name == "get_escrow":
+            result = await _get(f"{base}/escrow/{_safe_path(_validate_hash(args['service_hash'], 'service_hash'))}")
 
-    elif name == "get_reputation":
-        result = await _get(f"{base}/reputation/{args['agent']}")
+        elif name == "get_reputation":
+            result = await _get(f"{base}/reputation/{_safe_path(_validate_id(args['agent'], 'agent'))}")
 
-    elif name == "build_x402_header":
-        nonce = uuid.uuid4().hex
-        sh = _hash(args["sender"], args["receiver"], args["amount"], nonce)
-        ts = int(time.time())
-        result = {"header": f"x402;1;{args['amount']};{sh};{ts};{nonce}", "service_hash": sh, "nonce": nonce}
+        elif name == "build_x402_header":
+            sender = _validate_id(args["sender"], "sender")
+            receiver = _validate_id(args["receiver"], "receiver")
+            amount = _validate_amount(args["amount"])
+            nonce = uuid.uuid4().hex
+            sh = _hash(sender, receiver, amount, nonce)
+            ts = int(time.time())
+            result = {"header": f"x402;1;{amount};{sh};{ts};{nonce}", "service_hash": sh, "nonce": nonce}
 
-    elif name == "list_escrows":
-        params = {}
-        if "status" in args:
-            params["status"] = args["status"]
-        if "limit" in args:
-            params["limit"] = str(args["limit"])
-        qs = "&".join(f"{k}={v}" for k, v in params.items())
-        url = f"{base}/escrows" + (f"?{qs}" if qs else "")
-        result = await _get(url)
+        elif name == "list_escrows":
+            params: dict[str, str] = {}
+            if "status" in args:
+                params["status"] = str(args["status"])
+            params["limit"] = str(_validate_limit(args.get("limit"), 50))
+            result = await _get(f"{base}/escrows", params=params)
 
-    elif name == "get_stats":
-        result = await _get(f"{base}/stats")
+        elif name == "get_stats":
+            result = await _get(f"{base}/stats")
 
-    elif name == "estimate_fee":
-        result = await _get(f"{base}/estimate?amount={args['amount']}")
+        elif name == "estimate_fee":
+            amount = _validate_amount(args["amount"])
+            result = await _get(f"{base}/estimate", params={"amount": str(amount)})
 
-    elif name == "get_escrow_history":
-        result = await _get(f"{base}/escrow/{args['service_hash']}/history")
+        elif name == "get_escrow_history":
+            result = await _get(f"{base}/escrow/{_safe_path(_validate_hash(args['service_hash'], 'service_hash'))}/history")
 
-    elif name == "list_agents":
-        result = await _get(f"{base}/agents")
+        elif name == "list_agents":
+            result = await _get(f"{base}/agents")
 
-    elif name == "get_events":
-        result = await _get(f"{base}/events?limit={args.get('limit', 20)}")
+        elif name == "get_events":
+            limit = _validate_limit(args.get("limit"), 20)
+            result = await _get(f"{base}/events", params={"limit": str(limit)})
 
-    elif name == "compute_hash":
-        result = await _post(f"{base}/compute-hash", {"sender": args["sender"], "receiver": args["receiver"], "amount": args["amount"]})
+        elif name == "compute_hash":
+            result = await _post(f"{base}/compute-hash", {"sender": _validate_id(args["sender"], "sender"), "receiver": _validate_id(args["receiver"], "receiver"), "amount": _validate_amount(args["amount"])})
 
-    elif name == "health_check":
-        result = await _get(f"{base}/health")
+        elif name == "health_check":
+            result = await _get(f"{base}/health")
 
-    # --- AI Arbitration ---
-    elif name == "submit_dispute_arbitration":
-        result = await _post(f"{base}/arbitration/submit", {
-            "service_hash": args["service_hash"],
-            "evidence_sender": args["evidence_sender"],
-            "evidence_receiver": args["evidence_receiver"],
-            "category": args.get("category", "non_delivery"),
-        })
+        # --- AI Arbitration ---
+        elif name == "submit_dispute_arbitration":
+            result = await _post(f"{base}/arbitration/submit", {
+                "service_hash": _validate_hash(args["service_hash"], "service_hash"),
+                "evidence_sender": str(args["evidence_sender"])[:10000],
+                "evidence_receiver": str(args["evidence_receiver"])[:10000],
+                "category": args.get("category", "non_delivery"),
+            })
 
-    elif name == "get_arbitration_result":
-        result = await _get(f"{base}/arbitration/{args['arbitration_id']}")
+        elif name == "get_arbitration_result":
+            result = await _get(f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}")
 
-    elif name == "appeal_arbitration":
-        result = await _post(f"{base}/arbitration/{args['arbitration_id']}/appeal", {
-            "appellant": args["appellant"],
-            "new_evidence": args.get("new_evidence", ""),
-        })
+        elif name == "appeal_arbitration":
+            result = await _post(f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}/appeal", {
+                "appellant": _validate_id(args["appellant"], "appellant"),
+                "new_evidence": str(args.get("new_evidence", ""))[:10000],
+            })
 
-    # --- Risk Scoring ---
-    elif name == "calculate_risk_score":
-        result = await _post(f"{base}/risk/score", {
-            "sender": args["sender"],
-            "receiver": args["receiver"],
-            "amount": args["amount"],
-        })
+        # --- Risk Scoring ---
+        elif name == "calculate_risk_score":
+            result = await _post(f"{base}/risk/score", {
+                "sender": _validate_id(args["sender"], "sender"),
+                "receiver": _validate_id(args["receiver"], "receiver"),
+                "amount": _validate_amount(args["amount"]),
+            })
 
-    elif name == "get_risk_report":
-        result = await _get(f"{base}/risk/report/{args['target']}?type={args.get('report_type', 'agent')}")
+        elif name == "get_risk_report":
+            target = _validate_id(args["target"], "target")
+            report_type = args.get("report_type", "agent")
+            if report_type not in ("agent", "escrow"):
+                report_type = "agent"
+            result = await _get(f"{base}/risk/report/{_safe_path(target)}", params={"type": report_type})
 
-    elif name == "set_risk_threshold":
-        result = await _post(f"{base}/risk/threshold", {
-            "threshold": args["threshold"],
-            "action": args.get("action", "flag"),
-        })
+        elif name == "set_risk_threshold":
+            threshold = float(args["threshold"])
+            if not 0.0 <= threshold <= 1.0:
+                raise ValueError("threshold must be 0.0-1.0")
+            action = args.get("action", "flag")
+            if action not in ("flag", "reject", "require_review"):
+                action = "flag"
+            result = await _post(f"{base}/risk/threshold", {
+                "threshold": threshold,
+                "action": action,
+            })
 
-    # --- Identity Registry ---
-    elif name == "register_identity":
-        result = await _post(f"{base}/identity/register", {
-            "agent_id": args["agent_id"],
-            "public_key": args["public_key"],
-            "metadata": args.get("metadata", {}),
-        })
+        # --- Identity Registry ---
+        elif name == "register_identity":
+            result = await _post(f"{base}/identity/register", {
+                "agent_id": _validate_id(args["agent_id"], "agent_id"),
+                "public_key": str(args["public_key"])[:256],
+                "metadata": args.get("metadata", {}),
+            })
 
-    elif name == "verify_identity":
-        result = await _get(f"{base}/identity/{args['agent_id']}/verify")
+        elif name == "verify_identity":
+            result = await _get(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}/verify")
 
-    elif name == "revoke_identity":
-        result = await _post(f"{base}/identity/{args['agent_id']}/revoke", {"reason": args["reason"]})
+        elif name == "revoke_identity":
+            result = await _post(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}/revoke", {"reason": str(args["reason"])[:1000]})
 
-    else:
-        result = {"error": f"Unknown tool: {name}"}
+        else:
+            result = {"error": f"Unknown tool: {name}"}
+
+    except (ValueError, TypeError, KeyError) as exc:
+        result = {"error": f"Validation error: {exc}"}
+    except httpx.HTTPStatusError:
+        result = {"error": "API request failed"}
+    except httpx.RequestError:
+        result = {"error": "API connection error"}
 
     return json.dumps(result, indent=2)
 
