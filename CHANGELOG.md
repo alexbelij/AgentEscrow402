@@ -7,6 +7,48 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [1.1.0] — 2026-07-02
+
+*Major feature expansion — pre-submission hardening*
+
+### Added
+
+#### Smart Contracts (Rust/Odra)
+- **EscrowManager** (575 LOC) — advanced escrow lifecycle with multi-sig and batch support
+- **VRF Arbiter** (308 LOC) — verifiable random function for fair dispute arbitration
+- **InsurancePool** (268 LOC) — collective insurance fund with premium/payout tracking
+
+#### Backend Modules (Python)
+- **AI Arbitration Engine** (`server/ai_arbitration.py`, 299 LOC) — multi-model dispute resolution with evidence scoring, voting rounds, and appeal windows
+- **Risk Scoring** (`server/risk_scoring.py`, 167 LOC) — composite risk analysis combining counterparty history, amount heuristics, and chain patterns
+- **Identity Registry** (`server/identity_registry.py`, 240 LOC) — decentralized agent identity with Ed25519 credential verification and KYC-level attestation
+
+#### MCP Server
+- Expanded from 15 to 24 tools — new tools for arbitration, risk scoring, and identity management
+- Fixed duplicate tool definitions in MCP manifest
+
+#### Dashboard
+- 4 new tabs: Arbitration, Risk Analysis, Identity Registry, Contracts
+- AI dispute verdict history with confidence scores
+- Real-time risk factor breakdown with visual bars
+- Identity registration and verification status
+
+#### Tests
+- 103 new business logic tests (3 files, 1,398 LOC)
+- `test_ai_arbitration.py`: 40 tests — dispute resolution, voting, timeout handling
+- `test_risk_scoring.py`: 35 tests — scoring models, boundary values, validation
+- `test_identity_registry.py`: 28 tests — registration, verification, revocation
+
+### Security
+- Bounded nonce cache to prevent memory exhaustion
+- Constant-time Ed25519 signature comparison
+- Halt local state on transaction failure
+- Sanitized error messages (no stack trace leakage)
+- Capped pagination limits
+- Thread-safe SandboxStore with Lock
+
+---
+
 ## [1.0.0] — 2026-06-30
 
 *Hackathon release — Casper Agentic Buildathon 2026*
