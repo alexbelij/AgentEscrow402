@@ -1,6 +1,9 @@
-import random
 import math
+import os
+import random
+import struct
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 class TransactionFeatures(BaseModel):
@@ -83,10 +86,13 @@ class IsolationTree:
         return 2.0 * (math.log(n - 1) + 0.5772156649) - (2.0 * (n - 1) / n)
 
 class IsolationForest:
-    def __init__(self, n_trees: int = 100, sample_size: int = 256, max_depth: int = 8, seed: int = 42):
+    def __init__(self, n_trees: int = 100, sample_size: int = 256, max_depth: int = 8, seed: int | None = None):
         self.n_trees = n_trees
         self.sample_size = sample_size
         self.max_depth = max_depth
+        # Use cryptographically secure seed if none provided
+        if seed is None:
+            seed = struct.unpack("I", os.urandom(4))[0]
         self.seed = seed
         self.trees: list[IsolationNode] = []
         self.rng = random.Random(seed)
@@ -112,6 +118,7 @@ class IsolationForest:
         anomaly_score = self.score_sample(features)
         risk_int = min(100, max(0, int(anomaly_score * 100)))
         feature_values = self._to_dict(features)
+        import time as _time
         return RiskScore(
             escrow_id=escrow_id,
             score=risk_int,
@@ -119,7 +126,7 @@ class IsolationForest:
             features_used=list(feature_values.keys()),
             feature_values=feature_values,
             model_version="iforest-v1",
-            scored_at=int(random.Random().random() * 1000000000),
+            scored_at=int(_time.time()),
             explanation=f"Anomaly score: {anomaly_score:.4f}"
         )
 

@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import json as _json
 from datetime import datetime
 from enum import Enum
 from typing import Optional
@@ -61,11 +62,12 @@ class IdentityRegistry:
             did = f"did:casper:{account_hash}"
             now = int(datetime.utcnow().timestamp())
 
+            # Defensive copy to prevent shared mutable reference
             identity = AgentIdentity(
                 did=did,
                 account_hash=account_hash,
-                display_name=display_name,
-                capabilities=capabilities or [],
+                display_name=display_name[:256],
+                capabilities=list(capabilities) if capabilities else [],
                 verification_level=VerificationLevel.UNVERIFIED,
                 reputation_score=50,
                 total_deals=0,
@@ -213,7 +215,15 @@ class IdentityRegistry:
             }
 
     def _compute_metadata_hash(self, identity: AgentIdentity) -> str:
-        data = f"{identity.did}:{identity.account_hash}:{identity.display_name}:{identity.verification_level.value}:{identity.reputation_score}:{identity.last_active}"
+        # Use structured JSON to avoid delimiter-based hash collisions
+        data = _json.dumps({
+            "did": identity.did,
+            "account_hash": identity.account_hash,
+            "display_name": identity.display_name,
+            "verification_level": identity.verification_level.value,
+            "reputation_score": identity.reputation_score,
+            "last_active": identity.last_active,
+        }, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(data.encode()).hexdigest()
 
 

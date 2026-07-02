@@ -35,6 +35,8 @@ class ArbitrationRecommendation(BaseModel):
 
 
 class ArbitrationAgent:
+    MAX_HISTORY = 10_000
+
     def __init__(self, slashing_rate: float = 0.05, min_evidence: int = 1, max_evidence: int = 20):
         if not 0.0 <= slashing_rate <= 1.0:
             raise ValueError("slashing_rate must be between 0 and 1")
@@ -121,10 +123,18 @@ class ArbitrationAgent:
         )
 
         self._history.append(result)
+        # Evict oldest entries when history exceeds limit
+        if len(self._history) > self.MAX_HISTORY:
+            self._history = self._history[-self.MAX_HISTORY:]
         for ev in sender_evidence:
             self._agent_disputes[ev.claimant].append(dispute_id)
         for ev in receiver_evidence:
             self._agent_disputes[ev.claimant].append(dispute_id)
+        # Cap agent dispute history
+        for ev in sender_evidence + receiver_evidence:
+            disputes = self._agent_disputes[ev.claimant]
+            if len(disputes) > self.MAX_HISTORY:
+                self._agent_disputes[ev.claimant] = disputes[-self.MAX_HISTORY:]
 
         return result
 
