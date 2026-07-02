@@ -12,6 +12,7 @@ import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
 import NotFound from './components/NotFound'
 import Dashboard from './components/Dashboard'
+import { DataModeProvider } from './components/DataModeToggle'
 
 function Landing() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
   }, [mobileOpen])
 
   return (
+    <DataModeProvider>
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
       <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
@@ -49,5 +51,6 @@ export default function App() {
       </main>
       <Footer />
     </div>
+    </DataModeProvider>
   )
 }
