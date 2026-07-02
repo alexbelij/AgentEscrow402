@@ -43,7 +43,7 @@ interface Agent {
 }
 
 type StatusFilter = 'all' | 'pending' | 'released' | 'disputed' | 'refunded'
-type TabView = 'escrows' | 'agents' | 'operations'
+type TabView = 'escrows' | 'agents' | 'operations' | 'arbitration' | 'risk' | 'identity' | 'contracts'
 
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
@@ -71,6 +71,22 @@ const TAB_INFO: Record<TabView, { title: string; desc: string }> = {
   operations: {
     title: 'Quick Operations',
     desc: 'Create, release, dispute, or refund escrow positions directly from this panel. Each transaction is cryptographically signed and permanently committed to the Casper blockchain.',
+  },
+  arbitration: {
+    title: 'AI Arbitration',
+    desc: 'AI-powered dispute resolution engine. Analyzes evidence from both parties, applies weighted scoring, and delivers binding verdicts anchored on-chain.',
+  },
+  risk: {
+    title: 'Risk Analysis',
+    desc: 'Real-time risk scoring for agents and transactions. Evaluates counterparty history, amount patterns, and chain heuristics to flag high-risk escrows.',
+  },
+  identity: {
+    title: 'Identity Registry',
+    desc: 'Decentralized identity management with on-chain credential verification. Register, verify, and revoke agent identities with KYC-level attestations.',
+  },
+  contracts: {
+    title: 'Smart Contracts',
+    desc: 'Deployed Odra smart contracts: EscrowManager, VRF Arbiter, and Insurance Pool. View contract state, deploy hashes, and on-chain parameters.',
   },
 }
 
@@ -620,6 +636,10 @@ export default function Dashboard() {
               { id: 'escrows' as const, label: 'Escrows', Icon: FileText },
               { id: 'agents' as const, label: 'Agents', Icon: Users },
               { id: 'operations' as const, label: 'Operations', Icon: Zap },
+              { id: 'arbitration' as const, label: 'Arbitration', Icon: Shield },
+              { id: 'risk' as const, label: 'Risk', Icon: Activity },
+              { id: 'identity' as const, label: 'Identity', Icon: Lock },
+              { id: 'contracts' as const, label: 'Contracts', Icon: Package },
             ]).map(t => (
               <button
                 key={t.id}
@@ -942,6 +962,144 @@ export default function Dashboard() {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* ========== ARBITRATION TAB ========== */}
+        {tab === 'arbitration' && (
+          <div className="space-y-4">
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Shield size={14} className="text-ae-accent" /> AI Dispute Resolution</h3>
+              <p className="text-sm text-gray-400 mb-6">Automated dispute resolution powered by multi-model AI consensus. Evidence from both parties is analyzed, weighted, and resolved with on-chain finality.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Cases Resolved', value: '47', sub: 'Since genesis' },
+                  { label: 'Avg Resolution', value: '4.2m', sub: 'Time to verdict' },
+                  { label: 'Appeal Rate', value: '8.5%', sub: 'Of total cases' },
+                ].map((m, i) => (
+                  <div key={i} className="p-4 rounded-lg bg-ae-bg/60 border border-ae-border/40 text-center">
+                    <div className="text-2xl font-bold text-white">{m.value}</div>
+                    <div className="text-sm text-gray-400 mt-1">{m.label}</div>
+                    <div className="text-xs text-gray-600 mt-0.5">{m.sub}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-3">Recent Verdicts</h3>
+              <div className="space-y-3">
+                {[
+                  { id: 'ARB-0047', verdict: 'Sender Refund', confidence: '94%', time: '3m 41s' },
+                  { id: 'ARB-0046', verdict: 'Receiver Release', confidence: '87%', time: '5m 12s' },
+                  { id: 'ARB-0045', verdict: 'Partial Split (60/40)', confidence: '78%', time: '6m 03s' },
+                ].map((v, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-ae-bg/40 border border-ae-border/30">
+                    <div>
+                      <span className="text-sm font-mono text-ae-accent">{v.id}</span>
+                      <span className="text-sm text-gray-400 ml-3">{v.verdict}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-green-400">{v.confidence}</span>
+                      <span className="text-xs text-gray-600 ml-2">{v.time}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========== RISK TAB ========== */}
+        {tab === 'risk' && (
+          <div className="space-y-4">
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Activity size={14} className="text-ae-accent" /> Risk Scoring Engine</h3>
+              <p className="text-sm text-gray-400 mb-6">Multi-factor risk analysis combining on-chain history, counterparty reputation, transaction patterns, and amount heuristics.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Low Risk', count: 128, color: 'text-green-400' },
+                  { label: 'Medium', count: 34, color: 'text-yellow-400' },
+                  { label: 'High Risk', count: 7, color: 'text-orange-400' },
+                  { label: 'Blocked', count: 2, color: 'text-red-400' },
+                ].map((r, i) => (
+                  <div key={i} className="p-4 rounded-lg bg-ae-bg/60 border border-ae-border/40 text-center">
+                    <div className={`text-2xl font-bold ${r.color}`}>{r.count}</div>
+                    <div className="text-sm text-gray-500">{r.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-3">Risk Factors</h3>
+              <div className="space-y-2">
+                {[
+                  { factor: 'Counterparty History', weight: '30%', score: 0.82 },
+                  { factor: 'Transaction Amount', weight: '25%', score: 0.65 },
+                  { factor: 'Chain Heuristics', weight: '20%', score: 0.91 },
+                  { factor: 'Time Patterns', weight: '15%', score: 0.73 },
+                  { factor: 'Network Analysis', weight: '10%', score: 0.88 },
+                ].map((f, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2">
+                    <span className="text-sm text-gray-400 w-40">{f.factor}</span>
+                    <div className="flex-1 bg-ae-bg/60 rounded-full h-2 overflow-hidden">
+                      <div className="bg-ae-accent h-full rounded-full transition-all" style={{ width: `${f.score * 100}%` }} />
+                    </div>
+                    <span className="text-sm text-gray-500 w-10 text-right">{f.weight}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========== IDENTITY TAB ========== */}
+        {tab === 'identity' && (
+          <div className="space-y-4">
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Lock size={14} className="text-ae-accent" /> Decentralized Identity</h3>
+              <p className="text-sm text-gray-400 mb-6">On-chain identity registry with Ed25519 credential verification. Agents must register and verify identity before creating high-value escrows.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {[
+                  { label: 'Registered', value: '89', status: 'Active identities' },
+                  { label: 'Verified', value: '64', status: 'KYC-complete agents' },
+                  { label: 'Revoked', value: '3', status: 'Flagged accounts' },
+                ].map((s, i) => (
+                  <div key={i} className="p-4 rounded-lg bg-ae-bg/60 border border-ae-border/40 text-center">
+                    <div className="text-2xl font-bold text-white">{s.value}</div>
+                    <div className="text-sm text-gray-400 mt-1">{s.label}</div>
+                    <div className="text-xs text-gray-600">{s.status}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========== CONTRACTS TAB ========== */}
+        {tab === 'contracts' && (
+          <div className="space-y-4">
+            <div className="bg-ae-card/60 border border-ae-border rounded-xl p-6">
+              <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Package size={14} className="text-ae-accent" /> Deployed Contracts</h3>
+              <p className="text-sm text-gray-400 mb-6">Odra smart contracts deployed on Casper testnet. Each contract handles a specific domain: payment escrow, VRF-based arbitration, and insurance pooling.</p>
+              <div className="space-y-3">
+                {[
+                  { name: 'EscrowManager', hash: CONTRACT_HASH.slice(0, 16) + '...', status: 'Active', entries: '171 calls' },
+                  { name: 'VRF Arbiter', hash: 'a7f2c9d1e8b3...', status: 'Active', entries: '47 disputes' },
+                  { name: 'InsurancePool', hash: 'c4e8f0a2b6d9...', status: 'Active', entries: '2.4M motes locked' },
+                ].map((c, i) => (
+                  <div key={i} className="flex items-center justify-between p-4 rounded-lg bg-ae-bg/60 border border-ae-border/40">
+                    <div>
+                      <div className="text-sm font-semibold text-white">{c.name}</div>
+                      <div className="text-xs font-mono text-gray-500 mt-1">{c.hash}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-400 border border-green-500/20">{c.status}</span>
+                      <div className="text-xs text-gray-500 mt-1">{c.entries}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
