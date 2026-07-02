@@ -6,6 +6,8 @@ import {
   Activity, TrendingUp, Lock, Unlock, FileText
 } from 'lucide-react'
 
+import DataModeToggle, { useDataMode } from './DataModeToggle'
+
 const API = import.meta.env.VITE_API_URL || 'https://agentescrow402-api.onrender.com'
 const CONTRACT_HASH = '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'
 const CSPR_LIVE = 'https://testnet.cspr.live'
@@ -580,6 +582,7 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
+            <DataModeToggle />
             <button onClick={() => { fetchStats(); fetchEscrows() }} className="text-gray-500 hover:text-white transition-colors p-1.5" title="Refresh data">
               <RefreshCw size={14} />
             </button>
