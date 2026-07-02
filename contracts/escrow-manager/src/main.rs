@@ -3,62 +3,67 @@
 
 extern crate alloc;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::{String, ToString};
 use alloc::vec;
+use alloc::vec::Vec;
 
 use casper_contract::contract_api::{runtime, storage, system};
 use casper_contract::unwrap_or_revert::UnwrapOrRevert;
-
-use casper_types::{
-    ApiError, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointType, EntryPoints,
-    Parameter, URef, U512, Key,
-};
 use casper_types::account::AccountHash;
 use casper_types::contracts::NamedKeys;
-use casper_types::EntryPointPayment;
+use casper_types::{
+    ApiError, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointType, EntryPoints, Key,
+    Parameter, URef, U512, EntryPointPayment,
+};
 
 // Error codes
 const ERROR_NOT_INSTALLER: u16 = 1;
 const ERROR_ESCROW_NOT_FOUND: u16 = 2;
 const ERROR_NOT_SENDER: u16 = 3;
-const ERROR_NOT_RECEIVER: u16 = 4;
-const ERROR_INVALID_STATUS: u16 = 5;
-const ERROR_ALREADY_EXISTS: u16 = 6;
-const ERROR_INVALID_FEE: u16 = 7;
-const ERROR_CONTRACT_FROZEN: u16 = 8;
-const ERROR_TRANSFER_FAILED: u16 = 9;
-const ERROR_INVALID_TTL: u16 = 10;
-const ERROR_ESCROW_EXPIRED: u16 = 11;
-const ERROR_INVALID_AMOUNT: u16 = 12;
-const ERROR_NOT_PARTICIPANT: u16 = 13;
+const ERROR_INVALID_STATUS: u16 = 4;
+const ERROR_ALREADY_EXISTS: u16 = 5;
+const ERROR_INVALID_FEE: u16 = 6;
+const ERROR_TRANSFER_FAILED: u16 = 7;
+const ERROR_INVALID_TTL: u16 = 8;
+const ERROR_ESCROW_EXPIRED: u16 = 9;
+const ERROR_INVALID_AMOUNT: u16 = 10;
+const ERROR_INVALID_ACCOUNT_HASH: u16 = 11;
+const ERROR_INPUT_MISMATCH: u16 = 12;
+const ERROR_BATCH_LIMIT_EXCEEDED: u16 = 13;
 
 // Storage keys
-const KEY_INSTALLER: &str = "installer";
-const KEY_ESCROWS: &str = "escrows";
-const KEY_ESCROW_COUNTER: &str = "escrow_counter";
-const KEY_FEE_BPS: &str = "fee_bps";
-const KEY_FROZEN: &str = "frozen";
-const KEY_FEE_PURSE: &str = "fee_purse";
-const KEY_ESCROW_DICT: &str = "escrow_dict";
+const INSTALLER_KEY: &str = "installer";
+const ESCROWS_DICT: &str = "escrows_dict";
+const FEE_BPS_KEY: &str = "fee_bps";
+const CONTRACT_PURSE_KEY: &str = "contract_purse"; // Main purse for holding escrow funds
+const FEE_PURSE_KEY: &str = "fee_purse"; // Purse for collecting fees
+const ALL_ESCROW_KEYS: &str = "all_escrow_keys"; // List of all service_hashes for listing
 
 // Status constants
 const STATUS_PENDING: u64 = 0;
 const STATUS_RELEASED: u64 = 1;
 const STATUS_CANCELLED: u64 = 2;
-const STATUS_DISPUTED: u64 = 3;
-const STATUS_RESOLVED: u64 = 4;
+const STATUS_DISPUTED: u64 = 3; // Not used in this version, but kept for consistency
+const STATUS_RESOLVED: u64 = 4; // Not used in this version, but kept for consistency
 const STATUS_EXPIRED: u64 = 5;
 
 // Max fee in basis points (1000 = 10%)
 const MAX_FEE_BPS: u64 = 1000;
+const MAX_BATCH_SIZE: usize = 50; // Limit for batch operations
+
+/// Escrow record layout: ((sender, receiver, amount), (fee_bps, ttl, status), (created_at, evidence_hash))
+/// service_hash is the dictionary key.
+type EscrowRecord = ((String, String, U512), (u64, u64, u64), (u64, String));
+
+// Helper functions
 
 fn get_installer() -> AccountHash {
-    let key: Key = runtime::get_key(KEY_INSTALLER)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
-        .into();
+    let key: Key = runtime::get_key(INSTALLER_KEY)
+        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
     key.into_account()
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
+        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_ACCOUNT_HASH))
 }
 
 fn check_installer() {
@@ -69,81 +74,80 @@ fn check_installer() {
     }
 }
 
-fn check_not_frozen() {
-    let frozen: bool = storage::read(runtime::get_key(KEY_FROZEN).unwrap_or_revert().into_uref().unwrap_or_revert())
-        .unwrap_or(Some(false))
-        .unwrap_or(false);
-    if frozen {
-        runtime::revert(ApiError::User(ERROR_CONTRACT_FROZEN));
-    }
-}
-
-fn get_escrow_dict_uref() -> URef {
-    runtime::get_key(KEY_ESCROW_DICT)
+fn get_escrows_dict_uref() -> URef {
+    runtime::get_key(ESCROWS_DICT)
         .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
         .into_uref()
         .unwrap_or_revert()
 }
 
-fn get_next_escrow_id() -> String {
-    let counter_uref = runtime::get_key(KEY_ESCROW_COUNTER)
+fn get_contract_purse_uref() -> URef {
+    runtime::get_key(CONTRACT_PURSE_KEY)
+        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
+        .into_uref()
+        .unwrap_or_revert()
+}
+
+fn get_fee_purse_uref() -> URef {
+    runtime::get_key(FEE_PURSE_KEY)
+        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
+        .into_uref()
+        .unwrap_or_revert()
+}
+
+fn get_all_escrow_keys_uref() -> URef {
+    runtime::get_key(ALL_ESCROW_KEYS)
+        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
+        .into_uref()
+        .unwrap_or_revert()
+}
+
+fn read_fee_bps() -> u64 {
+    let uref = runtime::get_key(FEE_BPS_KEY)
         .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
         .into_uref()
         .unwrap_or_revert();
-    
-    let current: u64 = storage::read(counter_uref)
-        .unwrap_or(Some(0))
-        .unwrap_or(0);
-    
-    let next = current + 1;
-    storage::write(counter_uref, next);
-    
-    format!("escrow_{}", next)
+    storage::read::<u64>(uref)
+        .unwrap_or_revert()
+        .unwrap_or(0) // Default fee is 0
 }
 
 fn store_escrow(
-    escrow_id: &str,
+    service_hash: &str,
     sender: &str,
     receiver: &str,
-    amount: u64,
+    amount: U512,
     fee_bps: u64,
     ttl: u64,
     status: u64,
     created_at: u64,
     evidence_hash: &str,
-    service_hash: &str,
 ) {
-    let dict_uref = get_escrow_dict_uref();
-    
-    let record = (
-        (escrow_id.to_string(), sender.to_string(), receiver.to_string()),
-        (amount, fee_bps, ttl),
-        (status, created_at, evidence_hash.to_string()),
-        service_hash.to_string(),
+    let dict_uref = get_escrows_dict_uref();
+
+    let record: EscrowRecord = (
+        (sender.to_string(), receiver.to_string(), amount),
+        (fee_bps, ttl, status),
+        (created_at, evidence_hash.to_string()),
     );
-    
-    storage::dictionary_put(dict_uref, escrow_id, record);
+
+    storage::dictionary_put(dict_uref, service_hash, record);
 }
 
-fn get_escrow_record(escrow_id: &str) -> Option<(
-    (String, String, String),
-    (u64, u64, u64),
-    (u64, u64, String),
-    String,
-)> {
-    let dict_uref = get_escrow_dict_uref();
-    storage::dictionary_get(dict_uref, escrow_id)
-        .unwrap_or(None)
+fn get_escrow_record(service_hash: &str) -> Option<EscrowRecord> {
+    let dict_uref = get_escrows_dict_uref();
+    storage::dictionary_get(dict_uref, service_hash)
+        .unwrap_or_revert()
 }
 
-fn update_escrow_status(escrow_id: &str, new_status: u64) {
-    let record = get_escrow_record(escrow_id)
+fn update_escrow_status(service_hash: &str, new_status: u64) {
+    let record = get_escrow_record(service_hash)
         .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let ((id, sender, receiver), (amount, fee_bps, ttl), (_, created_at, evidence_hash), service_hash) = record;
-    
+
+    let ((sender, receiver, amount), (fee_bps, ttl, _old_status), (created_at, evidence_hash)) = record;
+
     store_escrow(
-        &id,
+        service_hash,
         &sender,
         &receiver,
         amount,
@@ -152,425 +156,323 @@ fn update_escrow_status(escrow_id: &str, new_status: u64) {
         new_status,
         created_at,
         &evidence_hash,
-        &service_hash,
     );
 }
 
-fn get_fee_purse() -> URef {
-    runtime::get_key(KEY_FEE_PURSE)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
-        .into_uref()
+// Entry points
+
+#[no_mangle]
+pub extern "C" fn create_batch() {
+    let count: u32 = runtime::get_named_arg("count");
+    let receivers_str: Vec<String> = runtime::get_named_arg("receivers");
+    let amounts: Vec<U512> = runtime::get_named_arg("amounts");
+    let service_hashes: Vec<String> = runtime::get_named_arg("service_hashes");
+    let ttls: Vec<u64> = runtime::get_named_arg("ttls");
+    let source_purse: URef = runtime::get_named_arg("source_purse");
+
+    let caller = runtime::get_caller();
+    let contract_purse = get_contract_purse_uref();
+    let current_fee_bps = read_fee_bps();
+    let created_at: u64 = runtime::get_blocktime().into();
+
+    if count == 0 {
+        runtime::revert(ApiError::User(ERROR_INPUT_MISMATCH));
+    }
+    if count as usize > MAX_BATCH_SIZE {
+        runtime::revert(ApiError::User(ERROR_BATCH_LIMIT_EXCEEDED));
+    }
+
+    if receivers_str.len() != count as usize
+        || amounts.len() != count as usize
+        || service_hashes.len() != count as usize
+        || ttls.len() != count as usize
+    {
+        runtime::revert(ApiError::User(ERROR_INPUT_MISMATCH));
+    }
+
+    let all_keys_uref = get_all_escrow_keys_uref();
+    let mut current_all_service_hashes: Vec<String> = storage::read(all_keys_uref)
         .unwrap_or_revert()
-}
+        .unwrap_or_default();
 
-#[no_mangle]
-pub extern "C" fn create_escrow() {
-    check_not_frozen();
-    
-    let sender = runtime::get_named_arg::<String>("sender");
-    let receiver = runtime::get_named_arg::<String>("receiver");
-    let amount: u64 = runtime::get_named_arg("amount");
-    let ttl: u64 = runtime::get_named_arg("ttl");
-    let service_hash = runtime::get_named_arg::<String>("service_hash");
-    let fee_bps: u64 = runtime::get_named_arg("fee_bps");
-    
-    if amount == 0 {
-        runtime::revert(ApiError::User(ERROR_INVALID_AMOUNT));
-    }
-    
-    if ttl == 0 {
-        runtime:: upsilon_revert(ApiError::User(ERROR_INVALID_TTL));
-    }
-    
-    if fee_bps > MAX_FEE_BPS {
-        runtime::revert(ApiError::User(ERROR_INVALID_FEE));
-    }
-    
-    let caller = runtime::get_caller();
-    let sender_account = AccountHash::from_formatted_str(&sender)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    if caller != sender_account {
-        runtime::revert(ApiError::User(ERROR_NOT_SENDER));
-    }
-    
-    let escrow_id = get_next_escrow_id();
-    
-    if get_escrow_record(&escrow_id).is_some() {
-        runtime::revert(ApiError::User(ERROR_ALREADY_EXISTS));
-    }
-    
-    let main_purse = system::get_main_purse();
-    let contract_purse = system::create_purse();
-    
-    let transfer_amount = U512::from(amount);
-    system::transfer_from_purse_to_purse(main_purse, contract_purse, transfer_amount, None)
-        .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
-    
-    let created_at = runtime::get_blocktime().into();
-    
-    store_escrow(
-        &escrow_id,
-        &sender,
-        &receiver,
-        amount,
-        fee_bps,
-        ttl,
-        STATUS_PENDING,
-        created_at,
-        "",
-        &service_hash,
-    );
-    
-    let result = CLValue::from_t((escrow_id,)).unwrap_or_revert();
-    runtime::ret(result);
-}
+    let mut created_service_hashes = Vec::new();
 
-#[no_mangle]
-pub extern "C" fn release_escrow() {
-    check_not_frozen();
-    
-    let escrow_id = runtime::get_named_arg::<String>("escrow_id");
-    let record = get_escrow_record(&escrow_id)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let ((id, sender_str, receiver_str), (amount, fee_bps, ttl), (status, created_at, evidence_hash), service_hash) = record;
-    
-    let caller = runtime::get_caller();
-    let sender_account = AccountHash::from_formatted_str(&sender_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    if caller != sender_account {
-        runtime::revert(ApiError::User(ERROR_NOT_SENDER));
-    }
-    
-    if status != STATUS_PENDING {
-        runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
-    }
-    
-    let current_time: u64 = runtime::get_blocktime().into();
-    if current_time > created_at + ttl {
-        update_escrow_status(&escrow_id, STATUS_EXPIRED);
-        runtime::revert(ApiError::User(ERROR_ESCROW_EXPIRED));
-    }
-    
-    let fee_amount = (amount * fee_bps) / 10000;
-    let receiver_amount = amount - fee_amount;
-    
-    let contract_purse = system::create_purse();
-    let fee_purse = get_fee_purse();
-    let receiver = AccountHash::from_formatted_str(&receiver_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    if fee_amount > 0 {
-        system::transfer_from_purse_to_purse(contract_purse, fee_purse, U512::from(fee_amount), None)
+    for i in 0..count as usize {
+        let receiver_str = &receivers_str[i];
+        let amount = amounts[i];
+        let service_hash = &service_hashes[i];
+        let ttl = ttls[i];
+
+        if amount.is_zero() {
+            runtime::revert(ApiError::User(ERROR_INVALID_AMOUNT));
+        }
+        if ttl == 0 {
+            runtime::revert(ApiError::User(ERROR_INVALID_TTL));
+        }
+
+        // Check if service_hash already exists
+        if get_escrow_record(service_hash).is_some() {
+            runtime::revert(ApiError::User(ERROR_ALREADY_EXISTS));
+        }
+
+        // Transfer funds from source_purse to contract_purse
+        system::transfer_from_purse_to_purse(source_purse, contract_purse, amount, None)
             .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
+
+        store_escrow(
+            service_hash,
+            &caller.to_string(), // Sender is the caller
+            receiver_str,
+            amount,
+            current_fee_bps,
+            ttl,
+            STATUS_PENDING,
+            created_at,
+            "", // No evidence hash initially
+        );
+        current_all_service_hashes.push(service_hash.clone());
+        created_service_hashes.push(service_hash.clone());
     }
-    
-    system::transfer_from_purse_to_account(contract_purse, receiver, U512::from(receiver_amount), None)
-        .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
-    
-    update_escrow_status(&escrow_id, STATUS_RELEASED);
+
+    storage::write(all_keys_uref, current_all_service_hashes);
+    runtime::ret(CLValue::from_t(created_service_hashes).unwrap_or_revert());
 }
 
 #[no_mangle]
-pub extern "C" fn cancel_escrow() {
-    check_not_frozen();
-    
-    let escrow_id = runtime::get_named_arg::<String>("escrow_id");
-    let record = get_escrow_record(&escrow_id)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let ((id, sender_str, receiver_str), (amount, fee_bps, ttl), (status, created_at, evidence_hash), service_hash) = record;
-    
+pub extern "C" fn batch_release() {
+    let service_hashes: Vec<String> = runtime::get_named_arg("service_hashes");
     let caller = runtime::get_caller();
-    let sender_account = AccountHash::from_formatted_str(&sender_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    if caller != sender_account {
-        runtime::revert(ApiError::User(ERROR_NOT_SENDER));
-    }
-    
-    if status != STATUS_PENDING {
-        runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
-    }
-    
-    let contract_purse = system::create_purse();
-    system::transfer_from_purse_to_account(contract_purse, sender_account, U512::from(amount), None)
-        .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
-    
-    update_escrow_status(&escrow_id, STATUS_CANCELLED);
-}
+    let contract_purse = get_contract_purse_uref();
+    let fee_purse = get_fee_purse_uref();
 
-#[no_mangle]
-pub extern "C" fn dispute_escrow() {
-    check_not_frozen();
-    
-    let escrow_id = runtime::get_named_arg::<String>("escrow_id");
-    let evidence_hash = runtime::get_named_arg::<String>("evidence_hash");
-    
-    let record = get_escrow_record(&escrow_id)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let ((id, sender_str, receiver_str), (amount, fee_bps, ttl), (status, created_at, old_evidence), service_hash) = record;
-    
-    let caller = runtime::get_caller();
-    let sender_account = AccountHash::from_formatted_str(&sender_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    let receiver_account = AccountHash::from_formatted_str(&receiver_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    if caller != sender_account && caller != receiver_account {
-        runtime::revert(ApiError::User(ERROR_NOT_PARTICIPANT));
+    if service_hashes.is_empty() {
+        runtime::revert(ApiError::User(ERROR_INPUT_MISMATCH));
     }
-    
-    if status != STATUS_PENDING {
-        runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
+    if service_hashes.len() > MAX_BATCH_SIZE {
+        runtime::revert(ApiError::User(ERROR_BATCH_LIMIT_EXCEEDED));
     }
-    
-    let dict_uref = get_escrow_dict_uref();
-    let new_record = (
-        (escrow_id.clone(), sender_str, receiver_str),
-        (amount, fee_bps, ttl),
-        (STATUS_DISPUTED, created_at, evidence_hash),
-        service_hash,
-    );
-    storage::dictionary_put(dict_uref, &escrow_id, new_record);
-}
 
-#[no_mangle]
-pub extern "C" fn resolve_dispute() {
-    check_installer();
-    check_not_frozen();
-    
-    let escrow_id = runtime::get_named_arg::<String>("escrow_id");
-    let winner_str = runtime::get_named_arg::<String>("winner");
-    
-    let record = get_escrow_record(&escrow_id)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let ((id, sender_str, receiver_str), (amount, fee_bps, ttl), (status, created_at, evidence_hash), service_hash) = record;
-    
-    if status != STATUS_DISPUTED {
-        runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
-    }
-    
-    let winner = AccountHash::from_formatted_str(&winner_str)
-        .unwrap_or_revert_with(ApiError::User(ERROR_INVALID_STATUS));
-    
-    let fee_amount = (amount * fee_bps) / 10000;
-    let payout = amount - fee_amount;
-    
-    let contract_purse = system::create_purse();
-    let fee_purse = get_fee_purse();
-    
-    if fee_amount > 0 {
-        system::transfer_from_purse_to_purse(contract_purse, fee_purse, U512::from(fee_amount), None)
+    for service_hash in service_hashes {
+        let record = get_escrow_record(&service_hash)
+            .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
+
+        let ((sender_str, receiver_str, amount), (fee_bps, ttl, status), (created_at, _evidence_hash)) = record;
+
+        let sender_account = AccountHash::from_formatted_str(&sender_str)
+            .map_err(|_| ApiError::User(ERROR_INVALID_ACCOUNT_HASH))
+            .unwrap_or_revert();
+        let receiver_account = AccountHash::from_formatted_str(&receiver_str)
+            .map_err(|_| ApiError::User(ERROR_INVALID_ACCOUNT_HASH))
+            .unwrap_or_revert();
+
+        // Only sender can release
+        if caller != sender_account {
+            runtime::revert(ApiError::User(ERROR_NOT_SENDER));
+        }
+
+        if status != STATUS_PENDING {
+            runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
+        }
+
+        let current_time: u64 = runtime::get_blocktime().into();
+        if current_time > created_at + ttl {
+            update_escrow_status(&service_hash, STATUS_EXPIRED);
+            runtime::revert(ApiError::User(ERROR_ESCROW_EXPIRED));
+        }
+
+        let fee_amount = amount.checked_mul(U512::from(fee_bps))
+            .unwrap_or_revert_with(ApiError::User(100))
+            .checked_div(U512::from(10000))
+            .unwrap_or_revert_with(ApiError::User(100));
+        let receiver_amount = amount.checked_sub(fee_amount)
+            .unwrap_or_revert_with(ApiError::User(100));
+
+        if fee_amount > U512::zero() {
+            system::transfer_from_purse_to_purse(contract_purse, fee_purse, fee_amount, None)
+                .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
+        }
+
+        system::transfer_from_purse_to_account(contract_purse, receiver_account, receiver_amount, None)
             .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
+
+        update_escrow_status(&service_hash, STATUS_RELEASED);
     }
-    
-    system::transfer_from_purse_to_account(contract_purse, winner, U512::from(payout), None)
-        .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
-    
-    update_escrow_status(&escrow_id, STATUS_RESOLVED);
 }
 
 #[no_mangle]
-pub extern "C" fn get_escrow() {
-    let escrow_id = runtime::get_named_arg::<String>("escrow_id");
-    let record = get_escrow_record(&escrow_id)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
-    
-    let result = CLValue::from_t(record).unwrap_or_revert();
-    runtime::ret(result);
+pub extern "C" fn batch_cancel() {
+    let service_hashes: Vec<String> = runtime::get_named_arg("service_hashes");
+    let caller = runtime::get_caller();
+    let contract_purse = get_contract_purse_uref();
+
+    if service_hashes.is_empty() {
+        runtime::revert(ApiError::User(ERROR_INPUT_MISMATCH));
+    }
+    if service_hashes.len() > MAX_BATCH_SIZE {
+        runtime::revert(ApiError::User(ERROR_BATCH_LIMIT_EXCEEDED));
+    }
+
+    for service_hash in service_hashes {
+        let record = get_escrow_record(&service_hash)
+            .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND));
+
+        let ((sender_str, _receiver_str, amount), (_fee_bps, _ttl, status), (_created_at, _evidence_hash)) = record;
+
+        let sender_account = AccountHash::from_formatted_str(&sender_str)
+            .map_err(|_| ApiError::User(ERROR_INVALID_ACCOUNT_HASH))
+            .unwrap_or_revert();
+
+        // Only sender can cancel
+        if caller != sender_account {
+            runtime::revert(ApiError::User(ERROR_NOT_SENDER));
+        }
+
+        if status != STATUS_PENDING {
+            runtime::revert(ApiError::User(ERROR_INVALID_STATUS));
+        }
+
+        system::transfer_from_purse_to_account(contract_purse, sender_account, amount, None)
+            .unwrap_or_revert_with(ApiError::User(ERROR_TRANSFER_FAILED));
+
+        update_escrow_status(&service_hash, STATUS_CANCELLED);
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn list_escrows() {
+    let offset: u32 = runtime::get_named_arg("offset");
+    let limit: u32 = runtime::get_named_arg("limit");
+
+    let all_keys_uref = get_all_escrow_keys_uref();
+    let all_service_hashes: Vec<String> = storage::read(all_keys_uref)
+        .unwrap_or_revert()
+        .unwrap_or_default();
+
+    let start_index = offset as usize;
+    let end_index = (offset + limit) as usize;
+
+    if start_index >= all_service_hashes.len() {
+        runtime::ret(CLValue::from_t(Vec::<EscrowRecord>::new()).unwrap_or_revert());
+        return;
+    }
+
+    let actual_end_index = all_service_hashes.len().min(end_index);
+    let mut result_escrows = Vec::new();
+
+    for i in start_index..actual_end_index {
+        let service_hash = &all_service_hashes[i];
+        if let Some(record) = get_escrow_record(service_hash) {
+            result_escrows.push(record);
+        }
+    }
+
+    runtime::ret(CLValue::from_t(result_escrows).unwrap_or_revert());
 }
 
 #[no_mangle]
 pub extern "C" fn set_fee() {
     check_installer();
-    
-    let new_fee_bps: u64 = runtime::get_named_arg("new_bps");
+
+    let new_fee_bps: u64 = runtime::get_named_arg("new_fee_bps");
     if new_fee_bps > MAX_FEE_BPS {
         runtime::revert(ApiError::User(ERROR_INVALID_FEE));
     }
-    
-    let fee_uref = runtime::get_key(KEY_FEE_BPS)
+
+    let fee_uref = runtime::get_key(FEE_BPS_KEY)
         .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
         .into_uref()
         .unwrap_or_revert();
-    
+
     storage::write(fee_uref, new_fee_bps);
-}
-
-#[no_mangle]
-pub extern "C" fn freeze() {
-    check_installer();
-    
-    let frozen_uref = runtime::get_key(KEY_FROZEN)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
-        .into_uref()
-        .unwrap_or_revert();
-    
-    storage::write(frozen_uref, true);
-}
-
-#[no_mangle]
-pub extern "C" fn unfreeze() {
-    check_installer();
-    
-    let frozen_uref = runtime::get_key(KEY_FROZEN)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
-        .into_uref()
-        .unwrap_or_revert();
-    
-    storage::write(frozen_uref, false);
 }
 
 fn get_entry_points() -> EntryPoints {
     let mut entry_points = EntryPoints::new();
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "create_escrow",
-            vec![
-                Parameter::new("sender", CLType::String),
-                Parameter::new("receiver", CLType::String),
-                Parameter::new("amount", CLType::U64),
-                Parameter::new("ttl", CLType::U64),
-                Parameter::new("service_hash", CLType::String),
-                Parameter::new("fee_bps", CLType::U64),
-            ],
-            CLType::Tuple {
-                elements: vec![Box::new(CLType::String)],
-            },
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "release_escrow",
-            vec![Parameter::new("escrow_id", CLType::String)],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "cancel_escrow",
-            vec![Parameter::new("escrow_id", CLType::String)],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "dispute_escrow",
-            vec![
-                Parameter::new("escrow_id", CLType::String),
-                Parameter::new("evidence_hash", CLType::String),
-            ],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "resolve_dispute",
-            vec![
-                Parameter::new("escrow_id", CLType::String),
-                Parameter::new("winner", CLType::String),
-            ],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "get_escrow",
-            vec![Parameter::new("escrow_id", CLType::String)],
-            CLType::Any,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "set_fee",
-            vec![Parameter::new("new_bps", CLType::U64)],
-            dependency_only::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "freeze",
-            vec![],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
-    entry_points.add_entry_point(
-        EntityEntryPoint::new(
-            "unfreeze",
-            vec![],
-            CLType::Unit,
-            EntryPointAccess::Public,
-            EntryPointType::Contract,
-            EntryPointPayment::Caller,
-        ),
-    );
-    
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "create_batch",
+        vec![
+            Parameter::new("count", CLType::U32),
+            Parameter::new("receivers", CLType::List(Box::new(CLType::String))),
+            Parameter::new("amounts", CLType::List(Box::new(CLType::U512))),
+            Parameter::new("service_hashes", CLType::List(Box::new(CLType::String))),
+            Parameter::new("ttls", CLType::List(Box::new(CLType::U64))),
+            Parameter::new("source_purse", CLType::URef),
+        ],
+        CLType::List(Box::new(CLType::String)), // Returns list of created service_hashes
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "batch_release",
+        vec![Parameter::new("service_hashes", CLType::List(Box::new(CLType::String)))],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "batch_cancel",
+        vec![Parameter::new("service_hashes", CLType::List(Box::new(CLType::String)))],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "list_escrows",
+        vec![
+            Parameter::new("offset", CLType::U32),
+            Parameter::new("limit", CLType::U32),
+        ],
+        CLType::Any,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "set_fee",
+        vec![Parameter::new("new_fee_bps", CLType::U64)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
     entry_points
 }
 
 #[no_mangle]
 pub extern "C" fn call() {
-    let mut named_keys = NamedKeys::new();
-    
     let installer = runtime::get_caller();
-    named_keys.insert(KEY_INSTALLER.to_string(), installer.into());
-    
-    let escrow_counter_uref = storage::new_uref(0u64);
-    named_keys.insert(KEY_ESCROW_COUNTER.to_string(), escrow_counter_uref.into());
-    
-    let fee_bps_uref = storage::new_uref(0u64);
-    named_keys.insert(KEY_FEE_BPS.to_string(), fee_bps_uref.into());
-    
-    let frozen_uref = storage::new_uref(false);
-    named_keys.insert(KEY_FROZEN.to_string(), frozen_uref.into());
-    
+
+    let escrows_dict = storage::new_dictionary(ESCROWS_DICT).unwrap_or_revert();
+    let contract_purse = system::create_purse();
     let fee_purse = system::create_purse();
-    named_keys.insert(KEY_FEE_PURSE.to_string(), fee_purse.into());
-    
-    let escrow_dict = storage::new_dictionary(KEY_ESCROWS).unwrap_or_revert();
-    named_keys.insert(KEY_ESCROW_DICT.to_string(), escrow_dict.into());
-    
+    let fee_bps_uref = storage::new_uref(0u64); // Default fee_bps is 0
+    let all_escrow_keys_uref = storage::new_uref(Vec::<String>::new()); // To support list_escrows
+
+    let mut named_keys = NamedKeys::new();
+    named_keys.insert(INSTALLER_KEY.into(), Key::Account(installer));
+    named_keys.insert(ESCROWS_DICT.into(), escrows_dict.into());
+    named_keys.insert(CONTRACT_PURSE_KEY.into(), contract_purse.into());
+    named_keys.insert(FEE_PURSE_KEY.into(), fee_purse.into());
+    named_keys.insert(FEE_BPS_KEY.into(), fee_bps_uref.into());
+    named_keys.insert(ALL_ESCROW_KEYS.into(), all_escrow_keys_uref.into());
+
     let entry_points = get_entry_points();
-    
-    let (contract_hash, _version) = storage::new_contract(entry_points, Some(named_keys), None, None, None);
-    
-    runtime::put_key("escrow_manager", contract_hash.into());
+
+    let (contract_hash, _version) = storage::new_contract(
+        entry_points,
+        Some(named_keys),
+        Some("escrow_manager_package_hash".into()),
+        Some("escrow_manager_access_uref".into()),
+        None,
+    );
+    runtime::put_key("escrow_manager_contract_hash", contract_hash.into());
 }

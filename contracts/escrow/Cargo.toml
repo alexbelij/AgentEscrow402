@@ -7,9 +7,6 @@ edition = "2021"
 casper-contract = "5.1"
 casper-types = "6.0"
 
-[features]
-default = ["casper-contract/std", "casper-types/std"]
-
 [[bin]]
 name = "escrow"
 path = "src/main.rs"
