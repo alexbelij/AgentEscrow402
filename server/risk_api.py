@@ -10,8 +10,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import math
+import random
 import re
-import time
+import time as _time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -52,7 +53,7 @@ def get_db():
 async def _get_or_train_engine(casper, db) -> RiskEngine:
     global _risk_engine, _last_trained
 
-    now = time.time()
+    now = _time.time()
     if _risk_engine is not None and (now - _last_trained) < _TRAIN_TTL:
         return _risk_engine
 
@@ -80,7 +81,7 @@ async def _get_or_train_engine(casper, db) -> RiskEngine:
                         total_volume=amount,
                         max_single=amount,
                         stddev_amount=0.0,
-                        hour_of_day=time.gmtime(created_at).tm_hour,
+                        hour_of_day=_time.gmtime(created_at).tm_hour,
                     ))
                 except Exception as exc:
                     logger.debug("Skipping malformed escrow record: %s", exc)
