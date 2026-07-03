@@ -1,7 +1,7 @@
 import React from 'react';
 import { FileText, Link, Code, Info, ExternalLink, Hash } from 'lucide-react';
 
-const CONTRACT_HASH = '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3277f3a134451'; // Corrected hash from prompt
+const CONTRACT_HASH = '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'; // Corrected hash from prompt
 const EXPLORER_BASE_URL = 'https://testnet.cspr.live';
 
 const contractFunctions = [

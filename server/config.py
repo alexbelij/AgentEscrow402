@@ -49,3 +49,8 @@ class Config:
             insurance_fee_bps=int(os.getenv("INSURANCE_FEE_BPS", "200")),
             contract_hash=os.getenv("ESCROW_CONTRACT_HASH", ""),
         )
+
+
+def get_config() -> Config:
+    """Dependency injection helper for FastAPI."""
+    return Config.from_env()
