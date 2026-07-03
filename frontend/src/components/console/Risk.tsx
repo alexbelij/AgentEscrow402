@@ -1,144 +1,217 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { api, Agent, Reputation } from '../../lib/api';
-import {
-  ShieldAlert,
-  Users,
-  Star,
-  RefreshCw,
-  XCircle,
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  Info,
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { api, DEMO_AGENT_RECEIVER } from '../../lib/api';
+import { formatCspr } from '../../lib/format';
+import { AlertTriangle, Brain, Gauge, Loader2, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
 
-interface AgentRisk extends Agent {
-  reputation_details?: Reputation | null;
-}
+type RiskAgent = {
+  agent: string;
+  risk_score: number;
+  anomaly_flag: boolean;
+  explanation: string;
+  model_version: string;
+  scored_at: number;
+  escrow_count: number;
+  total_volume_motes: number;
+  dispute_rate: number;
+};
+
+type RiskDashboard = {
+  total_agents: number;
+  high_risk_count: number;
+  avg_risk_score: number;
+  agents: RiskAgent[];
+  model_trained_at: number;
+  training_samples: number;
+};
+
+const short = (value: string) => value.length > 22 ? `${value.slice(0, 10)}…${value.slice(-8)}` : value;
+const pct = (value: number) => `${Math.round((value || 0) * 100)}%`;
+
+const scoreColor = (score: number) => {
+  if (score >= 75) return 'text-red-400 bg-red-500/10 border-red-500/30';
+  if (score >= 45) return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+  return 'text-green-400 bg-green-500/10 border-green-500/30';
+};
 
 const Risk: React.FC = () => {
-  const [agents, setAgents] = useState<AgentRisk[]>([]);
+  const [dashboard, setDashboard] = useState<RiskDashboard | null>(null);
+  const [selectedAgent, setSelectedAgent] = useState(DEMO_AGENT_RECEIVER);
+  const [agentScore, setAgentScore] = useState<RiskAgent | null>(null);
   const [loading, setLoading] = useState(true);
+  const [scoreLoading, setScoreLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAgentData = useCallback(async () => {
+  const topAgents = useMemo(() => dashboard?.agents?.slice(0, 8) || [], [dashboard]);
+
+  const loadDashboard = async () => {
     setLoading(true);
     setError(null);
     try {
-      const agentsRes = await api.getAgents();
-      if (agentsRes.error) throw new Error(agentsRes.error);
-
-      const fetchedAgents: AgentRisk[] = agentsRes.data || [];
-
-      const agentsWithReputation = await Promise.all(
-        fetchedAgents.map(async (agent) => {
-          try {
-            const reputationRes = await api.getReputation(agent.public_key);
-            if (reputationRes.error) {
-              console.warn(`Failed to fetch reputation for ${agent.public_key}: ${reputationRes.error}`);
-              return { ...agent, reputation_details: undefined };
-            }
-            return { ...agent, reputation_details: reputationRes.data };
-          } catch (repError) {
-            console.warn(`Error fetching reputation for ${agent.public_key}:`, repError);
-            return { ...agent, reputation_details: undefined };
-          }
-        })
-      );
-      setAgents(agentsWithReputation);
+      const res = await api.getRiskDashboard();
+      if (res.error) throw new Error(res.error);
+      setDashboard(res.data as RiskDashboard);
+      const first = (res.data as RiskDashboard)?.agents?.[0]?.agent;
+      if (first && selectedAgent === DEMO_AGENT_RECEIVER) setSelectedAgent(first);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch agent risk data.');
-      console.error('Risk data fetch error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load risk dashboard');
     } finally {
       setLoading(false);
     }
+  };
+
+  const scoreAgent = async (agent = selectedAgent) => {
+    if (!agent.trim()) return;
+    setScoreLoading(true);
+    setError(null);
+    try {
+      const res = await api.getRiskScore(agent.trim());
+      if (res.error) throw new Error(res.error);
+      setAgentScore(res.data as RiskAgent);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to score agent');
+    } finally {
+      setScoreLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
   }, []);
 
   useEffect(() => {
-    fetchAgentData();
-  }, [fetchAgentData]);
-
-  const getRiskLevel = (score: number): { level: string; color: string; icon: React.ElementType } => {
-    if (score >= 80) return { level: 'Low Risk', color: 'bg-green-500', icon: CheckCircle };
-    if (score >= 50) return { level: 'Moderate Risk', color: 'bg-yellow-500', icon: AlertTriangle };
-    return { level: 'High Risk', color: 'bg-red-500', icon: XCircle };
-  };
+    if (dashboard?.agents?.[0]?.agent) scoreAgent(dashboard.agents[0].agent);
+  }, [dashboard?.model_trained_at]);
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Agent Risk Assessment</h2>
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-3xl font-bold text-gray-50">Risk Intelligence</h2>
+          <p className="text-gray-400 mt-2">IsolationForest model for agent escrow risk, insurance pricing and dispute prevention.</p>
+        </div>
+        <button
+          onClick={loadDashboard}
+          disabled={loading}
+          className="inline-flex h-12 items-center justify-center px-5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
+        >
+          {loading ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <RefreshCw className="h-5 w-5 mr-2" />}
+          Recalculate
+        </button>
+      </div>
 
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-semibold text-gray-300 flex items-center">
-            <ShieldAlert className="h-6 w-6 mr-2 text-amber-500" />
-            Agent Risk Overview
-          </h3>
-          <button
-            onClick={fetchAgentData}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors"
-            title="Refresh Data"
-          >
-            <RefreshCw size={20} />
-          </button>
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
+        <p className="font-semibold mb-1">What this is / why it matters</p>
+        <p>
+          The backend trains an IsolationForest on escrow features (amounts, TTLs, dispute rate, frequency, volume dispersion) and turns it into an agent-level risk score.
+          Product use: warn buyers before hiring risky agents, route high-risk jobs to stronger arbitration, and price the insurance premium dynamically.
+        </p>
+      </div>
+
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-200 flex items-center">
+          <AlertTriangle className="h-5 w-5 mr-2" /> {error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Metric icon={Brain} label="Model" value={agentScore?.model_version || 'IsolationForest'} />
+        <Metric icon={Gauge} label="Avg risk" value={loading ? '…' : `${dashboard?.avg_risk_score ?? 0}/100`} />
+        <Metric icon={AlertTriangle} label="High-risk agents" value={loading ? '…' : String(dashboard?.high_risk_count ?? 0)} />
+        <Metric icon={TrendingUp} label="Training samples" value={loading ? '…' : String(dashboard?.training_samples ?? 0)} />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6">
+          <div className="flex items-center justify-between gap-4 mb-5">
+            <h3 className="text-xl font-semibold text-gray-50">Live agent scores</h3>
+            <span className="text-xs text-gray-500">{dashboard?.total_agents ?? 0} agents from live/demo escrow records</span>
+          </div>
+          {loading ? (
+            <div className="flex items-center text-gray-400"><Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading risk data…</div>
+          ) : topAgents.length === 0 ? (
+            <div className="text-gray-400">No escrow agents found yet. Create an escrow in the demo/sandbox, then recalculate.</div>
+          ) : (
+            <div className="space-y-3">
+              {topAgents.map((agent) => (
+                <button
+                  key={agent.agent}
+                  onClick={() => { setSelectedAgent(agent.agent); scoreAgent(agent.agent); }}
+                  className="w-full text-left bg-[#0d0d14] border border-[#1e1e2e] hover:border-amber-500/50 rounded-lg p-4 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-gray-100">{short(agent.agent)}</p>
+                      <p className="text-xs text-gray-500">Escrows: {agent.escrow_count} · Volume: {formatCspr(agent.total_volume_motes)} · Disputes: {pct(agent.dispute_rate)}</p>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full border text-sm font-semibold ${scoreColor(agent.risk_score)}`}>
+                      {agent.risk_score}/100{agent.anomaly_flag ? ' anomaly' : ''}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-400 mt-2">{agent.explanation}</p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="animate-spin h-10 w-10 text-amber-500" />
-          </div>
-        ) : error ? (
-          <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-4 m-4 flex items-center">
-            <XCircle className="h-6 w-6 mr-2" />
-            <p>Error: {error}</p>
-          </div>
-        ) : agents.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No agents found to assess risk.</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {agents.map((agent) => {
-              const { level, color, icon: RiskIcon } = getRiskLevel(agent.reputation_score);
-              return (
-                <div key={agent.public_key} className="bg-gray-800 border border-[#1e1e2e] rounded-lg p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-lg font-semibold text-gray-50">{agent.name || 'Unnamed Agent'}</h4>
-                    <RiskIcon className={`h-6 w-6 ${color.replace('bg-', 'text-')}`} />
-                  </div>
-                  <p className="text-gray-400 text-sm mb-2 break-all">
-                    Public Key: {agent.public_key.substring(0, 10)}...{agent.public_key.substring(agent.public_key.length - 8)}
-                  </p>
-                  <div className="mb-3">
-                    <p className="text-gray-300 flex items-center mb-1">
-                      <Star className="h-4 w-4 text-yellow-400 mr-2" />
-                      Reputation Score: <span className="font-bold ml-1">{(agent.reputation_score ?? 0).toFixed(2)}</span>
-                    </p>
-                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                      <div
-                        className={`h-2.5 rounded-full ${color}`}
-                        style={{ width: `${Math.min(100, Math.max(0, agent.reputation_score))}%` }}
-                      ></div>
-                    </div>
-                    <p className={`text-sm font-medium mt-1 ${color.replace('bg-', 'text-')}`}>{level}</p>
-                  </div>
-                  {agent.reputation_details ? (
-                    <div className="text-xs text-gray-500 space-y-1">
-                      <p>Total Escrows: {agent.reputation_details.total_escrows_completed}</p>
-                      <p>Successful Releases: {agent.reputation_details.successful_releases}</p>
-                      <p>Disputes Lost: {agent.reputation_details.disputes_lost}</p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-gray-500 flex items-center">
-                      <Info className="h-3 w-3 mr-1" /> No detailed reputation.
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 space-y-4">
+          <h3 className="text-xl font-semibold text-gray-50">Score any agent</h3>
+          <p className="text-sm text-gray-400">Use this as a risk oracle before escrow creation or insurance quote calculation.</p>
+          <textarea
+            value={selectedAgent}
+            onChange={(e) => setSelectedAgent(e.target.value)}
+            className="w-full min-h-[110px] p-3 rounded-md bg-[#0d0d14] text-gray-100 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm"
+          />
+          <button
+            onClick={() => scoreAgent()}
+            disabled={scoreLoading}
+            className="w-full h-12 inline-flex items-center justify-center rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
+          >
+            {scoreLoading ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Gauge className="h-5 w-5 mr-2" />}
+            Score agent
+          </button>
+
+          {agentScore && (
+            <div className={`rounded-lg border p-4 ${scoreColor(agentScore.risk_score)}`}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold">Risk score</span>
+                <span className="text-2xl font-bold">{agentScore.risk_score}/100</span>
+              </div>
+              <p className="text-sm">{agentScore.explanation}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs mt-4 text-gray-300">
+                <span>Escrows: {agentScore.escrow_count}</span>
+                <span>Disputes: {pct(agentScore.dispute_rate)}</span>
+                <span>Volume: {formatCspr(agentScore.total_volume_motes)}</span>
+                <span>Model: {agentScore.model_version}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <ActionCard title="Before escrow" text="Block or warn on high-risk counterparties before funds are locked." />
+        <ActionCard title="Insurance pricing" text="Feed this score into premium-quote so risky jobs pay more into the pool." />
+        <ActionCard title="Arbitration routing" text="Route anomalies to VRF-selected arbiters or require stronger evidence up front." />
       </div>
     </div>
   );
 };
+
+const Metric: React.FC<{ icon: React.ElementType; label: string; value: string }> = ({ icon: Icon, label, value }) => (
+  <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5">
+    <Icon className="h-6 w-6 text-amber-500 mb-3" />
+    <p className="text-sm text-gray-400">{label}</p>
+    <p className="text-2xl font-bold text-gray-50 mt-1">{value}</p>
+  </div>
+);
+
+const ActionCard: React.FC<{ title: string; text: string }> = ({ title, text }) => (
+  <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5">
+    <ShieldCheck className="h-6 w-6 text-green-400 mb-3" />
+    <p className="text-gray-50 font-semibold mb-1">{title}</p>
+    <p className="text-sm text-gray-400">{text}</p>
+  </div>
+);
 
 export default Risk;

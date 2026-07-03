@@ -56,6 +56,8 @@ class AgentIdentity(BaseModel):
     registered_at: int
     updated_at: int | None = None
     capabilities: list[str] = Field(default_factory=list, description="List of capabilities delegated to this agent")
+    deploy_hash: str | None = None
+    mode: str = "local_registry"
 
 
 class DelegateCapabilityRequest(BaseModel):
@@ -93,28 +95,30 @@ async def register_agent_identity(
     if request.agent_id in _agent_identities:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Agent ID already registered")
 
-    if not casper:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Casper client not initialized")
-    if not config.identity_contract_hash:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Identity contract not configured")
-
     logger.info("Registering agent identity for %s", request.agent_id[:8])
 
-    # Simulate Casper deploy to store identity details on the identity contract
+    # The demo service may run without the optional identity contract deployed.
+    # Still register locally so API Sandbox/Agents demonstrate the ERC-8004-style
+    # identity data shape instead of failing with a configuration error.
+    mode = "local_registry"
     try:
-        # deploy_hash = await casper.call_contract(
-        #     contract_hash=config.identity_contract_hash,
-        #     entry_point="register_agent",
-        #     args={
-        #         "agent_id": request.agent_id,
-        #         "public_key": request.public_key,
-        #         "did_document_hash": request.did_document_hash,
-        #     },
-        # )
-        deploy_hash = f"deploy-hash-identity-register-{int(time.time())}"
+        if casper and config.identity_contract_hash:
+            # deploy_hash = await casper.call_contract(
+            #     contract_hash=config.identity_contract_hash,
+            #     entry_point="register_agent",
+            #     args={
+            #         "agent_id": request.agent_id,
+            #         "public_key": request.public_key,
+            #         "did_document_hash": request.did_document_hash,
+            #     },
+            # )
+            deploy_hash = f"deploy-hash-identity-register-{int(time.time())}"
+            mode = "identity_contract"
+        else:
+            deploy_hash = f"local-identity-register-{hashlib.sha256((request.agent_id + str(time.time())).encode()).hexdigest()[:24]}"
     except Exception as e:
         logger.error("Failed to register agent identity for %s: %s", request.agent_id[:8], e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register identity on-chain")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register identity")
 
     new_identity = {
         "agent_id": request.agent_id,
@@ -123,6 +127,7 @@ async def register_agent_identity(
         "registered_at": int(time.time()),
         "updated_at": None,
         "deploy_hash": deploy_hash,
+        "mode": mode,
     }
     _agent_identities[request.agent_id] = new_identity
     _capabilities[request.agent_id] = [] # Initialize empty capabilities list
@@ -167,10 +172,7 @@ async def delegate_capability(
     if request.expiry_timestamp <= int(time.time()):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expiry timestamp must be in the future")
 
-    if not casper:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Casper client not initialized")
-    if not config.identity_contract_hash:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Identity contract not configured")
+    mode = "local_registry"
 
     logger.info(
         "Delegating capability '%s' from %s to %s, expiring at %s",
@@ -204,33 +206,41 @@ async def delegate_capability(
     except Exception as exc:
         logger.warning("Signature verification unavailable, applying fallback check: %s", exc)
 
-    # Simulate Casper deploy to record the delegation on the identity contract
+    # Simulate Casper deploy to record the delegation on the identity contract when configured;
+    # otherwise keep a transparent local-registry delegation for the hosted demo.
     try:
-        logger.info("Recording delegation on-chain for %s -> %s", req.delegator_id, req.delegate_id)
-        # deploy_hash = await casper.call_contract(
-        #     contract_hash=config.identity_contract_hash,
-        #     entry_point="delegate_capability",
-        #     args={...}
-        # )
+        logger.info("Recording delegation for %s -> %s", request.delegator_id, request.delegatee_id)
+        if casper and config.identity_contract_hash:
+            # deploy_hash = await casper.call_contract(
+            #     contract_hash=config.identity_contract_hash,
+            #     entry_point="delegate_capability",
+            #     args={...}
+            # )
+            mode = "identity_contract"
         deploy_hash = hashlib.sha256(
-            f"delegate:{req.delegator_id}:{req.delegate_id}:{time.time()}".encode()
+            f"delegate:{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{time.time()}".encode()
         ).hexdigest()
     except Exception as e:
         logger.error("Delegation recording failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to record delegation on-chain",
+            detail="Failed to record delegation",
         )
 
+    record = CapabilityRecord(
+        delegator_id=request.delegator_id,
+        delegatee_id=request.delegatee_id,
+        capability_uri=request.capability_uri,
+        expiry_timestamp=request.expiry_timestamp,
+        delegated_at=int(time.time()),
+    )
+    _capabilities.setdefault(request.delegatee_id, []).append(record.model_dump())
     delegation = {
-        "delegator_id": req.delegator_id,
-        "delegate_id": req.delegate_id,
-        "capabilities": req.capabilities,
-        "expires_at": req.expires_at,
+        **record.model_dump(),
         "deploy_hash": deploy_hash,
-        "created_at": time.time(),
+        "mode": mode,
     }
-    _delegations.setdefault(req.delegator_id, []).append(delegation)
+    _delegations.setdefault(request.delegator_id, []).append(delegation)
     return delegation
 
 
@@ -242,10 +252,15 @@ async def get_capabilities(agent_id: str):
     delegated = []
     for delegator_id, dels in _delegations.items():
         for d in dels:
-            if d["delegate_id"] == agent_id:
-                if d.get("expires_at") and d["expires_at"] < time.time():
+            delegatee = d.get("delegatee_id") or d.get("delegate_id")
+            if delegatee == agent_id:
+                expires_at = d.get("expiry_timestamp") or d.get("expires_at")
+                if expires_at and expires_at < time.time():
                     continue
-                delegated.extend(d["capabilities"])
+                if "capability_uri" in d:
+                    delegated.append(d["capability_uri"])
+                else:
+                    delegated.extend(d.get("capabilities", []))
     return {
         "agent_id": agent_id,
         "own_capabilities": own_caps,

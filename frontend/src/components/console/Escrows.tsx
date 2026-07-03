@@ -83,16 +83,16 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
 }
 
-const Select: React.FC<SelectProps> = ({ label, id, options, error, ...props }) => (
-  <div className="mb-4">
+const Select: React.FC<SelectProps> = ({ label, id, options, error, className = '', ...props }) => (
+  <div className="mb-0">
     <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
       {label}
     </label>
     <select
       id={id}
-      className={`w-full p-3 rounded-md bg-gray-800 text-gray-50 border ${
+      className={`w-full h-12 px-3 rounded-md bg-[#0d0d14] text-gray-50 border ${
         error ? 'border-red-500' : 'border-[#1e1e2e]'
-      } focus:ring-amber-500 focus:border-amber-500 outline-none`}
+      } focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none ${className}`}
       {...props}
     >
       {options.map((option) => (
@@ -140,14 +140,7 @@ const Escrows: React.FC = () => {
       const res = await api.getEscrows(params);
       if (res.error) throw new Error(res.error);
       setEscrows(res.data || []);
-      // Assuming API provides total count, if not, we'd need a separate endpoint or estimate
-      // For now, let's assume the API returns all matching items and we paginate client-side
-      // Or, if the API returns a subset, we'd need a `total_count` field in the response.
-      // For this example, let's simulate a total count for pagination.
-      // In a real app, `api.getEscrows` would need to return `total_count`
-      // For now, we'll just use the length of the fetched data as a proxy for the current page.
-      // A proper API would return { data: Escrow[], total_count: number }
-      setTotalEscrows(res.data?.length || 0); // This is not accurate for real pagination
+      setTotalEscrows((res.data as any)?.total ?? res.data?.length ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch escrows.');
       console.error('Escrow fetch error:', err);
@@ -247,6 +240,11 @@ const Escrows: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Escrow Management</h2>
 
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
+        These rows come from the live API. On the hosted demo, calls include a labelled demo <span className="font-mono">X-Payment</span>
+        identity header so create/release/refund/dispute works even while no browser wallet is connected. Production flow signs the same header.
+      </div>
+
       {/* Controls */}
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-4 w-full md:w-auto">
@@ -326,7 +324,7 @@ const Escrows: React.FC = () => {
                       {escrow.payee.substring(0, 8)}...
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {escrow.amount} {escrow.token_contract.length > 12 ? escrow.token_contract.substring(0, 8) + '...' : escrow.token_contract}
+                      {formatCspr(escrow.amount)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       {getStatusIcon(escrow.status)}
@@ -401,7 +399,7 @@ const Escrows: React.FC = () => {
               </p>
               <p className="flex items-center">
                 <DollarSign className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Amount:</strong> <span className="ml-2">{selectedEscrow.amount}</span>
+                <strong>Amount:</strong> <span className="ml-2">{formatCspr(selectedEscrow.amount)}</span>
               </p>
               <p className="flex items-center">
                 <Coins className="h-5 w-5 mr-2 text-amber-500" />
@@ -426,6 +424,14 @@ const Escrows: React.FC = () => {
                 </p>
               )}
             </div>
+
+            {(selectedEscrow.mlkem_algorithm || selectedEscrow.mlkem_ciphertext) && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 text-sm text-purple-100">
+                <p className="font-semibold mb-2">Post-Quantum metadata encryption</p>
+                <p>Algorithm: <span className="font-mono">{selectedEscrow.mlkem_algorithm || 'ML-KEM-768'}</span></p>
+                {selectedEscrow.mlkem_ciphertext && <p className="break-all">Ciphertext: <span className="font-mono">{selectedEscrow.mlkem_ciphertext}</span></p>}
+              </div>
+            )}
 
             <h4 className="text-lg font-semibold text-gray-300 mt-6 mb-3">Escrow History</h4>
             {history.length > 0 ? (
@@ -456,7 +462,7 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={selectedEscrow.status !== 'funded' && selectedEscrow.status !== 'disputed'}
+                disabled={!['pending', 'funded', 'disputed'].includes(selectedEscrow.status)}
                 className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Send className="h-5 w-5 mr-2" /> Release
@@ -468,7 +474,7 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={selectedEscrow.status !== 'funded' && selectedEscrow.status !== 'disputed'}
+                disabled={!['pending', 'funded', 'disputed'].includes(selectedEscrow.status)}
                 className="flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Undo2 className="h-5 w-5 mr-2" /> Refund
@@ -480,7 +486,7 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={selectedEscrow.status !== 'funded'}
+                disabled={!['pending', 'funded'].includes(selectedEscrow.status)}
                 className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <AlertTriangle className="h-5 w-5 mr-2" /> Dispute

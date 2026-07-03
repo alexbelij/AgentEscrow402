@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { api, CreateEscrowRequest, EscrowActionRequest } from '../../lib/api';
+import { api, CreateEscrowRequest, EscrowActionRequest, DEMO_AGENT_RECEIVER, buildDemoXPaymentHeader } from '../../lib/api';
 import { csprToMotes } from '../../lib/format';
 import {
   Play,
@@ -50,20 +50,22 @@ const AgentDemo: React.FC = () => {
     (window.crypto || (window as any).msCrypto).getRandomValues(bytes);
     return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
   };
-  const [serviceHash] = useState<string>(randomHex64());
+  const [serviceHash, setServiceHash] = useState<string>(randomHex64());
 
-  const examplePayee = '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'; // demo receiver
+  const examplePayee = DEMO_AGENT_RECEIVER;
   const exampleAmountCspr = 100; // 100 CSPR -> converted to motes below
 
   const resetDemo = () => {
+    const freshHash = randomHex64();
+    setServiceHash(freshHash);
     setCurrentStep(0);
     setEscrowHash(null);
     setOverallLoading(false);
     setOverallError(null);
-    initializeSteps();
+    initializeSteps(freshHash);
   };
 
-  const initializeSteps = () => {
+  const initializeSteps = (hashForRun = serviceHash) => {
     setDemoSteps([
       {
         id: 1,
@@ -76,13 +78,13 @@ const AgentDemo: React.FC = () => {
           const req: CreateEscrowRequest = {
             receiver: examplePayee,
             amount: csprToMotes(exampleAmountCspr),
-            service_hash: serviceHash,
+            service_hash: hashForRun,
             ttl: 300,
           };
           const res = await api.createEscrow(req);
           // The escrow is addressed by its service_hash for all later actions.
           if (res.data && !res.error) {
-            setEscrowHash((res.data as any).service_hash || serviceHash);
+            setEscrowHash((res.data as any).service_hash || hashForRun);
           }
           return res;
         },
@@ -95,10 +97,9 @@ const AgentDemo: React.FC = () => {
         status: 'pending',
         response: null,
         action: async () => {
-          if (!escrowHash) throw new Error('Escrow hash not available. Complete Step 1 first.');
-          return await api.getEscrowByHash(escrowHash);
+          const targetHash = escrowHash || hashForRun;
+          return await api.getEscrowByHash(targetHash);
         },
-        disabled: !escrowHash,
       },
       {
         id: 3,
@@ -108,11 +109,10 @@ const AgentDemo: React.FC = () => {
         status: 'pending',
         response: null,
         action: async () => {
-          if (!escrowHash) throw new Error('Escrow hash not available. Complete Step 1 first.');
-          const req: EscrowActionRequest = { service_hash: escrowHash };
+          const targetHash = escrowHash || hashForRun;
+          const req: EscrowActionRequest = { service_hash: targetHash };
           return await api.releaseEscrow(req);
         },
-        disabled: !escrowHash,
       },
       {
         id: 4,
@@ -130,7 +130,7 @@ const AgentDemo: React.FC = () => {
 
   useEffect(() => {
     initializeSteps();
-  }, [escrowHash]); // Re-initialize if escrowHash changes (e.g., after step 1 completes)
+  }, [serviceHash]); // Re-initialize only for a fresh demo hash; keep step responses visible during a run
 
   const runStep = async (stepIndex: number) => {
     if (overallLoading) return; // Prevent multiple steps running concurrently
@@ -182,9 +182,12 @@ const AgentDemo: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Agent Escrow Demo</h2>
       <p className="text-gray-400">
-        Walk through a typical escrow lifecycle for AI agents on the Casper blockchain.
-        This demo uses placeholder public keys and a mock signature for illustrative purposes.
+        Walk through a typical escrow lifecycle for AI agents on Casper testnet.
       </p>
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
+        The hosted demo sends a clearly labelled x402-style <span className="font-mono">X-Payment</span> identity header so the live backend can identify the sender without a wallet popup.
+        In production, a wallet/agent signs the same payload with Ed25519 and replay protection.
+      </div>
 
       <div className="flex gap-4">
         <button
@@ -233,18 +236,23 @@ const AgentDemo: React.FC = () => {
             <p className="text-gray-400 mb-4">{step.description}</p>
 
             {step.id === 1 && (
-              <CodeBlock title="Request Body (POST /escrow)">
-                {JSON.stringify(
-                  {
-                    receiver: examplePayee,
-                    amount: csprToMotes(exampleAmountCspr),
-                    service_hash: serviceHash,
-                    ttl: 300,
-                  },
-                  null,
-                  2
-                )}
-              </CodeBlock>
+              <div className="space-y-3">
+                <CodeBlock title="Request Body (POST /escrow)">
+                  {JSON.stringify(
+                    {
+                      receiver: examplePayee,
+                      amount: csprToMotes(exampleAmountCspr),
+                      service_hash: serviceHash,
+                      ttl: 300,
+                    },
+                    null,
+                    2
+                  )}
+                </CodeBlock>
+                <CodeBlock title="Demo identity header (generated by frontend)">
+                  {`X-Payment: ${buildDemoXPaymentHeader(serviceHash, csprToMotes(exampleAmountCspr)).slice(0, 96)}…`}
+                </CodeBlock>
+              </div>
             )}
 
             {step.id === 2 && (
@@ -284,6 +292,12 @@ const AgentDemo: React.FC = () => {
                 <CodeBlock>
                   {JSON.stringify(step.response, null, 2)}
                 </CodeBlock>
+                {(step.response?.mlkem_algorithm || step.response?.mlkem_ciphertext) && (
+                  <div className="mt-3 bg-purple-500/10 border border-purple-500/30 rounded-lg p-3 text-sm text-purple-100">
+                    ML-KEM metadata encryption visible: <span className="font-mono">{step.response.mlkem_algorithm || 'ML-KEM-768'}</span>
+                    {step.response?.mlkem_ciphertext && <span className="block break-all font-mono">{step.response.mlkem_ciphertext}</span>}
+                  </div>
+                )}
               </div>
             )}
           </div>

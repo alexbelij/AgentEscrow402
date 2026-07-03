@@ -43,15 +43,25 @@ def get_casper():
         return None
 
 
-def get_db():
+def _load_escrow_records() -> list[dict[str, Any]]:
+    """Load escrow records from PostgreSQL or the running in-memory demo store."""
     try:
-        from server.app import get_db as _gd
-        return _gd()
-    except Exception:
-        return None
+        from server import db as pgdb
+        records = pgdb.load_escrows()
+        if records:
+            return records
+    except Exception as exc:
+        logger.debug("PostgreSQL escrow load failed for risk API: %s", exc)
+    try:
+        from server.app import get_sandbox
+        store = get_sandbox()
+        return list(store._escrows.values())
+    except Exception as exc:
+        logger.debug("Sandbox escrow load failed for risk API: %s", exc)
+    return []
 
 
-async def _get_or_train_engine(casper, db) -> RiskEngine:
+async def _get_or_train_engine(casper, db=None) -> RiskEngine:
     global _risk_engine, _last_trained
 
     now = _time.time()
@@ -61,33 +71,28 @@ async def _get_or_train_engine(casper, db) -> RiskEngine:
     # Gather training data from in-memory DB (real escrow records)
     training_samples: list[TransactionFeatures] = []
 
-    if db is not None:
+    for e in _load_escrow_records()[:500]:
         try:
-            escrows = db.list_escrows(offset=0, limit=500)
-            for e in escrows:
-                try:
-                    amount = int(e.get("amount", 0))
-                    created_at = int(e.get("created_at", 0))
-                    ttl = int(e.get("ttl", 86400))
-                    status = str(e.get("status", "pending"))
-                    disputed = 1 if status in ("disputed", "resolved") else 0
+            amount = int(e.get("amount", 0))
+            created_at = int(e.get("created_at", 0))
+            ttl = int(e.get("ttl", 86400))
+            status = str(e.get("status", "pending"))
+            disputed = 1 if status in ("disputed", "resolved") else 0
 
-                    training_samples.append(TransactionFeatures(
-                        amount=amount,
-                        frequency=1.0,
-                        counterparty_count=1,
-                        avg_ttl=float(ttl),
-                        dispute_rate=float(disputed),
-                        time_since_first=max(0, int(now) - created_at),
-                        total_volume=amount,
-                        max_single=amount,
-                        stddev_amount=0.0,
-                        hour_of_day=_time.gmtime(created_at).tm_hour,
-                    ))
-                except Exception as exc:
-                    logger.debug("Skipping malformed escrow record: %s", exc)
+            training_samples.append(TransactionFeatures(
+                amount=amount,
+                frequency=1.0,
+                counterparty_count=1,
+                avg_ttl=float(ttl),
+                dispute_rate=float(disputed),
+                time_since_first=max(0, int(now) - created_at),
+                total_volume=amount,
+                max_single=amount,
+                stddev_amount=0.0,
+                hour_of_day=_time.gmtime(created_at).tm_hour,
+            ))
         except Exception as exc:
-            logger.warning("DB listing failed: %s", exc)
+            logger.debug("Skipping malformed escrow record: %s", exc)
 
     # If we have too few real samples, seed with synthetic normal distribution
     if len(training_samples) < 20:
@@ -150,8 +155,7 @@ async def get_agent_risk_score(agent: str) -> AgentRiskResponse:
     if len(agent) > 200 or not _AGENT_PATTERN.match(agent):
         raise HTTPException(status_code=422, detail="Invalid agent identifier format")
     casper = get_casper()
-    db = get_db()
-    engine = await _get_or_train_engine(casper, db)
+    engine = await _get_or_train_engine(casper)
 
     # Gather agent-specific metrics from DB
     escrow_count = 0
@@ -160,23 +164,18 @@ async def get_agent_risk_score(agent: str) -> AgentRiskResponse:
     ttls: list[float] = []
     amounts: list[int] = []
 
-    if db is not None:
-        try:
-            escrows = db.list_escrows(offset=0, limit=500)
-            for e in escrows:
-                sender = e.get("sender", "")
-                receiver = e.get("receiver", "")
-                if agent not in (sender, receiver):
-                    continue
-                escrow_count += 1
-                amt = int(e.get("amount", 0))
-                total_volume += amt
-                amounts.append(amt)
-                ttls.append(float(e.get("ttl", 86400)))
-                if e.get("status") in ("disputed", "resolved"):
-                    dispute_count += 1
-        except Exception as exc:
-            logger.warning("DB query failed for agent %s: %s", agent[:12], exc)
+    for e in _load_escrow_records()[:500]:
+        sender = e.get("sender", "")
+        receiver = e.get("receiver", "")
+        if agent not in (sender, receiver):
+            continue
+        escrow_count += 1
+        amt = int(e.get("amount", 0))
+        total_volume += amt
+        amounts.append(amt)
+        ttls.append(float(e.get("ttl", 86400)))
+        if e.get("status") in ("disputed", "resolved"):
+            dispute_count += 1
 
     # Build feature vector
     stddev = 0.0
@@ -216,27 +215,21 @@ async def get_agent_risk_score(agent: str) -> AgentRiskResponse:
 async def get_risk_dashboard() -> RiskDashboard:
     """Return aggregated risk scores for all known agents."""
     casper = get_casper()
-    db = get_db()
-    engine = await _get_or_train_engine(casper, db)
+    engine = await _get_or_train_engine(casper)
 
     # Collect all unique agents
     agents: dict[str, dict[str, Any]] = {}
-    if db is not None:
-        try:
-            escrows = db.list_escrows(offset=0, limit=500)
-            for e in escrows:
-                for role in ("sender", "receiver"):
-                    ag = e.get(role, "")
-                    if not ag:
-                        continue
-                    if ag not in agents:
-                        agents[ag] = {"amounts": [], "disputes": 0, "ttls": []}
-                    agents[ag]["amounts"].append(int(e.get("amount", 0)))
-                    agents[ag]["ttls"].append(float(e.get("ttl", 86400)))
-                    if e.get("status") in ("disputed", "resolved"):
-                        agents[ag]["disputes"] += 1
-        except Exception as exc:
-            logger.warning("Dashboard DB query failed: %s", exc)
+    for e in _load_escrow_records()[:500]:
+        for role in ("sender", "receiver"):
+            ag = e.get(role, "")
+            if not ag:
+                continue
+            if ag not in agents:
+                agents[ag] = {"amounts": [], "disputes": 0, "ttls": []}
+            agents[ag]["amounts"].append(int(e.get("amount", 0)))
+            agents[ag]["ttls"].append(float(e.get("ttl", 86400)))
+            if e.get("status") in ("disputed", "resolved"):
+                agents[ag]["disputes"] += 1
 
     # If no real agents, show empty dashboard
     if not agents:

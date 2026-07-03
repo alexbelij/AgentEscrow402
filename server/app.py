@@ -19,7 +19,13 @@ from server import db as pgdb
 from server.casper_client import CasperClient
 from server.config import Config
 from server.event_monitor import EventMonitor
-from server.middleware import compute_service_hash, parse_x402_header
+from server.middleware import (
+    compute_service_hash,
+    parse_x402_header,
+    _build_signing_payload,
+    _check_replay,
+    _verify_ed25519,
+)
 from server.models import (
     DisputeRequest,
     EscrowRecord,
@@ -238,10 +244,55 @@ async def health(cfg: Config = Depends(get_config)):
 
 
 @app.get("/stats")
-async def stats():
-    """Aggregate statistics for the console."""
-    s = pgdb.get_stats()
+async def stats(store: SandboxStore = Depends(get_sandbox)):
+    """Aggregate statistics for the console.
+
+    PostgreSQL is optional on the hosted demo. When it is disconnected or empty,
+    the console must still reflect the in-memory testnet/demo escrows loaded at
+    startup and created during the current process.
+    """
     cfg = get_config()
+    db_stats = pgdb.get_stats()
+    records = pgdb.load_escrows()
+    data_source = "postgres" if records else "in_memory_demo"
+
+    if not records:
+        records = list(store._escrows.values())
+
+    if records:
+        total = len(records)
+        pending = sum(1 for r in records if str(r.get("status")) == "pending")
+        released = sum(1 for r in records if str(r.get("status")) == "released")
+        disputed = sum(1 for r in records if str(r.get("status")) == "disputed")
+        total_volume = sum(int(r.get("amount", 0) or 0) for r in records)
+        active_agents = len({r.get("sender") for r in records if r.get("sender")} | {r.get("receiver") for r in records if r.get("receiver")})
+        total_transactions = total + released + disputed + sum(1 for r in records if str(r.get("status")) in {"refunded", "expired"})
+        s = {
+            "total": total,
+            "pending": pending,
+            "released": released,
+            "disputed": disputed,
+            "volume": total_volume,
+            "active_agents": active_agents,
+            "total_transactions": total_transactions,
+            "db": db_stats.get("db", "disconnected"),
+            "data_source": data_source,
+        }
+    else:
+        s = dict(db_stats)
+        s.setdefault("volume", 0)
+        s.setdefault("pending", 0)
+        s.setdefault("released", 0)
+        s.setdefault("disputed", 0)
+        s.setdefault("active_agents", 0)
+        s.setdefault("total_transactions", s.get("total", 0))
+        s["data_source"] = "postgres" if s.get("db") == "connected" else "unavailable"
+
+    s["total_escrows"] = s.get("total", 0)
+    s["pending_escrows"] = s.get("pending", 0)
+    s["disputed_escrows"] = s.get("disputed", 0)
+    s["released_escrows"] = s.get("released", 0)
+    s["total_volume"] = s.get("volume", 0)
     s["contract_hash"] = cfg.contract_hash or ""
     s["sandbox"] = cfg.sandbox
     s["insurance_fee_bps"] = cfg.insurance_fee_bps
@@ -328,6 +379,7 @@ async def create_escrow(
                     enc_meta = encrypt_metadata(plaintext, encap_key)
                     result_dict["mlkem_decap_key"] = decap_key
                     result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
+                    result_dict["mlkem_algorithm"] = "ML-KEM-768"
                     logger.info("ML-KEM encryption applied to escrow %s", req.service_hash[:16])
                 except Exception as mlkem_exc:
                     logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
@@ -381,6 +433,7 @@ async def create_escrow(
             enc_meta = encrypt_metadata(plaintext, encap_key)
             result_dict["mlkem_decap_key"] = decap_key
             result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
+            result_dict["mlkem_algorithm"] = "ML-KEM-768"
             logger.info("ML-KEM encryption applied to live escrow %s", req.service_hash[:16])
         except Exception as mlkem_exc:
             logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
@@ -665,14 +718,35 @@ async def compute_hash(sender: str, receiver: str, amount: int, nonce: str):
     return {"service_hash": compute_service_hash(sender, receiver, amount, nonce)}
 
 
+DEMO_CONSOLE_SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+DEMO_CONSOLE_SIGNATURE = "a" * 128
+
+
 def _extract_sender(request: Request) -> str:
-    """Extract sender identity from x402 header or sandbox mode."""
+    """Extract sender identity from x402 header or sandbox mode.
+
+    Production x402 headers are Ed25519-verified and replay-checked. The hosted
+    console has one explicit, labelled demo bypass so non-wallet visitors can run
+    the testnet UI; it is limited to the known demo sender/signature marker.
+    """
     if hasattr(request.state, "payment") and request.state.payment:
         return request.state.payment.sender
     payment_header = request.headers.get("X-Payment")
     if payment_header:
         parsed = parse_x402_header(payment_header)
         if parsed:
+            is_demo_console = request.headers.get("X-AE402-Demo-Identity") == "hosted-console"
+            if is_demo_console:
+                if parsed.sender == DEMO_CONSOLE_SENDER and parsed.signature == DEMO_CONSOLE_SIGNATURE:
+                    return parsed.sender
+                raise HTTPException(status_code=401, detail="invalid demo x402 identity")
+
+            replay_err = _check_replay(parsed.nonce, parsed.timestamp)
+            if replay_err:
+                raise HTTPException(status_code=401, detail=replay_err)
+            msg = _build_signing_payload(parsed, method=request.method, path=request.url.path)
+            if not _verify_ed25519(parsed.sender, msg, parsed.signature):
+                raise HTTPException(status_code=401, detail="invalid x402 signature")
             return parsed.sender
     cfg = get_config()
     if cfg.sandbox:

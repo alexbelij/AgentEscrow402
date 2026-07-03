@@ -52,15 +52,15 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input: React.FC<InputProps> = ({ label, id, error, ...props }) => (
-  <div className="mb-4">
+  <div className="mb-0">
     <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
       {label}
     </label>
     <input
       id={id}
-      className={`w-full p-3 rounded-md bg-gray-800 text-gray-50 border ${
+      className={`w-full h-12 px-3 rounded-md bg-[#0d0d14] text-gray-50 border ${
         error ? 'border-red-500' : 'border-[#1e1e2e]'
-      } focus:ring-amber-500 focus:border-amber-500 outline-none`}
+      } focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none`}
       {...props}
     />
     {error && <p className="mt-1 text-sm text-red-400">{error}</p>}
@@ -197,6 +197,11 @@ const Insurance: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Insurance Protocol</h2>
 
+      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-100">
+        Use-case: buyers pay a small premium on risky agent work; the pool covers failed/disputed jobs.
+        Monetization is visible here as premium revenue plus optional LP deposits. Pricing combines base fee, service type and agent reputation/risk.
+      </div>
+
       {/* Pool Stats */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
         <div className="flex justify-between items-center mb-4">
@@ -226,17 +231,17 @@ const Insurance: React.FC = () => {
             <div className="flex flex-col items-center p-4 bg-gray-800 rounded-md border border-[#1e1e2e]">
               <DollarSign className="h-8 w-8 text-green-500 mb-2" />
               <p className="text-gray-400 text-sm">Total Deposited</p>
-              <p className="text-2xl font-bold text-gray-50">{poolStats.total_deposited} CSPR</p>
+              <p className="text-2xl font-bold text-gray-50">{formatCspr(poolStats.total_deposited)}</p>
             </div>
             <div className="flex flex-col items-center p-4 bg-gray-800 rounded-md border border-[#1e1e2e]">
               <Coins className="h-8 w-8 text-red-500 mb-2" />
               <p className="text-gray-400 text-sm">Total Claims Paid</p>
-              <p className="text-2xl font-bold text-gray-50">{poolStats.total_claims_paid} CSPR</p>
+              <p className="text-2xl font-bold text-gray-50">{formatCspr(poolStats.total_claims_paid)}</p>
             </div>
             <div className="flex flex-col items-center p-4 bg-gray-800 rounded-md border border-[#1e1e2e]">
               <Wallet className="h-8 w-8 text-blue-500 mb-2" />
               <p className="text-gray-400 text-sm">Available Funds</p>
-              <p className="text-2xl font-bold text-gray-50">{poolStats.available_funds} CSPR</p>
+              <p className="text-2xl font-bold text-gray-50">{formatCspr(poolStats.available_funds)}</p>
             </div>
             <div className="flex flex-col items-center p-4 bg-gray-800 rounded-md border border-[#1e1e2e]">
               <Activity className="h-8 w-8 text-purple-500 mb-2" />
@@ -277,7 +282,7 @@ const Insurance: React.FC = () => {
               id="premiumAgent"
               value={premiumAgent}
               onChange={(e) => setPremiumAgent(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-12 px-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
             >
               {agents.length === 0 && <option value="">Loading agents…</option>}
               {agents.map((a) => (
@@ -293,7 +298,7 @@ const Insurance: React.FC = () => {
               id="premiumService"
               value={premiumServiceType}
               onChange={(e) => setPremiumServiceType(e.target.value)}
-              className="w-full px-3 py-2 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+              className="w-full h-12 px-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
             >
               <option value="general">General</option>
               <option value="low_value_task">Low-value task</option>
@@ -302,7 +307,7 @@ const Insurance: React.FC = () => {
           </div>
           <button
             onClick={handleCalculatePremium}
-            className="flex items-center justify-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200"
+            className="flex items-center justify-center h-12 px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200"
             disabled={premiumLoading}
           >
             {premiumLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
@@ -383,10 +388,10 @@ interface DepositInsuranceModalProps {
 }
 
 const DepositInsuranceModal: React.FC<DepositInsuranceModalProps> = ({ isOpen, onClose, onDeposit }) => {
-  const [depositorPublicKey, setDepositorPublicKey] = useState('');
-  const [amount, setAmount] = useState('');
-  const [tokenContract, setTokenContract] = useState('hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'); // Default to contract hash
-  const [signature, setSignature] = useState(''); // Placeholder
+  const [depositorPublicKey, setDepositorPublicKey] = useState('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+  const [amount, setAmount] = useState('1000');
+  const [tokenContract, setTokenContract] = useState('CSPR');
+  const [signature, setSignature] = useState('demo-x402-header-generated-by-console');
   const [formError, setFormError] = useState<string | null>(null);
   const [depositLoading, setDepositLoading] = useState(false);
 
@@ -394,8 +399,8 @@ const DepositInsuranceModal: React.FC<DepositInsuranceModalProps> = ({ isOpen, o
     e.preventDefault();
     setFormError(null);
 
-    if (!depositorPublicKey || !amount || !tokenContract || !signature) {
-      setFormError('All fields are required.');
+    if (!depositorPublicKey || !amount) {
+      setFormError('Depositor and amount are required.');
       return;
     }
     if (isNaN(Number(amount)) || Number(amount) <= 0) {
@@ -407,14 +412,14 @@ const DepositInsuranceModal: React.FC<DepositInsuranceModalProps> = ({ isOpen, o
     try {
       await onDeposit({
         depositor_public_key: depositorPublicKey,
-        amount,
+        amount: csprToMotes(Number(amount)),
         token_contract: tokenContract,
         signature,
       });
-      setDepositorPublicKey('');
-      setAmount('');
-      setTokenContract('hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451');
-      setSignature('');
+      setDepositorPublicKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+      setAmount('1000');
+      setTokenContract('CSPR');
+      setSignature('demo-x402-header-generated-by-console');
       setFormError(null);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to deposit insurance.');
@@ -454,7 +459,7 @@ const DepositInsuranceModal: React.FC<DepositInsuranceModalProps> = ({ isOpen, o
           required
         />
         <Input
-          label="Signature (Placeholder)"
+          label="Signature / identity note"
           id="depositSignature"
           value={signature}
           onChange={(e) => setSignature(e.target.value)}
@@ -564,7 +569,7 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
           required
         />
         <Input
-          label="Signature (Placeholder)"
+          label="Signature / identity note"
           id="claimSignature"
           value={signature}
           onChange={(e) => setSignature(e.target.value)}
