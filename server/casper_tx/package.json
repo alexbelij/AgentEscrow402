@@ -1,0 +1,9 @@
+{
+  "name": "ae402-casper-tx",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Casper on-chain transaction scripts for AE402 backend",
+  "dependencies": {
+    "casper-js-sdk": "5.0.12"
+  }
+}

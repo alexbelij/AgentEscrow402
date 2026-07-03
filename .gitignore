@@ -30,3 +30,4 @@ landing/
 *.secret
 Cargo.lock
 *.bak
+node_modules/
