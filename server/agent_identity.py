@@ -31,6 +31,7 @@ router = APIRouter(prefix="/identity", tags=["identity"])
 # In-memory store for agent identities and capabilities (replace with proper DB)
 _agent_identities: dict[str, dict[str, Any]] = {}
 _capabilities: dict[str, list[dict[str, Any]]] = {} # agent_id -> list of capabilities
+_delegations: dict[str, list[dict[str, Any]]] = {} # delegator_id -> list of delegations
 
 
 class RegisterAgentRequest(BaseModel):
@@ -236,7 +237,7 @@ async def delegate_capability(
 @router.get("/capabilities/{agent_id}")
 async def get_capabilities(agent_id: str):
     """Get all capabilities for an agent (own + delegated)."""
-    identity = _identities.get(agent_id)
+    identity = _agent_identities.get(agent_id)
     own_caps = identity.get("capabilities", []) if identity else []
     delegated = []
     for delegator_id, dels in _delegations.items():

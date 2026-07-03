@@ -8,58 +8,102 @@ interface ApiResponse<T> {
   status: number | null;
 }
 
+// The free-tier backend sleeps after ~15 min idle and takes ~50s to cold-start.
+// Instead of a hard timeout that crashes the UI, we retry with backoff and let a
+// global preloader (see BackendWakeOverlay) inform the user the server is waking.
+const PER_ATTEMPT_TIMEOUT_MS = 20000;
+const RETRY_DELAYS_MS = [1500, 3000, 5000, 8000, 12000]; // ~30s of retries after 1st try
+const RETRYABLE_STATUS = new Set([502, 503, 504]);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Emit a window event so a global overlay can show/hide a "waking up" preloader. */
+function emitBackendState(state: 'waking' | 'ready') {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('backend:state', { detail: state }));
+  }
+}
+
+/**
+ * Normalise API error payloads into a readable string.
+ * FastAPI validation errors return `detail` as an ARRAY of objects, which is why
+ * the UI previously rendered "[object Object],[object Object]".
+ */
+function normalizeError(data: any, statusText: string): string {
+  if (data == null) return `API Error: ${statusText || 'unknown'}`;
+  const detail = data.detail ?? data.message ?? data.error;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((d) => {
+        if (typeof d === 'string') return d;
+        const loc = Array.isArray(d?.loc) ? d.loc.filter((x: any) => x !== 'query' && x !== 'body').join('.') : '';
+        const msg = d?.msg || d?.message || JSON.stringify(d);
+        return loc ? `${loc}: ${msg}` : msg;
+      })
+      .join('; ');
+  }
+  if (detail && typeof detail === 'object') return JSON.stringify(detail);
+  return `API Error: ${statusText || 'unknown'}`;
+}
+
 async function fetcher<T>(
   url: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   body?: object
 ): Promise<ApiResponse<T>> {
-  const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-  };
-
-  // Abort requests that take too long (e.g. backend waiting on an
-  // unreachable Casper node) so pages never hang on infinite spinners.
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
+  const headers: HeadersInit = { 'Content-Type': 'application/json' };
   const config: RequestInit = {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
-    signal: controller.signal,
   };
 
+  const maxAttempts = RETRY_DELAYS_MS.length + 1;
+  let waking = false;
+  let lastError = 'An unknown error occurred';
+  let lastStatus: number | null = 500;
+
   try {
-    const response = await fetch(`${BASE_URL}${url}`, config);
-    clearTimeout(timeoutId);
-    const data = await response.json();
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
+      try {
+        const response = await fetch(`${BASE_URL}${url}`, { ...config, signal: controller.signal });
+        clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      return {
-        data: null,
-        error: data.detail || data.message || `API Error: ${response.statusText}`,
-        status: response.status,
-      };
+        // Gateway/cold-start responses -> retry (backend still waking).
+        if (RETRYABLE_STATUS.has(response.status) && attempt < maxAttempts - 1) {
+          if (!waking) { waking = true; emitBackendState('waking'); }
+          await sleep(RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
+
+        const text = await response.text();
+        const data = text ? JSON.parse(text) : {};
+
+        if (!response.ok) {
+          return { data: null, error: normalizeError(data, response.statusText), status: response.status };
+        }
+        return { data: data as T, error: null, status: response.status };
+      } catch (err) {
+        clearTimeout(timeoutId);
+        const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+        lastError = isTimeout ? 'Server is waking up, please wait…' : (err instanceof Error ? err.message : 'Network error');
+        lastStatus = isTimeout ? 504 : 503;
+        // A mid-flight abort on a non-GET could double-submit if the server already
+        // received it, so only retry non-GET on connection-level failures.
+        const safeToRetry = method === 'GET' || !isTimeout;
+        if (safeToRetry && attempt < maxAttempts - 1) {
+          if (!waking) { waking = true; emitBackendState('waking'); }
+          await sleep(RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
+      }
     }
-
-    return {
-      data: data as T,
-      error: null,
-      status: response.status,
-    };
-  } catch (err) {
-    clearTimeout(timeoutId);
-    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
-    if (!isTimeout) console.error(`Fetch error for ${url}:`, err);
-    return {
-      data: null,
-      error: isTimeout
-        ? 'Request timed out'
-        : err instanceof Error
-          ? err.message
-          : 'An unknown error occurred',
-      status: isTimeout ? 504 : 500,
-    };
+    return { data: null, error: lastError, status: lastStatus };
+  } finally {
+    if (waking) emitBackendState('ready');
   }
 }
 
@@ -131,18 +175,15 @@ export interface EscrowHistoryEntry {
 }
 
 export interface CreateEscrowRequest {
-  payer: string;
-  payee: string;
-  amount: string;
-  token_contract: string;
-  arbiter?: string;
-  metadata?: Record<string, any>;
+  receiver: string;      // Casper account hash of the receiver
+  amount: number;        // amount in motes (1 CSPR = 1e9 motes)
+  service_hash: string;  // 64-char hex identifier for the service
+  ttl?: number;          // time-to-live in seconds (60..86400), default 300
 }
 
 export interface EscrowActionRequest {
-  escrow_hash: string;
-  initiator_account: string;
-  signature: string;
+  service_hash: string;
+  reason_hash?: string;  // required only for dispute
 }
 
 // Multi-asset Escrow
@@ -257,10 +298,9 @@ export interface InsurancePoolStats {
 }
 
 export interface PremiumQuote {
-  amount: string;
-  duration_seconds: number;
-  premium_amount: string;
-  fee_rate: number;
+  premium_amount: number; // in motes
+  risk_multiplier: number;
+  base_rate_bps: number;
 }
 
 export interface DepositInsuranceRequest {
@@ -515,7 +555,11 @@ export const api = {
     }
     return res as ApiResponse<InsurancePoolStats>;
   },
-  getPremiumQuote: (amount: number, duration: number) => fetcher<PremiumQuote>(`/insurance/premium-quote?amount=${amount}&duration=${duration}`, 'GET'),
+  getPremiumQuote: (escrowAmountMotes: number, agentId: string, serviceType = 'general') =>
+    fetcher<PremiumQuote>(
+      `/insurance/premium-quote?escrow_amount=${escrowAmountMotes}&agent_id=${encodeURIComponent(agentId)}&service_type=${encodeURIComponent(serviceType)}`,
+      'GET'
+    ),
 
   // Arbitration Endpoints
   electArbiter: (data: ElectArbiterRequest) => fetcher<TransactionHash>('/arbitration/elect', 'POST', data),

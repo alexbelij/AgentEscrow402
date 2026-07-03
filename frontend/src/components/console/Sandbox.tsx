@@ -90,11 +90,10 @@ const endpoints: EndpointConfig[] = [
     path: '/escrow',
     description: 'Creates a new escrow payment.',
     initialBody: {
-      payer: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-      payee: '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
-      amount: '100',
-      token_contract: 'hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451',
-      arbiter: '01abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
+      receiver: '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      amount: 100000000000,
+      service_hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451',
+      ttl: 300,
     },
     apiCall: (p, q, b) => api.createEscrow(b as any),
   },
@@ -112,9 +111,7 @@ const endpoints: EndpointConfig[] = [
     path: '/release',
     description: 'Releases funds from an escrow.',
     initialBody: {
-      escrow_hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451', // Placeholder
-      initiator_account: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-      signature: 'mock_signature_payer_or_arbiter',
+      service_hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451', // Placeholder
     },
     apiCall: (p, q, b) => api.releaseEscrow(b as any),
   },
@@ -152,8 +149,8 @@ const endpoints: EndpointConfig[] = [
     method: 'GET',
     path: '/insurance/premium-quote',
     description: 'Calculates an insurance premium quote.',
-    initialQueryParams: { amount: '100', duration: '2592000' }, // 30 days in seconds
-    apiCall: (p, q) => api.getPremiumQuote(Number(q.amount), Number(q.duration)),
+    initialQueryParams: { escrow_amount: '100000000000', agent_id: 'agent-compute-gpt4', service_type: 'general' },
+    apiCall: (p, q) => api.getPremiumQuote(Number(q.escrow_amount), q.agent_id, q.service_type),
   },
   {
     name: 'Register Identity',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { api, CreateEscrowRequest, Escrow, EscrowActionRequest, Reputation } from '../../lib/api';
+import { api, CreateEscrowRequest, EscrowActionRequest } from '../../lib/api';
+import { csprToMotes } from '../../lib/format';
 import {
   Play,
   RefreshCw,
@@ -43,12 +44,16 @@ const AgentDemo: React.FC = () => {
   const [overallLoading, setOverallLoading] = useState(false);
   const [overallError, setOverallError] = useState<string | null>(null);
 
-  const examplePayer = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'; // Placeholder
-  const examplePayee = '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'; // Placeholder
-  const exampleArbiter = '01abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890'; // Placeholder
-  const exampleTokenContract = 'hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451';
-  const exampleAmount = '100';
-  const exampleSignature = '0123456789abcdef...'; // Placeholder
+  // Generate a fresh 64-char hex service hash for each demo run so the escrow is unique.
+  const randomHex64 = () => {
+    const bytes = new Uint8Array(32);
+    (window.crypto || (window as any).msCrypto).getRandomValues(bytes);
+    return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+  };
+  const [serviceHash] = useState<string>(randomHex64());
+
+  const examplePayee = '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210'; // demo receiver
+  const exampleAmountCspr = 100; // 100 CSPR -> converted to motes below
 
   const resetDemo = () => {
     setCurrentStep(0);
@@ -69,15 +74,15 @@ const AgentDemo: React.FC = () => {
         response: null,
         action: async () => {
           const req: CreateEscrowRequest = {
-            payer: examplePayer,
-            payee: examplePayee,
-            amount: exampleAmount,
-            token_contract: exampleTokenContract,
-            arbiter: exampleArbiter,
+            receiver: examplePayee,
+            amount: csprToMotes(exampleAmountCspr),
+            service_hash: serviceHash,
+            ttl: 300,
           };
           const res = await api.createEscrow(req);
-          if (res.data?.deploy_hash) {
-            setEscrowHash(res.data.deploy_hash); // Use deploy_hash as escrow hash for demo
+          // The escrow is addressed by its service_hash for all later actions.
+          if (res.data && !res.error) {
+            setEscrowHash((res.data as any).service_hash || serviceHash);
           }
           return res;
         },
@@ -104,11 +109,7 @@ const AgentDemo: React.FC = () => {
         response: null,
         action: async () => {
           if (!escrowHash) throw new Error('Escrow hash not available. Complete Step 1 first.');
-          const req: EscrowActionRequest = {
-            escrow_hash: escrowHash,
-            initiator_account: examplePayer, // Or arbiter
-            signature: exampleSignature,
-          };
+          const req: EscrowActionRequest = { service_hash: escrowHash };
           return await api.releaseEscrow(req);
         },
         disabled: !escrowHash,
@@ -235,11 +236,10 @@ const AgentDemo: React.FC = () => {
               <CodeBlock title="Request Body (POST /escrow)">
                 {JSON.stringify(
                   {
-                    payer: examplePayer,
-                    payee: examplePayee,
-                    amount: exampleAmount,
-                    token_contract: exampleTokenContract,
-                    arbiter: exampleArbiter,
+                    receiver: examplePayee,
+                    amount: csprToMotes(exampleAmountCspr),
+                    service_hash: serviceHash,
+                    ttl: 300,
                   },
                   null,
                   2
@@ -248,8 +248,8 @@ const AgentDemo: React.FC = () => {
             )}
 
             {step.id === 2 && (
-              <CodeBlock title="Request URL (GET /escrow/{hash})">
-                {`/escrow/${escrowHash || '{escrow_hash}'}`}
+              <CodeBlock title="Request URL (GET /escrow/{service_hash})">
+                {`/escrow/${escrowHash || serviceHash}`}
               </CodeBlock>
             )}
 
@@ -257,9 +257,7 @@ const AgentDemo: React.FC = () => {
               <CodeBlock title="Request Body (POST /release)">
                 {JSON.stringify(
                   {
-                    escrow_hash: escrowHash || '{escrow_hash}',
-                    initiator_account: examplePayer,
-                    signature: exampleSignature,
+                    service_hash: escrowHash || serviceHash,
                   },
                   null,
                   2
