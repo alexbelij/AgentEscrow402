@@ -498,7 +498,10 @@ async def get_reputation(
     if cfg.sandbox:
         return store.get_reputation(agent)
     if casper:
-        return await casper.get_reputation(agent)
+        try:
+            return await asyncio.wait_for(casper.get_reputation(agent), timeout=5.0)
+        except Exception:
+            logger.warning("On-chain reputation lookup failed for %s, using default", agent)
     return ReputationRecord(agent=agent)
 
 

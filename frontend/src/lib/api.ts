@@ -17,14 +17,21 @@ async function fetcher<T>(
     'Content-Type': 'application/json',
   };
 
+  // Abort requests that take too long (e.g. backend waiting on an
+  // unreachable Casper node) so pages never hang on infinite spinners.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
   const config: RequestInit = {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
+    signal: controller.signal,
   };
 
   try {
     const response = await fetch(`${BASE_URL}${url}`, config);
+    clearTimeout(timeoutId);
     const data = await response.json();
 
     if (!response.ok) {
@@ -41,11 +48,17 @@ async function fetcher<T>(
       status: response.status,
     };
   } catch (err) {
-    console.error(`Fetch error for ${url}:`, err);
+    clearTimeout(timeoutId);
+    const isTimeout = err instanceof DOMException && err.name === 'AbortError';
+    if (!isTimeout) console.error(`Fetch error for ${url}:`, err);
     return {
       data: null,
-      error: err instanceof Error ? err.message : 'An unknown error occurred',
-      status: 500,
+      error: isTimeout
+        ? 'Request timed out'
+        : err instanceof Error
+          ? err.message
+          : 'An unknown error occurred',
+      status: isTimeout ? 504 : 500,
     };
   }
 }
