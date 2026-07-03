@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Info,
   Loader2,
+  Scale,
 } from 'lucide-react';
 import { format } from 'date-fns';
 

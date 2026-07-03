@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 interface AgentRisk extends Agent {
-  reputation_details?: Reputation;
+  reputation_details?: Reputation | null;
 }
 
 const Risk: React.FC = () => {
