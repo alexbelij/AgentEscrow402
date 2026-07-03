@@ -25,7 +25,7 @@ const EXTERNAL_LINKS = [
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
   const location = useLocation()
   const isLanding = location.pathname === '/'
-  const isConsole = location.pathname === '/console'
+  const isConsole = location.pathname.startsWith('/console')
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
@@ -101,11 +101,6 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
           )}
 
           <div className="flex items-center gap-3">
-            {!isConsole && (
-              <a href="/console" className="px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors">
-                Console
-              </a>
-            )}
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden text-gray-400 hover:text-white"
@@ -139,13 +134,6 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
               </a>
             ))}
             <div className="w-16 h-px bg-ae-border my-4" />
-            <a
-              href="/console"
-              onClick={() => setMobileOpen(false)}
-              className="px-8 py-3 rounded-xl bg-ae-accent text-white font-semibold text-lg"
-            >
-              Open Console
-            </a>
           </div>
           <div className="flex flex-wrap justify-center gap-4 pb-10 px-6">
             {EXTERNAL_LINKS.map(link => (

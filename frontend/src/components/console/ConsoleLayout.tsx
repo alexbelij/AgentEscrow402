@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ErrorBoundary from './ErrorBoundary';
 import BackendWakeOverlay from './BackendWakeOverlay';
+import WalletStatus from './WalletStatus';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Monitor,
-  Menu,
-  X,
   DollarSign,
   Users,
   Shield,
@@ -35,8 +34,6 @@ const navItems: NavItem[] = [
 
 const ConsoleLayout: React.FC = () => {
   const location = useLocation();
-  const [isMobileSubMenuOpen, setIsMobileSubMenuOpen] = useState(false);
-
   const pathnames = location.pathname.split('/').filter((x) => x);
 
   const getBreadcrumbs = () => {
@@ -63,30 +60,19 @@ const ConsoleLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-ae-bg text-gray-100 flex flex-col">
-      {/* Submenu Bar — sits right below the main Navbar (which has h-14 = 56px and is fixed) */}
-      <div className="sticky top-14 z-40 bg-ae-card border-b border-ae-border">
-        <div className="ae-section flex items-center justify-between h-11">
-          {/* Mobile submenu toggle */}
-          <button
-            className="lg:hidden text-gray-400 hover:text-ae-accent p-1"
-            onClick={() => setIsMobileSubMenuOpen(!isMobileSubMenuOpen)}
-            aria-label="Toggle console menu"
-          >
-            {isMobileSubMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            <span className="ml-2 text-xs font-semibold text-gray-300">Sections</span>
-          </button>
-
-          {/* Desktop submenu links */}
-          <nav className="hidden lg:flex items-center gap-1 overflow-x-auto">
+      {/* Console section rail — one professional horizontal nav row on desktop and mobile. */}
+      <div className="sticky top-14 z-40 bg-ae-card/95 backdrop-blur border-b border-ae-border">
+        <div className="ae-section h-12 flex items-center overflow-x-auto no-scrollbar">
+          <nav className="flex items-center gap-1 min-w-max">
             {navItems.map((item) => (
               <NavLink
                 key={item.name}
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors whitespace-nowrap ${
+                  `flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'bg-ae-accent/20 text-ae-accent'
-                      : 'text-gray-400 hover:bg-ae-border/50 hover:text-gray-200'
+                      ? 'bg-ae-accent/20 text-ae-accent border border-ae-accent/30'
+                      : 'text-gray-400 hover:bg-ae-border/50 hover:text-gray-200 border border-transparent'
                   }`
                 }
               >
@@ -96,37 +82,13 @@ const ConsoleLayout: React.FC = () => {
             ))}
           </nav>
         </div>
-
-        {/* Mobile dropdown submenu */}
-        {isMobileSubMenuOpen && (
-          <div className="lg:hidden border-t border-ae-border bg-ae-card px-4 py-2">
-            <nav className="grid grid-cols-2 gap-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.name}
-                  to={item.path}
-                  onClick={() => setIsMobileSubMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-ae-accent/20 text-ae-accent'
-                        : 'text-gray-400 hover:bg-ae-border/50 hover:text-gray-200'
-                    }`
-                  }
-                >
-                  <item.icon className="h-4 w-4" />
-                  {item.name}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
-        )}
       </div>
+      <WalletStatus />
 
       {/* Main Content Area */}
-      <main className="flex-1 p-6 lg:p-8">
+      <main className="flex-1 p-4 sm:p-6 lg:p-8">
         {/* Breadcrumbs */}
-        <nav className="mb-6 flex items-center text-sm">
+        <nav className="mb-6 hidden sm:flex items-center text-sm">
           <NavLink to="/" className="text-gray-400 hover:text-ae-accent transition-colors">
             Home
           </NavLink>

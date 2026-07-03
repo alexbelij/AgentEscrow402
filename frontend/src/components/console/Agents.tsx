@@ -75,6 +75,7 @@ const Agents: React.FC = () => {
   const [agentCapabilities, setAgentCapabilities] = useState<Capability[]>([]);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -133,6 +134,8 @@ const Agents: React.FC = () => {
     }
   };
 
+  const filteredAgents = statusFilter === 'all' ? agents : agents.filter((agent) => agent.status === statusFilter);
+
   const getStatusColor = (status: Agent['status']) => {
     switch (status) {
       case 'active':
@@ -150,21 +153,39 @@ const Agents: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Agent Management</h2>
 
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
+        <strong>What this section is for:</strong> agent identities bind a service agent to a public key, DID document hash, capabilities and reputation. The list is fetched from the live identity/reputation API. If the optional on-chain identity registry is not configured, the backend labels registrations as <span className="font-mono">local_registry</span> instead of pretending they were contract writes. Use the detail icon to inspect reputation and delegated capabilities before trusting an agent.
+      </div>
+
       {/* Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <button
-          onClick={() => fetchAgents()}
-          className="p-3 bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors"
-          title="Refresh Agents"
-        >
-          <RefreshCw size={20} />
-        </button>
+      <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <button
+            onClick={() => fetchAgents()}
+            className="h-12 w-12 shrink-0 inline-flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors"
+            title="Refresh Agents"
+          >
+            <RefreshCw size={20} />
+          </button>
+          <select
+            aria-label="Filter agents by status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="h-12 w-36 sm:w-44 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none"
+          >
+            <option value="all">All statuses</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
         <button
           onClick={() => setIsRegisterModalOpen(true)}
-          className="flex items-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full md:w-auto justify-center"
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
+          title="Register a DID-style agent identity"
         >
           <UserPlus className="h-5 w-5 mr-2" />
-          Register New Agent
+          Register Agent
         </button>
       </div>
 
@@ -179,8 +200,8 @@ const Agents: React.FC = () => {
             <XCircle className="h-6 w-6 mr-2" />
             <p>Error: {error}</p>
           </div>
-        ) : agents.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No agents found.</div>
+        ) : filteredAgents.length === 0 ? (
+          <div className="p-6 text-center text-gray-400">No agents match this filter.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">
@@ -195,7 +216,7 @@ const Agents: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e1e2e]">
-                {agents.map((agent) => (
+                {filteredAgents.map((agent) => (
                   <tr key={agent.public_key} className="hover:bg-gray-800 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{agent.name || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">

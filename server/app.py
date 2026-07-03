@@ -13,7 +13,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from server import db as pgdb
 from server.casper_client import CasperClient
@@ -64,6 +64,7 @@ _sandbox = SandboxStore()
 _monitor: EventMonitor | None = None
 _monitor_task: asyncio.Task | None = None
 _event_subscribers: list[asyncio.Queue] = []
+_started_at = time.time()
 
 
 def get_sandbox() -> SandboxStore:
@@ -200,7 +201,12 @@ async def rate_limit_middleware(request: Request, call_next):
     else:
         entry["count"] += 1
         if entry["count"] > 60:
-            raise HTTPException(status_code=429, detail="Too many requests")
+            return JSONResponse(status_code=429, content={"error": "rate_limited", "detail": "Too many requests"})
+    # Bound the in-memory limiter so attacker-controlled IP churn cannot grow it forever.
+    if len(_rate_limits) > 5000:
+        cutoff = now - 120
+        for key in [k for k, v in _rate_limits.items() if v.get("reset", 0) < cutoff]:
+            _rate_limits.pop(key, None)
     return await call_next(request)
 
 
@@ -240,6 +246,7 @@ async def health(cfg: Config = Depends(get_config)):
         chain=cfg.casper_chain_name,
         contract_hash=contract_hash,
         db="connected" if connected else "disconnected",
+        uptime=int(time.time() - _started_at),
     )
 
 
@@ -247,14 +254,14 @@ async def health(cfg: Config = Depends(get_config)):
 async def stats(store: SandboxStore = Depends(get_sandbox)):
     """Aggregate statistics for the console.
 
-    PostgreSQL is optional on the hosted demo. When it is disconnected or empty,
+    Neon is optional on the hosted demo. When it is disconnected or empty,
     the console must still reflect the in-memory testnet/demo escrows loaded at
     startup and created during the current process.
     """
     cfg = get_config()
     db_stats = pgdb.get_stats()
     records = pgdb.load_escrows()
-    data_source = "postgres" if records else "in_memory_demo"
+    data_source = "neon" if records else "hosted_demo_fallback"
 
     if not records:
         records = list(store._escrows.values())
@@ -286,7 +293,7 @@ async def stats(store: SandboxStore = Depends(get_sandbox)):
         s.setdefault("disputed", 0)
         s.setdefault("active_agents", 0)
         s.setdefault("total_transactions", s.get("total", 0))
-        s["data_source"] = "postgres" if s.get("db") == "connected" else "unavailable"
+        s["data_source"] = "neon" if s.get("db") == "connected" else "unavailable"
 
     s["total_escrows"] = s.get("total", 0)
     s["pending_escrows"] = s.get("pending", 0)
@@ -729,6 +736,7 @@ def _extract_sender(request: Request) -> str:
     console has one explicit, labelled demo bypass so non-wallet visitors can run
     the testnet UI; it is limited to the known demo sender/signature marker.
     """
+    cfg = get_config()
     if hasattr(request.state, "payment") and request.state.payment:
         return request.state.payment.sender
     payment_header = request.headers.get("X-Payment")
@@ -737,6 +745,8 @@ def _extract_sender(request: Request) -> str:
         if parsed:
             is_demo_console = request.headers.get("X-AE402-Demo-Identity") == "hosted-console"
             if is_demo_console:
+                if not cfg.allow_hosted_demo_identity:
+                    raise HTTPException(status_code=401, detail="hosted demo x402 identity disabled")
                 if parsed.sender == DEMO_CONSOLE_SENDER and parsed.signature == DEMO_CONSOLE_SIGNATURE:
                     return parsed.sender
                 raise HTTPException(status_code=401, detail="invalid demo x402 identity")
@@ -748,7 +758,6 @@ def _extract_sender(request: Request) -> str:
             if not _verify_ed25519(parsed.sender, msg, parsed.signature):
                 raise HTTPException(status_code=401, detail="invalid x402 signature")
             return parsed.sender
-    cfg = get_config()
     if cfg.sandbox:
         return request.query_params.get("sender", "sandbox-agent-001")
     raise HTTPException(status_code=401, detail="sender identity required")

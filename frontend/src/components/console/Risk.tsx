@@ -99,11 +99,10 @@ const Risk: React.FC = () => {
         </button>
       </div>
 
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
-        <p className="font-semibold mb-1">What this is / why it matters</p>
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
+        <p className="font-semibold mb-1">What is real here / why it matters</p>
         <p>
-          The backend trains an IsolationForest on escrow features (amounts, TTLs, dispute rate, frequency, volume dispersion) and turns it into an agent-level risk score.
-          Product use: warn buyers before hiring risky agents, route high-risk jobs to stronger arbitration, and price the insurance premium dynamically.
+          Scores are computed by the live backend from the escrow dataset currently available to it: Neon-persisted records when the database is connected, otherwise the explicitly labelled hosted demo records. The IsolationForest model is real business logic, not a static mock: it uses amounts, TTLs, dispute rate, activity frequency and volume dispersion to flag anomalous agents. Product use: warn buyers before hiring risky agents, route high-risk jobs to stronger arbitration, and price insurance premiums dynamically.
         </p>
       </div>
 
