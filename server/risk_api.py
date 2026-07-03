@@ -12,6 +12,7 @@ import logging
 import math
 import random
 import re
+import secrets
 import time as _time
 from typing import Any
 
@@ -90,7 +91,7 @@ async def _get_or_train_engine(casper, db) -> RiskEngine:
 
     # If we have too few real samples, seed with synthetic normal distribution
     if len(training_samples) < 20:
-        rng = random.Random(42)
+        rng = random.Random(secrets.randbits(64))  # non-deterministic synthetic seed
         for i in range(50):
             amount = int(rng.gauss(500_000_000_000, 200_000_000_000))  # ~500 CSPR
             training_samples.append(TransactionFeatures(
@@ -139,9 +140,15 @@ class RiskDashboard(BaseModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
+_AGENT_PATTERN = re.compile(r"^[a-fA-F0-9]{64}$|^account-hash-[a-fA-F0-9]{64}$|^[a-zA-Z0-9_\-]{1,128}$")
+
+
 @router.get("/score/{agent}", response_model=AgentRiskResponse)
 async def get_agent_risk_score(agent: str) -> AgentRiskResponse:
     """Get the IsolationForest risk score for a specific agent address."""
+    # Input validation — reject oversized or suspicious agent identifiers
+    if len(agent) > 200 or not _AGENT_PATTERN.match(agent):
+        raise HTTPException(status_code=422, detail="Invalid agent identifier format")
     casper = get_casper()
     db = get_db()
     engine = await _get_or_train_engine(casper, db)
