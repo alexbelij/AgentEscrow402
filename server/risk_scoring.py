@@ -111,8 +111,10 @@ class IsolationForest:
 
     def score_sample(self, sample: TransactionFeatures) -> float:
         sample_dict = self._to_dict(sample)
+        if not self.trees:
+            return 0.5
         avg_path = sum(IsolationTree.path_length(tree, sample_dict) for tree in self.trees) / len(self.trees)
-        return 2.0 ** (-avg_path / IsolationTree._c(self.sample_size)) if self.trees else 0.5
+        return 2.0 ** (-avg_path / IsolationTree._c(self.sample_size))
 
     def score_escrow(self, escrow_id: str, features: TransactionFeatures) -> RiskScore:
         anomaly_score = self.score_sample(features)
