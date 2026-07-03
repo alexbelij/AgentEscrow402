@@ -327,7 +327,7 @@ const Escrows: React.FC = () => {
                       {escrow.payee.substring(0, 8)}...
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {escrow.amount} {escrow.token_contract.substring(0, 8)}...
+                      {escrow.amount} {escrow.token_contract.length > 12 ? escrow.token_contract.substring(0, 8) + '...' : escrow.token_contract}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       {getStatusIcon(escrow.status)}
