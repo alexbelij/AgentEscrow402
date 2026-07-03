@@ -110,7 +110,7 @@ const Risk: React.FC = () => {
                   <div className="mb-3">
                     <p className="text-gray-300 flex items-center mb-1">
                       <Star className="h-4 w-4 text-yellow-400 mr-2" />
-                      Reputation Score: <span className="font-bold ml-1">{agent.reputation_score.toFixed(2)}</span>
+                      Reputation Score: <span className="font-bold ml-1">{(agent.reputation_score ?? 0).toFixed(2)}</span>
                     </p>
                     <div className="w-full bg-gray-700 rounded-full h-2.5">
                       <div

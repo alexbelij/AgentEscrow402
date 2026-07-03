@@ -199,10 +199,10 @@ const Agents: React.FC = () => {
                   <tr key={agent.public_key} className="hover:bg-gray-800 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{agent.name || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {agent.public_key.substring(0, 12)}...{agent.public_key.substring(agent.public_key.length - 8)}
+                      {agent.public_key.length > 20 ? `${agent.public_key.substring(0, 12)}...${agent.public_key.substring(agent.public_key.length - 8)}` : agent.public_key}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
-                      <Star className="h-4 w-4 text-yellow-400 mr-1" /> {agent.reputation_score.toFixed(2)}
+                      <Star className="h-4 w-4 text-yellow-400 mr-1" /> {(agent.reputation_score ?? 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`font-medium ${getStatusColor(agent.status)} capitalize`}>
@@ -294,7 +294,7 @@ const Agents: React.FC = () => {
                     <ShieldCheck className="h-5 w-5 mr-2 text-green-500" />
                     <span className="font-medium">{cap.capability}</span>
                     <span className="ml-auto text-gray-400 text-sm">
-                      Delegated by: {cap.delegated_by.substring(0, 8)}... (Expires: {format(new Date(cap.expires_at), 'MMM dd, yyyy')})
+                      Delegated by: {(cap.delegated_by || '').substring(0, 8)}... (Expires: {cap.expires_at ? format(new Date(cap.expires_at), 'MMM dd, yyyy') : 'N/A'})
                     </span>
                   </li>
                 ))}
