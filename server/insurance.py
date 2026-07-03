@@ -16,6 +16,15 @@ from server.db import get_db, InMemoryDB
 from server.models import EscrowRecord, EscrowStatus, ReputationRecord, PaymentHeader
 from server.middleware import parse_x402_header
 
+def get_casper() -> CasperClient | None:
+    # This function is a placeholder, in a real app.py it would be defined globally
+    # or imported from app.py. For this file generation, we assume it exists.
+    from server.app import get_casper as _get_casper
+    return _get_casper()
+
+
+
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/insurance", tags=["insurance"])
 
@@ -69,13 +78,6 @@ class PoolStatsResponse(BaseModel):
     total_claims_filed: int
     coverage_ratio: float = Field(..., description="Ratio of total assets to total potential liabilities (simplified)")
     last_rebalance_time: int
-
-
-def get_casper() -> CasperClient | None:
-    # This function is a placeholder, in a real app.py it would be defined globally
-    # or imported from app.py. For this file generation, we assume it exists.
-    from server.app import get_casper as _get_casper
-    return _get_casper()
 
 
 @router.post("/deposit", status_code=status.HTTP_202_ACCEPTED)

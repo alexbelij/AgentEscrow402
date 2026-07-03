@@ -212,3 +212,32 @@ def get_reputation_db(agent: str) -> dict[str, Any] | None:
         }
     except Exception:
         return None
+
+
+class InMemoryDB:
+    """Simple in-memory store for batch 3 modules that need Depends(get_db)."""
+    
+    def __init__(self):
+        self._data: dict[str, list[dict]] = {}
+    
+    def get_collection(self, name: str) -> list[dict]:
+        if name not in self._data:
+            self._data[name] = []
+        return self._data[name]
+    
+    def insert(self, collection: str, item: dict) -> None:
+        self.get_collection(collection).append(item)
+    
+    def find(self, collection: str, **kwargs) -> list[dict]:
+        results = self.get_collection(collection)
+        for k, v in kwargs.items():
+            results = [r for r in results if r.get(k) == v]
+        return results
+
+
+_in_memory_db = InMemoryDB()
+
+
+def get_db() -> InMemoryDB:
+    """Dependency injection helper for FastAPI."""
+    return _in_memory_db

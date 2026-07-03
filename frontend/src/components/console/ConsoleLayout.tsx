@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ErrorBoundary from './ErrorBoundary';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Monitor,
@@ -48,8 +49,8 @@ const ConsoleLayout: React.FC = () => {
         <React.Fragment key={name}>
           <NavLink
             to={currentPath}
-            className={`text-gray-400 hover:text-amber-500 transition-colors ${
-              isLast ? 'font-semibold text-amber-500' : ''
+            className={`text-gray-400 hover:text-purple-400 transition-colors ${
+              isLast ? 'font-semibold text-purple-400' : ''
             }`}
           >
             {displayName}
@@ -66,12 +67,12 @@ const ConsoleLayout: React.FC = () => {
       <header className="bg-[#12121a] border-b border-[#1e1e2e] p-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center">
           <button
-            className="lg:hidden text-gray-400 hover:text-amber-500 mr-4"
+            className="lg:hidden text-gray-400 hover:text-purple-400 mr-4"
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
-          <NavLink to="/console/overview" className="flex items-center text-2xl font-bold text-amber-500">
+          <NavLink to="/console/overview" className="flex items-center text-2xl font-bold text-purple-400">
             <Bot className="h-8 w-8 mr-2" />
             AgentEscrow402
           </NavLink>
@@ -86,7 +87,7 @@ const ConsoleLayout: React.FC = () => {
               className={({ isActive }) =>
                 `flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
                   isActive
-                    ? 'bg-amber-500/20 text-amber-400'
+                    ? 'bg-purple-500/20 text-purple-400'
                     : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                 }`
               }
@@ -99,7 +100,7 @@ const ConsoleLayout: React.FC = () => {
 
         <div className="flex items-center">
           {/* Wallet Connect Button */}
-          <button className="flex items-center bg-amber-600 hover:bg-amber-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
+          <button className="flex items-center bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">
             <Wallet className="h-5 w-5 mr-2" />
             Connect Wallet
           </button>
@@ -111,7 +112,7 @@ const ConsoleLayout: React.FC = () => {
         <div className="fixed inset-0 bg-[#0a0a0f] z-40 flex flex-col p-4 lg:hidden">
           <div className="flex justify-end mb-4">
             <button
-              className="text-gray-400 hover:text-amber-500"
+              className="text-gray-400 hover:text-purple-400"
               onClick={() => setIsMobileMenuOpen(false)}
             >
               <X size={24} />
@@ -126,7 +127,7 @@ const ConsoleLayout: React.FC = () => {
                 className={({ isActive }) =>
                   `flex items-center px-4 py-3 rounded-md text-lg font-medium transition-colors duration-200 ${
                     isActive
-                      ? 'bg-amber-500/20 text-amber-400'
+                      ? 'bg-purple-500/20 text-purple-400'
                       : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
                   }`
                 }
@@ -143,13 +144,15 @@ const ConsoleLayout: React.FC = () => {
       <main className="flex-1 p-6 lg:p-8">
         {/* Breadcrumbs */}
         <nav className="mb-6 flex items-center text-sm">
-          <NavLink to="/" className="text-gray-400 hover:text-amber-500 transition-colors">
+          <NavLink to="/" className="text-gray-400 hover:text-purple-400 transition-colors">
             Home
           </NavLink>
           <ChevronRight className="h-4 w-4 text-gray-600 mx-1" />
           {getBreadcrumbs()}
         </nav>
-        <Outlet /> {/* Renders the nested route components */}
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );

@@ -17,6 +17,15 @@ from server.db import get_db, InMemoryDB
 from server.models import EscrowRecord, EscrowStatus, PaymentHeader
 from server.middleware import parse_x402_header
 
+def get_casper() -> CasperClient | None:
+    # This function is a placeholder, in a real app.py it would be defined globally
+    # or imported from app.py. For this file generation, we assume it exists.
+    from server.app import get_casper as _get_casper
+    return _get_casper()
+
+
+
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/escrow", tags=["multi-asset", "streaming"])
 
@@ -237,13 +246,6 @@ def get_token_adapter(
         return Cep78Adapter(casper, config)
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported token type: {token_id.token_type}")
-
-
-def get_casper() -> CasperClient | None:
-    # This function is a placeholder, in a real app.py it would be defined globally
-    # or imported from app.py. For this file generation, we assume it exists.
-    from server.app import get_casper as _get_casper
-    return _get_casper()
 
 
 @router.post("/multi-asset", response_model=EscrowRecord, status_code=status.HTTP_201_CREATED)

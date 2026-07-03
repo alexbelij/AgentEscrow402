@@ -285,12 +285,15 @@ export const api = {
   // Main Endpoints
   getHealth: () => fetcher<HealthStatus>('/health', 'GET'),
   getStats: () => fetcher<Stats>('/stats', 'GET'),
-  getEscrows: (params?: { limit?: number; offset?: number; status?: EscrowStatus }) => {
+  getEscrows: async (params?: { limit?: number; offset?: number; status?: EscrowStatus }): Promise<ApiResponse<Escrow[]>> => {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());
     if (params?.offset) query.append('offset', params.offset.toString());
     if (params?.status) query.append('status', params.status);
-    return fetcher<Escrow[]>(`/escrows?${query.toString()}`, 'GET');
+    const res = await fetcher<any>(`/escrows?${query.toString()}`, 'GET');
+    if (res.data?.escrows) return { ...res, data: res.data.escrows };
+    if (Array.isArray(res.data)) return res as ApiResponse<Escrow[]>;
+    return { ...res, data: [] };
   },
   createEscrow: (data: CreateEscrowRequest) => fetcher<TransactionHash>('/escrow', 'POST', data),
   releaseEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/release', 'POST', data),
@@ -298,7 +301,12 @@ export const api = {
   disputeEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/dispute', 'POST', data),
   getEscrowByHash: (hash: string) => fetcher<Escrow>(`/escrow/${hash}`, 'GET'),
   getReputation: (agent: string) => fetcher<Reputation>(`/reputation/${agent}`, 'GET'),
-  getAgents: () => fetcher<Agent[]>('/agents', 'GET'),
+  getAgents: async (): Promise<ApiResponse<Agent[]>> => {
+    const res = await fetcher<any>('/agents', 'GET');
+    if (res.data?.agents) return { ...res, data: res.data.agents };
+    if (Array.isArray(res.data)) return res as ApiResponse<Agent[]>;
+    return { ...res, data: [] };
+  },
   getEscrowHistory: (hash: string) => fetcher<EscrowHistoryEntry[]>(`/escrow/${hash}/history`, 'GET'),
   getEstimate: (amount: number) => fetcher<Estimate>(`/estimate?amount=${amount}`, 'GET'),
   getEvents: () => fetcher<Event[]>('/events', 'GET'),

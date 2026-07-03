@@ -17,6 +17,15 @@ from server.db import get_db, InMemoryDB
 from server.models import ReputationRecord, PaymentHeader
 from server.middleware import parse_x402_header
 
+def get_casper() -> CasperClient | None:
+    # This function is a placeholder, in a real app.py it would be defined globally
+    # or imported from app.py. For this file generation, we assume it exists.
+    from server.app import get_casper as _get_casper
+    return _get_casper()
+
+
+
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/arbitration", tags=["arbitration"])
 
@@ -66,13 +75,6 @@ class ArbiterListResponse(BaseModel):
     """List of available arbiters."""
 
     arbiters: list[ArbiterRecord]
-
-
-def get_casper() -> CasperClient | None:
-    # This function is a placeholder, in a real app.py it would be defined globally
-    # or imported from app.py. For this file generation, we assume it exists.
-    from server.app import get_casper as _get_casper
-    return _get_casper()
 
 
 @router.post("/elect", response_model=ElectArbiterResponse, status_code=status.HTTP_201_CREATED)
