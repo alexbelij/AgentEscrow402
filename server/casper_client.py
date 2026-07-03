@@ -220,13 +220,17 @@ class CasperClient:
             status_int = int(inner1[1])
             status_str = _STATUS_MAP.get(status_int, "pending")
 
+            # created_at is stored on-chain in milliseconds; convert to seconds
+            created_at_raw = int(inner1[2])
+            created_at = created_at_raw // 1000 if created_at_raw > 1_000_000_000_000 else created_at_raw
+
             return EscrowRecord(
                 sender=inner0[0],
                 receiver=inner0[1],
                 amount=int(inner0[2]),
                 service_hash=inner1[0],
                 status=EscrowStatus(status_str),
-                created_at=int(inner1[2]),
+                created_at=created_at,
                 ttl=int(inner2[0]),
             )
         except (IndexError, KeyError, ValueError, TypeError) as exc:
