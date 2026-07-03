@@ -166,6 +166,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# ---------------------------------------------------------------------------
+# Rate limiting (60 req/min per IP)
+# ---------------------------------------------------------------------------
+_rate_limits: dict[str, dict] = {}
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    entry = _rate_limits.get(ip)
+    if not entry or now > entry["reset"]:
+        _rate_limits[ip] = {"count": 1, "reset": now + 60}
+    else:
+        entry["count"] += 1
+        if entry["count"] > 60:
+            raise HTTPException(status_code=429, detail="Too many requests")
+    return await call_next(request)
+
+
 # Register sub-routers
 app.include_router(multi_asset_router)
 app.include_router(insurance_router)
@@ -405,10 +426,23 @@ async def refund_escrow(
 @app.post("/dispute", response_model=EscrowRecord)
 async def dispute_escrow(
     req: DisputeRequest,
+    request: Request,
     cfg: Config = Depends(get_config),
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
+    # Authorization: only escrow sender or receiver may dispute
+    caller = _extract_sender(request)
+    try:
+        escrow = store.get_escrow(req.service_hash)
+        if caller not in (escrow.sender, escrow.receiver):
+            raise HTTPException(
+                status_code=403,
+                detail="Only escrow sender or receiver may dispute",
+            )
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
