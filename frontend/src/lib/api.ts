@@ -1,5 +1,8 @@
 
-const BASE_URL = 'https://agentescrow402-api.onrender.com';
+// Requests go through the Vercel proxy (/backend/*) to bypass ad-blockers
+// that block direct calls to *.onrender.com hostnames containing "api".
+// Vercel rewrites /backend/:path* → https://agentescrow402-api.onrender.com/:path*
+const BASE_URL = '/backend';
 
 // --- Utility Fetcher ---
 interface ApiResponse<T> {
@@ -8,7 +11,7 @@ interface ApiResponse<T> {
   status: number | null;
 }
 
-// The free-tier backend sleeps after ~15 min idle and takes ~50s to cold-start.
+// The demo backend sleeps after ~15 min idle and takes ~50s to cold-start.
 // Instead of a hard timeout that crashes the UI, we retry with backoff and let a
 // global preloader (see BackendWakeOverlay) inform the user the server is waking.
 const PER_ATTEMPT_TIMEOUT_MS = 20000;

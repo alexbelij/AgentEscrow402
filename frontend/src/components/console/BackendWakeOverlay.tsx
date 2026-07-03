@@ -39,7 +39,7 @@ const BackendWakeOverlay: React.FC = () => {
         <div>
           <p className="text-sm font-semibold text-gray-100">Connecting to backend…</p>
           <p className="text-xs text-gray-400">
-            The free-tier server may be waking from sleep. Retrying automatically
+            The demo server may be waking from sleep. Retrying automatically
             {elapsed > 2 ? ` (${elapsed}s)` : ''} — no need to refresh.
           </p>
         </div>

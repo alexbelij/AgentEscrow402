@@ -12,7 +12,6 @@ const NAV_ITEMS = [
 ]
 
 const CONSOLE_ITEMS = [
-  { label: 'Console', href: '/console', icon: LayoutDashboard },
   { label: 'Landing', href: '/', icon: Home },
 ]
 
