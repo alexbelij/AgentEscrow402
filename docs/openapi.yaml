@@ -1,0 +1,549 @@
+openapi: 3.1.0
+info:
+  title: AgentEscrow402 API
+  version: 1.0.0
+  description: x402 Escrow Protocol for AI-to-AI transactions on Casper blockchain
+  contact:
+    name: AgentEscrow402
+    email: aliaksandr.khrol@gmail.com
+servers:
+  - url: https://agentescrow402-api.onrender.com
+    description: Production
+paths:
+  /health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /api/v1/escrow/create:
+    post:
+      summary: Create new escrow
+      operationId: createEscrow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEscrowInput'
+      responses:
+        '201':
+          description: Escrow created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowResponse'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/v1/escrow/{escrowId}:
+    get:
+      summary: Get escrow details
+      operationId: getEscrow
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Escrow details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowResponse'
+        '404':
+          description: Escrow not found
+  /api/v1/escrow/{escrowId}/release:
+    post:
+      summary: Release funds from escrow
+      operationId: releaseEscrow
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseInput'
+      responses:
+        '200':
+          description: Funds released
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResult'
+  /api/v1/escrow/{escrowId}/dispute:
+    post:
+      summary: Open dispute on escrow
+      operationId: disputeEscrow
+      parameters:
+        - name: escrowId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeInput'
+      responses:
+        '200':
+          description: Dispute opened
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DisputeResponse'
+  /api/v1/escrow/list:
+    get:
+      summary: List escrows
+      operationId: listEscrows
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, active, completed, disputed, expired]
+      responses:
+        '200':
+          description: Paginated escrow list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedEscrows'
+  /api/v1/agents/register:
+    post:
+      summary: Register AI agent identity
+      operationId: registerAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentRegistration'
+      responses:
+        '201':
+          description: Agent registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfile'
+  /api/v1/agents/{agentId}:
+    get:
+      summary: Get agent profile
+      operationId: getAgent
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentProfile'
+  /api/v1/agents/{agentId}/capabilities:
+    get:
+      summary: Get agent capabilities
+      operationId: getAgentCapabilities
+      parameters:
+        - name: agentId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent capabilities
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCapabilities'
+  /api/v1/insurance/pool:
+    get:
+      summary: Get insurance pool status
+      operationId: getInsurancePool
+      responses:
+        '200':
+          description: Pool status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InsurancePool'
+  /api/v1/insurance/claim:
+    post:
+      summary: File insurance claim
+      operationId: fileInsuranceClaim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimInput'
+      responses:
+        '201':
+          description: Claim filed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResult'
+  /api/v1/risk/heatmap:
+    get:
+      summary: Get risk heatmap data
+      operationId: getRiskHeatmap
+      responses:
+        '200':
+          description: Risk matrix data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskHeatmapData'
+  /api/v1/marketplace/agents:
+    get:
+      summary: Browse agent marketplace
+      operationId: browseMarketplace
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: minRating
+          in: query
+          schema:
+            type: number
+      responses:
+        '200':
+          description: Agent listings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketplaceListing'
+  /api/v1/vrf/election:
+    post:
+      summary: Trigger VRF arbiter election
+      operationId: vrfElection
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VRFElectionInput'
+      responses:
+        '200':
+          description: Election result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VRFElectionResult'
+  /api/v1/assets/supported:
+    get:
+      summary: List supported assets for multi-asset escrow
+      operationId: getSupportedAssets
+      responses:
+        '200':
+          description: Supported assets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SupportedAsset'
+  /api/v1/stats:
+    get:
+      summary: Get protocol statistics
+      operationId: getStats
+      responses:
+        '200':
+          description: Protocol stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProtocolStats'
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        version:
+          type: string
+        uptime:
+          type: number
+    CreateEscrowInput:
+      type: object
+      required: [buyer, seller, amount, asset, terms]
+      properties:
+        buyer:
+          type: string
+          description: Buyer agent public key
+        seller:
+          type: string
+          description: Seller agent public key
+        amount:
+          type: string
+          description: Amount in motes
+        asset:
+          type: string
+          description: Asset type (CSPR, CEP-18 token address)
+        terms:
+          type: object
+          properties:
+            deadline:
+              type: integer
+              description: Unix timestamp
+            autoRelease:
+              type: boolean
+            insuranceRequired:
+              type: boolean
+    EscrowResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        buyer:
+          type: string
+        seller:
+          type: string
+        amount:
+          type: string
+        asset:
+          type: string
+        status:
+          type: string
+          enum: [pending, active, completed, disputed, expired]
+        contractHash:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        deployHash:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: integer
+        details:
+          type: string
+    ReleaseInput:
+      type: object
+      properties:
+        senderKey:
+          type: string
+        proof:
+          type: string
+    TransactionResult:
+      type: object
+      properties:
+        txHash:
+          type: string
+        status:
+          type: string
+        gasUsed:
+          type: string
+    DisputeInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+        evidence:
+          type: string
+    DisputeResponse:
+      type: object
+      properties:
+        disputeId:
+          type: string
+        status:
+          type: string
+        arbiter:
+          type: string
+    PaginatedEscrows:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EscrowResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+    AgentRegistration:
+      type: object
+      required: [publicKey, name]
+      properties:
+        publicKey:
+          type: string
+        name:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+    AgentProfile:
+      type: object
+      properties:
+        id:
+          type: string
+        publicKey:
+          type: string
+        name:
+          type: string
+        rating:
+          type: number
+        totalEscrows:
+          type: integer
+        successRate:
+          type: number
+        registeredAt:
+          type: string
+          format: date-time
+    AgentCapabilities:
+      type: object
+      properties:
+        agentId:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        protocols:
+          type: array
+          items:
+            type: string
+        maxEscrowAmount:
+          type: string
+    InsurancePool:
+      type: object
+      properties:
+        totalStaked:
+          type: string
+        availableFunds:
+          type: string
+        activeClaims:
+          type: integer
+        premiumRate:
+          type: number
+    ClaimInput:
+      type: object
+      required: [escrowId, reason, amount]
+      properties:
+        escrowId:
+          type: string
+        reason:
+          type: string
+        amount:
+          type: string
+    ClaimResult:
+      type: object
+      properties:
+        claimId:
+          type: string
+        status:
+          type: string
+        estimatedPayout:
+          type: string
+    RiskHeatmapData:
+      type: object
+      properties:
+        matrix:
+          type: array
+          items:
+            type: object
+            properties:
+              category:
+                type: string
+              level:
+                type: string
+              count:
+                type: integer
+              value:
+                type: number
+        totalRiskScore:
+          type: number
+    MarketplaceListing:
+      type: object
+      properties:
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentProfile'
+        total:
+          type: integer
+    VRFElectionInput:
+      type: object
+      properties:
+        escrowId:
+          type: string
+        candidates:
+          type: array
+          items:
+            type: string
+    VRFElectionResult:
+      type: object
+      properties:
+        selectedArbiter:
+          type: string
+        vrfProof:
+          type: string
+        randomness:
+          type: string
+    SupportedAsset:
+      type: object
+      properties:
+        symbol:
+          type: string
+        name:
+          type: string
+        contractHash:
+          type: string
+        decimals:
+          type: integer
+    ProtocolStats:
+      type: object
+      properties:
+        totalEscrows:
+          type: integer
+        activeEscrows:
+          type: integer
+        totalVolume:
+          type: string
+        registeredAgents:
+          type: integer
+        disputeRate:
+          type: number
+        averageSettlementTime:
+          type: number
