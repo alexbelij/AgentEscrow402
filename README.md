@@ -22,7 +22,7 @@
 ---
 
 > [!IMPORTANT]
-> **What this is:** A deployed escrow system on Casper Testnet where AI agents lock funds via HTTP 402 headers, deliver compute, and release payment — all without a human facilitator. Contract is live and verified. Console live at [ae402.xyz](https://ae402.xyz).
+> **What this is:** A deployed Casper testnet escrow console for AI-agent payments: signed x402 payment intent, Casper deploys for escrow lifecycle calls, Neon-backed hosted records, IsolationForest risk scoring, ML-KEM metadata encryption, and VRF-assisted arbitration. Console live at [ae402.xyz](https://ae402.xyz); API live at [agentescrow402-api.onrender.com](https://agentescrow402-api.onrender.com).
 
 <details>
 <summary><kbd>Table of contents</kbd></summary>
@@ -46,7 +46,7 @@
 
 ## ✨ What makes it unique
 
-The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments via HTTP 402 headers. Existing implementations assume Ethereum facilitators. AgentEscrow402 brings this to Casper Network with three capabilities that don't exist elsewhere:
+The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments via HTTP 402 headers. Existing implementations assume Ethereum facilitators. AgentEscrow402 brings the pattern to Casper Network with live testnet escrow calls plus a hosted console that labels what is on-chain, what is Neon-backed API state, and what is demo-signer convenience for browsers.
 
 | Feature | AgentEscrow402 | Coinbase x402 | Manual invoicing |
 |---|---|---|---|
@@ -87,7 +87,7 @@ Agent A                    Payment Server                 Casper Network
   │◀── 200 ───────────────────┤  reputation updated on-chain │
 ```
 
-**x402 header format:** `X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<signature>`
+**x402 header format:** `X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<timestamp>;<nonce>;<signature>`
 
 Protected endpoints return `402 Payment Required` with machine-readable terms when the header is missing.
 
@@ -97,7 +97,7 @@ Protected endpoints return `402 Payment Required` with machine-readable terms wh
 
 ## 🚀 Quickstart
 
-Under 5 minutes. No Casper node needed — sandbox mode is default.
+Under 5 minutes for local development. No Casper node needed — sandbox mode is default locally.
 
 **Prerequisites:** Python 3.11+
 
@@ -112,7 +112,7 @@ python -m uvicorn server.app:app --host 0.0.0.0 --port 8000
 **Verify:**
 ```bash
 curl http://localhost:8000/health
-# {"status":"ok","mode":"sandbox"}
+# {"status":"ok","sandbox":true,"db":"disconnected",...}
 ```
 
 ### Create your first escrow
@@ -120,15 +120,16 @@ curl http://localhost:8000/health
 ```bash
 curl -X POST http://localhost:8000/escrow \
   -H "Content-Type: application/json" \
-  -d '{"sender":"agent-A","receiver":"agent-B","amount":5000000,"ttl":300}'
-# {"service_hash":"abc123...","status":"locked","expires_at":1234567890}
+  -H "X-Payment: x402-v1;<service_hash>;5000000;<sender>;<timestamp>;<nonce>;<signature>" \
+  -d '{"receiver":"agent-B","amount":5000000,"service_hash":"<64-hex>","ttl":300}'
+# {"service_hash":"<64-hex>","status":"pending",...}
 ```
 
 ### Check status
 
 ```bash
 curl http://localhost:8000/escrow/<service_hash>
-# {"service_hash":"abc123...","status":"locked","amount":5000000,"sender":"agent-A","receiver":"agent-B"}
+# {"service_hash":"<64-hex>","status":"pending","amount":5000000,...}
 ```
 
 ### Release after delivery
@@ -136,8 +137,9 @@ curl http://localhost:8000/escrow/<service_hash>
 ```bash
 curl -X POST http://localhost:8000/release \
   -H "Content-Type: application/json" \
-  -d '{"service_hash":"abc123...","sender":"agent-A"}'
-# {"status":"released"}
+  -H "X-Payment: x402-v1;<service_hash>;5000000;<sender>;<timestamp>;<nonce>;<signature>" \
+  -d '{"service_hash":"<64-hex>"}'
+# {"status":"released",...}
 ```
 
 > **Tip:** Switch to testnet by setting `CASPER_NODE_URL` and `DEPLOYER_KEY_PATH` in `.env`.
@@ -174,7 +176,7 @@ flowchart LR
   API -->|"release() → funds → B\nreputation++"| ESC
 ```
 
-*The payment server mediates between agent SDKs and the Casper contract. In sandbox mode the Casper client is replaced by an in-memory store with identical behavior.*
+*The payment server mediates between agent SDKs and the Casper contract. In sandbox mode the Casper client is replaced by an in-memory store. In the hosted demo, API records are persisted in Neon while the console clearly labels the hosted demo signer versus production x402 signatures.*
 
 Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -188,7 +190,7 @@ Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 |---|---|---|
 | ![Homepage](docs/screenshots/01-homepage.png) | ![Console](docs/screenshots/02-console.png) | ![Escrow detail](docs/screenshots/03-escrow-detail.png) |
 
-> Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/console](https://ae402.xyz/console)
+> Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/console/overview](https://ae402.xyz/console/overview)
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -197,7 +199,13 @@ Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 ## 📜 Smart contract
 
 Deployed on Casper Testnet:
-[`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
+
+| Contract | Hash |
+|---|---|
+| Core Escrow | `5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467` |
+| Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` |
+| Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` |
+| VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` |
 
 | Entry point | Description |
 |---|---|
@@ -209,7 +217,7 @@ Deployed on Casper Testnet:
 | `configure_fee` | Set insurance pool fee (basis points) |
 | `emergency_freeze` | Pause all state changes |
 
-Security audit: 18 findings identified and resolved. Risk score 6/10 → 2/10. Full report: [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md)
+Security status: latest changed code was reviewed through NVIDIA API and no concrete HIGH blockers were reported for the console/Neon patch. Full production hardening and legacy test-suite modernization are still tracked in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -217,7 +225,7 @@ Security audit: 18 findings identified and resolved. Risk score 6/10 → 2/10. F
 
 ## 📡 API reference
 
-Base URL (production): `https://ae402-backend.onrender.com`
+Base URL (production): `https://agentescrow402-api.onrender.com`
 
 | Method | Path | Description |
 |---|---|---|
@@ -228,6 +236,11 @@ Base URL (production): `https://ae402-backend.onrender.com`
 | `POST` | `/dispute` | Open dispute (sender or receiver) |
 | `POST` | `/resolve` | Arbiter vote (3-of-5) |
 | `GET` | `/escrow/{hash}` | Look up escrow by service hash |
+| `GET` | `/stats` | Console statistics and data-source label |
+| `GET` | `/risk/dashboard` | IsolationForest risk dashboard |
+| `GET` | `/risk/score/{agent}` | Agent risk score |
+| `GET` | `/insurance/pool-stats` | Hosted insurance pool accounting |
+| `POST` | `/vrf/elect` | VRF-assisted arbiter election |
 | `GET` | `/reputation/{agent}` | Agent trust score |
 | `POST` | `/compute-hash` | Derive service hash from params |
 
@@ -251,7 +264,7 @@ Base URL (production): `https://ae402-backend.onrender.com`
 ```python
 from sdk import EscrowClient
 
-async with EscrowClient("https://ae402-backend.onrender.com", sender="my-agent") as client:
+async with EscrowClient("https://agentescrow402-api.onrender.com", sender="my-agent") as client:
     escrow = await client.create_escrow(receiver="agent-B", amount=5_000_000, ttl=300)
     await client.release(escrow["service_hash"])
 ```
@@ -259,11 +272,11 @@ async with EscrowClient("https://ae402-backend.onrender.com", sender="my-agent")
 ### LangChain tool
 ```python
 from sdk.langchain_tool import EscrowPaymentTool
-tool = EscrowPaymentTool(base_url="https://ae402-backend.onrender.com", sender="my-agent")
+tool = EscrowPaymentTool(base_url="https://agentescrow402-api.onrender.com", sender="my-agent")
 result = await tool.run(action="create", receiver="target", amount=1_000_000)
 ```
 
-### MCP server (7 tools via stdio/SSE)
+### MCP server (24 tools via stdio/SSE)
 ```bash
 python sdk/mcp_server.py
 ```
@@ -281,10 +294,11 @@ Full SDK reference → [docs/SDK.md](docs/SDK.md)
 | **Smart contract** | Rust → WASM, Casper 2.x CEP-88 |
 | **Payment server** | Python 3.11, FastAPI, Uvicorn |
 | **x402 middleware** | Custom header parser + validator |
-| **Sandbox / testing** | In-memory store with identical API surface |
+| **Persistence** | Neon PostgreSQL-compatible serverless database for hosted API records |
+| **Sandbox / testing** | In-memory fallback for local/demo development |
 | **SDK** | Python async SDK, LangChain tool, MCP server |
 | **CI** | GitHub Actions — lint → pytest → WASM build → cargo test |
-| **Frontend** | Next.js console, Vercel |
+| **Frontend** | React + Vite console, Vercel |
 | **Backend hosting** | Render (always-on) |
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
@@ -293,24 +307,15 @@ Full SDK reference → [docs/SDK.md](docs/SDK.md)
 
 ## 🧪 Testing
 
-103 tests total — all passing.
+Current validation status for the hosted demo branch:
 
 ```bash
-# Python (85 tests)
-PYTHONPATH=. pytest tests/ -v --tb=short
-
-# Rust contract (18 tests)
-cd contracts/tests && cargo test --release
+python -m compileall -q server
+npm --prefix frontend run build
+ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py
 ```
 
-| Suite | Tests | Coverage |
-|---|---|---|
-| `test_api.py` | 15 | All REST endpoints, error cases |
-| `test_middleware.py` | 14 | x402 header parsing, edge cases |
-| `test_models.py` | 15 | Pydantic schema validation |
-| `test_sandbox.py` | 19 | Store CRUD, TTL expiry, disputes |
-| `test_casper_client.py` | 9 | RPC client mocks |
-| `integration_tests.rs` | 18 | Contract entry point logic |
+The custom business-logic runner is green, live smoke checks cover health/stats/escrow create+release/risk/VRF/insurance, and NVIDIA API security review reported no concrete HIGH blockers for the latest console/Neon patch. The legacy full pytest suite is not currently green because several tests still target older endpoint/model contracts; do not treat this repository as fully audited production code until that suite is modernized.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
