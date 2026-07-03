@@ -12,6 +12,8 @@ import {
   Info,
   Loader2,
   ShieldCheck,
+  DollarSign,
+  Scale,
 } from 'lucide-react';
 import { format } from 'date-fns';
 

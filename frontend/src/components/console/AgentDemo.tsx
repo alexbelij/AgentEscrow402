@@ -14,6 +14,8 @@ import {
   Star,
   Loader2,
   ChevronRight,
+  Eye,
+  PlusCircle,
 } from 'lucide-react';
 
 interface DemoStep {
@@ -23,7 +25,7 @@ interface DemoStep {
   icon: React.ElementType;
   status: 'pending' | 'loading' | 'success' | 'error';
   response: any;
-  action?: () => Promise<void>;
+  action?: () => Promise<any>;
   disabled?: boolean;
 }
 
