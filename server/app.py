@@ -11,6 +11,7 @@ from functools import lru_cache
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -33,6 +34,10 @@ from server.multi_asset import router as multi_asset_router
 from server.insurance import router as insurance_router
 from server.vrf_election import router as vrf_router
 from server.agent_identity import router as identity_router
+from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
+
+# Singleton arbitration agent (stateful — keeps history)
+_arbitration_agent = ArbitrationAgent()
 
 logger = logging.getLogger(__name__)
 
@@ -465,6 +470,43 @@ async def dispute_escrow(
         raise HTTPException(status_code=404, detail="Escrow not found")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# POST /arbitration/analyze — LLM-powered dispute analysis
+# ---------------------------------------------------------------------------
+
+class ArbitrateRequest(BaseModel):
+    dispute_id: str
+    sender_evidence: list[DisputeEvidence]
+    receiver_evidence: list[DisputeEvidence]
+    escrow_amount: int
+
+
+@app.post("/arbitration/analyze", response_model=ArbitrationRecommendation, tags=["arbitration"])
+async def arbitrate_dispute(req: ArbitrateRequest):
+    """Run LLM arbitration on dispute evidence.
+
+    Tries Groq → NVIDIA NIM → heuristic fallback.
+    Returns recommendation: favor_sender | favor_receiver | split | escalate.
+    """
+    if req.escrow_amount < 0:
+        raise HTTPException(status_code=400, detail="escrow_amount must be non-negative")
+    try:
+        result = await _arbitration_agent.analyze_dispute(
+            dispute_id=req.dispute_id,
+            sender_evidence=req.sender_evidence,
+            receiver_evidence=req.receiver_evidence,
+            escrow_amount=req.escrow_amount,
+        )
+        logger.info(
+            "Arbitration complete: dispute=%s provider=%s rec=%s conf=%.2f",
+            req.dispute_id[:16], result.provider, result.recommendation, result.confidence,
+        )
+        return result
+    except Exception as exc:
+        logger.exception("Arbitration error: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Arbitration failed: {exc}")
 
 
 @app.get("/escrow/{service_hash}", response_model=EscrowRecord)
