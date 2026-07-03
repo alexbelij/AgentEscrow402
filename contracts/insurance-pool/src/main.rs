@@ -41,6 +41,7 @@ const MAX_COVERAGE_BPS: u64 = 8000; // 80% of pool balance
 type ClaimsRecord = (u64, u64, String);
 
 // Helper functions (storage access)
+
 fn get_installer() -> AccountHash {
     let key: Key = runtime::get_key(KEY_INSTALLER).unwrap_or_revert();
     match key { Key::Account(hash) => hash, _ => runtime::revert(ApiError::User(ERR_ACCOUNT_HASH_PARSE)) }
@@ -60,10 +61,11 @@ fn get_uref(name: &str) -> URef {
 }
 
 fn get_dict_uref(name: &str) -> URef {
-    runtime::get_key(name)
-        .unwrap_or_revert()
-        .into_uref()
-        .unwrap_or_revert()
+    // Casper 2.2.x: lazy dict creation inside entry points
+    match runtime::get_key(name) {
+        Some(key) => key.into_uref().unwrap_or_revert(),
+        None => storage::new_dictionary(name).unwrap_or_revert(),
+    }
 }
 
 // Entry points
@@ -207,13 +209,11 @@ pub extern "C" fn call() {
     let installer = runtime::get_caller();
 
     let contract_purse = system::create_purse();
-    let claims_dict = storage::new_dictionary(DICT_CLAIMS).unwrap_or_revert();
     let premium_rate_uref = storage::new_uref(0u64); // Default premium rate
     let total_claimed_uref = storage::new_uref(U512::zero());
 
     let mut named_keys = NamedKeys::new();
     named_keys.insert(CONTRACT_PURSE.into(), contract_purse.into());
-    named_keys.insert(DICT_CLAIMS.into(), claims_dict.into());
     named_keys.insert(KEY_PREMIUM_RATE_BPS.into(), premium_rate_uref.into());
     named_keys.insert(KEY_TOTAL_CLAIMED.into(), total_claimed_uref.into());
     named_keys.insert(KEY_INSTALLER.into(), Key::Account(installer));

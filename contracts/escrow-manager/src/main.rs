@@ -53,6 +53,16 @@ const STATUS_EXPIRED: u64 = 5;
 const MAX_FEE_BPS: u64 = 1000;
 const MAX_BATCH_SIZE: usize = 50; // Limit for batch operations
 
+// Casper 2.2.x (audit-082): new_dictionary is disallowed in session/install context.
+// Dicts are created lazily inside entry points (Called context).
+fn get_dict_uref(name: &str) -> URef {
+    match runtime::get_key(name) {
+        Some(key) => key.into_uref().unwrap_or_revert(),
+        None => storage::new_dictionary(name).unwrap_or_revert(),
+    }
+}
+
+
 /// Escrow record layout: ((sender, receiver, amount), (fee_bps, ttl, status), (created_at, evidence_hash))
 /// service_hash is the dictionary key.
 type EscrowRecord = ((String, String, U512), (u64, u64, u64), (u64, String));
@@ -75,10 +85,7 @@ fn check_installer() {
 }
 
 fn get_escrows_dict_uref() -> URef {
-    runtime::get_key(ESCROWS_DICT)
-        .unwrap_or_revert_with(ApiError::User(ERROR_ESCROW_NOT_FOUND))
-        .into_uref()
-        .unwrap_or_revert()
+    get_dict_uref(ESCROWS_DICT)
 }
 
 fn get_contract_purse_uref() -> URef {
@@ -451,7 +458,6 @@ fn get_entry_points() -> EntryPoints {
 pub extern "C" fn call() {
     let installer = runtime::get_caller();
 
-    let escrows_dict = storage::new_dictionary(ESCROWS_DICT).unwrap_or_revert();
     let contract_purse = system::create_purse();
     let fee_purse = system::create_purse();
     let fee_bps_uref = storage::new_uref(0u64); // Default fee_bps is 0
@@ -459,7 +465,6 @@ pub extern "C" fn call() {
 
     let mut named_keys = NamedKeys::new();
     named_keys.insert(INSTALLER_KEY.into(), Key::Account(installer));
-    named_keys.insert(ESCROWS_DICT.into(), escrows_dict.into());
     named_keys.insert(CONTRACT_PURSE_KEY.into(), contract_purse.into());
     named_keys.insert(FEE_PURSE_KEY.into(), fee_purse.into());
     named_keys.insert(FEE_BPS_KEY.into(), fee_bps_uref.into());

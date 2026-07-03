@@ -35,6 +35,12 @@ from server.insurance import router as insurance_router
 from server.vrf_election import router as vrf_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
+from server.risk_api import router as risk_router
+try:
+    from server.mlkem_crypto import generate_keypair, encrypt_metadata, EncryptedMetadata
+    _MLKEM_AVAILABLE = True
+except Exception:
+    _MLKEM_AVAILABLE = False
 
 # Singleton arbitration agent (stateful — keeps history)
 _arbitration_agent = ArbitrationAgent()
@@ -197,6 +203,7 @@ app.include_router(multi_asset_router)
 app.include_router(insurance_router)
 app.include_router(vrf_router)
 app.include_router(identity_router)
+app.include_router(risk_router)
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +319,19 @@ async def create_escrow(
             pgdb.save_escrow(record)
             if fee > 0:
                 pgdb.record_insurance_fee(req.service_hash, fee)
-            return record
+            # ML-KEM: encrypt service metadata for post-quantum confidentiality
+            result_dict = record.model_dump()
+            if _MLKEM_AVAILABLE:
+                try:
+                    encap_key, decap_key = generate_keypair()
+                    plaintext = f"service_hash={req.service_hash}&sender={sender}&receiver={req.receiver}"
+                    enc_meta = encrypt_metadata(plaintext, encap_key)
+                    result_dict["mlkem_decap_key"] = decap_key
+                    result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
+                    logger.info("ML-KEM encryption applied to escrow %s", req.service_hash[:16])
+                except Exception as mlkem_exc:
+                    logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
+            return result_dict
         except ValueError as exc:
             logger.warning("create_escrow validation failed: %s", exc)
             raise HTTPException(status_code=409, detail="Escrow creation conflict")
@@ -353,7 +372,19 @@ async def create_escrow(
     _broadcast_event(
         {"type": "escrow_created", "service_hash": req.service_hash, "deploy_hash": deploy_hash, "ts": now}
     )
-    return record
+    # ML-KEM: post-quantum encrypt escrow metadata
+    result_dict = record.model_dump()
+    if _MLKEM_AVAILABLE:
+        try:
+            encap_key, decap_key = generate_keypair()
+            plaintext = f"service_hash={req.service_hash}&sender={sender}&receiver={req.receiver}"
+            enc_meta = encrypt_metadata(plaintext, encap_key)
+            result_dict["mlkem_decap_key"] = decap_key
+            result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
+            logger.info("ML-KEM encryption applied to live escrow %s", req.service_hash[:16])
+        except Exception as mlkem_exc:
+            logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
+    return result_dict
 
 
 @app.post("/release", response_model=EscrowRecord)

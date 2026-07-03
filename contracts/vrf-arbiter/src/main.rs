@@ -59,6 +59,7 @@ type VoteRecord = ((String, String, u64), (String, u64));
 
 // Helper functions for storage access and contract logic
 
+
 fn get_installer() -> AccountHash {
     let key: Key = runtime::get_key(INSTALLER_KEY).unwrap_or_revert();
     key.into_account().unwrap_or_revert()
@@ -71,10 +72,11 @@ fn assert_installer() {
 }
 
 fn get_dict_uref(name: &str) -> URef {
-    runtime::get_key(name)
-        .unwrap_or_revert()
-        .into_uref()
-        .unwrap_or_revert()
+    // Casper 2.2.x: lazy dict creation inside entry points
+    match runtime::get_key(name) {
+        Some(key) => key.into_uref().unwrap_or_revert(),
+        None => storage::new_dictionary(name).unwrap_or_revert(),
+    }
 }
 
 fn read_nonce() -> u64 {
@@ -368,9 +370,6 @@ pub extern "C" fn get_vote() {
 pub extern "C" fn call() {
     let installer = runtime::get_caller();
 
-    let arbiters_dict = storage::new_dictionary(ARBITERS_DICT).unwrap_or_revert();
-    let elections_dict = storage::new_dictionary(ELECTIONS_DICT).unwrap_or_revert();
-    let votes_dict = storage::new_dictionary(VOTES_DICT).unwrap_or_revert();
     let nonce_uref = storage::new_uref(0u64);
     let active_arbiters_list_uref = storage::new_uref(Vec::<String>::new());
     let contract_purse = system::create_purse();
@@ -378,9 +377,6 @@ pub extern "C" fn call() {
     let price_bps_uref = storage::new_uref(DEFAULT_PRICE_BPS);
 
     let mut named_keys = NamedKeys::new();
-    named_keys.insert(ARBITERS_DICT.into(), arbiters_dict.into());
-    named_keys.insert(ELECTIONS_DICT.into(), elections_dict.into());
-    named_keys.insert(VOTES_DICT.into(), votes_dict.into());
     named_keys.insert(NONCE_KEY.into(), nonce_uref.into());
     named_keys.insert(ACTIVE_ARBITERS_LIST.into(), active_arbiters_list_uref.into());
     named_keys.insert(CONTRACT_PURSE.into(), contract_purse.into());

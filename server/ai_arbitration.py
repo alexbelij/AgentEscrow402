@@ -209,6 +209,31 @@ async def _try_nvidia(prompt: str) -> dict[str, Any] | None:
         return None
 
 
+async def _try_zai(prompt: str) -> dict[str, Any] | None:
+    """z.ai (Zhipu GLM) — free tier with glm-4.5-air if account has balance."""
+    api_key = os.getenv("ZAI_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        raw = await _call_openai_compat(
+            "https://api.z.ai/api/paas/v4",
+            api_key,
+            "glm-4.5-air",
+            [
+                {"role": "system", "content": ARBITRATION_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=20.0,
+        )
+        parsed = _parse_llm_json(raw)
+        if parsed:
+            parsed["_provider"] = "zai/glm-4.5-air"
+        return parsed
+    except Exception as exc:
+        logger.warning("z.ai arbitration failed: %s", exc)
+        return None
+
+
 async def _try_openrouter(prompt: str) -> dict[str, Any] | None:
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if not api_key:
@@ -393,7 +418,7 @@ class ArbitrationAgent:
 
         # Try LLM providers in order: Groq → NVIDIA → OpenRouter → heuristic
         verdict: dict[str, Any] | None = None
-        for provider_fn in (_try_groq, _try_nvidia, _try_openrouter):
+        for provider_fn in (_try_groq, _try_nvidia, _try_zai, _try_openrouter):
             verdict = await provider_fn(prompt)
             if verdict:
                 logger.info("Arbitration via %s for dispute %s", verdict.get("_provider"), dispute_id[:16])
