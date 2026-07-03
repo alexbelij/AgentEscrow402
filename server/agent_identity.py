@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import secrets
 import time
 from typing import Any
 
@@ -12,9 +13,7 @@ from pydantic import BaseModel, Field
 
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.db import get_db, InMemoryDB
-from server.models import PaymentHeader
-from server.middleware import parse_x402_header
+from server.middleware import _verify_ed25519
 
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
@@ -37,12 +36,13 @@ _delegations: dict[str, list[dict[str, Any]]] = {} # delegator_id -> list of del
 class RegisterAgentRequest(BaseModel):
     """Request to register a new agent identity."""
 
-    agent_id: str = Field(..., description="Casper account hash of the agent")
-    public_key: str = Field(..., description="Public key associated with the agent's identity")
+    agent_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public agent identifier")
+    public_key: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$", description="Public key associated with the agent's identity")
     did_document_hash: str = Field(
         ...,
         min_length=64,
         max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
         description="SHA256 hash of the agent's Decentralized Identity (DID) document",
     )
 
@@ -63,13 +63,13 @@ class AgentIdentity(BaseModel):
 class DelegateCapabilityRequest(BaseModel):
     """Request to delegate a capability from one agent to another."""
 
-    delegator_id: str = Field(..., description="Casper account hash of the delegating agent")
-    delegatee_id: str = Field(..., description="Casper account hash of the agent receiving the capability")
-    capability_uri: str = Field(..., description="URI identifying the capability (e.g., 'urn:escrow:release')")
+    delegator_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public ID of the delegating agent")
+    delegatee_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public ID of the agent receiving the capability")
+    capability_uri: str = Field(..., min_length=1, max_length=256, pattern=r"^[a-zA-Z0-9_:/?.#=-]+$", description="URI identifying the capability (e.g., 'urn:escrow:release')")
     expiry_timestamp: int = Field(
         ..., gt=int(time.time()), description="Unix timestamp when the delegation expires"
     )
-    signature: str = Field(..., description="Cryptographic signature of the delegation request by the delegator")
+    signature: str = Field(..., min_length=128, max_length=128, pattern=r"^[0-9a-fA-F]{128}$", description="Ed25519 signature of the canonical delegation message")
 
 
 class CapabilityRecord(BaseModel):
@@ -102,7 +102,8 @@ async def register_agent_identity(
     # identity data shape instead of failing with a configuration error.
     mode = "local_registry"
     try:
-        if casper and config.identity_contract_hash:
+        identity_contract_hash = getattr(config, "identity_contract_hash", "")
+        if casper and identity_contract_hash:
             # deploy_hash = await casper.call_contract(
             #     contract_hash=config.identity_contract_hash,
             #     entry_point="register_agent",
@@ -115,7 +116,7 @@ async def register_agent_identity(
             deploy_hash = f"deploy-hash-identity-register-{int(time.time())}"
             mode = "identity_contract"
         else:
-            deploy_hash = f"local-identity-register-{hashlib.sha256((request.agent_id + str(time.time())).encode()).hexdigest()[:24]}"
+            deploy_hash = f"local-identity-register-{secrets.token_hex(16)}"
     except Exception as e:
         logger.error("Failed to register agent identity for %s: %s", request.agent_id[:8], e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to register identity")
@@ -182,44 +183,41 @@ async def delegate_capability(
         time.ctime(request.expiry_timestamp),
     )
 
-    # Verify the delegator's signature to prevent unauthorized delegation
-    if not request.signature:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Delegation signature is required",
-        )
-    try:
-        delegation_msg = f"{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{request.expiry_timestamp}"
-        msg_hash = hashlib.sha256(delegation_msg.encode()).hexdigest()
-        is_valid = await casper.verify_signature(
-            signer_public_key=_agent_identities[request.delegator_id]["public_key"],
-            message_hash=msg_hash,
-            signature=request.signature,
-        )
-        if not is_valid:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid delegation signature",
+    # Verify the delegator's signature to prevent unauthorized delegation.
+    delegation_msg = f"{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{request.expiry_timestamp}"
+    msg_hash = hashlib.sha256(delegation_msg.encode()).hexdigest()
+    signer_public_key = _agent_identities[request.delegator_id]["public_key"]
+    is_valid = False
+    if casper:
+        try:
+            is_valid = await casper.verify_signature(
+                signer_public_key=signer_public_key,
+                message_hash=msg_hash,
+                signature=request.signature,
             )
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.warning("Signature verification unavailable, applying fallback check: %s", exc)
+        except Exception as exc:
+            logger.warning("Casper signature verification unavailable, trying local Ed25519 check: %s", exc)
+    if not is_valid:
+        is_valid = _verify_ed25519(signer_public_key, msg_hash.encode("utf-8"), request.signature)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid delegation signature",
+        )
 
     # Simulate Casper deploy to record the delegation on the identity contract when configured;
     # otherwise keep a transparent local-registry delegation for the hosted demo.
     try:
         logger.info("Recording delegation for %s -> %s", request.delegator_id, request.delegatee_id)
-        if casper and config.identity_contract_hash:
+        identity_contract_hash = getattr(config, "identity_contract_hash", "")
+        if casper and identity_contract_hash:
             # deploy_hash = await casper.call_contract(
             #     contract_hash=config.identity_contract_hash,
             #     entry_point="delegate_capability",
             #     args={...}
             # )
             mode = "identity_contract"
-        deploy_hash = hashlib.sha256(
-            f"delegate:{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{time.time()}".encode()
-        ).hexdigest()
+        deploy_hash = f"local-delegation-{secrets.token_hex(16)}" if mode == "local_registry" else f"deploy-hash-delegate-{secrets.token_hex(16)}"
     except Exception as e:
         logger.error("Delegation recording failed: %s", e)
         raise HTTPException(
