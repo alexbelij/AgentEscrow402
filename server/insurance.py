@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.db import get_db, InMemoryDB
+from server.db import get_db, InMemoryDB, get_reputation_db
 from server.models import EscrowRecord, EscrowStatus, ReputationRecord, PaymentHeader
 from server.middleware import parse_x402_header
 
@@ -237,7 +237,6 @@ async def get_insurance_pool_stats(
 @router.get("/premium-quote", response_model=PremiumQuoteResponse)
 async def get_premium_quote(
     request: PremiumQuoteRequest = Depends(),
-    db: InMemoryDB = Depends(get_db),
 ) -> PremiumQuoteResponse:
     """
     Calculates a dynamic insurance premium quote based on agent reputation and escrow details.
@@ -245,20 +244,26 @@ async def get_premium_quote(
     base_rate_bps = 50  # 0.5% base rate in basis points
     risk_multiplier = 1.0
 
-    reputation = db.get_reputation(request.agent_id)
+    # Look up the agent's reputation from the persistent store (if available).
+    reputation = None
+    try:
+        reputation = get_reputation_db(request.agent_id)
+    except Exception:  # never let a reputation lookup break the quote
+        reputation = None
     if reputation:
+        score = reputation.get("score", 50)
         # Adjust risk multiplier based on reputation score
-        if reputation.score < 30:
+        if score < 30:
             risk_multiplier *= 2.0  # High risk
-        elif reputation.score < 50:
+        elif score < 50:
             risk_multiplier *= 1.5  # Medium risk
-        elif reputation.score > 70:
+        elif score > 70:
             risk_multiplier *= 0.8  # Low risk
 
         # Further adjustments based on dispute/slashed history
-        if reputation.disputed > 0:
+        if reputation.get("disputed", 0) > 0:
             risk_multiplier *= 1.2
-        if reputation.slashed > 0:
+        if reputation.get("slashed", 0) > 0:
             risk_multiplier *= 1.5
 
     # Adjust based on service type (simplified)
