@@ -90,7 +90,14 @@ def parse_x402_header(raw: str) -> PaymentHeader | None:
         timestamp = int(ts_str)
     except ValueError:
         return None
-    if not all(c in "0123456789abcdef" for c in escrow_hash.lower()):
+    hex_chars = set("0123456789abcdef")
+    if len(escrow_hash) != 64 or not all(c in hex_chars for c in escrow_hash.lower()):
+        return None
+    if len(sender) != 64 or not all(c in hex_chars for c in sender.lower()):
+        return None
+    if len(signature) != 128 or not all(c in hex_chars for c in signature.lower()):
+        return None
+    if not (8 <= len(nonce) <= 128) or any(ch in ";\r\n" for ch in nonce):
         return None
     return PaymentHeader(
         version=version,

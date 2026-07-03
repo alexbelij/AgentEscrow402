@@ -26,7 +26,11 @@ class EscrowRequest(BaseModel):
 
 
 class EscrowRecord(BaseModel):
-    """On-chain escrow record."""
+    """On-chain escrow record.
+
+    Optional ML-KEM fields are returned by create_escrow so the console can
+    prove that post-quantum metadata encryption actually ran for the demo.
+    """
 
     sender: str
     receiver: str
@@ -36,6 +40,9 @@ class EscrowRecord(BaseModel):
     created_at: int
     ttl: int
     deploy_hash: str | None = None
+    mlkem_ciphertext: str | None = None
+    mlkem_decap_key: str | None = None
+    mlkem_algorithm: str | None = None
 
 
 class ReleaseRequest(BaseModel):

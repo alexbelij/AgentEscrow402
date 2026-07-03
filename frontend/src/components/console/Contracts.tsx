@@ -1,133 +1,190 @@
-import React from 'react';
-import { FileText, Link, Code, Info, ExternalLink, Hash } from 'lucide-react';
+import React, { useState } from 'react';
+import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
+import { csprToMotes, randomHex64 } from '../../lib/format';
+import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards } from 'lucide-react';
 
-const CONTRACT_HASH = '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'; // Corrected hash from prompt
-const EXPLORER_BASE_URL = 'https://testnet.cspr.live';
-
-const contractFunctions = [
+const CONTRACTS = [
   {
-    name: 'create_escrow',
-    description: 'Initializes a new escrow. Requires payer, payee, amount, and token contract. An optional arbiter can be specified.',
-    params: ['payer: PublicKey', 'payee: PublicKey', 'amount: U512', 'token_contract: ContractHash', 'arbiter?: PublicKey'],
+    name: 'Core Escrow',
+    hash: '5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467',
+    role: 'Create/release/refund/dispute escrow lifecycle exposed by the API.',
   },
   {
-    name: 'fund_escrow',
-    description: 'Transfers the specified amount from the payer to the escrow contract. This changes the escrow status to "funded".',
-    params: ['escrow_hash: Hash'],
+    name: 'Escrow Manager',
+    hash: 'bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d',
+    role: 'Manager/orchestration contract used for deployed demo flows.',
   },
   {
-    name: 'release',
-    description: 'Releases the escrowed funds to the payee. Can be initiated by the payer or the arbiter (if assigned).',
-    params: ['escrow_hash: Hash', 'initiator: PublicKey', 'signature: String'],
+    name: 'Insurance Pool',
+    hash: 'e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61',
+    role: 'Insurance premium/deposit/claim accounting for risky agent work.',
   },
   {
-    name: 'refund',
-    description: 'Refunds the escrowed funds back to the payer. Can be initiated by the payee or the arbiter (if assigned).',
-    params: ['escrow_hash: Hash', 'initiator: PublicKey', 'signature: String'],
+    name: 'VRF Arbiter',
+    hash: '5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f',
+    role: 'On-chain random arbiter election target; API falls back to verifiable local CSPRNG when chain query is unavailable.',
   },
-  {
-    name: 'dispute',
-    description: 'Initiates a dispute process for an escrow. Typically requires an arbiter to resolve.',
-    params: ['escrow_hash: Hash', 'initiator: PublicKey', 'reason: String', 'signature: String'],
-  },
-  {
-    name: 'resolve_dispute',
-    description: 'An arbiter resolves a disputed escrow, either releasing funds to payee or refunding to payer.',
-    params: ['escrow_hash: Hash', 'arbiter: PublicKey', 'resolution: "release" | "refund"', 'signature: String'],
-  },
-  {
-    name: 'get_escrow',
-    description: 'Retrieves the current state of a specific escrow by its hash.',
-    params: ['escrow_hash: Hash'],
-  },
-  {
-    name: 'get_reputation',
-    description: 'Fetches the reputation score and metrics for a given agent public key.',
-    params: ['agent_public_key: PublicKey'],
-  },
-  {
-    name: 'register_identity',
-    description: 'Registers a new agent identity with a public key and name.',
-    params: ['public_key: PublicKey', 'name: String'],
-  },
-  // Add more functions as needed based on the protocol's contract
 ];
 
+const short = (value: string) => `${value.slice(0, 12)}…${value.slice(-10)}`;
+
 const Contracts: React.FC = () => {
+  const [serviceHash, setServiceHash] = useState(randomHex64());
+  const [amountCspr, setAmountCspr] = useState('100');
+  const [result, setResult] = useState<any>(null);
+  const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async (label: string, fn: () => Promise<any>) => {
+    setLoadingAction(label);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fn();
+      if (res.error) throw new Error(res.error);
+      setResult({ action: label, response: res.data });
+      if (label === 'Create escrow' && res.data?.service_hash) setServiceHash(res.data.service_hash);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const amountMotes = csprToMotes(Number(amountCspr || '0'));
+
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Contract Information</h2>
-
-      {/* Main Contract Details */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
-          <FileText className="h-6 w-6 mr-2 text-amber-500" />
-          AgentEscrow402 Core Contract
-        </h3>
-        <div className="space-y-3 text-gray-300">
-          <p className="flex items-center">
-            <Hash className="h-5 w-5 mr-2 text-gray-500" />
-            <strong>Contract Hash:</strong>{' '}
-            <span className="ml-2 font-mono break-all text-amber-400">{CONTRACT_HASH}</span>
-          </p>
-          <p className="flex items-center">
-            <Link className="h-5 w-5 mr-2 text-gray-500" />
-            <strong>Explorer Link:</strong>{' '}
-            <a
-              href={`${EXPLORER_BASE_URL}/contract/${CONTRACT_HASH}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="ml-2 text-blue-400 hover:underline flex items-center"
-            >
-              View on CSPR.Live <ExternalLink className="h-4 w-4 ml-1" />
-            </a>
-          </p>
-          <p className="flex items-center">
-            <Info className="h-5 w-5 mr-2 text-gray-500" />
-            <strong>Description:</strong> The core smart contract implementing the AgentEscrow402 protocol,
-            managing escrow creation, funding, release, refund, dispute resolution, and agent reputation.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-3xl font-bold text-gray-50">Contracts & Playground</h2>
+        <p className="text-gray-400 mt-2">Live Casper testnet contract hashes plus API-backed tools for escrow, VRF and service hash generation.</p>
       </div>
 
-      {/* Key Functions */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
-          <Code className="h-6 w-6 mr-2 text-amber-500" />
-          Key Contract Functions
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {contractFunctions.map((func, index) => (
-            <div key={index} className="bg-gray-800 border border-[#1e1e2e] rounded-lg p-4">
-              <h4 className="text-lg font-semibold text-amber-400 mb-2">{func.name}</h4>
-              <p className="text-gray-400 text-sm mb-3">{func.description}</p>
-              <div className="text-xs text-gray-500">
-                <p className="font-medium mb-1">Parameters:</p>
-                <ul className="list-disc list-inside space-y-0.5">
-                  {func.params.map((param, pIndex) => (
-                    <li key={pIndex} className="font-mono">{param}</li>
-                  ))}
-                </ul>
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-100">
+        This playground calls the deployed backend against the current testnet contract configuration. Write calls include the demo x402 identity header from the frontend;
+        production calls should use wallet/agent-signed payment headers. Results below are raw live API responses, not screenshots or mock cards.
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {CONTRACTS.map((contract) => (
+          <div key={contract.hash} className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-lg font-semibold text-gray-50">{contract.name}</p>
+                <p className="text-sm text-gray-400 mt-1">{contract.role}</p>
               </div>
+              <Cpu className="h-6 w-6 text-amber-500 shrink-0" />
             </div>
-          ))}
+            <p className="font-mono text-sm text-gray-300 mt-4 break-all">{contract.hash}</p>
+            <a
+              href={`https://testnet.cspr.live/search/${contract.hash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-block mt-3 text-sm text-amber-400 hover:text-amber-300"
+            >
+              Search on CSPR.live →
+            </a>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="xl:col-span-2 bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-xl font-semibold text-gray-50">Escrow playground</h3>
+            <button
+              onClick={() => { setServiceHash(randomHex64()); setResult(null); setError(null); }}
+              className="inline-flex items-center px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" /> Fresh service hash
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="space-y-2">
+              <span className="text-sm text-gray-400">Receiver</span>
+              <textarea
+                value={DEMO_AGENT_RECEIVER}
+                readOnly
+                className="w-full h-24 p-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-300 font-mono text-xs"
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm text-gray-400">Amount (CSPR)</span>
+              <input
+                value={amountCspr}
+                onChange={(e) => setAmountCspr(e.target.value)}
+                className="w-full h-12 px-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-100 focus:ring-2 focus:ring-amber-500 outline-none"
+              />
+              <span className="text-xs text-gray-500">Converted to {amountMotes.toLocaleString()} motes.</span>
+            </label>
+          </div>
+
+          <label className="space-y-2 block">
+            <span className="text-sm text-gray-400">Service hash (escrow ID)</span>
+            <input
+              value={serviceHash}
+              onChange={(e) => setServiceHash(e.target.value)}
+              className="w-full h-12 px-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-100 font-mono text-sm focus:ring-2 focus:ring-amber-500 outline-none"
+            />
+          </label>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <PlayButton label="Create escrow" icon={WalletCards} loading={loadingAction} onClick={() => run('Create escrow', () => api.createEscrow({ receiver: DEMO_AGENT_RECEIVER, amount: amountMotes, service_hash: serviceHash, ttl: 300 }))} />
+            <PlayButton label="Release" icon={Play} loading={loadingAction} onClick={() => run('Release', () => api.releaseEscrow({ service_hash: serviceHash }))} />
+            <PlayButton label="Refund" icon={RefreshCw} loading={loadingAction} onClick={() => run('Refund', () => api.refundEscrow({ service_hash: serviceHash }))} />
+            <PlayButton label="Dispute" icon={Shield} loading={loadingAction} onClick={() => run('Dispute', () => api.disputeEscrow({ service_hash: serviceHash, reason_hash: randomHex64() }))} />
+          </div>
+        </div>
+
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 space-y-4">
+          <h3 className="text-xl font-semibold text-gray-50">Hash + VRF tools</h3>
+          <p className="text-sm text-gray-400">Validate service_hash generation and arbiter selection without leaving the console.</p>
+          <button
+            onClick={() => run('Compute service hash', () => api.computeServiceHash({ sender: DEMO_AGENT_SENDER, receiver: DEMO_AGENT_RECEIVER, amount: amountMotes, nonce: serviceHash.slice(0, 12) }))}
+            disabled={!!loadingAction}
+            className="w-full h-12 inline-flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-100 disabled:opacity-50"
+          >
+            {loadingAction === 'Compute service hash' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Cpu className="h-5 w-5 mr-2" />}
+            Compute hash
+          </button>
+          <button
+            onClick={() => run('VRF election', () => api.electVrfArbiter({ dispute_id: `contract-console-${Date.now()}`, sender: DEMO_AGENT_SENDER, receiver: DEMO_AGENT_RECEIVER, seed_hash: randomHex64() }))}
+            disabled={!!loadingAction}
+            className="w-full h-12 inline-flex items-center justify-center rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
+          >
+            {loadingAction === 'VRF election' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Shuffle className="h-5 w-5 mr-2" />}
+            Run VRF election
+          </button>
+          <div className="text-xs text-gray-500">
+            VRF response reports <span className="font-mono">method=onchain_vrf</span> when on-chain contract data is available, otherwise <span className="font-mono">local_csprng</span> with proof.
+          </div>
         </div>
       </div>
 
-      {/* Additional Contract Info (Placeholder) */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
-          <Info className="h-6 w-6 mr-2 text-amber-500" />
-          Additional Information
-        </h3>
-        <p className="text-gray-400">
-          For detailed contract source code, ABI, and deployment specifics, please refer to the
-          official AgentEscrow402 GitHub repository or the Casper Testnet Explorer link provided above.
-          This section will be expanded with more technical details as they become available.
-        </p>
-      </div>
+      {(error || result) && (
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6">
+          <h3 className="text-xl font-semibold text-gray-50 mb-3">Playground result</h3>
+          {error ? (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-200">{error}</div>
+          ) : (
+            <pre className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-4 text-sm text-gray-300 overflow-x-auto">{JSON.stringify(result, null, 2)}</pre>
+          )}
+        </div>
+      )}
     </div>
   );
 };
+
+const PlayButton: React.FC<{ label: string; icon: React.ElementType; loading: string | null; onClick: () => void }> = ({ label, icon: Icon, loading, onClick }) => (
+  <button
+    onClick={onClick}
+    disabled={!!loading}
+    className="h-12 inline-flex items-center justify-center rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-100 font-semibold disabled:opacity-50"
+  >
+    {loading === label ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : <Icon className="h-5 w-5 mr-2" />}
+    {label}
+  </button>
+);
 
 export default Contracts;

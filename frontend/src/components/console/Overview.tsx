@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api, HealthStatus, Stats, Event } from '../../lib/api';
+import { formatCspr } from '../../lib/format';
 import {
   Activity,
   CheckCircle,
@@ -91,6 +92,12 @@ const Overview: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Console Overview</h2>
 
+      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-100">
+        This is the hosted Casper testnet console. If the database says <span className="font-mono">disconnected</span>,
+        the API is honestly showing that persistent PostgreSQL is not attached; demo/testnet escrows are served from the live in-memory fallback
+        and labelled via <span className="font-mono">data_source</span> below, not silently faked.
+      </div>
+
       {/* Health Status */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
         <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
@@ -123,7 +130,17 @@ const Overview: React.FC = () => {
             <div className="flex items-center">
               <Info className="h-5 w-5 text-gray-500 mr-2" />
               <span className="text-gray-300">Database: </span>
-              <span className="ml-2 text-gray-400">{health.database}</span>
+              <span className={`ml-2 font-medium ${health.database === 'connected' ? 'text-green-400' : 'text-amber-400'}`}>{health.database}</span>
+            </div>
+            <div className="flex items-center">
+              <Info className="h-5 w-5 text-gray-500 mr-2" />
+              <span className="text-gray-300">Data source: </span>
+              <span className="ml-2 text-gray-400 font-mono">{stats?.data_source || 'api'}</span>
+            </div>
+            <div className="flex items-center">
+              <Info className="h-5 w-5 text-gray-500 mr-2" />
+              <span className="text-gray-300">Sandbox mode: </span>
+              <span className="ml-2 text-gray-400">{String(health.sandbox ?? stats?.sandbox ?? false)}</span>
             </div>
           </div>
         ) : (
@@ -141,7 +158,7 @@ const Overview: React.FC = () => {
         />
         <StatCard
           title="Total Volume"
-          value={`${stats?.total_volume ?? 'N/A'} CSPR`}
+          value={stats ? formatCspr(stats.total_volume) : 'N/A'}
           icon={Scale}
           colorClass="text-orange-500"
         />

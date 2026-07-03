@@ -50,8 +50,8 @@ def get_config() -> Config:
 
 
 def get_db():
-    from server.app import get_db as _get_db
-    return _get_db()
+    """Legacy hook kept for compatibility; VRF routes no longer require app.get_db."""
+    return None
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────

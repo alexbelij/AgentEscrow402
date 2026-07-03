@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { api } from '../../lib/api';
+import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
 import {
   FlaskConical,
   Play,
@@ -90,9 +90,9 @@ const endpoints: EndpointConfig[] = [
     path: '/escrow',
     description: 'Creates a new escrow payment.',
     initialBody: {
-      receiver: '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210',
+      receiver: DEMO_AGENT_RECEIVER,
       amount: 100000000000,
-      service_hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451',
+      service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
       ttl: 300,
     },
     apiCall: (p, q, b) => api.createEscrow(b as any),
@@ -102,7 +102,7 @@ const endpoints: EndpointConfig[] = [
     method: 'GET',
     path: '/escrow/{hash}',
     description: 'Retrieves details for a specific escrow.',
-    initialPathParams: { hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451' }, // Placeholder
+    initialPathParams: { hash: '1111111111111111111111111111111111111111111111111111111111111111' },
     apiCall: (p) => api.getEscrowByHash(p.hash),
   },
   {
@@ -111,7 +111,7 @@ const endpoints: EndpointConfig[] = [
     path: '/release',
     description: 'Releases funds from an escrow.',
     initialBody: {
-      service_hash: '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451', // Placeholder
+      service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
     },
     apiCall: (p, q, b) => api.releaseEscrow(b as any),
   },
@@ -120,7 +120,7 @@ const endpoints: EndpointConfig[] = [
     method: 'GET',
     path: '/reputation/{agent}',
     description: 'Fetches reputation score for an agent.',
-    initialPathParams: { agent: '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210' }, // Placeholder
+    initialPathParams: { agent: DEMO_AGENT_RECEIVER },
     apiCall: (p) => api.getReputation(p.agent),
   },
   {
@@ -134,7 +134,7 @@ const endpoints: EndpointConfig[] = [
     name: 'Get Events',
     method: 'GET',
     path: '/events',
-    description: 'Retrieves recent protocol events.',
+    description: 'Explains the live Server-Sent Events stream. /events is an open SSE connection, not a REST list endpoint.',
     apiCall: () => api.getEvents(),
   },
   {
@@ -156,14 +156,50 @@ const endpoints: EndpointConfig[] = [
     name: 'Register Identity',
     method: 'POST',
     path: '/identity/register',
-    description: 'Registers a new agent identity.',
+    description: 'Registers a new DID-style agent identity. Shape must include agent_id, public_key and did_document_hash.',
     initialBody: {
-      public_key: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-      name: 'TestAgent_001',
+      agent_id: 'demo-agent-001',
+      public_key: DEMO_AGENT_SENDER,
+      did_document_hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     },
     apiCall: (p, q, b) => api.registerIdentity(b as any),
   },
-  // Add more endpoints here following the pattern
+  {
+    name: 'Risk Dashboard',
+    method: 'GET',
+    path: '/risk/dashboard',
+    description: 'Runs the IsolationForest-backed dashboard over live/demo escrow records.',
+    apiCall: () => api.getRiskDashboard(),
+  },
+  {
+    name: 'Risk Score Agent',
+    method: 'GET',
+    path: '/risk/score/{agent}',
+    description: 'Scores one agent with IsolationForest features such as volume, TTL and dispute rate.',
+    initialPathParams: { agent: DEMO_AGENT_RECEIVER },
+    apiCall: (p) => api.getRiskScore(p.agent),
+  },
+  {
+    name: 'Compute Service Hash',
+    method: 'POST',
+    path: '/compute-hash',
+    description: 'Computes deterministic service_hash from sender, receiver, amount and nonce query parameters.',
+    initialQueryParams: { sender: DEMO_AGENT_SENDER, receiver: DEMO_AGENT_RECEIVER, amount: '100000000000', nonce: 'console-demo' },
+    apiCall: (p, q) => api.computeServiceHash({ sender: q.sender, receiver: q.receiver, amount: Number(q.amount), nonce: q.nonce }),
+  },
+  {
+    name: 'VRF Arbiter Election',
+    method: 'POST',
+    path: '/vrf/elect',
+    description: 'Elects an arbiter through on-chain VRF when available, otherwise cryptographic local CSPRNG fallback with proof.',
+    initialBody: {
+      dispute_id: `console-${Date.now()}`,
+      sender: DEMO_AGENT_SENDER,
+      receiver: DEMO_AGENT_RECEIVER,
+      seed_hash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+    },
+    apiCall: (p, q, b) => api.electVrfArbiter(b as any),
+  },
 ];
 
 const Sandbox: React.FC = () => {
@@ -321,6 +357,9 @@ const Sandbox: React.FC = () => {
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">API Sandbox</h2>
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
+        Write operations use the same demo <span className="font-mono">X-Payment</span> identity header as the console buttons. The request shapes below match the backend exactly, including DID identity registration, risk scoring and VRF election.
+      </div>
       <p className="text-gray-400">
         Interact with the AgentEscrow402 API directly. Select an endpoint, fill in parameters/body, and execute the request.
       </p>

@@ -50,12 +50,39 @@ function normalizeError(data: any, statusText: string): string {
   return `API Error: ${statusText || 'unknown'}`;
 }
 
+export const DEMO_AGENT_SENDER = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+export const DEMO_AGENT_RECEIVER = '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+
+const HEX_64 = /^[0-9a-f]{64}$/i;
+
+export function buildDemoXPaymentHeader(escrowHash?: string, amount = 0, sender = DEMO_AGENT_SENDER): string {
+  if (!HEX_64.test(sender)) throw new Error('Demo sender must be a 64-char hex public key');
+  if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Demo payment amount must be a non-negative safe integer');
+  const hash = (escrowHash && HEX_64.test(escrowHash))
+    ? escrowHash.toLowerCase()
+    : Array.from(crypto.getRandomValues(new Uint8Array(32))).map((b) => b.toString(16).padStart(2, '0')).join('');
+  const nonce = Array.from(crypto.getRandomValues(new Uint8Array(16))).map((b) => b.toString(16).padStart(2, '0')).join('');
+  // Hosted-console demo identity only. Production wallets sign the canonical
+  // x402 payload with Ed25519 and replay protection; the extra demo header
+  // lets the backend distinguish this labelled demo path from production auth.
+  const mockSignature = 'a'.repeat(128);
+  return `x402-v1;${hash};${amount};${sender.toLowerCase()};${Math.floor(Date.now() / 1000)};${nonce};${mockSignature}`;
+}
+
+export function buildDemoPaymentHeaders(escrowHash?: string, amount = 0): HeadersInit {
+  return {
+    'X-Payment': buildDemoXPaymentHeader(escrowHash, amount),
+    'X-AE402-Demo-Identity': 'hosted-console',
+  };
+}
+
 async function fetcher<T>(
   url: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-  body?: object
+  body?: object,
+  extraHeaders?: HeadersInit
 ): Promise<ApiResponse<T>> {
-  const headers: HeadersInit = { 'Content-Type': 'application/json' };
+  const headers: HeadersInit = { 'Content-Type': 'application/json', ...(extraHeaders || {}) };
   const config: RequestInit = {
     method,
     headers,
@@ -132,6 +159,9 @@ export interface Stats {
   total_transactions: number;
   released?: number;
   insurance_fee_bps?: number;
+  db?: string;
+  data_source?: string;
+  sandbox?: boolean;
 }
 
 export interface Event {
@@ -150,7 +180,9 @@ export interface Estimate {
 }
 
 export interface TransactionHash {
-  deploy_hash: string;
+  deploy_hash?: string;
+  service_hash?: string;
+  [key: string]: any;
 }
 
 // Escrow
@@ -169,6 +201,9 @@ export interface Escrow {
   metadata?: Record<string, any>;
   deploy_hash?: string;
   ttl?: number;
+  mlkem_ciphertext?: string;
+  mlkem_decap_key?: string;
+  mlkem_algorithm?: string;
 }
 
 export interface EscrowHistoryEntry {
@@ -266,16 +301,19 @@ export interface Reputation {
 }
 
 export interface RegisterIdentityRequest {
+  agent_id: string;
   public_key: string;
-  name: string;
-  metadata?: Record<string, any>;
+  did_document_hash: string;
 }
 
 export interface Identity {
+  agent_id: string;
   public_key: string;
-  name: string;
-  registered_at: string;
-  metadata?: Record<string, any>;
+  did_document_hash: string;
+  registered_at: string | number;
+  deploy_hash?: string;
+  mode?: string;
+  capabilities?: string[];
 }
 
 export interface DelegateIdentityRequest {
@@ -307,10 +345,10 @@ export interface PremiumQuote {
 }
 
 export interface DepositInsuranceRequest {
-  depositor_public_key: string;
-  amount: string;
-  token_contract: string;
-  signature: string;
+  depositor_public_key?: string;
+  amount: number;
+  token_contract?: string;
+  signature?: string;
 }
 
 export interface ClaimInsuranceRequest {
@@ -373,6 +411,9 @@ function normalizeStats(raw: any): Stats {
     total_transactions: raw.total_transactions ?? (raw.total ?? 0),
     released: raw.released,
     insurance_fee_bps: raw.insurance_fee_bps,
+    db: raw.db,
+    data_source: raw.data_source,
+    sandbox: raw.sandbox,
   };
 }
 
@@ -409,6 +450,9 @@ function normalizeEscrow(raw: any): Escrow {
     metadata: raw.metadata,
     deploy_hash: raw.deploy_hash,
     ttl: raw.ttl,
+    mlkem_ciphertext: raw.mlkem_ciphertext,
+    mlkem_decap_key: raw.mlkem_decap_key,
+    mlkem_algorithm: raw.mlkem_algorithm,
   };
 }
 
@@ -479,13 +523,15 @@ export const api = {
     if (params?.status) query.append('status', params.status);
     const res = await fetcher<any>(`/escrows?${query.toString()}`, 'GET');
     const raw = res.data?.escrows || (Array.isArray(res.data) ? res.data : []);
-    return { ...res, data: raw.map(normalizeEscrow) };
+    const mapped = raw.map(normalizeEscrow);
+    (mapped as any).total = res.data?.total ?? mapped.length;
+    return { ...res, data: mapped };
   },
 
-  createEscrow: (data: CreateEscrowRequest) => fetcher<TransactionHash>('/escrow', 'POST', data),
-  releaseEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/release', 'POST', data),
-  refundEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/refund', 'POST', data),
-  disputeEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/dispute', 'POST', data),
+  createEscrow: (data: CreateEscrowRequest) => fetcher<TransactionHash>('/escrow', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
+  releaseEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/release', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
+  refundEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/refund', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
+  disputeEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/dispute', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
 
   getEscrowByHash: async (hash: string): Promise<ApiResponse<Escrow>> => {
     const res = await fetcher<any>(`/escrow/${hash}`, 'GET');
@@ -528,12 +574,23 @@ export const api = {
     return res as ApiResponse<Estimate>;
   },
 
-  // /events is an SSE stream — return empty array for REST callers
+  // /events is an SSE stream, not a REST list. Return a marker object so UI can explain this honestly.
   getEvents: async (): Promise<ApiResponse<Event[]>> => {
-    return { data: [], error: null, status: 200 };
+    return {
+      data: [{
+        id: 'sse-stream',
+        type: 'SSE stream',
+        timestamp: new Date().toISOString(),
+        details: { endpoint: '/events', note: 'Live Server-Sent Events stream; open connection is used for new escrow_created/released/disputed messages.' },
+      }],
+      error: null,
+      status: 200,
+    };
   },
 
-  computeHash: (data: { value: string }) => fetcher<{ hash: string }>('/compute-hash', 'POST', data),
+  computeServiceHash: (params: { sender: string; receiver: string; amount: number; nonce: string }) =>
+    fetcher<{ service_hash: string }>(`/compute-hash?sender=${encodeURIComponent(params.sender)}&receiver=${encodeURIComponent(params.receiver)}&amount=${params.amount}&nonce=${encodeURIComponent(params.nonce)}`, 'POST'),
+  computeHash: (data: { value: string }) => fetcher<{ hash: string }>(`/compute-hash?sender=${encodeURIComponent(data.value)}&receiver=${encodeURIComponent(DEMO_AGENT_RECEIVER)}&amount=1&nonce=console`, 'POST'),
 
   // Multi-asset Escrow Endpoints
   createMultiAssetEscrow: (data: MultiAssetEscrowRequest) => fetcher<TransactionHash>('/escrow/multi-asset', 'POST', data),
@@ -543,8 +600,8 @@ export const api = {
   revealAtomicSwap: (data: AtomicSwapRevealRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/reveal', 'POST', data),
 
   // Insurance Endpoints
-  depositInsurance: (data: DepositInsuranceRequest) => fetcher<TransactionHash>('/insurance/deposit', 'POST', data),
-  claimInsurance: (data: ClaimInsuranceRequest) => fetcher<TransactionHash>('/insurance/claim', 'POST', data),
+  depositInsurance: (data: DepositInsuranceRequest) => fetcher<TransactionHash>('/insurance/deposit', 'POST', data, buildDemoPaymentHeaders(undefined, data.amount)),
+  claimInsurance: (data: ClaimInsuranceRequest) => fetcher<TransactionHash>('/insurance/claim', 'POST', data, buildDemoPaymentHeaders(data.escrow_hash, 0)),
   getInsurancePoolStats: async (): Promise<ApiResponse<InsurancePoolStats>> => {
     const res = await fetcher<any>('/insurance/pool-stats', 'GET');
     if (res.data) return { ...res, data: normalizeInsurancePoolStats(res.data) };
@@ -563,6 +620,11 @@ export const api = {
       `/insurance/premium-quote?escrow_amount=${escrowAmountMotes}&agent_id=${encodeURIComponent(agentId)}&service_type=${encodeURIComponent(serviceType)}`,
       'GET'
     ),
+
+  // Risk / VRF Endpoints
+  getRiskDashboard: () => fetcher<any>('/risk/dashboard', 'GET'),
+  getRiskScore: (agent: string) => fetcher<any>(`/risk/score/${encodeURIComponent(agent)}`, 'GET'),
+  electVrfArbiter: (data: { dispute_id: string; sender: string; receiver: string; seed_hash: string }) => fetcher<any>('/vrf/elect', 'POST', data),
 
   // Arbitration Endpoints
   electArbiter: (data: ElectArbiterRequest) => fetcher<TransactionHash>('/arbitration/elect', 'POST', data),

@@ -324,8 +324,9 @@ interface RegisterAgentModalProps {
 }
 
 const RegisterAgentModal: React.FC<RegisterAgentModalProps> = ({ isOpen, onClose, onRegister }) => {
-  const [publicKey, setPublicKey] = useState('');
-  const [name, setName] = useState('');
+  const [agentId, setAgentId] = useState('demo-agent-001');
+  const [publicKey, setPublicKey] = useState('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+  const [didHash, setDidHash] = useState('b'.repeat(64));
   const [formError, setFormError] = useState<string | null>(null);
   const [registerLoading, setRegisterLoading] = useState(false);
 
@@ -333,16 +334,21 @@ const RegisterAgentModal: React.FC<RegisterAgentModalProps> = ({ isOpen, onClose
     e.preventDefault();
     setFormError(null);
 
-    if (!publicKey || !name) {
-      setFormError('Public Key and Name are required.');
+    if (!agentId || !publicKey || !didHash) {
+      setFormError('Agent ID, public key and DID document hash are required.');
+      return;
+    }
+    if (!/^[0-9a-fA-F]{64}$/.test(didHash)) {
+      setFormError('DID document hash must be exactly 64 hex characters.');
       return;
     }
 
     setRegisterLoading(true);
     try {
-      await onRegister({ public_key: publicKey, name });
-      setPublicKey('');
-      setName('');
+      await onRegister({ agent_id: agentId, public_key: publicKey, did_document_hash: didHash });
+      setAgentId('demo-agent-001');
+      setPublicKey('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+      setDidHash('b'.repeat(64));
       setFormError(null);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Failed to register agent.');
@@ -352,22 +358,34 @@ const RegisterAgentModal: React.FC<RegisterAgentModalProps> = ({ isOpen, onClose
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Register New Agent">
-      <form onSubmit={handleSubmit}>
+    <Modal isOpen={isOpen} onClose={onClose} title="Register New Agent Identity">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100">
+          Backend expects DID-style identity fields: <span className="font-mono">agent_id</span>, <span className="font-mono">public_key</span>, <span className="font-mono">did_document_hash</span>.
+          If the optional identity contract is not configured, the demo stores it in the local registry and returns that mode explicitly.
+        </div>
+        <Input
+          label="Agent ID"
+          id="agentId"
+          value={agentId}
+          onChange={(e) => setAgentId(e.target.value)}
+          placeholder="e.g., agent-compute-gpt4"
+          required
+        />
         <Input
           label="Agent Public Key"
           id="agentPublicKey"
           value={publicKey}
           onChange={(e) => setPublicKey(e.target.value)}
-          placeholder="e.g., 0123..."
+          placeholder="64-char hex public key"
           required
         />
         <Input
-          label="Agent Name"
-          id="agentName"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g., AI_Assistant_v1"
+          label="DID Document Hash"
+          id="didDocumentHash"
+          value={didHash}
+          onChange={(e) => setDidHash(e.target.value)}
+          placeholder="64-char hex hash"
           required
         />
 
@@ -393,7 +411,7 @@ const RegisterAgentModal: React.FC<RegisterAgentModalProps> = ({ isOpen, onClose
             disabled={registerLoading}
           >
             {registerLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
-            Register Agent
+            Register Identity
           </button>
         </div>
       </form>
