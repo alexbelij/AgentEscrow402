@@ -75,10 +75,12 @@ fn read_fee_bps() -> u64 {
 }
 
 fn get_dict_uref(name: &str) -> URef {
-    runtime::get_key(name)
-        .unwrap_or_revert()
-        .into_uref()
-        .unwrap_or_revert()
+    // Casper 2.2.x (audit-082): new_dictionary is disallowed in session/install context (call()).
+    // Dicts and purses are lazily created inside entry points (Called context).
+    match runtime::get_key(name) {
+        Some(key) => key.into_uref().unwrap_or_revert(),
+        None => storage::new_dictionary(name).unwrap_or_revert(),
+    }
 }
 
 fn reputation_score(completed: u64, disputed: u64, weeks_inactive: u64) -> u64 {
@@ -128,10 +130,25 @@ fn parse_u512(s: &str) -> U512 {
     }
 }
 
+fn hex_decode_32(s: &str) -> [u8; 32] {
+    // runtime::get_caller().to_string() returns raw lowercase hex, not "account-hash-{hex}"
+    let mut out = [0u8; 32];
+    for (i, chunk) in s.as_bytes().chunks(2).enumerate() {
+        if i >= 32 { break; }
+        let hi = (chunk[0] as char).to_digit(16).unwrap_or(0) as u8;
+        let lo = chunk.get(1)
+            .and_then(|&b| (b as char).to_digit(16))
+            .unwrap_or(0) as u8;
+        out[i] = (hi << 4) | lo;
+    }
+    out
+}
+
 fn parse_account(s: &str) -> AccountHash {
+    // Try formatted "account-hash-{hex}" first; fall back to raw hex.
     match AccountHash::from_formatted_str(s) {
         Ok(v) => v,
-        Err(_) => runtime::revert(ApiError::User(ERR_INVALID_STATUS)),
+        Err(_) => AccountHash::new(hex_decode_32(s)),
     }
 }
 
@@ -478,8 +495,8 @@ pub extern "C" fn get_reputation() {
 pub extern "C" fn call() {
     let installer = runtime::get_caller();
 
-    let escrow_dict = storage::new_dictionary(ESCROWS_DICT).unwrap_or_revert();
-    let rep_dict = storage::new_dictionary(REPUTATION_DICT).unwrap_or_revert();
+    // Casper 2.2.x: new_dictionary is disallowed in session/install context.
+    // Dictionaries (escrows, reputation) are created lazily in entry points via get_dict_uref().
     let contract_purse = system::create_purse();
     let insurance_purse = system::create_purse();
     let fee_bps_uref = storage::new_uref(DEFAULT_FEE_BPS);
@@ -488,8 +505,6 @@ pub extern "C" fn call() {
     let arbiter_uref = storage::new_uref(Vec::<String>::new());
 
     let mut named_keys = NamedKeys::new();
-    named_keys.insert(ESCROWS_DICT.into(), escrow_dict.into());
-    named_keys.insert(REPUTATION_DICT.into(), rep_dict.into());
     named_keys.insert(CONTRACT_PURSE.into(), contract_purse.into());
     named_keys.insert(INSURANCE_PURSE.into(), insurance_purse.into());
     named_keys.insert(FEE_BPS_KEY.into(), fee_bps_uref.into());
