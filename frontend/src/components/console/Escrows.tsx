@@ -85,9 +85,11 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 
 const Select: React.FC<SelectProps> = ({ label, id, options, error, className = '', ...props }) => (
   <div className="mb-0">
-    <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
-      {label}
-    </label>
+    {label && (
+      <label htmlFor={id} className="block text-sm font-medium text-gray-300 mb-1">
+        {label}
+      </label>
+    )}
     <select
       id={id}
       className={`w-full h-12 px-3 rounded-md bg-[#0d0d14] text-gray-50 border ${
@@ -240,16 +242,15 @@ const Escrows: React.FC = () => {
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Escrow Management</h2>
 
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100">
-        These rows come from the live API. On the hosted demo, calls include a labelled demo <span className="font-mono">X-Payment</span>
-        identity header so create/release/refund/dispute works even while no browser wallet is connected. Production flow signs the same header.
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
+        <strong>What is real here:</strong> every row is loaded from the live backend; new rows are persisted in Neon when the hosted database is connected and otherwise shown as a clearly labelled demo fallback. Create/release/refund/dispute calls go through the same API used by production. The hosted console currently uses a labelled demo <span className="font-mono">X-Payment</span> identity header instead of silently pretending a browser wallet is connected; production clients sign that header with their wallet/agent key.
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
+      <div className="flex flex-row items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Select
-            label="Filter by Status"
+            label=""
             id="filterStatus"
             value={filterStatus}
             onChange={(e) => {
@@ -265,11 +266,11 @@ const Escrows: React.FC = () => {
               { value: 'disputed', label: 'Disputed' },
               { value: 'cancelled', label: 'Cancelled' },
             ]}
-            className="w-full md:w-48"
+            className="w-36 sm:w-48"
           />
           <button
             onClick={() => fetchEscrows()}
-            className="p-3 bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors"
+            className="h-12 w-12 shrink-0 inline-flex items-center justify-center bg-gray-700 hover:bg-gray-600 rounded-md text-gray-200 transition-colors"
             title="Refresh Escrows"
           >
             <RefreshCw size={20} />
@@ -277,10 +278,10 @@ const Escrows: React.FC = () => {
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="flex items-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full md:w-auto justify-center"
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
         >
           <PlusCircle className="h-5 w-5 mr-2" />
-          Create New Escrow
+          Create Escrow
         </button>
       </div>
 

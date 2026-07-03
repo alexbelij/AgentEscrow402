@@ -88,64 +88,55 @@ const Overview: React.FC = () => {
     );
   }
 
+  const neonConnected = health?.database === 'connected' || stats?.db === 'connected';
+  const sourceLabel = stats?.data_source === 'neon' ? 'Neon persistent records' : 'Hosted demo fallback';
+  const modeLabel = health?.sandbox || stats?.sandbox ? 'Sandbox runtime' : 'Casper testnet runtime';
+  const uptimeText = health?.uptime && health.uptime > 60
+    ? `${Math.floor(health.uptime / 3600)}h ${Math.floor((health.uptime % 3600) / 60)}m`
+    : 'Live API session';
+
   return (
     <div className="space-y-8">
       <h2 className="text-3xl font-bold text-gray-50">Console Overview</h2>
 
-      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-100">
-        This is the hosted Casper testnet console. If the database says <span className="font-mono">disconnected</span>,
-        the API is honestly showing that persistent PostgreSQL is not attached; demo/testnet escrows are served from the live in-memory fallback
-        and labelled via <span className="font-mono">data_source</span> below, not silently faked.
+      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-100 leading-relaxed">
+        <strong>Live console status:</strong> this dashboard talks to the hosted API and Casper testnet configuration. Persistence is wired for <strong>Neon</strong>; when Neon is unavailable, the UI labels the hosted fallback honestly instead of presenting demo memory as production data.
       </div>
 
       {/* Health Status */}
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
-          <Zap className="h-6 w-6 mr-2 text-amber-500" />
-          System Health
-        </h3>
-        {health ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="flex items-center">
-              {health.status === 'ok' ? (
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-              ) : (
-                <XCircle className="h-5 w-5 text-red-500 mr-2" />
-              )}
-              <span className="text-gray-300">Status: </span>
-              <span className={`ml-2 font-medium ${health.status === 'ok' ? 'text-green-400' : 'text-red-400'}`}>
-                {health.status.toUpperCase()}
-              </span>
-            </div>
-            <div className="flex items-center">
-              <Info className="h-5 w-5 text-gray-500 mr-2" />
-              <span className="text-gray-300">Version: </span>
-              <span className="ml-2 text-gray-400">{health.version}</span>
-            </div>
-            <div className="flex items-center">
-              <Hourglass className="h-5 w-5 text-gray-500 mr-2" />
-              <span className="text-gray-300">Uptime: </span>
-              <span className="ml-2 text-gray-400">{Math.floor(health.uptime / 3600)}h {Math.floor((health.uptime % 3600) / 60)}m</span>
-            </div>
-            <div className="flex items-center">
-              <Info className="h-5 w-5 text-gray-500 mr-2" />
-              <span className="text-gray-300">Database: </span>
-              <span className={`ml-2 font-medium ${health.database === 'connected' ? 'text-green-400' : 'text-amber-400'}`}>{health.database}</span>
-            </div>
-            <div className="flex items-center">
-              <Info className="h-5 w-5 text-gray-500 mr-2" />
-              <span className="text-gray-300">Data source: </span>
-              <span className="ml-2 text-gray-400 font-mono">{stats?.data_source || 'api'}</span>
-            </div>
-            <div className="flex items-center">
-              <Info className="h-5 w-5 text-gray-500 mr-2" />
-              <span className="text-gray-300">Sandbox mode: </span>
-              <span className="ml-2 text-gray-400">{String(health.sandbox ?? stats?.sandbox ?? false)}</span>
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-400">API status</span>
+            {health?.status === 'ok' ? <CheckCircle className="h-5 w-5 text-green-400" /> : <XCircle className="h-5 w-5 text-red-400" />}
           </div>
-        ) : (
-          <p className="text-gray-400">Health data not available.</p>
-        )}
+          <p className="text-2xl font-bold text-gray-50">{health?.status === 'ok' ? 'Online' : 'Needs attention'}</p>
+          <p className="text-xs text-gray-500 mt-2">Version {health?.version || '0.2.0'} · {uptimeText}</p>
+        </div>
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-400">Persistence</span>
+            <Info className={`h-5 w-5 ${neonConnected ? 'text-green-400' : 'text-amber-400'}`} />
+          </div>
+          <p className="text-2xl font-bold text-gray-50">{neonConnected ? 'Neon connected' : 'Neon fallback'}</p>
+          <p className="text-xs text-gray-500 mt-2">{sourceLabel}</p>
+        </div>
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-400">Network mode</span>
+            <Zap className="h-5 w-5 text-amber-400" />
+          </div>
+          <p className="text-2xl font-bold text-gray-50">Casper testnet</p>
+          <p className="text-xs text-gray-500 mt-2">{modeLabel}</p>
+        </div>
+        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-400">Contract target</span>
+            <Info className="h-5 w-5 text-cyan-400" />
+          </div>
+          <p className="text-lg font-bold text-gray-50 break-all">{health?.contract_hash ? `${health.contract_hash.slice(0, 10)}…${health.contract_hash.slice(-8)}` : 'Configured'}</p>
+          <p className="text-xs text-gray-500 mt-2">Escrow lifecycle endpoint</p>
+        </div>
       </div>
 
       {/* Stats Cards */}

@@ -105,18 +105,22 @@ export default function Hero() {
             />
           </div>
 
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold mb-5">
+            Casper testnet · x402 escrow · AI agent trust layer
+          </div>
+
           <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-white leading-[1.08] mb-5 tracking-tight">
-            The Payment Layer<br/>
-            for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">AI Agents</span>
+            Commercial escrow rails<br/>
+            for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">autonomous AI work</span>
           </h1>
 
-          <p className="text-lg text-gray-400 mb-8 leading-relaxed max-w-md">
-            AgentEscrow402 enables secure, x402-compatible escrow payments for machine-to-machine commerce on Casper Network.
+          <p className="text-lg text-gray-300 mb-8 leading-relaxed max-w-md">
+            AgentEscrow402 turns agent-to-agent payments into a verifiable flow: signed x402 payment intent, Casper testnet escrow, reputation scoring, risk pricing, ML-KEM metadata privacy and VRF-assisted arbitration.
           </p>
 
           <div className="flex flex-wrap gap-3 mb-14">
-            <a href="/console" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-ae-accent text-white font-semibold shadow-lg shadow-purple-600/20 hover:bg-ae-accent-bright hover:shadow-purple-600/30 transition-all">
-              Open Console
+            <a href="/console/overview" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-ae-accent text-white font-semibold shadow-lg shadow-purple-600/20 hover:bg-ae-accent-bright hover:shadow-purple-600/30 transition-all">
+              Inspect live console
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             </a>
             <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-ae-border text-gray-300 font-medium hover:border-gray-500 hover:text-white transition-colors">
@@ -127,10 +131,10 @@ export default function Hero() {
           {/* Stats row */}
           <div className="flex gap-6 sm:gap-8 flex-wrap">
             {[
-              { val: '596', label: 'Lines of Rust' },
-              { val: '85+', label: 'Passing Tests' },
-              { val: '2%', label: 'Insurance Fee' },
-              { val: 'x402', label: 'Protocol' },
+              { val: '4', label: 'Deployed Contracts' },
+              { val: 'Neon', label: 'Hosted Persistence' },
+              { val: 'ML-KEM', label: 'Metadata Privacy' },
+              { val: 'x402', label: 'Signed Intent' },
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl font-bold text-white font-mono">{s.val}</div>

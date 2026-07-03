@@ -20,6 +20,7 @@ class Config:
     default_ttl: int = 300
     insurance_fee_bps: int = 200  # 2% = 200 basis points
     contract_hash: str = ""
+    allow_hosted_demo_identity: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
@@ -48,6 +49,7 @@ class Config:
             default_ttl=int(os.getenv("DEFAULT_TTL", "300")),
             insurance_fee_bps=int(os.getenv("INSURANCE_FEE_BPS", "200")),
             contract_hash=os.getenv("ESCROW_CONTRACT_HASH", ""),
+            allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
         )
 
 

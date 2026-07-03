@@ -1,4 +1,4 @@
-"""PostgreSQL persistence layer for AgentEscrow402."""
+"""Neon persistence layer for AgentEscrow402 (PostgreSQL wire protocol)."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from server.models import EscrowRecord, EscrowStatus
 
@@ -24,12 +25,51 @@ def _get_pool():
         db_url = os.getenv("DATABASE_URL", "")
         if not db_url:
             return None
+        parsed = urlparse(db_url)
+        if parsed.scheme not in {"postgresql", "postgres"} or not parsed.hostname:
+            logger.warning("Ignoring invalid Neon DATABASE_URL")
+            return None
         _pool = psycopg_pool.ConnectionPool(db_url, min_size=1, max_size=5)
-        logger.info("PostgreSQL pool opened")
+        _ensure_schema(_pool)
+        logger.info("Neon pool opened")
         return _pool
     except Exception as exc:
-        logger.warning("PostgreSQL unavailable: %s", exc)
+        logger.warning("Neon unavailable: %s", exc)
         return None
+
+
+def _ensure_schema(pool) -> None:
+    """Create the small Neon schema used by the hosted console if it is missing."""
+    with pool.connection() as conn:
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS escrows (
+                   service_hash TEXT PRIMARY KEY,
+                   sender TEXT NOT NULL,
+                   receiver TEXT NOT NULL,
+                   amount BIGINT NOT NULL DEFAULT 0,
+                   status TEXT NOT NULL DEFAULT 'pending',
+                   ttl INTEGER NOT NULL DEFAULT 300,
+                   created_at BIGINT NOT NULL,
+                   deploy_hash TEXT DEFAULT ''
+               )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS reputation (
+                   agent TEXT PRIMARY KEY,
+                   completed INTEGER NOT NULL DEFAULT 0,
+                   disputed INTEGER NOT NULL DEFAULT 0,
+                   slashed INTEGER NOT NULL DEFAULT 0,
+                   last_active BIGINT NOT NULL DEFAULT 0,
+                   score INTEGER NOT NULL DEFAULT 50
+               )"""
+        )
+        conn.execute(
+            """CREATE TABLE IF NOT EXISTS insurance_pool (
+                   service_hash TEXT PRIMARY KEY,
+                   fee_amount BIGINT NOT NULL DEFAULT 0,
+                   collected_at BIGINT NOT NULL DEFAULT 0
+               )"""
+        )
 
 
 def is_connected() -> bool:
@@ -101,7 +141,7 @@ def load_escrows() -> list[dict[str, Any]]:
     try:
         with pool.connection() as conn:
             rows = conn.execute(
-                "SELECT service_hash, sender, receiver, amount, status, ttl, created_at, deploy_hash FROM escrows"
+                "SELECT service_hash, sender, receiver, amount, status, ttl, created_at, COALESCE(deploy_hash, '') FROM escrows ORDER BY created_at DESC"
             ).fetchall()
         result = []
         for r in rows:

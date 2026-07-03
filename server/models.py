@@ -14,6 +14,9 @@ class EscrowStatus(str, Enum):
     EXPIRED = "expired"
     DISPUTED = "disputed"
     RESOLVED = "resolved"
+    # Backward-compatible aliases used by older batch tests / integrations.
+    COMPLETED = "released"
+    FAILED = "refunded"
 
 
 class EscrowRequest(BaseModel):
@@ -96,3 +99,4 @@ class HealthResponse(BaseModel):
     chain: str = ""
     contract_hash: str = ""
     db: str = "disconnected"
+    uptime: int = 0

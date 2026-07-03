@@ -44,14 +44,14 @@ def get_casper():
 
 
 def _load_escrow_records() -> list[dict[str, Any]]:
-    """Load escrow records from PostgreSQL or the running in-memory demo store."""
+    """Load escrow records from Neon or the running in-memory demo store."""
     try:
         from server import db as pgdb
         records = pgdb.load_escrows()
         if records:
             return records
     except Exception as exc:
-        logger.debug("PostgreSQL escrow load failed for risk API: %s", exc)
+        logger.debug("Neon escrow load failed for risk API: %s", exc)
     try:
         from server.app import get_sandbox
         store = get_sandbox()
