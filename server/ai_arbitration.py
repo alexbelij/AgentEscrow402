@@ -1,10 +1,30 @@
+"""AI arbitration for AgentEscrow402.
+
+Fallback chain (cheapest/fastest first):
+  1. Groq          (llama-3.1-8b-instant, free tier)
+  2. NVIDIA NIM    (meta/llama-3.1-8b-instruct, free tier)
+  3. OpenRouter    (free-tier model)
+  4. Heuristic     (deterministic scoring, always works)
+"""
+from __future__ import annotations
+
 import hashlib
+import json
+import logging
+import os
+import re
 import time
 from typing import Any
 from collections import defaultdict
 
+import httpx
 from pydantic import BaseModel, Field, field_validator
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Data models
+# ---------------------------------------------------------------------------
 
 class DisputeEvidence(BaseModel):
     escrow_id: str
@@ -32,7 +52,314 @@ class ArbitrationRecommendation(BaseModel):
     risk_factors: list[str]
     suggested_split_pct: float = Field(..., ge=0.0, le=100.0)
     analysis_hash: str
+    provider: str = "heuristic"  # which provider answered
 
+
+# ---------------------------------------------------------------------------
+# LLM provider implementations (all async, all OpenAI-compatible)
+# ---------------------------------------------------------------------------
+
+ARBITRATION_SYSTEM_PROMPT = """You are an impartial AI arbitration judge for AgentEscrow402 — \
+an on-chain escrow system for AI agent service payments on Casper blockchain.
+
+Your task: analyze dispute evidence and return a JSON verdict. No markdown, no explanation outside JSON.
+
+Valid recommendations:
+- "favor_sender"   — refund sender (service not delivered / fraud)
+- "favor_receiver" — release funds to receiver (service delivered)
+- "split"          — split funds proportionally
+- "escalate"       — insufficient evidence, needs human review
+
+Required JSON format (EXACTLY, no extra keys):
+{
+  "recommendation": "<favor_sender|favor_receiver|split|escalate>",
+  "confidence": <0.0-1.0>,
+  "reasoning": "<concise explanation, max 200 chars>",
+  "risk_factors": ["<factor1>", "<factor2>"],
+  "suggested_split_pct": <0.0-100.0>
+}
+suggested_split_pct = percentage that goes to RECEIVER (0 = full refund, 100 = full payment).
+"""
+
+
+def _build_arbitration_prompt(
+    dispute_id: str,
+    sender_evidence: list[DisputeEvidence],
+    receiver_evidence: list[DisputeEvidence],
+    escrow_amount: int,
+) -> str:
+    def _fmt(evs: list[DisputeEvidence]) -> str:
+        if not evs:
+            return "  (none)"
+        lines = []
+        for i, e in enumerate(evs[:5]):  # cap at 5 items for token efficiency
+            lines.append(
+                f"  [{i+1}] type={e.evidence_type} claimant={e.claimant[:12]}... "
+                f"description={e.description[:80]}"
+            )
+        if len(evs) > 5:
+            lines.append(f"  ... and {len(evs)-5} more items")
+        return "\n".join(lines)
+
+    cspr = escrow_amount / 1_000_000_000
+    return (
+        f"Dispute ID: {dispute_id}\n"
+        f"Escrow Amount: {cspr:.4f} CSPR ({escrow_amount} motes)\n\n"
+        f"SENDER evidence ({len(sender_evidence)} items):\n{_fmt(sender_evidence)}\n\n"
+        f"RECEIVER evidence ({len(receiver_evidence)} items):\n{_fmt(receiver_evidence)}\n\n"
+        "Respond with JSON verdict only."
+    )
+
+
+def _parse_llm_json(raw: str) -> dict[str, Any] | None:
+    """Extract and validate JSON from LLM response (handles markdown code blocks)."""
+    # Strip markdown code fences
+    raw = re.sub(r"```(?:json)?", "", raw).strip()
+    # Find first { ... }
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not m:
+        return None
+    try:
+        d = json.loads(m.group())
+    except json.JSONDecodeError:
+        return None
+
+    required = {"recommendation", "confidence", "reasoning", "risk_factors", "suggested_split_pct"}
+    if not required.issubset(d.keys()):
+        return None
+    if d["recommendation"] not in ("favor_sender", "favor_receiver", "split", "escalate"):
+        return None
+    try:
+        d["confidence"] = float(d["confidence"])
+        d["suggested_split_pct"] = float(d["suggested_split_pct"])
+        d["risk_factors"] = list(d["risk_factors"])
+    except (TypeError, ValueError):
+        return None
+    d["confidence"] = max(0.0, min(1.0, d["confidence"]))
+    d["suggested_split_pct"] = max(0.0, min(100.0, d["suggested_split_pct"]))
+    return d
+
+
+async def _call_openai_compat(
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    timeout: float = 20.0,
+) -> str:
+    """Generic OpenAI-compatible chat completions call."""
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.post(
+            f"{base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={
+                "model": model,
+                "messages": messages,
+                "max_tokens": 300,
+                "temperature": 0.1,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+async def _try_groq(prompt: str) -> dict[str, Any] | None:
+    api_key = os.getenv("GROQ_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        raw = await _call_openai_compat(
+            "https://api.groq.com/openai/v1",
+            api_key,
+            "llama-3.1-8b-instant",
+            [
+                {"role": "system", "content": ARBITRATION_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        parsed = _parse_llm_json(raw)
+        if parsed:
+            parsed["_provider"] = "groq/llama-3.1-8b-instant"
+        return parsed
+    except Exception as exc:
+        logger.warning("Groq arbitration failed: %s", exc)
+        return None
+
+
+async def _try_nvidia(prompt: str) -> dict[str, Any] | None:
+    api_key = os.getenv("NVIDIA_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        raw = await _call_openai_compat(
+            "https://integrate.api.nvidia.com/v1",
+            api_key,
+            "meta/llama-3.1-8b-instruct",
+            [
+                {"role": "system", "content": ARBITRATION_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        parsed = _parse_llm_json(raw)
+        if parsed:
+            parsed["_provider"] = "nvidia/llama-3.1-8b-instruct"
+        return parsed
+    except Exception as exc:
+        logger.warning("NVIDIA arbitration failed: %s", exc)
+        return None
+
+
+async def _try_openrouter(prompt: str) -> dict[str, Any] | None:
+    api_key = os.getenv("OPENROUTER_API_KEY", "")
+    if not api_key:
+        return None
+    # Use nemotron-ultra (free, large context)
+    try:
+        raw = await _call_openai_compat(
+            "https://openrouter.ai/api/v1",
+            api_key,
+            "nvidia/nemotron-3-ultra-550b-a55b:free",
+            [
+                {"role": "system", "content": ARBITRATION_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            timeout=30.0,
+        )
+        parsed = _parse_llm_json(raw)
+        if parsed:
+            parsed["_provider"] = "openrouter/nemotron-ultra"
+        return parsed
+    except Exception as exc:
+        logger.warning("OpenRouter arbitration failed: %s", exc)
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Heuristic fallback (kept from original, always works)
+# ---------------------------------------------------------------------------
+
+class _HeuristicArbitrator:
+    """Pure scoring-based arbitration, no external calls."""
+
+    def analyze(
+        self,
+        dispute_id: str,
+        sender_evidence: list[DisputeEvidence],
+        receiver_evidence: list[DisputeEvidence],
+        escrow_amount: int,
+        min_evidence: int = 1,
+        max_evidence: int = 20,
+        agent_disputes: dict[str, list[str]] | None = None,
+    ) -> dict[str, Any]:
+        agent_disputes = agent_disputes or {}
+        total_evidence = len(sender_evidence) + len(receiver_evidence)
+        if total_evidence < min_evidence:
+            return {
+                "recommendation": "escalate",
+                "confidence": 0.0,
+                "reasoning": f"Insufficient evidence: {total_evidence} items, min {min_evidence}",
+                "risk_factors": ["insufficient_evidence"],
+                "suggested_split_pct": 50.0,
+                "_provider": "heuristic",
+            }
+        if total_evidence > max_evidence * 2:
+            sender_evidence = sender_evidence[:max_evidence]
+            receiver_evidence = receiver_evidence[:max_evidence]
+
+        sender_sd = self._score(sender_evidence)
+        receiver_sd = self._score(receiver_evidence)
+        confidence = self._confidence(sender_sd, receiver_sd)
+        risk_factors = self._risks(sender_evidence, receiver_evidence, escrow_amount, agent_disputes)
+
+        s = sender_sd["score"]
+        r = receiver_sd["score"]
+        if confidence < 0.3:
+            rec, split, reasoning = "escalate", 50.0, f"Low confidence ({confidence:.2f}): manual review needed"
+        elif abs(s - r) < 0.15:
+            rec, split, reasoning = "split", 50.0, f"Evidence too close. Sender={s:.2f} Receiver={r:.2f}"
+        elif s > r:
+            diff = s - r
+            split = min(100.0, 50.0 + diff * 50.0)
+            rec, reasoning = "favor_sender", f"Sender evidence stronger by {diff:.2f}"
+        else:
+            diff = r - s
+            split = max(0.0, 50.0 - diff * 50.0)
+            rec, reasoning = "favor_receiver", f"Receiver evidence stronger by {diff:.2f}"
+
+        return {
+            "recommendation": rec,
+            "confidence": confidence,
+            "reasoning": reasoning,
+            "risk_factors": risk_factors,
+            "suggested_split_pct": round(split, 2),
+            "_provider": "heuristic",
+        }
+
+    def _score(self, evidence: list[DisputeEvidence]) -> dict[str, Any]:
+        if not evidence:
+            return {"score": 0.0, "factors": ["no_evidence"]}
+        now = int(time.time())
+        max_age = 90 * 86400
+        scores: list[float] = []
+        types_seen: set[str] = set()
+        hashes_seen: set[str] = set()
+        dup_count = 0
+        for ev in evidence:
+            item = 1.0
+            age = max(0, now - ev.timestamp)
+            item *= (1.0 - (age / max_age) * 0.7) if age <= max_age else 0.3
+            item *= {"transaction": 1.3, "hash": 1.2, "screenshot": 1.0}.get(ev.evidence_type, 0.9)
+            if ev.content_hash in hashes_seen:
+                dup_count += 1
+                item *= 0.5
+            hashes_seen.add(ev.content_hash)
+            types_seen.add(ev.evidence_type)
+            scores.append(item)
+        total = sum(scores) / len(scores) if scores else 0.0
+        total *= (1.0 + min(len(evidence) * 0.1, 0.5) + len(types_seen) * 0.1 - dup_count * 0.3)
+        return {"score": max(0.0, min(1.0, total)), "factors": list(types_seen)}
+
+    def _confidence(self, s: dict, r: dict) -> float:
+        sv, rv = s["score"], r["score"]
+        total = sv + rv
+        if total == 0:
+            return 0.0
+        dominance = max(sv, rv) / total
+        quality = (sv + rv) / 2.0
+        return round(min(1.0, max(0.0, dominance * 0.6 + quality * 0.4)), 4)
+
+    def _risks(
+        self,
+        sender: list[DisputeEvidence],
+        receiver: list[DisputeEvidence],
+        amount: int,
+        agent_disputes: dict[str, list[str]],
+    ) -> list[str]:
+        risks: list[str] = []
+        all_ev = sender + receiver
+        if not all_ev:
+            return ["no_evidence_submitted"]
+        for cl in {e.claimant for e in all_ev}:
+            cnt = len(agent_disputes.get(cl, []))
+            if cnt >= 3:
+                risks.append(f"repeat_disputes:{cl[:12]}:{cnt}")
+        if amount > 1_000_000:
+            risks.append("high_value_escrow")
+        if not sender or not receiver:
+            risks.append("unilateral_evidence")
+        now = int(time.time())
+        stale = sum(1 for e in all_ev if now - e.timestamp > 180 * 86400)
+        if stale > len(all_ev) // 2:
+            risks.append("majority_stale_evidence")
+        return risks or ["standard_risk_profile"]
+
+
+_heuristic = _HeuristicArbitrator()
+
+
+# ---------------------------------------------------------------------------
+# Main ArbitrationAgent
+# ---------------------------------------------------------------------------
 
 class ArbitrationAgent:
     MAX_HISTORY = 10_000
@@ -44,7 +371,6 @@ class ArbitrationAgent:
             raise ValueError("min_evidence must be at least 1")
         if max_evidence < min_evidence:
             raise ValueError("max_evidence must be >= min_evidence")
-        
         self.slashing_rate = slashing_rate
         self.min_evidence = min_evidence
         self.max_evidence = max_evidence
@@ -60,81 +386,53 @@ class ArbitrationAgent:
     ) -> ArbitrationRecommendation:
         if escrow_amount < 0:
             raise ValueError("escrow_amount must be non-negative")
-        
-        total_evidence = len(sender_evidence) + len(receiver_evidence)
-        if total_evidence < self.min_evidence:
-            return ArbitrationRecommendation(
-                dispute_id=dispute_id,
-                recommendation="escalate",
-                confidence=0.0,
-                reasoning=f"Insufficient evidence: {total_evidence} items provided, minimum {self.min_evidence} required",
-                risk_factors=["insufficient_evidence"],
-                suggested_split_pct=50.0,
-                analysis_hash="",
-            )
-        
-        if total_evidence > self.max_evidence * 2:
-            sender_evidence = sender_evidence[:self.max_evidence]
-            receiver_evidence = receiver_evidence[:self.max_evidence]
 
-        sender_score_data = self._score_evidence_set(sender_evidence)
-        receiver_score_data = self._score_evidence_set(receiver_evidence)
-
-        confidence = self._compute_confidence(sender_score_data, receiver_score_data)
-        risk_factors = self._detect_risk_factors(sender_evidence, receiver_evidence, escrow_amount)
-
-        sender_score = sender_score_data["score"]
-        receiver_score = receiver_score_data["score"]
-
-        if confidence < 0.3:
-            recommendation = "escalate"
-            split_pct = 50.0
-            reasoning = f"Low confidence ({confidence:.2f}): manual review required. Sender score: {sender_score:.2f}, Receiver score: {receiver_score:.2f}"
-        elif abs(sender_score - receiver_score) < 0.15:
-            recommendation = "split"
-            split_pct = 50.0
-            reasoning = f"Scores too close to determine winner. Sender: {sender_score:.2f}, Receiver: {receiver_score:.2f}"
-        elif sender_score > receiver_score:
-            recommendation = "favor_sender"
-            score_diff = sender_score - receiver_score
-            split_pct = min(100.0, 50.0 + score_diff * 50.0)
-            reasoning = f"Sender evidence stronger by {score_diff:.2f}. Factors: {sender_score_data['factors']}"
-        else:
-            recommendation = "favor_receiver"
-            score_diff = receiver_score - sender_score
-            split_pct = max(0.0, 50.0 - score_diff * 50.0)
-            reasoning = f"Receiver evidence stronger by {score_diff:.2f}. Factors: {receiver_score_data['factors']}"
-
-        analysis_content = (
-            f"{dispute_id}:{recommendation}:{confidence:.4f}:"
-            f"{sender_score:.4f}:{receiver_score:.4f}:"
-            f"{escrow_amount}:{','.join(sorted(risk_factors))}"
+        prompt = _build_arbitration_prompt(
+            dispute_id, sender_evidence, receiver_evidence, escrow_amount
         )
-        analysis_hash = hashlib.sha256(analysis_content.encode()).hexdigest()
+
+        # Try LLM providers in order: Groq → NVIDIA → OpenRouter → heuristic
+        verdict: dict[str, Any] | None = None
+        for provider_fn in (_try_groq, _try_nvidia, _try_openrouter):
+            verdict = await provider_fn(prompt)
+            if verdict:
+                logger.info("Arbitration via %s for dispute %s", verdict.get("_provider"), dispute_id[:16])
+                break
+
+        if not verdict:
+            logger.warning("All LLM providers failed; using heuristic for %s", dispute_id[:16])
+            verdict = _heuristic.analyze(
+                dispute_id, sender_evidence, receiver_evidence, escrow_amount,
+                self.min_evidence, self.max_evidence, dict(self._agent_disputes),
+            )
+
+        provider = verdict.pop("_provider", "heuristic")
+
+        # Build analysis_hash
+        content = (
+            f"{dispute_id}:{verdict['recommendation']}:{verdict['confidence']:.4f}:"
+            f"{escrow_amount}:{','.join(sorted(verdict['risk_factors']))}"
+        )
+        analysis_hash = hashlib.sha256(content.encode()).hexdigest()
 
         result = ArbitrationRecommendation(
             dispute_id=dispute_id,
-            recommendation=recommendation,
-            confidence=confidence,
-            reasoning=reasoning,
-            risk_factors=risk_factors,
-            suggested_split_pct=round(split_pct, 2),
+            recommendation=verdict["recommendation"],
+            confidence=verdict["confidence"],
+            reasoning=str(verdict["reasoning"])[:300],
+            risk_factors=verdict["risk_factors"],
+            suggested_split_pct=round(float(verdict["suggested_split_pct"]), 2),
             analysis_hash=analysis_hash,
+            provider=provider,
         )
 
         self._history.append(result)
-        # Evict oldest entries when history exceeds limit
         if len(self._history) > self.MAX_HISTORY:
             self._history = self._history[-self.MAX_HISTORY:]
-        for ev in sender_evidence:
-            self._agent_disputes[ev.claimant].append(dispute_id)
-        for ev in receiver_evidence:
-            self._agent_disputes[ev.claimant].append(dispute_id)
-        # Cap agent dispute history
         for ev in sender_evidence + receiver_evidence:
-            disputes = self._agent_disputes[ev.claimant]
-            if len(disputes) > self.MAX_HISTORY:
-                self._agent_disputes[ev.claimant] = disputes[-self.MAX_HISTORY:]
+            self._agent_disputes[ev.claimant].append(dispute_id)
+            if len(self._agent_disputes[ev.claimant]) > self.MAX_HISTORY:
+                self._agent_disputes[ev.claimant] = self._agent_disputes[ev.claimant][-self.MAX_HISTORY:]
 
         return result
 
@@ -143,167 +441,28 @@ class ArbitrationAgent:
             raise ValueError("amounts must be non-negative")
         if not 0.0 <= confidence <= 1.0:
             raise ValueError("confidence must be between 0 and 1")
-        
         base_slash = int(loser_stake * self.slashing_rate)
-        confidence_multiplier = 0.5 + (confidence * 0.5)
-        adjusted_slash = int(base_slash * confidence_multiplier)
-        
-        max_slash = min(escrow_amount, loser_stake)
-        return min(adjusted_slash, max_slash)
-
-    def _score_evidence_set(self, evidence: list[DisputeEvidence]) -> dict[str, Any]:
-        if not evidence:
-            return {"score": 0.0, "factors": ["no_evidence"]}
-
-        now = int(time.time())
-        max_age = 90 * 86400
-
-        scores: list[float] = []
-        types_seen: set[str] = set()
-        hashes_seen: set[str] = set()
-        consistency_issues = 0
-
-        for ev in evidence:
-            item_score = 1.0
-
-            age = now - ev.timestamp
-            if age < 0:
-                age = 0
-            if age > max_age:
-                recency_factor = 0.3
-            else:
-                recency_factor = 1.0 - (age / max_age) * 0.7
-            item_score *= recency_factor
-
-            if ev.evidence_type == "transaction":
-                item_score *= 1.3
-            elif ev.evidence_type == "hash":
-                item_score *= 1.2
-            elif ev.evidence_type == "screenshot":
-                item_score *= 1.0
-            else:
-                item_score *= 0.9
-
-            if ev.content_hash in hashes_seen:
-                consistency_issues += 1
-                item_score *= 0.5
-            hashes_seen.add(ev.content_hash)
-
-            types_seen.add(ev.evidence_type)
-            scores.append(item_score)
-
-        count_bonus = min(len(evidence) * 0.1, 0.5)
-        diversity_bonus = len(types_seen) * 0.1
-
-        consistency_penalty = consistency_issues * 0.3
-
-        total_score = sum(scores) / len(scores) if scores else 0.0
-        total_score = total_score * (1.0 + count_bonus + diversity_bonus - consistency_penalty)
-        total_score = max(0.0, min(1.0, total_score))
-
-        factors = []
-        if len(evidence) >= 5:
-            factors.append("high_volume")
-        if len(types_seen) >= 3:
-            factors.append("high_diversity")
-        if consistency_issues > 0:
-            factors.append(f"consistency_issues:{consistency_issues}")
-        else:
-            factors.append("consistent")
-
-        return {"score": total_score, "factors": factors}
-
-    def _compute_confidence(self, sender_score: dict, receiver_score: dict) -> float:
-        sender_val = sender_score["score"]
-        receiver_val = receiver_score["score"]
-
-        if sender_val == 0.0 and receiver_val == 0.0:
-            return 0.0
-
-        total = sender_val + receiver_val
-        if total == 0.0:
-            return 0.0
-
-        max_score = max(sender_val, receiver_val)
-        dominance = max_score / total if total > 0 else 0.0
-
-        evidence_quality = (sender_val + receiver_val) / 2.0
-
-        raw_confidence = dominance * 0.6 + evidence_quality * 0.4
-        return round(min(1.0, max(0.0, raw_confidence)), 4)
-
-    def _detect_risk_factors(
-        self,
-        sender_evidence: list[DisputeEvidence],
-        receiver_evidence: list[DisputeEvidence],
-        escrow_amount: int,
-    ) -> list[str]:
-        risks: list[str] = []
-
-        all_evidence = sender_evidence + receiver_evidence
-        if not all_evidence:
-            return ["no_evidence_submitted"]
-
-        claimants: set[str] = set()
-        for ev in all_evidence:
-            claimants.add(ev.claimant)
-
-        for claimant in claimants:
-            dispute_count = len(self._agent_disputes.get(claimant, []))
-            if dispute_count >= 3:
-                risks.append(f"repeat_disputes:{claimant}:{dispute_count}")
-            if dispute_count >= 5:
-                risks.append(f"high_volume_disputant:{claimant}")
-
-        if escrow_amount > 1_000_000:
-            risks.append("high_value_escrow")
-        elif escrow_amount > 100_000:
-            risks.append("elevated_value_escrow")
-
-        sender_types = {e.evidence_type for e in sender_evidence}
-        receiver_types = {e.evidence_type for e in receiver_evidence}
-        if sender_types and receiver_types and not sender_types.intersection(receiver_types):
-            risks.append("divergent_evidence_types")
-
-        now = int(time.time())
-        stale_count = sum(1 for e in all_evidence if now - e.timestamp > 180 * 86400)
-        if stale_count > len(all_evidence) // 2:
-            risks.append("majority_stale_evidence")
-
-        if len(sender_evidence) == 0 or len(receiver_evidence) == 0:
-            risks.append("unilateral_evidence")
-
-        unique_escrows = {e.escrow_id for e in all_evidence}
-        if len(unique_escrows) > 1:
-            risks.append("multi_escrow_evidence")
-
-        return risks if risks else ["standard_risk_profile"]
+        adjusted = int(base_slash * (0.5 + confidence * 0.5))
+        return min(adjusted, min(escrow_amount, loser_stake))
 
 
 class ArbitrationHistory:
     def __init__(self) -> None:
         self._records: list[ArbitrationRecommendation] = []
-        self._agent_records: dict[str, list[ArbitrationRecommendation]] = defaultdict(list)
 
     def record(self, recommendation: ArbitrationRecommendation) -> None:
         self._records.append(recommendation)
 
     def get_agent_disputes(self, agent: str) -> list[ArbitrationRecommendation]:
-        return [r for r in self._records if r.dispute_id.startswith(agent) or any(
-            agent in rf for rf in r.risk_factors
-        )]
+        return [r for r in self._records if any(agent in rf for rf in r.risk_factors)]
 
     def get_repeat_offenders(self, threshold: int = 3) -> list[str]:
         from collections import Counter
-
-        claimant_counts: Counter[str] = Counter()
+        counts: Counter[str] = Counter()
         for rec in self._records:
-            for factor in rec.risk_factors:
-                if factor.startswith("repeat_disputes:"):
-                    parts = factor.split(":")
+            for rf in rec.risk_factors:
+                if rf.startswith("repeat_disputes:"):
+                    parts = rf.split(":")
                     if len(parts) >= 3:
-                        claimant = parts[1]
-                        count = int(parts[2])
-                        claimant_counts[claimant] = max(claimant_counts[claimant], count)
-
-        return [claimant for claimant, count in claimant_counts.items() if count >= threshold]
+                        counts[parts[1]] = max(counts[parts[1]], int(parts[2]))
+        return [c for c, n in counts.items() if n >= threshold]
