@@ -29,6 +29,10 @@ from server.models import (
     ReputationRecord,
 )
 from server.sandbox import SandboxStore
+from server.multi_asset import router as multi_asset_router
+from server.insurance import router as insurance_router
+from server.vrf_election import router as vrf_router
+from server.agent_identity import router as identity_router
 
 logger = logging.getLogger(__name__)
 
@@ -161,6 +165,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register sub-routers
+app.include_router(multi_asset_router)
+app.include_router(insurance_router)
+app.include_router(vrf_router)
+app.include_router(identity_router)
 
 
 # ---------------------------------------------------------------------------
