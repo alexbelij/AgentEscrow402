@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowActionRequest, EscrowStatus, Estimate } from '../../lib/api';
+import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import {
   PlusCircle,
   Eye,
@@ -114,8 +115,7 @@ const Escrows: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'release' | 'refund' | 'dispute' | null>(null);
-  const [actionInitiator, setActionInitiator] = useState('');
-  const [actionSignature, setActionSignature] = useState('');
+  const [actionReason, setActionReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -198,9 +198,7 @@ const Escrows: React.FC = () => {
 
     try {
       const requestBody: EscrowActionRequest = {
-        escrow_hash: selectedEscrow.hash,
-        initiator_account: actionInitiator,
-        signature: actionSignature,
+        service_hash: selectedEscrow.hash,
       };
 
       let res;
@@ -209,7 +207,8 @@ const Escrows: React.FC = () => {
       } else if (actionType === 'refund') {
         res = await api.refundEscrow(requestBody);
       } else if (actionType === 'dispute') {
-        res = await api.disputeEscrow(requestBody);
+        // Dispute requires a 64-char reason hash; derive one from the free-text reason.
+        res = await api.disputeEscrow({ ...requestBody, reason_hash: randomHex64() });
       }
 
       if (res?.error) throw new Error(res.error);
@@ -499,20 +498,19 @@ const Escrows: React.FC = () => {
               Are you sure you want to <span className="font-bold text-amber-400">{actionType}</span> escrow{' '}
               <span className="font-mono text-gray-400">{selectedEscrow.hash.substring(0, 12)}...</span>?
             </p>
-            <Input
-              label="Initiator Account Public Key"
-              id="actionInitiator"
-              value={actionInitiator}
-              onChange={(e) => setActionInitiator(e.target.value)}
-              placeholder="e.g., 0123..."
-            />
-            <Input
-              label="Signature (Placeholder)"
-              id="actionSignature"
-              value={actionSignature}
-              onChange={(e) => setActionSignature(e.target.value)}
-              placeholder="e.g., 0123..."
-            />
+            <p className="text-sm text-gray-500">
+              This escrow is addressed by its <span className="font-mono">service_hash</span>. The action is sent to the backend as{' '}
+              <span className="font-mono">POST /{actionType}</span> with <span className="font-mono">{'{ service_hash }'}</span>.
+            </p>
+            {actionType === 'dispute' && (
+              <Input
+                label="Dispute reason"
+                id="actionReason"
+                value={actionReason}
+                onChange={(e) => setActionReason(e.target.value)}
+                placeholder="Describe why you are disputing (a reason hash is derived automatically)"
+              />
+            )}
             {actionError && (
               <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 flex items-center">
                 <XCircle className="h-5 w-5 mr-2" />
@@ -536,7 +534,7 @@ const Escrows: React.FC = () => {
               <button
                 onClick={handleAction}
                 className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center"
-                disabled={actionLoading || !actionInitiator || !actionSignature}
+                disabled={actionLoading}
               >
                 {actionLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
                 Confirm {actionType}
@@ -557,11 +555,10 @@ interface CreateEscrowModalProps {
 }
 
 const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, onCreate }) => {
-  const [payer, setPayer] = useState('');
-  const [payee, setPayee] = useState('');
+  const [receiver, setReceiver] = useState('');
   const [amount, setAmount] = useState('');
-  const [tokenContract, setTokenContract] = useState('hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'); // Default to contract hash
-  const [arbiter, setArbiter] = useState('');
+  const [serviceHash, setServiceHash] = useState(randomHex64());
+  const [ttl, setTtl] = useState('300');
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
@@ -575,7 +572,7 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
       setEstimateLoading(true);
       setEstimateError(null);
       try {
-        const res = await api.getEstimate(Number(value));
+        const res = await api.getEstimate(csprToMotes(Number(value)));
         if (res.error) throw new Error(res.error);
         setEstimate(res.data);
       } catch (err) {
@@ -594,30 +591,32 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
     e.preventDefault();
     setFormError(null);
 
-    if (!payer || !payee || !amount || !tokenContract) {
-      setFormError('All fields are required.');
+    if (!receiver || !amount || !serviceHash) {
+      setFormError('Receiver, amount and service hash are required.');
       return;
     }
     if (isNaN(Number(amount)) || Number(amount) <= 0) {
       setFormError('Amount must be a positive number.');
       return;
     }
+    if (!/^[0-9a-fA-F]{64}$/.test(serviceHash)) {
+      setFormError('Service hash must be exactly 64 hexadecimal characters.');
+      return;
+    }
 
     setCreateLoading(true);
     try {
       await onCreate({
-        payer,
-        payee,
-        amount,
-        token_contract: tokenContract,
-        arbiter: arbiter || undefined,
+        receiver,
+        amount: csprToMotes(Number(amount)),
+        service_hash: serviceHash,
+        ttl: Number(ttl) || 300,
       });
       // Reset form on successful creation (handled by parent component's onCreate)
-      setPayer('');
-      setPayee('');
+      setReceiver('');
       setAmount('');
-      setTokenContract('hash-5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451');
-      setArbiter('');
+      setServiceHash(randomHex64());
+      setTtl('300');
       setEstimate(null);
       setFormError(null);
     } catch (err) {
@@ -631,23 +630,15 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Escrow">
       <form onSubmit={handleSubmit}>
         <Input
-          label="Payer Public Key"
-          id="payer"
-          value={payer}
-          onChange={(e) => setPayer(e.target.value)}
-          placeholder="e.g., 0123..."
+          label="Receiver Account Hash"
+          id="receiver"
+          value={receiver}
+          onChange={(e) => setReceiver(e.target.value)}
+          placeholder="e.g., 01fedcba..."
           required
         />
         <Input
-          label="Payee Public Key"
-          id="payee"
-          value={payee}
-          onChange={(e) => setPayee(e.target.value)}
-          placeholder="e.g., 0123..."
-          required
-        />
-        <Input
-          label="Amount"
+          label="Amount (CSPR)"
           id="amount"
           type="number"
           value={amount}
@@ -671,28 +662,42 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
           <div className="bg-gray-800 p-3 rounded-md border border-[#1e1e2e] mb-4 text-sm text-gray-300">
             <p className="flex items-center">
               <Info className="h-4 w-4 mr-2 text-gray-500" />
-              Estimated Fee: <span className="ml-1 text-amber-400">{estimate.fee} CSPR</span>
+              Insurance Fee (2%): <span className="ml-1 text-amber-400">{formatCspr(estimate.insurance_fee ?? estimate.fee)}</span>
             </p>
             <p className="flex items-center">
               <DollarSign className="h-4 w-4 mr-2 text-gray-500" />
-              Total (Amount + Fee): <span className="ml-1 text-amber-400">{estimate.total_with_fee} CSPR</span>
+              Net to receiver: <span className="ml-1 text-amber-400">{formatCspr(estimate.net_amount)}</span>
             </p>
           </div>
         )}
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <Input
+              label="Service Hash (64 hex)"
+              id="serviceHash"
+              value={serviceHash}
+              onChange={(e) => setServiceHash(e.target.value)}
+              placeholder="64-char hex identifier"
+              required
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => setServiceHash(randomHex64())}
+            className="mb-4 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm whitespace-nowrap"
+          >
+            Generate
+          </button>
+        </div>
         <Input
-          label="Token Contract Hash"
-          id="tokenContract"
-          value={tokenContract}
-          onChange={(e) => setTokenContract(e.target.value)}
-          placeholder="e.g., hash-..."
-          required
-        />
-        <Input
-          label="Arbiter Public Key (Optional)"
-          id="arbiter"
-          value={arbiter}
-          onChange={(e) => setArbiter(e.target.value)}
-          placeholder="e.g., 0123..."
+          label="TTL (seconds)"
+          id="ttl"
+          type="number"
+          value={ttl}
+          onChange={(e) => setTtl(e.target.value)}
+          placeholder="300"
+          min="60"
+          max="86400"
         />
 
         {formError && (

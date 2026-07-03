@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ErrorBoundary from './ErrorBoundary';
+import BackendWakeOverlay from './BackendWakeOverlay';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Monitor,
@@ -136,6 +137,7 @@ const ConsoleLayout: React.FC = () => {
           <Outlet />
         </ErrorBoundary>
       </main>
+      <BackendWakeOverlay />
     </div>
   );
 };

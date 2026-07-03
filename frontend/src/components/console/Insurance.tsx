@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { api, InsurancePoolStats, PremiumQuote, DepositInsuranceRequest, ClaimInsuranceRequest } from '../../lib/api';
+import { api, InsurancePoolStats, PremiumQuote, DepositInsuranceRequest, ClaimInsuranceRequest, Agent } from '../../lib/api';
+import { formatCspr, csprToMotes } from '../../lib/format';
 import {
   Shield,
   DollarSign,
@@ -97,7 +98,9 @@ const Insurance: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const [premiumAmount, setPremiumAmount] = useState<number | ''>('');
-  const [premiumDuration, setPremiumDuration] = useState<number | ''>(30); // Default 30 days
+  const [premiumServiceType, setPremiumServiceType] = useState<string>('general');
+  const [premiumAgent, setPremiumAgent] = useState<string>('');
+  const [agents, setAgents] = useState<Agent[]>([]);
   const [premiumQuote, setPremiumQuote] = useState<PremiumQuote | null>(null);
   const [premiumLoading, setPremiumLoading] = useState(false);
   const [premiumError, setPremiumError] = useState<string | null>(null);
@@ -122,11 +125,22 @@ const Insurance: React.FC = () => {
 
   useEffect(() => {
     fetchPoolStats();
+    // Load agents so the premium quote can be tied to a real agent's reputation.
+    api.getAgents().then((res) => {
+      const list = res.data || [];
+      setAgents(list);
+      if (list.length && !premiumAgent) setPremiumAgent(list[0].public_key);
+    });
   }, []);
 
   const handleCalculatePremium = async () => {
-    if (!premiumAmount || !premiumDuration || premiumAmount <= 0 || premiumDuration <= 0) {
-      setPremiumError('Please enter valid amount and duration.');
+    if (!premiumAmount || premiumAmount <= 0) {
+      setPremiumError('Please enter a valid escrow amount.');
+      setPremiumQuote(null);
+      return;
+    }
+    if (!premiumAgent) {
+      setPremiumError('Please select an agent.');
       setPremiumQuote(null);
       return;
     }
@@ -134,7 +148,9 @@ const Insurance: React.FC = () => {
     setPremiumLoading(true);
     setPremiumError(null);
     try {
-      const res = await api.getPremiumQuote(premiumAmount, premiumDuration * 24 * 3600); // Convert days to seconds
+      // Backend expects the escrow amount in motes and prices risk against the
+      // selected agent's on-chain reputation + the service type.
+      const res = await api.getPremiumQuote(csprToMotes(premiumAmount), premiumAgent, premiumServiceType);
       if (res.error) throw new Error(res.error);
       setPremiumQuote(res.data);
     } catch (err) {
@@ -235,11 +251,15 @@ const Insurance: React.FC = () => {
 
       {/* Premium Calculator */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
+        <h3 className="text-xl font-semibold text-gray-300 mb-2 flex items-center">
           <Calculator className="h-6 w-6 mr-2 text-amber-500" />
           Premium Calculator
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+        <p className="text-sm text-gray-500 mb-4">
+          Quotes a dynamic insurance premium. The rate starts at a 0.5% base and is
+          adjusted by the selected agent&apos;s on-chain reputation and the service risk type.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
           <Input
             label="Escrow Amount (CSPR)"
             id="premiumAmount"
@@ -251,17 +271,35 @@ const Insurance: React.FC = () => {
             step="any"
             required
           />
-          <Input
-            label="Duration (Days)"
-            id="premiumDuration"
-            type="number"
-            value={premiumDuration}
-            onChange={(e) => setPremiumDuration(Number(e.target.value))}
-            placeholder="e.g., 30"
-            min="1"
-            step="1"
-            required
-          />
+          <div>
+            <label htmlFor="premiumAgent" className="block text-sm font-medium text-gray-400 mb-1">Agent</label>
+            <select
+              id="premiumAgent"
+              value={premiumAgent}
+              onChange={(e) => setPremiumAgent(e.target.value)}
+              className="w-full px-3 py-2 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              {agents.length === 0 && <option value="">Loading agents…</option>}
+              {agents.map((a) => (
+                <option key={a.public_key} value={a.public_key}>
+                  {a.name || a.public_key} (rep {a.reputation_score})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="premiumService" className="block text-sm font-medium text-gray-400 mb-1">Service Type</label>
+            <select
+              id="premiumService"
+              value={premiumServiceType}
+              onChange={(e) => setPremiumServiceType(e.target.value)}
+              className="w-full px-3 py-2 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-200 focus:outline-none focus:ring-2 focus:ring-amber-500"
+            >
+              <option value="general">General</option>
+              <option value="low_value_task">Low-value task</option>
+              <option value="high_risk_data">High-risk data</option>
+            </select>
+          </div>
           <button
             onClick={handleCalculatePremium}
             className="flex items-center justify-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200"
@@ -281,15 +319,15 @@ const Insurance: React.FC = () => {
           <div className="bg-gray-800 p-4 rounded-md border border-[#1e1e2e] mt-4 text-gray-300">
             <p className="flex items-center mb-2">
               <Info className="h-5 w-5 mr-2 text-gray-500" />
-              <strong>Quoted Premium:</strong> <span className="ml-2 text-amber-400">{premiumQuote.premium_amount} CSPR</span>
+              <strong>Quoted Premium:</strong> <span className="ml-2 text-amber-400">{formatCspr(premiumQuote.premium_amount)}</span>
             </p>
             <p className="flex items-center mb-2">
               <Info className="h-5 w-5 mr-2 text-gray-500" />
-              <strong>Fee Rate:</strong> <span className="ml-2">{premiumQuote.fee_rate * 100}%</span>
+              <strong>Base Rate:</strong> <span className="ml-2">{(premiumQuote.base_rate_bps / 100).toFixed(2)}%</span>
             </p>
             <p className="flex items-center">
               <Info className="h-5 w-5 mr-2 text-gray-500" />
-              <strong>Duration:</strong> <span className="ml-2">{premiumQuote.duration_seconds / (24 * 3600)} days</span>
+              <strong>Risk Multiplier:</strong> <span className="ml-2">×{premiumQuote.risk_multiplier}</span>
             </p>
           </div>
         )}
