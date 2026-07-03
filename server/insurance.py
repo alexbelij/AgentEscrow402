@@ -206,11 +206,8 @@ async def get_insurance_pool_stats(
     """
     Retrieves current statistics for the insurance pool.
     """
-    if not casper:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Casper client not initialized")
-    if not config.insurance_contract_hash:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Insurance contract not configured")
-
+    # Pool stats are served from the in-memory store, so they must stay
+    # available even when the Casper client or contract hash is missing.
     logger.debug("Fetching insurance pool statistics.")
 
     # In a real system, query the insurance contract for these stats
