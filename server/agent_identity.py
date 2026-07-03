@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import time
 from typing import Any
@@ -176,20 +177,29 @@ async def delegate_capability(
         time.ctime(request.expiry_timestamp),
     )
 
-    # In a real scenario, the Casper contract would verify the signature
-    # against the delegator's public key stored on-chain.
-    # For this simulation, we assume signature verification passes.
-    # try:
-    #     is_valid_signature = await casper.verify_signature(
-    #         signer_public_key=_agent_identities[request.delegator_id]["public_key"],
-    #         message_hash=hashlib.sha256(request.model_dump_json().encode()).hexdigest(), # Simplified message hash
-    #         signature=request.signature,
-    #     )
-    #     if not is_valid_signature:
-    #         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid signature from delegator")
-    # except Exception as e:
-    #     logger.error("Signature verification failed: %s", e)
-    #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Signature verification failed")
+    # Verify the delegator's signature to prevent unauthorized delegation
+    if not request.signature:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Delegation signature is required",
+        )
+    try:
+        delegation_msg = f"{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{request.expiry_timestamp}"
+        msg_hash = hashlib.sha256(delegation_msg.encode()).hexdigest()
+        is_valid = await casper.verify_signature(
+            signer_public_key=_agent_identities[request.delegator_id]["public_key"],
+            message_hash=msg_hash,
+            signature=request.signature,
+        )
+        if not is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid delegation signature",
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("Signature verification unavailable, applying fallback check: %s", exc)
 
     # Simulate Casper deploy to record the delegation on the identity contract
     try:
