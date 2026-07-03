@@ -2,13 +2,13 @@
 
 ## HOOK OPTIONS (pick one)
 **Hook A**: [SHOW: terminal window, curl command firing] "What if a payment protocol had no middleman — at all?"
-**Hook B**: [SHOW: dashboard, escrow counter ticking up] "Every escrow here is enforced by code, not trust."
+**Hook B**: [SHOW: console, escrow counter ticking up] "Every escrow here is enforced by code, not trust."
 **Hook C**: [SHOW: two wallets, money moving] "x402 makes HTTP payments programmable. AE402 makes them trustless."
 
 ## SCRIPT (120 seconds)
 
 [0:00-0:05] HOOK
-[SHOW: dashboard loading, stats animating]
+[SHOW: console loading, stats animating]
 [NARRATION]: "This is AE402 — trustless escrow for x402 payments on Casper."
 
 [0:05-0:20] PROBLEM
@@ -16,8 +16,8 @@
 [NARRATION]: "x402 is brilliant. But who enforces the escrow? Right now — a centralized server. AE402 removes that assumption."
 
 [0:20-0:50] DEMO — ESCROW CREATION
-[SHOW: dashboard → Escrows tab → create escrow form]
-[NARRATION]: "Open the dashboard. Hit Escrows. We deploy a smart contract directly to Casper testnet."
+[SHOW: console → Escrows tab → create escrow form]
+[NARRATION]: "Open the console. Hit Escrows. We deploy a smart contract directly to Casper testnet."
 [SHOW: Casper explorer link appearing, clickable]
 [NARRATION]: "The deploy hash is live. Click it — you're looking at the actual on-chain transaction."
 

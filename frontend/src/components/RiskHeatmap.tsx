@@ -96,7 +96,7 @@ const RiskHeatmap: React.FC = () => {
   };
 
   return (
-    <div className="p-6 bg-gray-900 text-gray-100 min-h-screen" role="main" aria-label="Escrow Risk Heatmap Dashboard">
+    <div className="p-6 bg-gray-900 text-gray-100 min-h-screen" role="main" aria-label="Escrow Risk Heatmap Console">
       <h2 className="text-3xl font-bold mb-8 text-center text-blue-400">Active Escrow Risk Heatmap</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8" role="list" aria-label="Escrow risk items">

@@ -10,7 +10,7 @@
 |------|-----|
 | GitHub | https://github.com/alexbelij/AgentEscrow402 |
 | Landing Page | https://ae402.xyz |
-| Dashboard | https://ae402.xyz/dashboard |
+| Console | https://ae402.xyz/console |
 | Backend API | https://agentescrow402-api.onrender.com |
 | Testnet Contract | [5dd33e8e...134451](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451) |
 | Demo Video | _TBD_ |

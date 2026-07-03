@@ -11,8 +11,8 @@ const NAV_ITEMS = [
   { label: 'FAQ', href: '/#faq', icon: HelpCircle },
 ]
 
-const DASHBOARD_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+const CONSOLE_ITEMS = [
+  { label: 'Console', href: '/console', icon: LayoutDashboard },
   { label: 'Landing', href: '/', icon: Home },
 ]
 
@@ -26,7 +26,7 @@ const EXTERNAL_LINKS = [
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
   const location = useLocation()
   const isLanding = location.pathname === '/'
-  const isDashboard = location.pathname === '/dashboard'
+  const isConsole = location.pathname === '/console'
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
     return () => observer.disconnect()
   }, [isLanding])
 
-  const navItems = isDashboard ? DASHBOARD_ITEMS : NAV_ITEMS
+  const navItems = isConsole ? CONSOLE_ITEMS : NAV_ITEMS
 
   return (
     <>
@@ -82,8 +82,8 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             })}
           </div>
 
-          {/* Desktop external links (on dashboard page) */}
-          {isDashboard && (
+          {/* Desktop external links (on console page) */}
+          {isConsole && (
             <div className="hidden lg:flex items-center gap-3 mr-4">
               {EXTERNAL_LINKS.slice(0, 2).map(link => (
                 <a
@@ -102,9 +102,9 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
           )}
 
           <div className="flex items-center gap-3">
-            {!isDashboard && (
-              <a href="/dashboard" className="px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors">
-                Dashboard
+            {!isConsole && (
+              <a href="/console" className="px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors">
+                Console
               </a>
             )}
             <button
@@ -141,11 +141,11 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             ))}
             <div className="w-16 h-px bg-ae-border my-4" />
             <a
-              href="/dashboard"
+              href="/console"
               onClick={() => setMobileOpen(false)}
               className="px-8 py-3 rounded-xl bg-ae-accent text-white font-semibold text-lg"
             >
-              Launch Dashboard
+              Open Console
             </a>
           </div>
           <div className="flex flex-wrap justify-center gap-4 pb-10 px-6">
