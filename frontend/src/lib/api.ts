@@ -51,7 +51,7 @@ function normalizeError(data: any, statusText: string): string {
 }
 
 export const DEMO_AGENT_SENDER = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-export const DEMO_AGENT_RECEIVER = '01fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+export const DEMO_AGENT_RECEIVER = 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
 
 const HEX_64 = /^[0-9a-f]{64}$/i;
 

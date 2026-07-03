@@ -640,7 +640,7 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
           id="receiver"
           value={receiver}
           onChange={(e) => setReceiver(e.target.value)}
-          placeholder="e.g., 01fedcba..."
+          placeholder="e.g., fedcba9876543210... (64 hex chars)"
           required
         />
         <Input

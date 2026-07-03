@@ -19,9 +19,13 @@ class EscrowStatus(str, Enum):
 class EscrowRequest(BaseModel):
     """Request to create a new escrow."""
 
-    receiver: str = Field(..., description="Casper account hash of the receiver")
+    receiver: str = Field(
+        ...,
+        pattern=r"^(account-hash-)?[0-9a-fA-F]{64}$",
+        description="Casper account hash of the receiver (raw 64-hex or account-hash- prefixed)",
+    )
     amount: int = Field(..., gt=0, description="Amount in motes")
-    service_hash: str = Field(..., min_length=64, max_length=64)
+    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
 
 
