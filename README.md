@@ -22,7 +22,7 @@
 ---
 
 > [!IMPORTANT]
-> **What this is:** A deployed escrow system on Casper Testnet where AI agents lock funds via HTTP 402 headers, deliver compute, and release payment — all without a human facilitator. Contract is live and verified. Dashboard live at [ae402.xyz](https://ae402.xyz).
+> **What this is:** A deployed escrow system on Casper Testnet where AI agents lock funds via HTTP 402 headers, deliver compute, and release payment — all without a human facilitator. Contract is live and verified. Console live at [ae402.xyz](https://ae402.xyz).
 
 <details>
 <summary><kbd>Table of contents</kbd></summary>
@@ -184,11 +184,11 @@ Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 📸 Screenshots
 
-| Homepage — HTTP 402 flow | Dashboard — escrow table | Escrow detail — release flow |
+| Homepage — HTTP 402 flow | Console — escrow table | Escrow detail — release flow |
 |---|---|---|
-| ![Homepage](docs/screenshots/01-homepage.png) | ![Dashboard](docs/screenshots/02-dashboard.png) | ![Escrow detail](docs/screenshots/03-escrow-detail.png) |
+| ![Homepage](docs/screenshots/01-homepage.png) | ![Console](docs/screenshots/02-console.png) | ![Escrow detail](docs/screenshots/03-escrow-detail.png) |
 
-> Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/dashboard](https://ae402.xyz/dashboard)
+> Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/console](https://ae402.xyz/console)
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -284,7 +284,7 @@ Full SDK reference → [docs/SDK.md](docs/SDK.md)
 | **Sandbox / testing** | In-memory store with identical API surface |
 | **SDK** | Python async SDK, LangChain tool, MCP server |
 | **CI** | GitHub Actions — lint → pytest → WASM build → cargo test |
-| **Frontend** | Next.js dashboard, Vercel |
+| **Frontend** | Next.js console, Vercel |
 | **Backend hosting** | Render (always-on) |
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
@@ -313,14 +313,6 @@ cd contracts/tests && cargo test --release
 | `integration_tests.rs` | 18 | Contract entry point logic |
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
-
----
-
-## 👤 Team
-
-**alexbelij** — full-stack builder specializing in blockchain protocol design, smart contract development in Rust/WASM, and Python backend systems. Built AgentEscrow402 end-to-end: the Casper WASM escrow contract, x402 middleware, FastAPI payment server, Python async SDK, LangChain integration, and the Next.js dashboard. Previously contributed to agentic payment infrastructure and open-source Casper tooling. ([GitHub](https://github.com/alexbelij))
-
-Questions → [open an issue](https://github.com/alexbelij/AgentEscrow402/issues)
 
 ---
 

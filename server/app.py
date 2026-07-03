@@ -206,7 +206,7 @@ async def health(cfg: Config = Depends(get_config)):
 
 @app.get("/stats")
 async def stats():
-    """Aggregate statistics for the dashboard."""
+    """Aggregate statistics for the console."""
     s = pgdb.get_stats()
     cfg = get_config()
     s["contract_hash"] = cfg.contract_hash or ""

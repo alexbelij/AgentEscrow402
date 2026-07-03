@@ -6,7 +6,7 @@ import {
   Activity, TrendingUp, Lock, Unlock, FileText
 } from 'lucide-react'
 
-import DataModeToggle, { useDataMode } from './DataModeToggle'
+
 
 const API = import.meta.env.VITE_API_URL || 'https://agentescrow402-api.onrender.com'
 const CONTRACT_HASH = '5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451'
@@ -423,8 +423,8 @@ function AgentDetail({ agent, onClose }: { agent: Agent; onClose: () => void }) 
   )
 }
 
-/* ---------- Main Dashboard ---------- */
-export default function Dashboard() {
+/* ---------- Main Console ---------- */
+export default function Console() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [escrows, setEscrows] = useState<Escrow[]>([])
   const [agents, setAgents] = useState<Agent[]>([])
@@ -564,12 +564,12 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Dashboard header bar */}
+      {/* Console header bar */}
       <div className="border-b border-ae-border/40 bg-ae-bg/80 backdrop-blur">
         <div className="ae-section flex items-center justify-between h-14">
           <div className="flex items-center gap-4">
             <h1 className="text-white font-bold text-sm flex items-center gap-2">
-              <Activity size={14} className="text-ae-accent" /> Escrow Dashboard
+              <Activity size={14} className="text-ae-accent" /> Escrow Console
             </h1>
             <a
               href={`${CSPR_LIVE}/contract/${CONTRACT_HASH}`}
@@ -582,7 +582,6 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <DataModeToggle />
             <button onClick={() => { fetchStats(); fetchEscrows() }} className="text-gray-500 hover:text-white transition-colors p-1.5" title="Refresh data">
               <RefreshCw size={14} />
             </button>

@@ -27,7 +27,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Expanded from 15 to 24 tools — new tools for arbitration, risk scoring, and identity management
 - Fixed duplicate tool definitions in MCP manifest
 
-#### Dashboard
+#### Console
 - 4 new tabs: Arbitration, Risk Analysis, Identity Registry, Contracts
 - AI dispute verdict history with confidence scores
 - Real-time risk factor breakdown with visual bars
@@ -81,7 +81,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 - Dispute lifecycle: open → voting → resolved (release or refund)
 - On-chain vote recording and quorum detection
 
-#### Dashboard (Next.js — ae402.xyz)
+#### Console (Next.js — ae402.xyz)
 - Live escrow table with status badges (Locked / Released / Disputed / Expired)
 - Real-time event feed via SSE
 - Escrow creation form with sender/receiver/amount/TTL inputs

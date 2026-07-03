@@ -16,12 +16,12 @@ AI agents increasingly need to transact with each other — paying for compute, 
 
 ## Solution
 
-AgentEscrow402 deploys a Rust/WASM smart contract on Casper Network that implements a full escrow lifecycle: Agent A locks funds with a time-to-live, Agent B delivers the service, Agent A releases — all mediated by a FastAPI payment server that validates x402 headers on every HTTP request. Three capabilities distinguish it from every existing x402 implementation: time-locked on-chain escrow (if Agent B doesn't deliver, the sender auto-reclaims after TTL), per-agent reputation tracking with exponential decay stored directly in the contract, and 3-of-5 multi-sig arbiter dispute resolution with on-chain vote recording. The full stack — contract, server, dashboard, Python SDK, LangChain tool, and MCP server — is deployed and live.
+AgentEscrow402 deploys a Rust/WASM smart contract on Casper Network that implements a full escrow lifecycle: Agent A locks funds with a time-to-live, Agent B delivers the service, Agent A releases — all mediated by a FastAPI payment server that validates x402 headers on every HTTP request. Three capabilities distinguish it from every existing x402 implementation: time-locked on-chain escrow (if Agent B doesn't deliver, the sender auto-reclaims after TTL), per-agent reputation tracking with exponential decay stored directly in the contract, and 3-of-5 multi-sig arbiter dispute resolution with on-chain vote recording. The full stack — contract, server, console, Python SDK, LangChain tool, and MCP server — is deployed and live.
 
 ---
 
 ## Live Demo
-🔗 **[ae402.xyz](https://ae402.xyz)** — live dashboard with real escrow data on Casper Testnet
+🔗 **[ae402.xyz](https://ae402.xyz)** — live console with real escrow data on Casper Testnet
 
 Backend API: `https://ae402-backend.onrender.com`
 
@@ -47,7 +47,7 @@ Contract: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d38683
 | Payment server | Python 3.11, FastAPI, Uvicorn |
 | x402 middleware | Custom HTTP 402 header parser + validator |
 | SDK | Python async SDK, LangChain tool, MCP server (7 tools) |
-| Dashboard | Next.js, Vercel |
+| Console | Next.js, Vercel |
 | Backend hosting | Render |
 | CI | GitHub Actions — lint, pytest, WASM build, cargo test |
 | Tests | 85 Python + 18 Rust = 103 total, all passing |

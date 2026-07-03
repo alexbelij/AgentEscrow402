@@ -37,7 +37,7 @@
 **Tweet 4 — Demo Link**
 > It's live. Right now.
 >
-> Dashboard → ae402.xyz (real escrow data, Casper Testnet)
+> Console → ae402.xyz (real escrow data, Casper Testnet)
 > API → ae402-backend.onrender.com
 > Contract → testnet.cspr.live (verified deployment)
 >
@@ -80,7 +80,7 @@ The premise: AI agents increasingly transact with each other — paying for comp
 
 AgentEscrow402 solves this with a Rust/WASM smart contract on Casper Network implementing time-locked escrow, per-agent on-chain reputation scoring, and 3-of-5 multi-sig dispute resolution — no facilitator required.
 
-The full stack is deployed and live: dashboard at ae402.xyz, API at ae402-backend.onrender.com, contract verified on Casper Testnet. Python SDK, LangChain integration, and MCP server included. 103 tests passing.
+The full stack is deployed and live: console at ae402.xyz, API at ae402-backend.onrender.com, contract verified on Casper Testnet. Python SDK, LangChain integration, and MCP server included. 103 tests passing.
 
 For developers building agentic systems that require trustless, programmable payments — the infrastructure is here.
 
@@ -94,4 +94,4 @@ For developers building agentic systems that require trustless, programmable pay
 
 ## Telegram Announcement (3 sentences)
 
-🚀 **AgentEscrow402 is live** — HTTP 402 × Casper Network: AI agents paying AI agents on-chain with time-locked escrow, reputation scoring, and 3-of-5 arbiter dispute resolution. No facilitator, no hot wallet, no humans in the loop — one curl creates a live on-chain escrow right now. Dashboard → ae402.xyz | Code → github.com/alexbelij/AgentEscrow402 | #CasperBuildathon
+🚀 **AgentEscrow402 is live** — HTTP 402 × Casper Network: AI agents paying AI agents on-chain with time-locked escrow, reputation scoring, and 3-of-5 arbiter dispute resolution. No facilitator, no hot wallet, no humans in the loop — one curl creates a live on-chain escrow right now. Console → ae402.xyz | Code → github.com/alexbelij/AgentEscrow402 | #CasperBuildathon

@@ -10,7 +10,7 @@
 - [x] FastAPI backend with PostgreSQL (Neon) persistence
 - [x] Python SDK (`EscrowClient`) + LangChain `EscrowPaymentTool`
 - [x] MCP server exposing 7 escrow tools
-- [x] React dashboard at ae402.xyz/dashboard
+- [x] React console at ae402.xyz/console
 - [x] Reputation scoring with decay formula
 - [x] Insurance pool (2% fee on release)
 - [x] 103 tests passing (85 Python + 18 Rust)
@@ -29,7 +29,7 @@
 - [ ] Post-quantum key encapsulation (ML-KEM, FIPS 203) for escrow metadata
 - [ ] ML risk scoring (Isolation Forest) — anomaly detection in transaction patterns
 - [ ] Commit-reveal for escrow creation (front-running protection)
-- [ ] Demo/Real data toggle in dashboard
+- [ ] Demo/Real data toggle in console
 
 ## Phase 3 — Advanced
 

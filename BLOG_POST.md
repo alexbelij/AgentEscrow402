@@ -51,12 +51,12 @@ curl -X POST https://ae402-backend.onrender.com/escrow \
 
 ## Demo Walkthrough
 
-Land on **[ae402.xyz](https://ae402.xyz)** and you'll see the live dashboard: a table of escrows with status badges (Locked, Released, Disputed), a real-time event feed, and links to verified Casper Testnet transactions.
+Land on **[ae402.xyz](https://ae402.xyz)** and you'll see the live console: a table of escrows with status badges (Locked, Released, Disputed), a real-time event feed, and links to verified Casper Testnet transactions.
 
 The contract is not a demo — it's deployed:
 [`5dd33e8e...` on testnet.cspr.live](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
 
-Every escrow you create from the dashboard triggers a real on-chain transaction you can verify independently.
+Every escrow you create from the console triggers a real on-chain transaction you can verify independently.
 
 ---
 
@@ -106,7 +106,7 @@ An AI agent SDK can parse this, create an escrow, retry the request, and handle 
 - **Server:** Python 3.11, FastAPI, 85 passing tests
 - **Contract tests:** 18 Rust integration tests
 - **SDK:** Python async client, LangChain tool, MCP server (7 tools)
-- **Dashboard:** Next.js on Vercel
+- **Console:** Next.js on Vercel
 
 ---
 
