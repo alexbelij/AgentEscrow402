@@ -646,6 +646,15 @@ async def arbitrate_dispute(req: ArbitrateRequest):
         raise HTTPException(status_code=500, detail=f"Arbitration failed: {exc}")
 
 
+@app.get("/arbitration/history", response_model=list[ArbitrationRecommendation], tags=["arbitration"])
+async def arbitration_history(limit: int = 20):
+    """Most recent LLM arbitration analyses (process-lifetime in-memory history),
+    newest first. Powers the console's Arbitration verdict-history view."""
+    if limit < 1 or limit > 200:
+        raise HTTPException(status_code=400, detail="limit must be between 1 and 200")
+    return list(reversed(_arbitration_agent._history[-limit:]))
+
+
 @app.get("/escrow/{service_hash}", response_model=EscrowRecord)
 async def get_escrow(
     service_hash: str,

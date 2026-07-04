@@ -389,6 +389,49 @@ export interface Arbiter {
   name: string;
   reputation_score: number;
   active_elections: number;
+  disputed: number;
+}
+
+export interface ArbiterRecord {
+  arbiter_id: string;
+  reputation_score: number;
+  completed_arbitrations: number;
+  availability: boolean;
+}
+
+export interface ElectArbiterResponse {
+  dispute_id: string;
+  elected_arbiter: ArbiterRecord;
+  election_proof: string;
+  elected_at: number;
+  method: string;
+}
+
+export interface DisputeEvidence {
+  escrow_id: string;
+  claimant: string;
+  evidence_type: 'text' | 'screenshot' | 'hash' | 'transaction';
+  content_hash: string;
+  description: string;
+  timestamp: number;
+}
+
+export interface ArbitrateRequest {
+  dispute_id: string;
+  sender_evidence: DisputeEvidence[];
+  receiver_evidence: DisputeEvidence[];
+  escrow_amount: number;
+}
+
+export interface ArbitrationRecommendation {
+  dispute_id: string;
+  recommendation: 'favor_sender' | 'favor_receiver' | 'split' | 'escalate';
+  confidence: number;
+  reasoning: string;
+  risk_factors: string[];
+  suggested_split_pct: number;
+  analysis_hash: string;
+  provider: string;
 }
 
 // =========================================================
@@ -489,11 +532,14 @@ function normalizeReputation(agentKey: string, raw: any): Reputation {
 }
 
 function normalizeArbiter(raw: any): Arbiter {
+  // Real backend shape is server/vrf_election.py's ReputationScore:
+  // { agent, score, completed, disputed }.
   return {
-    public_key: raw.public_key || raw.arbiter_id || 'unknown',
-    name: raw.name || raw.arbiter_id || 'Unknown',
-    reputation_score: raw.reputation_score ?? 0,
-    active_elections: raw.active_elections ?? raw.completed_arbitrations ?? 0,
+    public_key: raw.agent || raw.public_key || raw.arbiter_id || 'unknown',
+    name: raw.agent || raw.name || raw.arbiter_id || 'Unknown',
+    reputation_score: raw.score ?? raw.reputation_score ?? 0,
+    active_elections: raw.completed ?? raw.active_elections ?? raw.completed_arbitrations ?? 0,
+    disputed: raw.disputed ?? 0,
   };
 }
 
@@ -632,14 +678,22 @@ export const api = {
   // Risk / VRF Endpoints
   getRiskDashboard: () => fetcher<any>('/risk/dashboard', 'GET'),
   getRiskScore: (agent: string) => fetcher<any>(`/risk/score/${encodeURIComponent(agent)}`, 'GET'),
-  electVrfArbiter: (data: { dispute_id: string; sender: string; receiver: string; seed_hash: string }) => fetcher<any>('/vrf/elect', 'POST', data),
+  electVrfArbiter: (data: { dispute_id: string; sender: string; receiver: string; seed_hash: string }) =>
+    fetcher<ElectArbiterResponse>('/vrf/elect', 'POST', data),
+  getElectionResult: (disputeId: string) => fetcher<ElectArbiterResponse>(`/vrf/election/${encodeURIComponent(disputeId)}`, 'GET'),
+  registerArbiter: (data: { agent: string; score?: number; completed?: number; disputed?: number }) =>
+    fetcher<{ status: string; agent: string }>('/vrf/arbiters/register', 'POST', data),
 
   // Arbitration Endpoints
   getArbiters: async (): Promise<ApiResponse<Arbiter[]>> => {
-    const res = await fetcher<any>('/arbitration/arbiters', 'GET');
+    // Note: registered arbiters live in server/vrf_election.py, mounted at /vrf/arbiters
+    // (there is no separate /arbitration/arbiters endpoint).
+    const res = await fetcher<any>('/vrf/arbiters', 'GET');
     const raw = res.data?.arbiters || (Array.isArray(res.data) ? res.data : []);
     return { ...res, data: raw.map(normalizeArbiter) };
   },
+  analyzeDispute: (data: ArbitrateRequest) => fetcher<ArbitrationRecommendation>('/arbitration/analyze', 'POST', data),
+  getArbitrationHistory: (limit = 20) => fetcher<ArbitrationRecommendation[]>(`/arbitration/history?limit=${limit}`, 'GET'),
 
   // Identity Endpoints
   registerIdentity: (data: RegisterIdentityRequest) => fetcher<TransactionHash>('/identity/register', 'POST', data),
