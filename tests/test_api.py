@@ -16,6 +16,14 @@ def _hash(val: str) -> str:
     return hashlib.sha256(val.encode()).hexdigest()
 
 
+# EscrowRequest.receiver requires a raw 64-hex string (optionally
+# "account-hash-" prefixed) — see server/models.py. Plain slugs like "r" or
+# "receiver-001" fail pydantic validation with a 422, so tests use these
+# realistic-looking hex receivers instead.
+RECEIVER_HEX = "ab" * 32
+RECEIVER_HEX_2 = "cd" * 32
+
+
 @pytest.fixture
 def sandbox_store():
     return SandboxStore()
@@ -50,7 +58,7 @@ class TestEscrowEndpoint:
         resp = client.post(
             "/escrow",
             json={
-                "receiver": "receiver-001",
+                "receiver": RECEIVER_HEX,
                 "amount": 5000,
                 "service_hash": h,
             },
@@ -65,7 +73,7 @@ class TestEscrowEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -73,7 +81,7 @@ class TestEscrowEndpoint:
         resp = client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -85,7 +93,7 @@ class TestEscrowEndpoint:
         resp = client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 0,
                 "service_hash": h,
             },
@@ -97,7 +105,7 @@ class TestEscrowEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -117,7 +125,7 @@ class TestReleaseEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -149,7 +157,7 @@ class TestRefundEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -172,7 +180,7 @@ class TestDisputeEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "r",
+                "receiver": RECEIVER_HEX,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -211,7 +219,7 @@ class TestReputationEndpoint:
         client.post(
             "/escrow",
             json={
-                "receiver": "good-agent",
+                "receiver": RECEIVER_HEX_2,
                 "amount": 100,
                 "service_hash": h,
             },
@@ -224,7 +232,7 @@ class TestReputationEndpoint:
             },
             params={"sender": "payer"},
         )
-        resp = client.get("/reputation/good-agent")
+        resp = client.get(f"/reputation/{RECEIVER_HEX_2}")
         assert resp.json()["completed"] == 1
 
 
@@ -232,7 +240,7 @@ class TestComputeHashEndpoint:
     def test_compute_hash(self, client):
         resp = client.post(
             "/compute-hash",
-            params={"sender": "s", "receiver": "r", "amount": 100, "nonce": "n"},
+            params={"sender": "s", "receiver": RECEIVER_HEX, "amount": 100, "nonce": "n"},
         )
         assert resp.status_code == 200
         assert "service_hash" in resp.json()

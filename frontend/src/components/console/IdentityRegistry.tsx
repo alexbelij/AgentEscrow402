@@ -24,6 +24,8 @@ export default function IdentityRegistry() {
   const [registering, setRegistering] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [identity, setIdentity] = useState<RegistryIdentity | null>(null);
+  const [lookupBusy, setLookupBusy] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
 
   const [dealsCompleted, setDealsCompleted] = useState(5);
   const [dealsDisputed, setDealsDisputed] = useState(0);
@@ -66,6 +68,33 @@ export default function IdentityRegistry() {
     }
     setIdentity(res.data ?? null);
     await Promise.all([loadStats(), runSearch()]);
+  };
+
+  // Select any existing identity from the registry (e.g. a search result, or
+  // one registered in a previous session) as the "active" identity below, so
+  // simulate/decay/slash/verify aren't only usable right after registering.
+  const selectByDid = async (did: string) => {
+    setLookupBusy(true);
+    setLookupError(null);
+    const res = await api.getRegistryIdentity(did);
+    setLookupBusy(false);
+    if (res.error) {
+      setLookupError(res.error);
+      return;
+    }
+    setIdentity(res.data ?? null);
+  };
+
+  const lookupByAccount = async () => {
+    setLookupBusy(true);
+    setLookupError(null);
+    const res = await api.getRegistryIdentityByAccount(accountHash);
+    setLookupBusy(false);
+    if (res.error) {
+      setLookupError(res.error);
+      return;
+    }
+    setIdentity(res.data ?? null);
   };
 
   const withBusy = async (label: string, fn: () => Promise<ApiResponse<RegistryIdentity>>) => {
@@ -118,15 +147,27 @@ export default function IdentityRegistry() {
             onChange={(e) => setDisplayName(e.target.value)}
             className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] mb-4"
           />
-          <button
-            onClick={register}
-            disabled={registering}
-            className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
-          >
-            {registering ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
-            Register identity
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={register}
+              disabled={registering}
+              className="h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
+            >
+              {registering ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
+              Register identity
+            </button>
+            <button
+              onClick={lookupByAccount}
+              disabled={lookupBusy}
+              title="Look up an identity that already exists for this account hash, instead of registering a new one"
+              className="h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white font-semibold disabled:opacity-50"
+            >
+              {lookupBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              Look up existing
+            </button>
+          </div>
           {registerError && <p className="text-red-400 text-sm mt-2">{registerError}</p>}
+          {lookupError && <p className="text-red-400 text-sm mt-2">{lookupError}</p>}
 
           {identity && (
             <div className="mt-5 p-4 rounded-lg bg-gray-800/60 border border-[#1e1e2e] text-sm space-y-1">
@@ -260,7 +301,12 @@ export default function IdentityRegistry() {
             </thead>
             <tbody>
               {results.map((r) => (
-                <tr key={r.did} className="border-b border-[#1e1e2e]/50">
+                <tr
+                  key={r.did}
+                  onClick={() => selectByDid(r.did)}
+                  title="Select this identity to simulate activity / decay / slash / verify on it"
+                  className={`border-b border-[#1e1e2e]/50 cursor-pointer hover:bg-gray-800/40 ${identity?.did === r.did ? 'bg-amber-500/10' : ''}`}
+                >
                   <td className="py-2 font-mono text-gray-300 truncate max-w-[180px]">{r.did}</td>
                   <td className={`py-2 ${LEVEL_COLOR[r.verification_level]}`}>{r.verification_level}</td>
                   <td className="py-2 text-gray-300">{r.reputation_score}</td>

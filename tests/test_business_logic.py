@@ -143,6 +143,16 @@ class TestMLKEM:
         ek, dk = generate_keypair()
         assert decrypt_metadata(encrypt_metadata("", ek), dk) == ""
 
+    def test_encrypted_metadata_json_roundtrip(self):
+        ek, dk = generate_keypair()
+        payload = encrypt_metadata("hello json", ek)
+
+        serialized = payload.to_json()
+        restored = type(payload).from_json(serialized)
+
+        assert restored == payload
+        assert decrypt_metadata(restored, dk) == "hello json"
+
     def test_long_payload(self):
         ek, dk = generate_keypair()
         plain = "x" * 10_000
