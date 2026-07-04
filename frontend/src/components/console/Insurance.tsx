@@ -34,7 +34,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
           <h3 className="text-xl font-semibold text-gray-50">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright rounded">
             <XCircle size={24} />
           </button>
         </div>
@@ -195,8 +195,6 @@ const Insurance: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Insurance Protocol</h2>
-
       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-100 leading-relaxed">
         <strong>Truth label:</strong> the Insurance Pool contract is deployed on Casper testnet, and the hosted API exposes the same premium/deposit/claim business flow used by production. Until contract-backed pool accounting is fully verified in the browser, pool balances shown here are live API accounting/demo fallback values, not silently presented as mainnet liquidity. Pricing itself is real backend logic: base fee + service risk + selected agent reputation/risk.
       </div>

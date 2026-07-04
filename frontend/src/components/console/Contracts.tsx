@@ -64,11 +64,6 @@ const Contracts: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-50">Contracts & Playground</h2>
-        <p className="text-gray-400 mt-2">Live Casper testnet contract hashes plus API-backed tools for escrow, VRF and service hash generation.</p>
-      </div>
-
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-100">
         This playground calls the deployed backend against the current testnet contract configuration. Write calls include the demo x402 identity header from the frontend;
         production calls should use wallet/agent-signed payment headers. Results below are raw live API responses, not screenshots or mock cards.
@@ -99,21 +94,13 @@ const Contracts: React.FC = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 space-y-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-xl font-semibold text-gray-50">Escrow playground settings</h3>
-              <p className="text-sm text-gray-400 mt-1">Create a fresh escrow first. Terminal states disable invalid actions so the console does not ask the API to dispute/refund a released escrow.</p>
-            </div>
-            <button
-              onClick={() => { setServiceHash(randomHex64()); setResult(null); setError(null); setEscrowStatus(null); }}
-              className="inline-flex items-center px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" /> Fresh escrow
-            </button>
+          <div>
+            <h3 className="text-xl font-semibold text-gray-50">Escrow playground settings</h3>
+            <p className="text-sm text-gray-400 mt-1">Create a fresh escrow first. Terminal states disable invalid actions so the console does not ask the API to dispute/refund a released escrow.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <label className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <label className="space-y-2 md:col-span-2">
               <span className="text-sm text-gray-400">Receiver</span>
               <textarea value={DEMO_AGENT_RECEIVER} readOnly className="w-full h-24 p-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-300 font-mono text-xs" />
             </label>
@@ -124,10 +111,19 @@ const Contracts: React.FC = () => {
             </label>
           </div>
 
-          <label className="space-y-2 block">
-            <span className="text-sm text-gray-400">Service hash (escrow ID)</span>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm text-gray-400">Service hash (escrow ID)</span>
+              <button
+                onClick={() => { setServiceHash(randomHex64()); setResult(null); setError(null); setEscrowStatus(null); }}
+                className="inline-flex items-center px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs shrink-0"
+                title="Generate a new random service hash for a fresh escrow"
+              >
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Fresh escrow
+              </button>
+            </div>
             <input value={serviceHash} onChange={(e) => { setServiceHash(e.target.value); setEscrowStatus(null); }} className="w-full h-12 px-3 bg-[#0d0d14] border border-[#1e1e2e] rounded-lg text-gray-100 font-mono text-sm focus:ring-2 focus:ring-amber-500 outline-none" />
-          </label>
+          </div>
 
           <div className="rounded-lg border border-[#1e1e2e] bg-[#0d0d14] p-3 text-sm text-gray-300">
             Current playground state: <span className="font-mono text-amber-300">{escrowStatus || 'fresh hash — create escrow first'}</span>

@@ -110,16 +110,6 @@ export default function Arbitration() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Arbitration</h1>
-        <p className="text-gray-400 mt-1 max-w-3xl">
-          Two real backend systems for resolving disputed escrows: an LLM-powered evidence analyzer that recommends a
-          resolution with a confidence score, and a VRF-based arbiter election that picks a neutral, reputation-weighted
-          third party excluded from the dispute. In production these feed the <code>/dispute</code> → <code>/resolve</code>{' '}
-          escrow lifecycle; here you can exercise each independently. Escrow amount and evidence below are demo inputs -
-          the analysis and election are computed live by the real backend, not scripted.
-        </p>
-      </div>
 
       <div className="flex gap-2 border-b border-[#1e1e2e]">
         {TABS.map((t) => {
@@ -193,46 +183,57 @@ export default function Arbitration() {
               Run AI arbitration
             </button>
             {analyzeError && <p className="text-red-400 text-sm mt-2">{analyzeError}</p>}
-
-            {result && (
-              <div className="mt-5 p-4 rounded-lg bg-gray-800/60 border border-[#1e1e2e]">
-                <div className="flex items-center justify-between mb-2">
-                  <span className={`text-lg font-bold uppercase ${RECOMMENDATION_COLOR[result.recommendation] || 'text-gray-200'}`}>
-                    {result.recommendation.replace('_', ' ')}
-                  </span>
-                  <span className="text-sm text-gray-400">confidence {(result.confidence * 100).toFixed(0)}%</span>
-                </div>
-                <p className="text-sm text-gray-300 mb-2">{result.reasoning}</p>
-                {result.risk_factors.length > 0 && (
-                  <ul className="text-xs text-gray-400 list-disc list-inside mb-2">
-                    {result.risk_factors.map((f, i) => (
-                      <li key={i}>{f}</li>
-                    ))}
-                  </ul>
-                )}
-                <div className="flex justify-between text-xs text-gray-500 font-mono">
-                  <span>suggested split: {result.suggested_split_pct.toFixed(1)}% to sender</span>
-                  <span>provider: {result.provider}</span>
-                </div>
-              </div>
-            )}
           </div>
 
-          <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5">
-            <h2 className="text-lg font-semibold text-white mb-4">Recent verdicts (this server instance)</h2>
-            {history.length === 0 && <p className="text-gray-500 text-sm">No arbitration analyses run yet.</p>}
-            <div className="space-y-2">
-              {history.map((h) => (
-                <div key={h.analysis_hash} className="p-3 rounded-md bg-gray-800/40 border border-[#1e1e2e] text-sm">
-                  <div className="flex justify-between">
-                    <span className={`font-semibold ${RECOMMENDATION_COLOR[h.recommendation] || 'text-gray-200'}`}>
-                      {h.recommendation.replace('_', ' ')}
+          {/* Results rail: the live result of "Run AI arbitration" always
+              renders here, on the right, never stacked below the form. */}
+          <div className="space-y-6">
+            <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5 xl:sticky xl:top-24">
+              <h2 className="text-lg font-semibold text-white mb-4">Result</h2>
+              {result ? (
+                <div className="p-4 rounded-lg bg-gray-800/60 border border-[#1e1e2e]">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-lg font-bold uppercase ${RECOMMENDATION_COLOR[result.recommendation] || 'text-gray-200'}`}>
+                      {result.recommendation.replace('_', ' ')}
                     </span>
-                    <span className="text-gray-500">{(h.confidence * 100).toFixed(0)}%</span>
+                    <span className="text-sm text-gray-400">confidence {(result.confidence * 100).toFixed(0)}%</span>
                   </div>
-                  <p className="text-gray-400 text-xs mt-1 font-mono truncate">{h.dispute_id}</p>
+                  <p className="text-sm text-gray-300 mb-2">{result.reasoning}</p>
+                  {result.risk_factors.length > 0 && (
+                    <ul className="text-xs text-gray-400 list-disc list-inside mb-2">
+                      {result.risk_factors.map((f, i) => (
+                        <li key={i}>{f}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="flex justify-between text-xs text-gray-500 font-mono">
+                    <span>suggested split: {result.suggested_split_pct.toFixed(1)}% to sender</span>
+                    <span>provider: {result.provider}</span>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                <p className="text-sm text-gray-500 italic border border-dashed border-[#2a2a3a] rounded-lg p-4">
+                  The recommendation will appear here after you run an analysis.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5">
+              <h2 className="text-lg font-semibold text-white mb-4">Recent verdicts (this server instance)</h2>
+              {history.length === 0 && <p className="text-gray-500 text-sm">No arbitration analyses run yet.</p>}
+              <div className="space-y-2">
+                {history.map((h) => (
+                  <div key={h.analysis_hash} className="p-3 rounded-md bg-gray-800/40 border border-[#1e1e2e] text-sm">
+                    <div className="flex justify-between">
+                      <span className={`font-semibold ${RECOMMENDATION_COLOR[h.recommendation] || 'text-gray-200'}`}>
+                        {h.recommendation.replace('_', ' ')}
+                      </span>
+                      <span className="text-gray-500">{(h.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                    <p className="text-gray-400 text-xs mt-1 font-mono truncate">{h.dispute_id}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -271,39 +272,50 @@ export default function Arbitration() {
               Elect arbiter
             </button>
             {electError && <p className="text-red-400 text-sm mt-2">{electError}</p>}
-
-            {electionResult && (
-              <div className="mt-5 p-4 rounded-lg bg-gray-800/60 border border-[#1e1e2e] text-sm space-y-1">
-                <div className="flex items-center gap-2 text-emerald-400 font-semibold">
-                  <CheckCircle className="w-4 h-4" /> Elected: {electionResult.elected_arbiter.arbiter_id}
-                </div>
-                <p className="text-gray-400">reputation score: {electionResult.elected_arbiter.reputation_score}</p>
-                <p className="text-gray-400">method: {electionResult.method}</p>
-                <p className="text-gray-500 text-xs font-mono break-all">proof: {electionResult.election_proof}</p>
-              </div>
-            )}
           </div>
 
-          <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5">
-            <h2 className="text-lg font-semibold text-white mb-4">Registered arbiter pool</h2>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-gray-400 text-left border-b border-[#1e1e2e]">
-                  <th className="pb-2">Agent</th>
-                  <th className="pb-2">Score</th>
-                  <th className="pb-2">Completed</th>
-                </tr>
-              </thead>
-              <tbody>
-                {arbiters.map((a) => (
-                  <tr key={a.public_key} className="border-b border-[#1e1e2e]/50">
-                    <td className="py-2 font-mono text-gray-300 truncate max-w-[160px]">{a.public_key}</td>
-                    <td className="py-2 text-gray-300">{a.reputation_score.toFixed(1)}</td>
-                    <td className="py-2 text-gray-300">{a.active_elections}</td>
+          {/* Results rail: the elected arbiter always renders here, on the
+              right, never stacked below the election form. */}
+          <div className="space-y-6">
+            <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5 xl:sticky xl:top-24">
+              <h2 className="text-lg font-semibold text-white mb-4">Result</h2>
+              {electionResult ? (
+                <div className="p-4 rounded-lg bg-gray-800/60 border border-[#1e1e2e] text-sm space-y-1">
+                  <div className="flex items-center gap-2 text-emerald-400 font-semibold">
+                    <CheckCircle className="w-4 h-4" /> Elected: {electionResult.elected_arbiter.arbiter_id}
+                  </div>
+                  <p className="text-gray-400">reputation score: {electionResult.elected_arbiter.reputation_score}</p>
+                  <p className="text-gray-400">method: {electionResult.method}</p>
+                  <p className="text-gray-500 text-xs font-mono break-all">proof: {electionResult.election_proof}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 italic border border-dashed border-[#2a2a3a] rounded-lg p-4">
+                  The elected arbiter will appear here after you run an election.
+                </p>
+              )}
+            </div>
+
+            <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5">
+              <h2 className="text-lg font-semibold text-white mb-4">Registered arbiter pool</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-gray-400 text-left border-b border-[#1e1e2e]">
+                    <th className="pb-2">Agent</th>
+                    <th className="pb-2">Score</th>
+                    <th className="pb-2">Completed</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {arbiters.map((a) => (
+                    <tr key={a.public_key} className="border-b border-[#1e1e2e]/50">
+                      <td className="py-2 font-mono text-gray-300 truncate max-w-[160px]">{a.public_key}</td>
+                      <td className="py-2 text-gray-300">{a.reputation_score.toFixed(1)}</td>
+                      <td className="py-2 text-gray-300">{a.active_elections}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
