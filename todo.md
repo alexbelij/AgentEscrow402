@@ -62,3 +62,11 @@
 ## Process
 - Work in blocks, report progress to Alexey per block (heavy scope — 1:1 DM, no other channels).
 - Verify against CI-parity checks (frontend: tsc --noEmit + npm run build) before each report.
+
+## CRITICAL FINDING (this session) — resolve() dispute path non-functional
+- Deployed escrow contract's `resolve()` (3-of-5 arbiter multisig) can NEVER succeed: on-chain `arbiter_list` is empty (verified via query_global_state), and there is no post-install entry point to add arbiters.
+- Backend/SDK never call `resolve()` at all — `ResolveRequest` model exists in server/models.py but is unused (no endpoint, no casper_client method, no node script wiring).
+- Demo script (examples/escrow_agent.py) "bad" scenario calls /release after dispute -> fails (contract + local sandbox both require status==pending for release/refund).
+- Fix requires: contract upgrade (add installer-only `set_arbiters`/`add_arbiter` entry point via package-hash upgrade deploy) + backend `/resolve` endpoint + casper_client.resolve() + node script + 5 real/test arbiter accounts.
+- Rust toolchain now installed in sandbox (rustup, wasm32-unknown-unknown target) — `cargo build --release --target wasm32-unknown-unknown -p escrow` verified working.
+- Awaiting Alexey's go-ahead on contract upgrade + arbiter account list before implementing.
