@@ -110,16 +110,6 @@ export default function Arbitration() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Arbitration</h1>
-        <p className="text-gray-400 mt-1 max-w-3xl">
-          Two real backend systems for resolving disputed escrows: an LLM-powered evidence analyzer that recommends a
-          resolution with a confidence score, and a VRF-based arbiter election that picks a neutral, reputation-weighted
-          third party excluded from the dispute. In production these feed the <code>/dispute</code> → <code>/resolve</code>{' '}
-          escrow lifecycle; here you can exercise each independently. Escrow amount and evidence below are demo inputs -
-          the analysis and election are computed live by the real backend, not scripted.
-        </p>
-      </div>
 
       <div className="flex gap-2 border-b border-[#1e1e2e]">
         {TABS.map((t) => {

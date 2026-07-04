@@ -112,17 +112,6 @@ export default function IdentityRegistry() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Identity Registry</h1>
-        <p className="text-gray-400 mt-1 max-w-3xl">
-          A DID-based reputation system for agents (<code>server/identity_registry.py</code>): register a{' '}
-          <code>did:casper:&lt;account_hash&gt;</code> identity, track cumulative reputation from completed/disputed
-          deals, apply time-based reputation decay, slash stake for bad behavior, and search agents by capability,
-          reputation, or verification level. This is a separate reputation/staking layer from the public-key identity +
-          delegation registry on the Agents page.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-5">
           <h2 className="text-lg font-semibold text-white mb-4">Register an identity</h2>

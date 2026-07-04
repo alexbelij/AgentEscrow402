@@ -273,10 +273,6 @@ const Sandbox: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-50">API Sandbox</h2>
-        <p className="text-gray-400 mt-2">Professional two-column API explorer: endpoint list on the left, description, request editor and response on the right.</p>
-      </div>
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         Write operations use the labelled hosted-console <span className="font-mono">X-Payment</span> identity header. This is a live API playground, not screenshots; errors are returned exactly as the backend returns them.
       </div>
