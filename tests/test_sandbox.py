@@ -39,6 +39,27 @@ class TestSandboxEscrow:
         with pytest.raises(PermissionError, match="Only sender"):
             sandbox.release_escrow(service_hash, "some-other-account")
 
+    def test_release_records_its_own_deploy_hash(self, sandbox, sender, receiver, service_hash):
+        """Regression test: previously `release_escrow` (and refund/dispute)
+        silently kept whatever `deploy_hash` `create_escrow` had set, so a
+        live (non-sandbox) release against the real API would report the
+        *create* transaction's hash instead of the actual release
+        transaction's hash. Discovered live against production while
+        building examples/escrow_agent.py."""
+        sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
+        rec = sandbox.release_escrow(service_hash, sender, deploy_hash="release-deploy-hash-abc")
+        assert rec.deploy_hash == "release-deploy-hash-abc"
+
+    def test_refund_records_its_own_deploy_hash(self, sandbox, sender, receiver, service_hash):
+        sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
+        rec = sandbox.refund_escrow(service_hash, sender, deploy_hash="refund-deploy-hash-abc")
+        assert rec.deploy_hash == "refund-deploy-hash-abc"
+
+    def test_dispute_records_its_own_deploy_hash(self, sandbox, sender, receiver, service_hash):
+        sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
+        rec = sandbox.dispute_escrow(service_hash, deploy_hash="dispute-deploy-hash-abc")
+        assert rec.deploy_hash == "dispute-deploy-hash-abc"
+
     def test_release_already_released_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.release_escrow(service_hash, sender)

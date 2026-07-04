@@ -33,17 +33,23 @@ class SandboxStore:
         self._escrows[service_hash] = record
         return EscrowRecord(**record)
 
-    def release_escrow(self, service_hash: str, caller: str) -> EscrowRecord:
+    def release_escrow(self, service_hash: str, caller: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
         if rec["status"] != "pending":
             raise ValueError(f"Cannot release escrow in status {rec['status']}")
         if rec["sender"] != caller:
             raise PermissionError("Only sender can release")
         rec["status"] = "released"
+        if deploy_hash:
+            # Each lifecycle action is its own on-chain deploy -- the record
+            # must reflect the *release* deploy, not the stale one from
+            # `create_escrow`, or API/UI consumers would report the wrong
+            # transaction hash for a released escrow.
+            rec["deploy_hash"] = deploy_hash
         self._bump_reputation(rec["receiver"], completed=1)
         return EscrowRecord(**rec)
 
-    def refund_escrow(self, service_hash: str, caller: str) -> EscrowRecord:
+    def refund_escrow(self, service_hash: str, caller: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
         if rec["status"] != "pending":
             raise ValueError(f"Cannot refund escrow in status {rec['status']}")
@@ -52,13 +58,17 @@ class SandboxStore:
         if not expired and rec["sender"] != caller:
             raise PermissionError("Only sender can refund before TTL")
         rec["status"] = "expired" if expired else "refunded"
+        if deploy_hash:
+            rec["deploy_hash"] = deploy_hash
         return EscrowRecord(**rec)
 
-    def dispute_escrow(self, service_hash: str) -> EscrowRecord:
+    def dispute_escrow(self, service_hash: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
         if rec["status"] != "pending":
             raise ValueError(f"Cannot dispute escrow in status {rec['status']}")
         rec["status"] = "disputed"
+        if deploy_hash:
+            rec["deploy_hash"] = deploy_hash
         self._bump_reputation(rec["sender"], disputed=1)
         return EscrowRecord(**rec)
 
