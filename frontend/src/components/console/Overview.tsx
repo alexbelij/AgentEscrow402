@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, HealthStatus, Stats, Event } from '../../lib/api';
 import { formatCspr } from '../../lib/format';
 import {
@@ -12,8 +13,12 @@ import {
   Zap,
   Calendar,
   Info,
+  ExternalLink,
+  BarChart3,
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+const EXPLORER_BASE = 'https://testnet.cspr.live';
 
 // Reusable Card Component
 interface CardProps {
@@ -22,18 +27,44 @@ interface CardProps {
   icon: React.ElementType;
   colorClass?: string;
   description?: string;
+  /** Override the default value font size — long/verbose values (e.g. a CSPR
+   * amount with several decimals) look oversized and inconsistent next to
+   * short integer counts at the same 4xl size. */
+  valueClass?: string;
+  /** When set, the whole card becomes a link into the relevant console
+   * section or block explorer instead of being a dead-end number. */
+  linkTo?: string;
+  external?: boolean;
 }
 
-const StatCard: React.FC<CardProps> = ({ title, value, icon: Icon, colorClass = 'text-amber-500', description }) => (
-  <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md flex flex-col justify-between">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="text-lg font-semibold text-gray-300">{title}</h3>
-      <Icon className={`h-8 w-8 ${colorClass}`} />
-    </div>
-    <p className="text-4xl font-bold text-gray-50 mb-2">{value}</p>
-    {description && <p className="text-sm text-gray-400">{description}</p>}
-  </div>
-);
+const StatCard: React.FC<CardProps> = ({ title, value, icon: Icon, colorClass = 'text-amber-500', description, valueClass = 'text-3xl', linkTo, external }) => {
+  const body = (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">{title}</h3>
+        <Icon className={`h-6 w-6 ${colorClass}`} />
+      </div>
+      <p className={`${valueClass} font-bold text-gray-50 mb-2 break-all`}>{value}</p>
+      {description && <p className="text-xs text-gray-500 flex items-center gap-1">{description}{linkTo && <ExternalLink className="h-3 w-3" />}</p>}
+    </>
+  );
+  const cls = 'bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md flex flex-col justify-between transition-colors hover:border-ae-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright';
+  if (linkTo && external) {
+    return (
+      <a href={linkTo} target="_blank" rel="noreferrer" className={cls}>
+        {body}
+      </a>
+    );
+  }
+  if (linkTo) {
+    return (
+      <Link to={linkTo} className={cls}>
+        {body}
+      </Link>
+    );
+  }
+  return <div className={cls}>{body}</div>;
+};
 
 const Overview: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -41,35 +72,58 @@ const Overview: React.FC = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
+
+  const fetchData = async (showSpinner: boolean) => {
+    if (showSpinner) setLoading(true);
+    setError(null);
+    try {
+      const [healthRes, statsRes, eventsRes] = await Promise.all([
+        api.getHealth(),
+        api.getStats(),
+        api.getEvents(),
+      ]);
+
+      if (healthRes.error) throw new Error(healthRes.error);
+      if (statsRes.error) throw new Error(statsRes.error);
+      if (eventsRes.error) throw new Error(eventsRes.error);
+
+      setHealth(healthRes.data);
+      setStats(statsRes.data);
+      setEvents(eventsRes.data || []);
+      setLastFetchedAt(new Date());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch overview data.');
+      console.error('Overview fetch error:', err);
+    } finally {
+      if (showSpinner) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const [healthRes, statsRes, eventsRes] = await Promise.all([
-          api.getHealth(),
-          api.getStats(),
-          api.getEvents(),
-        ]);
-
-        if (healthRes.error) throw new Error(healthRes.error);
-        if (statsRes.error) throw new Error(statsRes.error);
-        if (eventsRes.error) throw new Error(eventsRes.error);
-
-        setHealth(healthRes.data);
-        setStats(statsRes.data);
-        setEvents(eventsRes.data || []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch overview data.');
-        console.error('Overview fetch error:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchData(true);
+    // Poll quietly in the background so "Recent Activity" behaves like a
+    // realtime feed instead of a static snapshot taken once on page load.
+    const id = window.setInterval(() => fetchData(false), 20000);
+    return () => window.clearInterval(id);
   }, []);
+
+  // Real (not fabricated) 7-day activity trend derived from the same events
+  // the list below shows — a day with zero events renders as an empty bar,
+  // it is never backfilled with placeholder data.
+  const dailyCounts = useMemo(() => {
+    const days: { label: string; count: number }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toDateString();
+      const count = events.filter((e) => new Date(e.timestamp).toDateString() === key).length;
+      days.push({ label: format(d, 'EEE'), count });
+    }
+    return days;
+  }, [events]);
+  const maxCount = Math.max(1, ...dailyCounts.map((d) => d.count));
 
   if (loading) {
     return (
@@ -94,6 +148,7 @@ const Overview: React.FC = () => {
   const uptimeText = health?.uptime && health.uptime > 60
     ? `${Math.floor(health.uptime / 3600)}h ${Math.floor((health.uptime % 3600) / 60)}m`
     : 'Live API session';
+  const contractExplorerUrl = health?.contract_hash ? `${EXPLORER_BASE}/contract/${health.contract_hash}` : undefined;
 
   return (
     <div className="space-y-8">
@@ -123,50 +178,107 @@ const Overview: React.FC = () => {
           <p className="text-2xl font-bold text-gray-50">Casper testnet</p>
           <p className="text-xs text-gray-500 mt-2">{modeLabel}</p>
         </div>
-        <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-400">Contract target</span>
-            <Info className="h-5 w-5 text-cyan-400" />
+        {contractExplorerUrl ? (
+          <a
+            href={contractExplorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md hover:border-ae-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-gray-400">Contract target</span>
+              <Info className="h-5 w-5 text-cyan-400" />
+            </div>
+            <p className="text-lg font-bold text-gray-50 break-all">{`${health?.contract_hash?.slice(0, 10)}…${health?.contract_hash?.slice(-8)}`}</p>
+            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">View on CSPR.live <ExternalLink className="h-3 w-3" /></p>
+          </a>
+        ) : (
+          <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm text-gray-400">Contract target</span>
+              <Info className="h-5 w-5 text-cyan-400" />
+            </div>
+            <p className="text-lg font-bold text-gray-50">Configured</p>
+            <p className="text-xs text-gray-500 mt-2">Escrow lifecycle endpoint</p>
           </div>
-          <p className="text-lg font-bold text-gray-50 break-all">{health?.contract_hash ? `${health.contract_hash.slice(0, 10)}…${health.contract_hash.slice(-8)}` : 'Configured'}</p>
-          <p className="text-xs text-gray-500 mt-2">Escrow lifecycle endpoint</p>
-        </div>
+        )}
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards — each links into the console section (or explorer) that
+          explains the number, instead of being a dead-end metric. */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Escrows"
           value={stats?.total_escrows ?? 'N/A'}
           icon={DollarSign}
           colorClass="text-amber-500"
+          description="View in Escrows"
+          linkTo="/console/escrows"
         />
         <StatCard
           title="Total Volume"
           value={stats ? formatCspr(stats.total_volume) : 'N/A'}
           icon={Scale}
           colorClass="text-orange-500"
+          valueClass="text-xl sm:text-2xl"
         />
         <StatCard
           title="Pending Escrows"
           value={stats?.pending_escrows ?? 'N/A'}
           icon={Hourglass}
           colorClass="text-blue-500"
+          description="View in Escrows"
+          linkTo="/console/escrows"
         />
         <StatCard
           title="Disputed Escrows"
           value={stats?.disputed_escrows ?? 'N/A'}
           icon={AlertTriangle}
           colorClass="text-red-500"
+          description="Resolve in Arbitration"
+          linkTo="/console/arbitration"
         />
+      </div>
+
+      {/* Activity trend — a real (not simulated) 7-day bar chart built from
+          the same event log shown below, so the console has at least one
+          at-a-glance visual instead of numbers only. */}
+      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
+        <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 mb-4 flex items-center">
+          <BarChart3 className="h-5 w-5 mr-2 text-amber-500" />
+          Event volume, last 7 days
+        </h3>
+        <div className="flex items-end gap-3 h-28">
+          {dailyCounts.map((d) => (
+            <div key={d.label} className="flex-1 flex flex-col items-center gap-1.5">
+              <div className="w-full flex items-end h-20">
+                <div
+                  className="w-full rounded-t-md bg-gradient-to-t from-amber-600 to-amber-400 transition-[height] duration-500"
+                  style={{ height: `${Math.max(4, (d.count / maxCount) * 100)}%` }}
+                  title={`${d.count} event(s)`}
+                />
+              </div>
+              <span className="text-[10px] text-gray-500">{d.label}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Recent Activity */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-6 shadow-md">
-        <h3 className="text-xl font-semibold text-gray-300 mb-4 flex items-center">
-          <Activity className="h-6 w-6 mr-2 text-amber-500" />
-          Recent Activity
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400 flex items-center">
+            <Activity className="h-5 w-5 mr-2 text-amber-500" />
+            Recent Activity
+          </h3>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+            </span>
+            Live · refreshed {lastFetchedAt ? format(lastFetchedAt, 'HH:mm:ss') : '—'}
+          </span>
+        </div>
         {events.length > 0 ? (
           <ul className="divide-y divide-[#1e1e2e]">
             {events.slice(0, 10).map((event) => (
