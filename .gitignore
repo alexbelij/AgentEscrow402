@@ -27,6 +27,9 @@ Thumbs.db
 keys/
 landing/
 *.pem
+# Exception: intentionally-committed throwaway test-only arbiter demo keys
+# (unfunded testnet keypairs, single-purpose, see demo/test-arbiter-keys/README.md)
+!demo/test-arbiter-keys/*.pem
 *.secret
 Cargo.lock
 *.bak
