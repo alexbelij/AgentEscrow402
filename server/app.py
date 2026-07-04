@@ -484,7 +484,7 @@ async def release_escrow(
     caller = _extract_release_refund_caller(request, req.wallet_tx_hash, existing.sender)
 
     try:
-        record = store.release_escrow(req.service_hash, caller)
+        record = store.release_escrow(req.service_hash, caller, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, "released", deploy_hash)
         pgdb.bump_reputation(record.receiver, completed=1)
         _broadcast_event(
@@ -537,7 +537,7 @@ async def refund_escrow(
     caller = _extract_release_refund_caller(request, req.wallet_tx_hash, existing.sender)
 
     try:
-        record = store.refund_escrow(req.service_hash, caller)
+        record = store.refund_escrow(req.service_hash, caller, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, record.status, deploy_hash)
         _broadcast_event({"type": "escrow_refunded", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
@@ -600,7 +600,7 @@ async def dispute_escrow(
             )
 
     try:
-        record = store.dispute_escrow(req.service_hash)
+        record = store.dispute_escrow(req.service_hash, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, "disputed", deploy_hash)
         pgdb.bump_reputation(record.sender, disputed=1)
         _broadcast_event({"type": "escrow_disputed", "service_hash": req.service_hash, "ts": int(time.time())})
