@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Layers,
   Gavel,
+  BadgeCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -32,6 +33,7 @@ const navItems: NavItem[] = [
   { name: 'Contracts', path: '/console/contracts', icon: FileText },
   { name: 'Advanced Escrow', path: '/console/advanced', icon: Layers },
   { name: 'Arbitration', path: '/console/arbitration', icon: Gavel },
+  { name: 'Identity Registry', path: '/console/identity-registry', icon: BadgeCheck },
   { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
   { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
 ];
@@ -83,6 +85,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   '/console/arbitration': {
     title: 'Arbitration',
     desc: 'AI-powered dispute evidence analysis (real LLM call with a deterministic heuristic fallback, tries Groq then NVIDIA NIM then a local model) and VRF-based neutral arbiter election, both run live against the real backend. In production these feed the escrow /dispute → /resolve lifecycle.',
+    source: 'tool',
+  },
+  '/console/identity-registry': {
+    title: 'Identity Registry',
+    desc: 'A DID reputation/staking layer (real backend, in-memory in this sandbox): register a did:casper:<account> identity, record completed/disputed deals to build cumulative reputation, apply time-based reputation decay, slash stake for bad behavior, advance verification level, and search agents by capability/reputation/verification. Separate from the public-key identity + capability delegation registry on the Agents page.',
     source: 'tool',
   },
   '/console/agent-demo': {

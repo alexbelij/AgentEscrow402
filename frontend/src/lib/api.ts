@@ -434,6 +434,41 @@ export interface ArbitrationRecommendation {
   provider: string;
 }
 
+// Identity Registry (server/identity_registry.py + identity_registry_api.py) -
+// a separate DID-based reputation/staking system from the /identity endpoints
+// above (server/agent_identity.py), mounted at /identity-registry.
+export type VerificationLevel = 'UNVERIFIED' | 'BASIC' | 'ENHANCED' | 'FULL';
+
+export interface RegistryCapability {
+  name: string;
+  version: string;
+  description: string;
+  verified: boolean;
+}
+
+export interface RegistryIdentity {
+  did: string;
+  account_hash: string;
+  display_name: string;
+  capabilities: RegistryCapability[];
+  verification_level: VerificationLevel;
+  reputation_score: number;
+  total_deals: number;
+  dispute_rate: number;
+  registered_at: number;
+  last_active: number;
+  metadata_hash: string;
+  risk_score: number;
+  slashed_count: number;
+  stake: number;
+}
+
+export interface RegistryStats {
+  total_agents: number;
+  avg_reputation: number;
+  distribution_by_level: Record<string, number>;
+}
+
 // =========================================================
 // RESPONSE NORMALIZERS — map backend fields to frontend types
 // =========================================================
@@ -694,6 +729,26 @@ export const api = {
   },
   analyzeDispute: (data: ArbitrateRequest) => fetcher<ArbitrationRecommendation>('/arbitration/analyze', 'POST', data),
   getArbitrationHistory: (limit = 20) => fetcher<ArbitrationRecommendation[]>(`/arbitration/history?limit=${limit}`, 'GET'),
+
+  // Identity Registry Endpoints (DID reputation/staking - distinct from /identity above)
+  registerRegistryIdentity: (data: { account_hash: string; display_name: string; capabilities?: RegistryCapability[] }) =>
+    fetcher<RegistryIdentity>('/identity-registry/register', 'POST', data),
+  getRegistryIdentity: (did: string) => fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}`, 'GET'),
+  updateRegistryReputation: (did: string, completed: number, disputed: number) =>
+    fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/reputation`, 'POST', { completed, disputed }),
+  applyRegistryDecay: (did: string) => fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/decay`, 'POST', {}),
+  slashRegistryIdentity: (did: string, amount: number, reason: string) =>
+    fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/slash`, 'POST', { amount, reason }),
+  verifyRegistryIdentity: (did: string, level: VerificationLevel) =>
+    fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/verify`, 'POST', { level }),
+  searchRegistryIdentities: (params: { capability?: string; min_reputation?: number; min_verification?: VerificationLevel }) => {
+    const qs = new URLSearchParams();
+    if (params.capability) qs.set('capability', params.capability);
+    if (params.min_reputation != null) qs.set('min_reputation', String(params.min_reputation));
+    if (params.min_verification) qs.set('min_verification', params.min_verification);
+    return fetcher<RegistryIdentity[]>(`/identity-registry/search/agents?${qs.toString()}`, 'GET');
+  },
+  getRegistryStats: () => fetcher<RegistryStats>('/identity-registry/stats/summary', 'GET'),
 
   // Identity Endpoints
   registerIdentity: (data: RegisterIdentityRequest) => fetcher<TransactionHash>('/identity/register', 'POST', data),

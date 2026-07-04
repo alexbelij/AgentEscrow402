@@ -42,6 +42,7 @@ from server.vrf_election import router as vrf_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
 from server.risk_api import router as risk_router
+from server.identity_registry_api import router as identity_registry_router
 try:
     from server.mlkem_crypto import generate_keypair, encrypt_metadata, EncryptedMetadata
     _MLKEM_AVAILABLE = True
@@ -216,6 +217,7 @@ app.include_router(insurance_router)
 app.include_router(vrf_router)
 app.include_router(identity_router)
 app.include_router(risk_router)
+app.include_router(identity_registry_router)
 
 
 # ---------------------------------------------------------------------------
