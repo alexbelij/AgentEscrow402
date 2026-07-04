@@ -189,21 +189,30 @@ class EscrowClient:
         )
 
     async def resolve(
-        self, service_hash: str, in_favor_of: str, arbiter_accounts: list[str],
+        self,
+        service_hash: str,
+        in_favor_of: str,
+        arbiter_pubkeys: list[str],
+        arbiter_signatures: list[str],
     ) -> dict[str, Any]:
         """Settle a disputed escrow via 3-of-5 arbiter multisig.
 
         Unlike release/refund/dispute this is not gated on the escrow
-        sender/receiver's own signature -- the contract instead checks that
-        `arbiter_accounts` (>= threshold) are members of the on-chain
-        registered `arbiter_list`. No X-Payment header is required.
+        sender/receiver's own signature -- the contract instead verifies,
+        on-chain, that each (pubkey, signature) pair is a registered
+        arbiter's real Ed25519 signature (>= threshold) over the canonical
+        message `"resolve:{service_hash}:{in_favor_of}"`. Use
+        `sign_arbiter_vote()` (see `sdk/arbiter_signing.py`) to produce each
+        arbiter's vote signature from their private key. No X-Payment
+        header is required.
         """
         resp = await self._http.post(
             f"{self._base}/resolve",
             json={
                 "service_hash": service_hash,
                 "in_favor_of": in_favor_of,
-                "arbiter_accounts": arbiter_accounts,
+                "arbiter_pubkeys": arbiter_pubkeys,
+                "arbiter_signatures": arbiter_signatures,
             },
         )
         resp.raise_for_status()

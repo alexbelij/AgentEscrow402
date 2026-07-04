@@ -24,6 +24,13 @@ class Config:
     insurance_contract_hash: str = ""
     vrf_contract_hash: str = ""
     allow_hosted_demo_identity: bool = False
+    # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
+    # arbiters, mirroring the on-chain `arbiter_list`. Used to verify
+    # arbiter vote signatures locally in sandbox mode (live mode relies on
+    # the contract's own on-chain verification, but checking here too gives
+    # callers a fast, clear 4xx instead of waiting for an on-chain revert).
+    arbiter_pubkeys: tuple[str, ...] = ()
+    arbiter_threshold: int = 3
 
     @classmethod
     def from_env(cls) -> Config:
@@ -68,6 +75,10 @@ class Config:
                 "5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f",
             ),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
+            arbiter_pubkeys=tuple(
+                p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()
+            ),
+            arbiter_threshold=int(os.getenv("ARBITER_THRESHOLD", "3")),
         )
 
 

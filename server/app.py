@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from server import arbiter_crypto
 from server import db as pgdb
 from server.casper_client import CasperClient
 from server.config import Config
@@ -659,13 +660,44 @@ async def resolve_escrow(
 
     Unlike release/refund/dispute, this is *not* gated on the escrow
     sender/receiver identity: authorization comes from the contract's own
-    check that `arbiter_accounts` (>= threshold) are members of the
-    on-chain registered `arbiter_list`. Any caller may submit this once
-    they have collected enough arbiter votes off-chain.
+    check that each submitted (pubkey, signature) pair is (a) a member of
+    the on-chain registered `arbiter_list` and (b) a real Ed25519 signature
+    over the canonical vote message `"resolve:{service_hash}:{in_favor_of}"`,
+    verified on-chain via `casper_types::crypto::verify`. Any caller may
+    submit this once they have collected enough signed arbiter votes
+    off-chain -- a claimed account-hash alone is never sufficient.
     """
     escrow = store.get_escrow(req.service_hash)
     if escrow is None:
         raise HTTPException(status_code=404, detail="Escrow not found")
+
+    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
+        raise HTTPException(
+            status_code=422,
+            detail="arbiter_pubkeys and arbiter_signatures must have the same length",
+        )
+
+    # Fast local check with the same crypto guarantee the contract enforces
+    # on-chain: real signatures, from registered arbiters, over this exact
+    # escrow+verdict. In sandbox mode this is the *only* enforcement (no
+    # chain call happens); in live mode it's a fast-fail before submitting
+    # a transaction the contract would otherwise revert.
+    if cfg.arbiter_pubkeys:
+        valid_votes = arbiter_crypto.count_valid_votes(
+            req.arbiter_pubkeys,
+            req.arbiter_signatures,
+            cfg.arbiter_pubkeys,
+            req.service_hash,
+            req.in_favor_of,
+        )
+        if valid_votes < cfg.arbiter_threshold:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Only {valid_votes} valid arbiter signature(s) for this escrow/verdict, "
+                    f"need >= {cfg.arbiter_threshold}"
+                ),
+            )
 
     deploy_hash = ""
 
@@ -694,7 +726,7 @@ async def resolve_escrow(
         for attempt in range(2):
             try:
                 deploy_hash = await casper.resolve(
-                    req.service_hash, req.in_favor_of, req.arbiter_accounts
+                    req.service_hash, req.in_favor_of, req.arbiter_pubkeys, req.arbiter_signatures
                 )
             except Exception as exc:
                 logger.error("Casper resolve submission failed: %s", exc)

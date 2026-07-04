@@ -76,7 +76,12 @@ class DisputeRequest(BaseModel):
 class ResolveRequest(BaseModel):
     service_hash: str = Field(..., min_length=64, max_length=64)
     in_favor_of: str = Field(..., pattern="^(sender|receiver)$")
-    arbiter_accounts: list[str]
+    # Each arbiter casts their vote as a real Ed25519 signature (hex,
+    # AsymmetricType tag-prefixed) over "resolve:{service_hash}:{in_favor_of}",
+    # verified on-chain in the resolve() entry point -- not just a claimed
+    # account-hash. arbiter_pubkeys[i] must correspond to arbiter_signatures[i].
+    arbiter_pubkeys: list[str]
+    arbiter_signatures: list[str]
 
 
 class ReputationRecord(BaseModel):
