@@ -188,6 +188,27 @@ class EscrowClient:
             json_body={"service_hash": service_hash, "reason_hash": reason_hash},
         )
 
+    async def resolve(
+        self, service_hash: str, in_favor_of: str, arbiter_accounts: list[str],
+    ) -> dict[str, Any]:
+        """Settle a disputed escrow via 3-of-5 arbiter multisig.
+
+        Unlike release/refund/dispute this is not gated on the escrow
+        sender/receiver's own signature -- the contract instead checks that
+        `arbiter_accounts` (>= threshold) are members of the on-chain
+        registered `arbiter_list`. No X-Payment header is required.
+        """
+        resp = await self._http.post(
+            f"{self._base}/resolve",
+            json={
+                "service_hash": service_hash,
+                "in_favor_of": in_favor_of,
+                "arbiter_accounts": arbiter_accounts,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
     # -- Reputation -------------------------------------------------------
 
     async def get_reputation(self, agent: str) -> dict[str, Any]:

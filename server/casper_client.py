@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 _SCRIPT_DIR = pathlib.Path(__file__).parent / "casper_tx"
 _CREATE_SCRIPT = _SCRIPT_DIR / "create_escrow.mjs"
 _LIFECYCLE_SCRIPT = _SCRIPT_DIR / "lifecycle.mjs"
+_RESOLVE_SCRIPT = _SCRIPT_DIR / "resolve.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -156,6 +157,41 @@ class CasperClient:
 
     async def dispute(self, service_hash: str) -> str:
         return await self._lifecycle("dispute", service_hash)
+
+    async def resolve(
+        self,
+        service_hash: str,
+        in_favor_of: str,
+        arbiter_accounts: list[str],
+    ) -> str:
+        """Submit `resolve` tx: 3-of-5 arbiter multisig dispute resolution.
+
+        Any account may submit this call (the contract checks
+        `arbiter_accounts` against the on-chain registered `arbiter_list`,
+        not the transaction signer's identity). We sign with the configured
+        deployer key by default.
+        """
+        if not self._contract_hash:
+            raise RuntimeError("contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        if in_favor_of not in ("sender", "receiver"):
+            raise ValueError(f"in_favor_of must be 'sender' or 'receiver', got: {in_favor_of!r}")
+        if not arbiter_accounts:
+            raise ValueError("arbiter_accounts must be non-empty")
+
+        return await self._run_node_script(
+            _RESOLVE_SCRIPT,
+            {
+                "CONTRACT_HASH": self._contract_hash,
+                "SERVICE_HASH": service_hash,
+                "IN_FAVOR_OF": in_favor_of,
+                "ARBITER_ACCOUNTS_JSON": json.dumps(arbiter_accounts),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
 
     async def _lifecycle(self, entry_point: str, service_hash: str) -> str:
         if not self._contract_hash:

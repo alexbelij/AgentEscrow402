@@ -603,6 +603,12 @@ export const api = {
     return res as ApiResponse<Stats>;
   },
 
+  getContracts: async (): Promise<ApiResponse<{ name: string; hash: string; role: string }[]>> => {
+    const res = await fetcher<any>('/contracts', 'GET');
+    if (res.data?.contracts) return { ...res, data: res.data.contracts };
+    return res as any;
+  },
+
   getEscrows: async (params?: { limit?: number; offset?: number; status?: EscrowStatus }): Promise<ApiResponse<Escrow[]>> => {
     const query = new URLSearchParams();
     if (params?.limit) query.append('limit', params.limit.toString());

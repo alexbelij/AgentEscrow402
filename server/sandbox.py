@@ -72,6 +72,30 @@ class SandboxStore:
         self._bump_reputation(rec["sender"], disputed=1)
         return EscrowRecord(**rec)
 
+    def resolve_escrow(
+        self,
+        service_hash: str,
+        in_favor_of: str,
+        deploy_hash: str = "",
+    ) -> EscrowRecord:
+        """Resolve a disputed escrow via arbiter multisig decision.
+
+        Mirrors the on-chain `resolve()` entry point: only valid on a
+        `disputed` escrow; pays out to sender or receiver depending on
+        `in_favor_of`, and marks the escrow `resolved`.
+        """
+        rec = self._get_or_raise(service_hash)
+        if rec["status"] != "disputed":
+            raise ValueError(f"Cannot resolve escrow in status {rec['status']} (must be disputed)")
+        if in_favor_of not in ("sender", "receiver"):
+            raise ValueError(f"in_favor_of must be 'sender' or 'receiver', got: {in_favor_of!r}")
+        rec["status"] = "resolved"
+        if deploy_hash:
+            rec["deploy_hash"] = deploy_hash
+        winner = rec["sender"] if in_favor_of == "sender" else rec["receiver"]
+        self._bump_reputation(winner, completed=1)
+        return EscrowRecord(**rec)
+
     def get_escrow(self, service_hash: str) -> EscrowRecord | None:
         rec = self._escrows.get(service_hash)
         if rec is None:
