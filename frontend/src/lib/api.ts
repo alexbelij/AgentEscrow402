@@ -320,18 +320,36 @@ export interface Identity {
   capabilities?: string[];
 }
 
+// Matches server/agent_identity.py's DelegateCapabilityRequest exactly: one
+// capability_uri per call (not an array) and an absolute expiry_timestamp
+// (not a duration). signature is a 128-char hex Ed25519 signature over
+// sha256(f"{delegator_id}:{delegatee_id}:{capability_uri}:{expiry_timestamp}")
+// signed by the delegator's registered public key — see lib/demoSigner.ts.
 export interface DelegateIdentityRequest {
-  delegator_public_key: string;
-  delegatee_public_key: string;
-  capabilities: string[];
-  duration_seconds: number;
+  delegator_id: string;
+  delegatee_id: string;
+  capability_uri: string;
+  expiry_timestamp: number;
   signature: string;
 }
 
-export interface Capability {
-  capability: string;
-  delegated_by: string;
-  expires_at: string;
+// Actual response shape of GET /identity/capabilities/{agent_id} (server/agent_identity.py).
+export interface AgentCapabilities {
+  agent_id: string;
+  own_capabilities: string[];
+  delegated_capabilities: string[];
+  total: number;
+}
+
+// Actual response shape of POST /identity/delegate (server/agent_identity.py).
+export interface DelegationRecord {
+  delegator_id: string;
+  delegatee_id: string;
+  capability_uri: string;
+  expiry_timestamp: number;
+  delegated_at: number;
+  deploy_hash: string;
+  mode: string;
 }
 
 // Insurance
@@ -621,6 +639,6 @@ export const api = {
   // Identity Endpoints
   registerIdentity: (data: RegisterIdentityRequest) => fetcher<TransactionHash>('/identity/register', 'POST', data),
   getIdentity: (id: string) => fetcher<Identity>(`/identity/${id}`, 'GET'),
-  delegateIdentity: (data: DelegateIdentityRequest) => fetcher<TransactionHash>('/identity/delegate', 'POST', data),
-  getIdentityCapabilities: (id: string) => fetcher<Capability[]>(`/identity/capabilities/${id}`, 'GET'),
+  delegateIdentity: (data: DelegateIdentityRequest) => fetcher<DelegationRecord>('/identity/delegate', 'POST', data),
+  getIdentityCapabilities: (id: string) => fetcher<AgentCapabilities>(`/identity/capabilities/${id}`, 'GET'),
 };
