@@ -23,6 +23,7 @@ import Sandbox from './components/console/Sandbox'
 import AdvancedEscrow from './components/console/AdvancedEscrow'
 import Arbitration from './components/console/Arbitration'
 import IdentityRegistry from './components/console/IdentityRegistry'
+import UseCases from './components/console/UseCases'
 
 function Landing() {
   useEffect(() => {
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="/console" element={<ConsoleLayout />}>
             <Route index element={<Navigate to="overview" replace />} />
             <Route path="overview" element={<Overview />} />
+            <Route path="use-cases" element={<UseCases />} />
             <Route path="escrows" element={<Escrows />} />
             <Route path="agents" element={<Agents />} />
             <Route path="insurance" element={<Insurance />} />

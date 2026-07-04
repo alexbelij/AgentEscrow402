@@ -16,6 +16,7 @@ import {
   Layers,
   Gavel,
   BadgeCheck,
+  Sparkles,
 } from 'lucide-react';
 
 interface NavItem {
@@ -26,6 +27,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { name: 'Overview', path: '/console/overview', icon: Monitor },
+  { name: 'Use Cases', path: '/console/use-cases', icon: Sparkles },
   { name: 'Escrows', path: '/console/escrows', icon: DollarSign },
   { name: 'Agents', path: '/console/agents', icon: Users },
   { name: 'Insurance', path: '/console/insurance', icon: Shield },
@@ -51,6 +53,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'Console Overview',
     desc: 'Live health of the hosted API and Casper testnet target: persistence status, network mode, deployed contract and escrow volume. Use it to confirm the backend is reachable before running actions.',
     source: 'live',
+  },
+  '/console/use-cases': {
+    title: 'Use Cases',
+    desc: 'Four narrative scenarios for non-technical reviewers — what AE402 is for, in plain language — with each step linking straight into the real panel that runs it (Escrows, Arbitration, Identity Registry, Advanced Escrow, Insurance, Risk). No separate logic: this page is a guided front door to the same live console.',
+    source: 'tool',
   },
   '/console/escrows': {
     title: 'Escrows',
