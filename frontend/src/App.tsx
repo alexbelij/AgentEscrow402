@@ -21,6 +21,7 @@ import Contracts from './components/console/Contracts'
 import AgentDemo from './components/console/AgentDemo'
 import Sandbox from './components/console/Sandbox'
 import AdvancedEscrow from './components/console/AdvancedEscrow'
+import Arbitration from './components/console/Arbitration'
 
 function Landing() {
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="agent-demo" element={<AgentDemo />} />
             <Route path="sandbox" element={<Sandbox />} />
             <Route path="advanced" element={<AdvancedEscrow />} />
+            <Route path="arbitration" element={<Arbitration />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

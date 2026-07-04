@@ -57,6 +57,12 @@ def _allow_hosted_demo_identity(monkeypatch):
     # app.py's own @lru_cache'd get_config - setting the env var is what
     # actually takes effect for this router regardless of dependency_overrides.
     monkeypatch.setenv("ALLOW_HOSTED_DEMO_IDENTITY", "true")
+    # server/app.py's rate_limit_middleware is a module-level dict keyed by
+    # client IP with a 60 req/min budget shared across the whole test
+    # session (TestClient always uses the same "testclient" IP) - clear it
+    # so this file's requests never get 429'd by unrelated tests that ran
+    # earlier in the same pytest session.
+    appmod._rate_limits.clear()
 
 
 class _FakeCasper:

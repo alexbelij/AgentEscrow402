@@ -14,6 +14,7 @@ import {
   Bot,
   ChevronRight,
   Layers,
+  Gavel,
 } from 'lucide-react';
 
 interface NavItem {
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { name: 'Risk', path: '/console/risk', icon: Activity },
   { name: 'Contracts', path: '/console/contracts', icon: FileText },
   { name: 'Advanced Escrow', path: '/console/advanced', icon: Layers },
+  { name: 'Arbitration', path: '/console/arbitration', icon: Gavel },
   { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
   { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
 ];
@@ -77,6 +79,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'Advanced Escrow',
     desc: 'Three advanced escrow primitives beyond the basic lifecycle: escrow with a selectable token type (CSPR/CEP-18/CEP-78, one token per escrow), a linear streaming payout between a start and end time, and a commit-reveal hash-lock on an existing escrow. CEP-18/CEP-78 transfers are currently simulated backend-side, not real on-chain calls.',
     source: 'demo',
+  },
+  '/console/arbitration': {
+    title: 'Arbitration',
+    desc: 'AI-powered dispute evidence analysis (real LLM call with a deterministic heuristic fallback, tries Groq then NVIDIA NIM then a local model) and VRF-based neutral arbiter election, both run live against the real backend. In production these feed the escrow /dispute → /resolve lifecycle.',
+    source: 'tool',
   },
   '/console/agent-demo': {
     title: 'Agent Demo',
