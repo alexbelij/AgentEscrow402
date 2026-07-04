@@ -70,3 +70,21 @@
 - Fix requires: contract upgrade (add installer-only `set_arbiters`/`add_arbiter` entry point via package-hash upgrade deploy) + backend `/resolve` endpoint + casper_client.resolve() + node script + 5 real/test arbiter accounts.
 - Rust toolchain now installed in sandbox (rustup, wasm32-unknown-unknown target) — `cargo build --release --target wasm32-unknown-unknown -p escrow` verified working.
 - Awaiting Alexey's go-ahead on contract upgrade + arbiter account list before implementing.
+
+## resolve()/arbiter-list fix — STATUS UPDATE (this session)
+- [x] Added `set_arbiters(arbiters: Vec<String>)` installer-only entry point to `contracts/escrow/src/main.rs`.
+- [x] Modified `call()` to detect existing `escrow_package_hash` and use `storage::add_contract_version` (upgrade path) instead of `storage::new_contract` (preserves existing escrows/reputation).
+- [x] Compiled wasm, verified `set_arbiters` string present in binary.
+- [x] Deployed contract upgrade on-chain via `deploy_contract_legacy.mjs` (400 CSPR payment; 150 CSPR was insufficient — "Out of gas"). Deploy hash `89fb3c3d86ac3ae67f2ff2b60cae83a46d05b68edd69faba60400af17eee83ce`, block 8396150, error_message: null.
+  - **IMPORTANT**: upgrade created a NEW contract entity hash `3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e`, distinct from OLD `5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467` used everywhere (frontend Contracts.tsx, backend .env CONTRACT_HASH). The package hash (`hash-d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) is stable across versions — should be the long-term reference, not the entity hash.
+  - **TODO**: update backend `.env`/`server/config.py` `ESCROW_CONTRACT_HASH` and frontend `Contracts.tsx` Core Escrow hash to the NEW entity hash `3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e` (or migrate config to reference the package hash + latest-version lookup instead of a fixed entity hash, to avoid this break on every future upgrade).
+- [x] Generated 5 test arbiter Ed25519 keypairs (`server/casper_tx/gen_arbiters.mjs`); pems at `/work/temp/keys/arbiters/arbiter_{1-5}_secret_key.pem` (became permission-denied mid-session due to sandbox user-context switch; hashes/pubkeys recorded in Slack report and in this repo's chat history).
+- [x] Registered the 5 arbiters on-chain via new `server/casper_tx/set_arbiters.mjs` script, called against the NEW contract hash. Deploy hash `a73cc0d0a35f43295674355a5bdb9f509b076ff3abf8c5d4bf5a6cdfcfef4a0d`, block 8396191, error_message: null.
+- [x] **Verified via `query_global_state`** on `hash-3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e` path `["arbiter_list"]` — returns all 5 registered arbiter account-hashes. Multisig arbiter list is now real and populated.
+- [ ] **STILL TODO (next)**: 
+  1. Wire `/resolve` FastAPI endpoint in `server/app.py` using existing (currently unused) `ResolveRequest` model.
+  2. Add `resolve()` method to `server/casper_client.py` (build+sign+submit a `resolve` deploy against the NEW contract hash with `service_hash`, `in_favor_of`, `arbiter_accounts` args).
+  3. Add resolve support to sandbox path (`server/sandbox.py`) so `--scenario bad` in `examples/escrow_agent.py` can complete end-to-end (currently fails after dispute because `release`/`refund` still require `status pending`, and `resolve` isn't called anywhere).
+  4. Update `.env`/`config.py`/`Contracts.tsx` to the new contract hash (see note above); consider making all 4 contract hashes backend-configurable per other agent's suggestion.
+  5. Re-run `examples/escrow_agent.py --scenario bad` end-to-end against production backend to prove full dispute→resolve→release lifecycle works on real testnet.
+  6. Fix stale hash in `SUBMISSION.md`.
