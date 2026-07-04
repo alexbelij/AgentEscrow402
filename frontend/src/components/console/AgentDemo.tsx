@@ -197,10 +197,6 @@ const AgentDemo: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-50">Agent Escrow Demo</h2>
-        <p className="text-gray-400 mt-2">Walk through a typical escrow lifecycle for AI agents on Casper testnet without losing the current result while you move between steps.</p>
-      </div>
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         The hosted demo sends a labelled x402-style <span className="font-mono">X-Payment</span> identity header so the live backend can identify the sender without a wallet popup. In production, a wallet/agent signs the same payload with Ed25519 and replay protection.
       </div>

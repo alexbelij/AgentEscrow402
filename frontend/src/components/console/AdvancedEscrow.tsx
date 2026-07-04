@@ -49,10 +49,10 @@ function TokenSelect({ value, onChange }: { value: TokenIdentifier; onChange: (t
   );
 }
 
-function ResultPanel({ error, result }: { error: string | null; result: unknown }) {
+function ResultPanel({ error, result, placeholder }: { error: string | null; result: unknown; placeholder?: string }) {
   if (error) {
     return (
-      <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 flex items-center mt-4">
+      <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 flex items-center">
         <XCircle className="h-5 w-5 mr-2 shrink-0" />
         <p className="break-all">{error}</p>
       </div>
@@ -60,13 +60,29 @@ function ResultPanel({ error, result }: { error: string | null; result: unknown 
   }
   if (result) {
     return (
-      <div className="text-emerald-300 bg-emerald-900/20 border border-emerald-700 rounded-lg p-3 mt-4">
+      <div className="text-emerald-300 bg-emerald-900/20 border border-emerald-700 rounded-lg p-3">
         <p className="flex items-center mb-2"><CheckCircle className="h-5 w-5 mr-2" /> Success</p>
         <pre className="text-xs font-mono whitespace-pre-wrap break-all">{JSON.stringify(result, null, 2)}</pre>
       </div>
     );
   }
-  return null;
+  return (
+    <div className="text-sm text-gray-500 border border-dashed border-[#2a2a3a] rounded-lg p-4 italic">
+      {placeholder || 'The response for this action will appear here.'}
+    </div>
+  );
+}
+
+/** Right-hand results rail: keeps every action's response visually anchored to
+ * the same side of the panel instead of stacking under the form, so long forms
+ * don't push the result out of view. */
+function ResultRail({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 xl:sticky xl:top-24 h-fit space-y-4">
+      <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">{title}</h4>
+      {children}
+    </div>
+  );
 }
 
 const AdvancedEscrow: React.FC = () => {
@@ -227,154 +243,174 @@ const AdvancedEscrow: React.FC = () => {
       </div>
 
       {tab === 'token' && (
-        <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 max-w-2xl">
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
-            Escrows a single token per escrow, selectable as native CSPR, a CEP-18 fungible token, or a CEP-78 NFT
-            (endpoint is named "multi-asset" but does not combine several assets in one escrow). CEP-18/CEP-78 transfers
-            are currently simulated on the backend (no real on-chain call yet) — the response's deploy hash is a
-            placeholder, exactly like the rest of this hosted demo console.
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Receiver account hash</label>
-              <input className={`${inputCls} font-mono text-sm`} value={tokenReceiver} onChange={(e) => setTokenReceiver(e.target.value)} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
+              Escrows a single token per escrow, selectable as native CSPR, a CEP-18 fungible token, or a CEP-78 NFT
+              (endpoint is named "multi-asset" but does not combine several assets in one escrow). CEP-18/CEP-78 transfers
+              are currently simulated on the backend (no real on-chain call yet) — the response's deploy hash is a
+              placeholder, exactly like the rest of this hosted demo console.
             </div>
-            <div>
-              <label className={labelCls}>Amount (motes / token units)</label>
-              <input className={inputCls} type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} />
-            </div>
-          </div>
-          <TokenSelect value={tokenIdentifier} onChange={setTokenIdentifier} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Service hash</label>
-              <div className="flex gap-2">
-                <input className={`${inputCls} font-mono text-sm`} value={tokenServiceHash} onChange={(e) => setTokenServiceHash(e.target.value)} />
-                <button type="button" onClick={() => setTokenServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
-                  <RefreshCw className="h-4 w-4" />
-                </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Receiver account hash</label>
+                <input className={`${inputCls} font-mono text-sm`} value={tokenReceiver} onChange={(e) => setTokenReceiver(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>Amount (motes / token units)</label>
+                <input className={inputCls} type="number" value={tokenAmount} onChange={(e) => setTokenAmount(e.target.value)} />
               </div>
             </div>
-            <div>
-              <label className={labelCls}>TTL (seconds)</label>
-              <input className={inputCls} type="number" value={tokenTtl} onChange={(e) => setTokenTtl(e.target.value)} />
+            <TokenSelect value={tokenIdentifier} onChange={setTokenIdentifier} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Service hash</label>
+                <div className="flex gap-2">
+                  <input className={`${inputCls} font-mono text-sm`} value={tokenServiceHash} onChange={(e) => setTokenServiceHash(e.target.value)} />
+                  <button type="button" onClick={() => setTokenServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>TTL (seconds)</label>
+                <input className={inputCls} type="number" value={tokenTtl} onChange={(e) => setTokenTtl(e.target.value)} />
+              </div>
             </div>
+            <button onClick={handleCreateTokenEscrow} disabled={tokenLoading} className={btnCls}>
+              {tokenLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+              Create escrow
+            </button>
           </div>
-          <button onClick={handleCreateTokenEscrow} disabled={tokenLoading} className={btnCls}>
-            {tokenLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
-            Create escrow
-          </button>
-          <ResultPanel error={tokenError} result={tokenResult} />
+          <ResultRail title="Result">
+            <ResultPanel error={tokenError} result={tokenResult} />
+          </ResultRail>
         </div>
       )}
 
       {tab === 'stream' && (
-        <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 max-w-2xl">
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
-            Deposits the full amount up front, then releases it to the receiver linearly between a start and end
-            timestamp. Streamed/remaining amounts are computed live from elapsed time — read them from the status card
-            below. Same simulated-transfer caveat as the alt-token escrow applies to CEP-18/CEP-78 tokens.
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Receiver account hash</label>
-              <input className={`${inputCls} font-mono text-sm`} value={streamReceiver} onChange={(e) => setStreamReceiver(e.target.value)} />
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
+              Deposits the full amount up front, then releases it to the receiver linearly between a start and end
+              timestamp. Streamed/remaining amounts are computed live from elapsed time — read them from the status
+              card on the right. Same simulated-transfer caveat as the alt-token escrow applies to CEP-18/CEP-78 tokens.
             </div>
-            <div>
-              <label className={labelCls}>Total amount</label>
-              <input className={inputCls} type="number" value={streamAmount} onChange={(e) => setStreamAmount(e.target.value)} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Receiver account hash</label>
+                <input className={`${inputCls} font-mono text-sm`} value={streamReceiver} onChange={(e) => setStreamReceiver(e.target.value)} />
+              </div>
+              <div>
+                <label className={labelCls}>Total amount</label>
+                <input className={inputCls} type="number" value={streamAmount} onChange={(e) => setStreamAmount(e.target.value)} />
+              </div>
             </div>
-          </div>
-          <TokenSelect value={streamToken} onChange={setStreamToken} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-            <div>
-              <label className={labelCls}>Service hash</label>
+            <TokenSelect value={streamToken} onChange={setStreamToken} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className={labelCls}>Service hash</label>
+                <div className="flex gap-2">
+                  <input className={`${inputCls} font-mono text-sm`} value={streamServiceHash} onChange={(e) => setStreamServiceHash(e.target.value)} />
+                  <button type="button" onClick={() => setStreamServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Duration (seconds, from now)</label>
+                <input className={inputCls} type="number" value={streamDurationSeconds} onChange={(e) => setStreamDurationSeconds(e.target.value)} />
+              </div>
+            </div>
+            <button onClick={handleCreateStreamEscrow} disabled={streamLoading} className={btnCls}>
+              {streamLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+              Create streaming escrow
+            </button>
+
+            <div className="mt-8 pt-6 border-t border-[#1e1e2e]">
+              <h4 className="text-lg font-semibold text-gray-200 mb-3">Check stream status</h4>
               <div className="flex gap-2">
-                <input className={`${inputCls} font-mono text-sm`} value={streamServiceHash} onChange={(e) => setStreamServiceHash(e.target.value)} />
-                <button type="button" onClick={() => setStreamServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
-                  <RefreshCw className="h-4 w-4" />
+                <input
+                  className={`${inputCls} font-mono text-sm`}
+                  placeholder="service_hash"
+                  value={streamStatusHash}
+                  onChange={(e) => setStreamStatusHash(e.target.value)}
+                />
+                <button
+                  onClick={() => handleFetchStreamStatus()}
+                  disabled={streamStatusLoading || !streamStatusHash}
+                  className={btnCls}
+                >
+                  {streamStatusLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+                  Refresh
                 </button>
               </div>
             </div>
-            <div>
-              <label className={labelCls}>Duration (seconds, from now)</label>
-              <input className={inputCls} type="number" value={streamDurationSeconds} onChange={(e) => setStreamDurationSeconds(e.target.value)} />
-            </div>
           </div>
-          <button onClick={handleCreateStreamEscrow} disabled={streamLoading} className={btnCls}>
-            {streamLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
-            Create streaming escrow
-          </button>
-          <ResultPanel error={streamError} result={streamResult} />
-
-          <div className="mt-8 pt-6 border-t border-[#1e1e2e]">
-            <h4 className="text-lg font-semibold text-gray-200 mb-3">Check stream status</h4>
-            <div className="flex gap-2 mb-3">
-              <input
-                className={`${inputCls} font-mono text-sm`}
-                placeholder="service_hash"
-                value={streamStatusHash}
-                onChange={(e) => setStreamStatusHash(e.target.value)}
-              />
-              <button
-                onClick={() => handleFetchStreamStatus()}
-                disabled={streamStatusLoading || !streamStatusHash}
-                className={btnCls}
-              >
-                {streamStatusLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
-                Refresh
-              </button>
-            </div>
-            {streamStatusError && <ResultPanel error={streamStatusError} result={null} />}
-            {streamStatus && (
-              <div className="bg-gray-800 border border-[#1e1e2e] rounded-lg p-4 space-y-2 text-sm text-gray-200">
-                <div className="flex justify-between"><span>Status</span><span className="font-mono">{streamStatus.status}</span></div>
-                <div className="flex justify-between"><span>Streamed</span><span className="font-mono">{streamStatus.streamed_amount} / {streamStatus.total_amount}</span></div>
-                <div className="flex justify-between"><span>Remaining</span><span className="font-mono">{streamStatus.remaining_amount}</span></div>
-                <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
-                  <div
-                    className="bg-amber-500 h-2 rounded-full"
-                    style={{ width: `${Math.min(100, (streamStatus.streamed_amount / Math.max(1, streamStatus.total_amount)) * 100)}%` }}
-                  />
+          <ResultRail title="Result">
+            <ResultPanel error={streamError} result={streamResult} />
+            <div className="pt-4 border-t border-[#1e1e2e]">
+              <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Stream status</h5>
+              {streamStatusError && <ResultPanel error={streamStatusError} result={null} />}
+              {!streamStatusError && streamStatus && (
+                <div className="bg-gray-800 border border-[#1e1e2e] rounded-lg p-4 space-y-2 text-sm text-gray-200">
+                  <div className="flex justify-between"><span>Status</span><span className="font-mono">{streamStatus.status}</span></div>
+                  <div className="flex justify-between"><span>Streamed</span><span className="font-mono">{streamStatus.streamed_amount} / {streamStatus.total_amount}</span></div>
+                  <div className="flex justify-between"><span>Remaining</span><span className="font-mono">{streamStatus.remaining_amount}</span></div>
+                  <div className="w-full bg-gray-700 rounded-full h-2 mt-2">
+                    <div
+                      className="bg-amber-500 h-2 rounded-full"
+                      style={{ width: `${Math.min(100, (streamStatus.streamed_amount / Math.max(1, streamStatus.total_amount)) * 100)}%` }}
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+              {!streamStatusError && !streamStatus && (
+                <p className="text-sm text-gray-500 italic">No status fetched yet.</p>
+              )}
+            </div>
+          </ResultRail>
         </div>
       )}
 
       {tab === 'swap' && (
-        <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 max-w-2xl">
-          <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
-            This is a commit-reveal hash-lock on an <span className="font-mono">existing</span> escrow, not a two-party
-            asset-for-asset swap: the escrow's sender commits <span className="font-mono">sha256(secret)</span>, then
-            the escrow's receiver later reveals the secret to release the escrow. Create the escrow first (Alt-Token
-            Escrow tab or Escrows page), then paste its service_hash here.
-          </div>
-          <div className="mb-4">
-            <label className={labelCls}>Service hash of an existing escrow</label>
-            <input className={`${inputCls} font-mono text-sm`} value={swapServiceHash} onChange={(e) => setSwapServiceHash(e.target.value)} placeholder={'a'.repeat(64)} />
-          </div>
-          <div className="mb-4">
-            <label className={labelCls}>Secret preimage</label>
-            <input className={inputCls} value={swapPreimage} onChange={(e) => setSwapPreimage(e.target.value)} />
-          </div>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <button onClick={handleCommit} disabled={swapCommitLoading || !swapServiceHash} className={`${btnCls} w-full justify-center`}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
+              This is a commit-reveal hash-lock on an <span className="font-mono">existing</span> escrow, not a two-party
+              asset-for-asset swap: the escrow's sender commits <span className="font-mono">sha256(secret)</span>, then
+              the escrow's receiver later reveals the secret to release the escrow. Create the escrow first (Alt-Token
+              Escrow tab or Escrows page), then paste its service_hash here.
+            </div>
+            <div className="mb-4">
+              <label className={labelCls}>Service hash of an existing escrow</label>
+              <input className={`${inputCls} font-mono text-sm`} value={swapServiceHash} onChange={(e) => setSwapServiceHash(e.target.value)} placeholder={'a'.repeat(64)} />
+            </div>
+            <div className="mb-4">
+              <label className={labelCls}>Secret preimage</label>
+              <input className={inputCls} value={swapPreimage} onChange={(e) => setSwapPreimage(e.target.value)} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={handleCommit} disabled={swapCommitLoading || !swapServiceHash} className={`${btnCls} flex-1 justify-center`}>
                 {swapCommitLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
                 1. Commit (as sender)
               </button>
-              <ResultPanel error={swapCommitError} result={swapCommitResult} />
-            </div>
-            <div className="flex-1">
-              <button onClick={handleReveal} disabled={swapRevealLoading || !swapServiceHash} className={`${btnCls} w-full justify-center`}>
+              <button onClick={handleReveal} disabled={swapRevealLoading || !swapServiceHash} className={`${btnCls} flex-1 justify-center`}>
                 {swapRevealLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
                 2. Reveal (as receiver)
               </button>
-              <ResultPanel error={swapRevealError} result={swapRevealResult} />
             </div>
           </div>
+          <ResultRail title="Result">
+            <div>
+              <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">1. Commit</h5>
+              <ResultPanel error={swapCommitError} result={swapCommitResult} />
+            </div>
+            <div className="pt-4 border-t border-[#1e1e2e]">
+              <h5 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">2. Reveal</h5>
+              <ResultPanel error={swapRevealError} result={swapRevealResult} />
+            </div>
+          </ResultRail>
         </div>
       )}
     </div>

@@ -195,8 +195,6 @@ const Insurance: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Insurance Protocol</h2>
-
       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-100 leading-relaxed">
         <strong>Truth label:</strong> the Insurance Pool contract is deployed on Casper testnet, and the hosted API exposes the same premium/deposit/claim business flow used by production. Until contract-backed pool accounting is fully verified in the browser, pool balances shown here are live API accounting/demo fallback values, not silently presented as mainnet liquidity. Pricing itself is real backend logic: base fee + service risk + selected agent reputation/risk.
       </div>

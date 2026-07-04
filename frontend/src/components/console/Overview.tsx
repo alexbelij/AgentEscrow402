@@ -97,12 +97,6 @@ const Overview: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Console Overview</h2>
-
-      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4 text-sm text-emerald-100 leading-relaxed">
-        <strong>Live console status:</strong> this dashboard talks to the hosted API and Casper testnet configuration. Persistence is wired for <strong>Neon</strong>; when Neon is unavailable, the UI labels the hosted fallback honestly instead of presenting demo memory as production data.
-      </div>
-
       {/* Health Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">

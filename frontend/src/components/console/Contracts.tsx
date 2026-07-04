@@ -64,11 +64,6 @@ const Contracts: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold text-gray-50">Contracts & Playground</h2>
-        <p className="text-gray-400 mt-2">Live Casper testnet contract hashes plus API-backed tools for escrow, VRF and service hash generation.</p>
-      </div>
-
       <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-sm text-amber-100">
         This playground calls the deployed backend against the current testnet contract configuration. Write calls include the demo x402 identity header from the frontend;
         production calls should use wallet/agent-signed payment headers. Results below are raw live API responses, not screenshots or mock cards.

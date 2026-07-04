@@ -154,8 +154,6 @@ const Agents: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Agent Management</h2>
-
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         <strong>What this section is for:</strong> agent identities bind a service agent to a public key, DID document hash, capabilities and reputation. The list is fetched from the live identity/reputation API. If the optional on-chain identity registry is not configured, the backend labels registrations as <span className="font-mono">local_registry</span> instead of pretending they were contract writes. Use the detail icon to inspect reputation and delegated capabilities before trusting an agent.
       </div>

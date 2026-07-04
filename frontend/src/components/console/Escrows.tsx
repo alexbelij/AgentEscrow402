@@ -249,8 +249,6 @@ const Escrows: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Escrow Management</h2>
-
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         <strong>What is real here:</strong> every row is loaded from the live backend; new rows are persisted in Neon when the hosted database is connected and otherwise shown as a clearly labelled demo fallback. Create/release/refund/dispute calls go through the same API used by production. The hosted console currently uses a labelled demo <span className="font-mono">X-Payment</span> identity header instead of silently pretending a browser wallet is connected; production clients sign that header with their wallet/agent key.
       </div>
