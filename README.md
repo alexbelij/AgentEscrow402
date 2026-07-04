@@ -202,7 +202,7 @@ Deployed on Casper Testnet:
 
 | Contract | Hash |
 |---|---|
-| Core Escrow | `3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e` |
+| Core Escrow | `dca7e926af8aac73fc1104e1bb9a52b0035a9196bef5de8336557ea34cec69d6` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` |
 | Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` |
 | VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` |

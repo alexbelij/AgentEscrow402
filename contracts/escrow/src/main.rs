@@ -11,6 +11,7 @@ use casper_contract::contract_api::{runtime, storage, system};
 use casper_contract::unwrap_or_revert::UnwrapOrRevert;
 use casper_types::account::AccountHash;
 use casper_types::contracts::NamedKeys;
+use casper_types::crypto::{self, AsymmetricType, PublicKey, Signature};
 use casper_types::{EntryPointPayment, 
     ApiError, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointType, EntryPoints, Key,
     Parameter, URef, U512,
@@ -165,6 +166,18 @@ fn require_not_frozen() {
 
 fn compute_fee(amount: U512, bps: u64) -> U512 {
     amount * U512::from(bps) / U512::from(10_000u64)
+}
+
+/// Canonical message an arbiter signs to cast a resolve() vote. Binding the
+/// exact service_hash and verdict into the signed message prevents a vote
+/// signature from being replayed for a different escrow or a different
+/// outcome on the same escrow.
+fn build_resolve_message(service_hash: &str, in_favor_of: &str) -> String {
+    let mut msg = String::from("resolve:");
+    msg.push_str(service_hash);
+    msg.push(':');
+    msg.push_str(in_favor_of);
+    msg
 }
 
 // ── Entry points ─────────────────────────────────────────────────────
@@ -362,16 +375,22 @@ pub extern "C" fn dispute() {
 }
 
 /// Resolve dispute via 3-of-5 multisig arbitration.
-/// NOTE: arbiter identity is verified against the registered list but not
-/// cryptographically signed on-chain. Production deployments should use a
-/// multi-call voting pattern or off-chain signature verification.
+/// Each arbiter's vote is a real Ed25519 signature (verified on-chain via
+/// `casper_types::crypto::verify`) over the canonical message
+/// `"resolve:{service_hash}:{in_favor_of}"`, signed with that arbiter's
+/// registered keypair. This binds every vote to this specific escrow and
+/// verdict -- a vote cannot be replayed for a different escrow/outcome or
+/// forged without the arbiter's private key.
 #[no_mangle]
 pub extern "C" fn resolve() {
     require_not_frozen();
 
     let service_hash: String = runtime::get_named_arg("service_hash");
     let in_favor_of: String = runtime::get_named_arg("in_favor_of");
-    let arbiter_accounts: Vec<String> = runtime::get_named_arg("arbiter_accounts");
+    // Hex-encoded (AsymmetricType::to_hex format, tag-prefixed) Ed25519
+    // public keys and their corresponding signatures over the vote message.
+    let arbiter_pubkeys: Vec<String> = runtime::get_named_arg("arbiter_pubkeys");
+    let arbiter_signatures: Vec<String> = runtime::get_named_arg("arbiter_signatures");
 
     let dict = get_dict_uref(ESCROWS_DICT);
     let ((sender_str, receiver_str, amount_str), (_, status, created_at), (ttl, stored_fee_bps)) =
@@ -387,7 +406,10 @@ pub extern "C" fn resolve() {
         .unwrap_or_revert();
     let threshold: u64 = storage::read(threshold_uref).unwrap_or_revert().unwrap_or(3);
 
-    if (arbiter_accounts.len() as u64) < threshold {
+    if arbiter_pubkeys.len() != arbiter_signatures.len() {
+        runtime::revert(ApiError::User(ERR_INVALID_SIGNATURE));
+    }
+    if (arbiter_pubkeys.len() as u64) < threshold {
         runtime::revert(ApiError::User(ERR_INSUFFICIENT_SIGS));
     }
 
@@ -395,15 +417,31 @@ pub extern "C" fn resolve() {
         .unwrap_or_revert()
         .into_uref()
         .unwrap_or_revert();
+    // ARBITER_LIST stores each arbiter's hex-encoded Ed25519 public key
+    // (registered via `set_arbiters`), not an account-hash -- a public key
+    // is required to verify a signature, an account-hash is one-way and
+    // cannot be reversed back into it.
     let registered: Vec<String> = storage::read(arb_uref).unwrap_or_revert().unwrap_or_default();
 
-    // Deduplicate arbiter accounts to prevent a single arbiter counting multiple times
+    let vote_message = build_resolve_message(&service_hash, &in_favor_of);
+
+    // Verify each claimed vote's signature and deduplicate by public key so
+    // a single arbiter's vote cannot be counted more than once.
     let mut seen = Vec::<String>::new();
     let mut valid_count: u64 = 0;
-    for acct in &arbiter_accounts {
-        if !seen.contains(acct) && registered.contains(acct) {
+    for (pubkey_hex, sig_hex) in arbiter_pubkeys.iter().zip(arbiter_signatures.iter()) {
+        if seen.contains(pubkey_hex) || !registered.contains(pubkey_hex) {
+            continue;
+        }
+        let Ok(public_key) = PublicKey::from_hex(pubkey_hex.as_bytes()) else {
+            continue;
+        };
+        let Ok(signature) = Signature::from_hex(sig_hex.as_bytes()) else {
+            continue;
+        };
+        if crypto::verify(vote_message.as_bytes(), &signature, &public_key).is_ok() {
             valid_count += 1;
-            seen.push(acct.clone());
+            seen.push(pubkey_hex.clone());
         }
     }
     if valid_count < threshold {
@@ -456,7 +494,9 @@ pub extern "C" fn configure_fee() {
 
 /// Register (replace) the on-chain arbiter list used by `resolve()`
 /// (installer only). Overwrites the whole list -- pass the full desired
-/// set of arbiter account-hash hex strings each time.
+/// set of arbiter hex-encoded Ed25519 public keys (AsymmetricType::to_hex
+/// format, tag-prefixed) each time. A public key (not an account-hash) is
+/// required so `resolve()` can verify each arbiter's vote signature.
 #[no_mangle]
 pub extern "C" fn set_arbiters() {
     let caller = runtime::get_caller();
@@ -578,7 +618,11 @@ pub extern "C" fn call() {
             Parameter::new("service_hash", CLType::String),
             Parameter::new("in_favor_of", CLType::String),
             Parameter::new(
-                "arbiter_accounts",
+                "arbiter_pubkeys",
+                CLType::List(alloc::boxed::Box::new(CLType::String)),
+            ),
+            Parameter::new(
+                "arbiter_signatures",
                 CLType::List(alloc::boxed::Box::new(CLType::String)),
             ),
         ],

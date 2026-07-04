@@ -162,14 +162,19 @@ class CasperClient:
         self,
         service_hash: str,
         in_favor_of: str,
-        arbiter_accounts: list[str],
+        arbiter_pubkeys: list[str],
+        arbiter_signatures: list[str],
     ) -> str:
         """Submit `resolve` tx: 3-of-5 arbiter multisig dispute resolution.
 
-        Any account may submit this call (the contract checks
-        `arbiter_accounts` against the on-chain registered `arbiter_list`,
-        not the transaction signer's identity). We sign with the configured
-        deployer key by default.
+        Any account may submit this call -- the contract itself verifies
+        each (pubkey, signature) pair on-chain via `casper_types::crypto::
+        verify`, checking (a) the pubkey is a registered arbiter and (b)
+        the signature is real, over the canonical message
+        `"resolve:{service_hash}:{in_favor_of}"`. We sign the *transaction*
+        with the configured deployer key (any submitter works), but the
+        arbiter *votes* themselves must be pre-signed off-chain by the
+        actual arbiters with their own keys.
         """
         if not self._contract_hash:
             raise RuntimeError("contract_hash not configured")
@@ -177,8 +182,10 @@ class CasperClient:
             raise RuntimeError("private key not configured")
         if in_favor_of not in ("sender", "receiver"):
             raise ValueError(f"in_favor_of must be 'sender' or 'receiver', got: {in_favor_of!r}")
-        if not arbiter_accounts:
-            raise ValueError("arbiter_accounts must be non-empty")
+        if not arbiter_pubkeys:
+            raise ValueError("arbiter_pubkeys must be non-empty")
+        if len(arbiter_pubkeys) != len(arbiter_signatures):
+            raise ValueError("arbiter_pubkeys and arbiter_signatures must have the same length")
 
         return await self._run_node_script(
             _RESOLVE_SCRIPT,
@@ -186,7 +193,8 @@ class CasperClient:
                 "CONTRACT_HASH": self._contract_hash,
                 "SERVICE_HASH": service_hash,
                 "IN_FAVOR_OF": in_favor_of,
-                "ARBITER_ACCOUNTS_JSON": json.dumps(arbiter_accounts),
+                "ARBITER_PUBKEYS_JSON": json.dumps(arbiter_pubkeys),
+                "ARBITER_SIGNATURES_JSON": json.dumps(arbiter_signatures),
                 "PEM_PATH": self._key_path,
                 "KEY_ALGO": "secp256k1",
                 "CASPER_RPC": self._rpc_url,

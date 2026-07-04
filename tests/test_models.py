@@ -90,7 +90,8 @@ class TestResolveRequest:
         r = ResolveRequest(
             service_hash="a" * 64,
             in_favor_of="sender",
-            arbiter_accounts=["arb1"],
+            arbiter_pubkeys=["01" + "aa" * 32],
+            arbiter_signatures=["01" + "bb" * 64],
         )
         assert r.in_favor_of == "sender"
 
@@ -99,7 +100,8 @@ class TestResolveRequest:
             ResolveRequest(
                 service_hash="a" * 64,
                 in_favor_of="hacker",
-                arbiter_accounts=[],
+                arbiter_pubkeys=[],
+                arbiter_signatures=[],
             )
 
 

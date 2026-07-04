@@ -236,6 +236,124 @@ class TestReputationEndpoint:
         assert resp.json()["completed"] == 1
 
 
+class TestResolveEndpoint:
+    """`/resolve` now requires real Ed25519 arbiter vote signatures, verified
+    locally against `Config.arbiter_pubkeys` (mirrors the on-chain check)."""
+
+    @staticmethod
+    def _make_arbiters(n: int):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        keys = [Ed25519PrivateKey.generate() for _ in range(n)]
+        pubkeys = tuple("01" + k.public_key().public_bytes_raw().hex() for k in keys)
+        return keys, pubkeys
+
+    @staticmethod
+    def _sign(key, service_hash: str, in_favor_of: str) -> str:
+        message = f"resolve:{service_hash}:{in_favor_of}".encode()
+        return "01" + key.sign(message).hex()
+
+    def _client_with_arbiters(self, sandbox_store, pubkeys):
+        cfg = Config(sandbox=True, arbiter_pubkeys=pubkeys, arbiter_threshold=3)
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[get_sandbox] = lambda: sandbox_store
+        client = TestClient(app)
+        return client
+
+    def _open_disputed_escrow(self, client, h: str):
+        client.post(
+            "/escrow",
+            json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+        )
+        resp = client.post(
+            "/dispute", json={"service_hash": h, "reason_hash": "b" * 64}
+        )
+        assert resp.status_code == 200
+
+    def test_resolve_with_valid_threshold_signatures_succeeds(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys)
+        try:
+            h = _hash("resolve-ok")
+            self._open_disputed_escrow(client, h)
+            sigs = [self._sign(k, h, "receiver") for k in keys[:3]]
+            resp = client.post(
+                "/resolve",
+                json={
+                    "service_hash": h,
+                    "in_favor_of": "receiver",
+                    "arbiter_pubkeys": list(pubkeys[:3]),
+                    "arbiter_signatures": sigs,
+                },
+            )
+            assert resp.status_code == 200, resp.text
+            assert resp.json()["status"] == "resolved"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_resolve_rejects_below_threshold(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys)
+        try:
+            h = _hash("resolve-too-few")
+            self._open_disputed_escrow(client, h)
+            sigs = [self._sign(k, h, "receiver") for k in keys[:2]]  # only 2, need 3
+            resp = client.post(
+                "/resolve",
+                json={
+                    "service_hash": h,
+                    "in_favor_of": "receiver",
+                    "arbiter_pubkeys": list(pubkeys[:2]),
+                    "arbiter_signatures": sigs,
+                },
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_resolve_rejects_forged_signatures_from_unregistered_key(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys)
+        try:
+            h = _hash("resolve-forged")
+            self._open_disputed_escrow(client, h)
+            outsider_keys, outsider_pubkeys = self._make_arbiters(3)
+            sigs = [self._sign(k, h, "receiver") for k in outsider_keys]
+            resp = client.post(
+                "/resolve",
+                json={
+                    "service_hash": h,
+                    "in_favor_of": "receiver",
+                    "arbiter_pubkeys": list(outsider_pubkeys),
+                    "arbiter_signatures": sigs,
+                },
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_resolve_rejects_replayed_signature_for_flipped_verdict(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys)
+        try:
+            h = _hash("resolve-replay")
+            self._open_disputed_escrow(client, h)
+            # Sign for "receiver" but submit claiming "sender" -- must fail.
+            sigs = [self._sign(k, h, "receiver") for k in keys[:3]]
+            resp = client.post(
+                "/resolve",
+                json={
+                    "service_hash": h,
+                    "in_favor_of": "sender",
+                    "arbiter_pubkeys": list(pubkeys[:3]),
+                    "arbiter_signatures": sigs,
+                },
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+
 class TestComputeHashEndpoint:
     def test_compute_hash(self, client):
         resp = client.post(
