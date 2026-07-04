@@ -36,7 +36,7 @@ class AgentIdentity(BaseModel):
     metadata_hash: str
     risk_score: int = Field(ge=0, le=100)
     slashed_count: int
-    stake: int = 0
+    stake: int = Field(default=0, ge=0)
 
     @field_validator("did")
     @classmethod
@@ -100,14 +100,17 @@ class IdentityRegistry:
             if not identity:
                 raise ValueError("Identity not found")
 
-            total = identity.total_deals + completed + disputed
-            if total > 0:
+            new_deals = completed + disputed
+            if new_deals > 0:
+                total = identity.total_deals + new_deals
                 new_dispute_rate = (identity.dispute_rate * identity.total_deals + disputed) / total
                 identity.dispute_rate = new_dispute_rate
+                identity.total_deals = total
+                success_rate = (completed / total) * 100
+                identity.reputation_score = min(100, max(0, round(success_rate)))
 
-            identity.total_deals += completed + disputed
-            success_rate = (completed / max(total, 1)) * 100
-            identity.reputation_score = min(100, max(0, int(success_rate)))
+            # No new deals this call: nothing to recompute, leave the score
+            # as-is (a bare "touch" call must not reset reputation to 0).
             identity.last_active = int(datetime.utcnow().timestamp())
             identity.metadata_hash = self._compute_metadata_hash(identity)
 
