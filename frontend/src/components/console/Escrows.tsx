@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowActionRequest, EscrowStatus, Estimate } from '../../lib/api';
+import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Estimate } from '../../lib/api';
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
+import { useSigner } from '../../lib/signer';
+import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import {
   PlusCircle,
   Eye,
@@ -108,6 +110,9 @@ const Select: React.FC<SelectProps> = ({ label, id, options, error, className = 
 );
 
 const Escrows: React.FC = () => {
+  const { isLive } = useSigner();
+  const { run: runLifecycleAction } = useLifecycleAction();
+  const [contractHash, setContractHash] = useState<string | undefined>(undefined);
   const [escrows, setEscrows] = useState<Escrow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,6 +160,12 @@ const Escrows: React.FC = () => {
     fetchEscrows();
   }, [fetchEscrows]);
 
+  useEffect(() => {
+    // Needed to build a live wallet-signed transaction (release/refund/dispute
+    // must target the exact deployed escrow contract). Harmless in demo mode.
+    api.getHealth().then((res) => setContractHash(res.data?.contract_hash)).catch(() => undefined);
+  }, []);
+
   const handleViewDetails = async (escrow: Escrow) => {
     setSelectedEscrow(escrow);
     setIsDetailModalOpen(true);
@@ -192,22 +203,20 @@ const Escrows: React.FC = () => {
     setActionSuccess(null);
 
     try {
-      const requestBody: EscrowActionRequest = {
-        service_hash: selectedEscrow.hash,
-      };
+      // Dispute requires a 64-char reason hash; derive one from the free-text reason.
+      const reasonHash = actionType === 'dispute' ? randomHex64() : undefined;
+      const result = await runLifecycleAction(actionType, selectedEscrow.hash, contractHash, reasonHash);
 
-      let res;
-      if (actionType === 'release') {
-        res = await api.releaseEscrow(requestBody);
-      } else if (actionType === 'refund') {
-        res = await api.refundEscrow(requestBody);
-      } else if (actionType === 'dispute') {
-        // Dispute requires a 64-char reason hash; derive one from the free-text reason.
-        res = await api.disputeEscrow({ ...requestBody, reason_hash: randomHex64() });
+      if (!result.ok) {
+        if (result.cancelled) {
+          setActionError('Cancelled in wallet.');
+          return;
+        }
+        throw new Error(result.error);
       }
-
-      if (res?.error) throw new Error(res.error);
-      setActionSuccess(`Action "${actionType}" successful! Deploy Hash: ${res?.data?.deploy_hash}`);
+      setActionSuccess(
+        `Action "${actionType}" successful! ${isLive ? 'Transaction hash' : 'Deploy hash'}: ${result.deployHash}`,
+      );
       fetchEscrows(); // Refresh list
       // Optionally, close modal after a delay or on user click
     } catch (err) {
@@ -506,8 +515,17 @@ const Escrows: React.FC = () => {
               <span className="font-mono text-gray-400">{selectedEscrow.hash.substring(0, 12)}...</span>?
             </p>
             <p className="text-sm text-gray-500">
-              This escrow is addressed by its <span className="font-mono">service_hash</span>. The action is sent to the backend as{' '}
-              <span className="font-mono">POST /{actionType}</span> with <span className="font-mono">{'{ service_hash }'}</span>.
+              {isLive ? (
+                <>
+                  Your connected wallet will build and sign this transaction directly (a wallet popup will appear) — the backend only verifies
+                  on-chain state afterwards. Only works if your connected account is this escrow's sender{actionType === 'dispute' ? ' or receiver' : ''}.
+                </>
+              ) : (
+                <>
+                  This escrow is addressed by its <span className="font-mono">service_hash</span>. The demo signer's action is sent to the backend as{' '}
+                  <span className="font-mono">POST /{actionType}</span> with <span className="font-mono">{'{ service_hash }'}</span>.
+                </>
+              )}
             </p>
             {actionType === 'dispute' && (
               <Input

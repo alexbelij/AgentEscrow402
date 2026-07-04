@@ -174,6 +174,31 @@ class CasperClient:
             },
         )
 
+    async def confirm_wallet_lifecycle_tx(
+        self,
+        service_hash: str,
+        expected_status: str,
+        *,
+        attempts: int = 10,
+        delay_seconds: float = 1.5,
+    ) -> bool:
+        """Poll on-chain contract state until it reflects a wallet-submitted
+        release/refund/dispute call, or give up.
+
+        We deliberately do NOT try to parse the deploy's execution result to
+        decide success — Casper contract state is the source of truth, and
+        the contract itself enforces `get_caller()` == sender/receiver for
+        these entry points. If the on-chain `escrows` dict shows the expected
+        status, the wallet's own signed transaction genuinely executed the
+        entry point as that caller; there is nothing left to trust.
+        """
+        for _ in range(attempts):
+            record = await self.get_escrow(service_hash)
+            if record is not None and record.status.value == expected_status:
+                return True
+            await asyncio.sleep(delay_seconds)
+        return False
+
     # ── Read operations (direct JSON-RPC) ─────────────────────────────────
 
     async def query_contract_dict(
