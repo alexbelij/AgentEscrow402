@@ -19,7 +19,7 @@ const EXTERNAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', icon: FileCode },
   { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: BookOpen },
   { label: 'MCP Server', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: Plug },
-  { label: 'Contracts', href: 'https://cspr.live/contract/5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467', icon: Shield },
+  { label: 'Contracts', href: 'https://testnet.cspr.live/contract/5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467', icon: Shield },
 ]
 
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
