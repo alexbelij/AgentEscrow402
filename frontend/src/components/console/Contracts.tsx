@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
 import { csprToMotes, randomHex64 } from '../../lib/format';
 import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards } from 'lucide-react';
 
-const CONTRACTS = [
+// Fallback only — used if the backend /contracts call fails (e.g. offline
+// dev build). The source of truth is the backend Config (env-overridable),
+// so a contract redeploy no longer requires a frontend code change.
+const FALLBACK_CONTRACTS = [
   {
     name: 'Core Escrow',
-    hash: '5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467',
-    role: 'Create/release/refund/dispute escrow lifecycle exposed by the API.',
+    hash: '3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e',
+    role: 'Create/release/refund/dispute/resolve escrow lifecycle exposed by the API.',
   },
   {
     name: 'Escrow Manager',
@@ -35,6 +38,15 @@ const Contracts: React.FC = () => {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [escrowStatus, setEscrowStatus] = useState<string | null>(null);
+  const [contractsList, setContractsList] = useState(FALLBACK_CONTRACTS);
+
+  useEffect(() => {
+    api.getContracts().then((res) => {
+      if (res.data && res.data.length > 0) setContractsList(res.data);
+    }).catch(() => {
+      // Keep fallback list — backend unreachable
+    });
+  }, []);
 
   const run = async (label: string, fn: () => Promise<any>) => {
     setLoadingAction(label);
@@ -70,7 +82,7 @@ const Contracts: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {CONTRACTS.map((contract) => (
+        {contractsList.map((contract) => (
           <div key={contract.hash} className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5">
             <div className="flex items-start justify-between gap-3">
               <div>

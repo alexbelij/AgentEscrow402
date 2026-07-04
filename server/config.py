@@ -20,6 +20,9 @@ class Config:
     default_ttl: int = 300
     insurance_fee_bps: int = 200  # 2% = 200 basis points
     contract_hash: str = ""
+    manager_contract_hash: str = ""
+    insurance_contract_hash: str = ""
+    vrf_contract_hash: str = ""
     allow_hosted_demo_identity: bool = False
 
     @classmethod
@@ -49,6 +52,21 @@ class Config:
             default_ttl=int(os.getenv("DEFAULT_TTL", "300")),
             insurance_fee_bps=int(os.getenv("INSURANCE_FEE_BPS", "200")),
             contract_hash=os.getenv("ESCROW_CONTRACT_HASH", ""),
+            # Deployed once, rarely redeployed; env-overridable so a future
+            # redeploy of any of these never requires a frontend code change
+            # (previously hardcoded in frontend/src/components/console/Contracts.tsx).
+            manager_contract_hash=os.getenv(
+                "MANAGER_CONTRACT_HASH",
+                "bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
+            ),
+            insurance_contract_hash=os.getenv(
+                "INSURANCE_CONTRACT_HASH",
+                "e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61",
+            ),
+            vrf_contract_hash=os.getenv(
+                "VRF_CONTRACT_HASH",
+                "5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f",
+            ),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
         )
 

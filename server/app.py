@@ -34,6 +34,7 @@ from server.models import (
     RefundRequest,
     ReleaseRequest,
     ReputationRecord,
+    ResolveRequest,
 )
 from server.sandbox import SandboxStore
 from server.multi_asset import router as multi_asset_router
@@ -250,6 +251,42 @@ async def health(cfg: Config = Depends(get_config)):
         db="connected" if connected else "disconnected",
         uptime=int(time.time() - _started_at),
     )
+
+
+@app.get("/contracts")
+async def contracts(cfg: Config = Depends(get_config)):
+    """Backend-configured deployed contract addresses.
+
+    Previously the 3 non-escrow contract hashes were hardcoded directly in
+    the frontend (frontend/src/components/console/Contracts.tsx) with no
+    env/config wiring — a redeploy of any of them required a frontend code
+    change. All 4 are now sourced from Config (env-overridable) and served
+    here so the frontend can fetch them at runtime instead.
+    """
+    return {
+        "contracts": [
+            {
+                "name": "Core Escrow",
+                "hash": cfg.contract_hash,
+                "role": "Create/release/refund/dispute/resolve escrow lifecycle exposed by the API.",
+            },
+            {
+                "name": "Escrow Manager",
+                "hash": cfg.manager_contract_hash,
+                "role": "Manager/orchestration contract used for deployed demo flows.",
+            },
+            {
+                "name": "Insurance Pool",
+                "hash": cfg.insurance_contract_hash,
+                "role": "Insurance premium/deposit/claim accounting for risky agent work.",
+            },
+            {
+                "name": "VRF Arbiter",
+                "hash": cfg.vrf_contract_hash,
+                "role": "On-chain random arbiter election target; API falls back to verifiable local CSPRNG when chain query is unavailable.",
+            },
+        ]
+    }
 
 
 @app.get("/stats")
@@ -604,6 +641,58 @@ async def dispute_escrow(
         pgdb.update_escrow_status(req.service_hash, "disputed", deploy_hash)
         pgdb.bump_reputation(record.sender, disputed=1)
         _broadcast_event({"type": "escrow_disputed", "service_hash": req.service_hash, "ts": int(time.time())})
+        return record
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/resolve", response_model=EscrowRecord)
+async def resolve_escrow(
+    req: ResolveRequest,
+    cfg: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox),
+    casper: CasperClient | None = Depends(get_casper),
+):
+    """Resolve a disputed escrow via 3-of-5 arbiter multisig.
+
+    Unlike release/refund/dispute, this is *not* gated on the escrow
+    sender/receiver identity: authorization comes from the contract's own
+    check that `arbiter_accounts` (>= threshold) are members of the
+    on-chain registered `arbiter_list`. Any caller may submit this once
+    they have collected enough arbiter votes off-chain.
+    """
+    escrow = store.get_escrow(req.service_hash)
+    if escrow is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    deploy_hash = ""
+
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.resolve(
+                req.service_hash, req.in_favor_of, req.arbiter_accounts
+            )
+        except Exception as exc:
+            logger.error("Casper resolve failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain resolve transaction failed; local state unchanged",
+            )
+        confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "resolved")
+        if not confirmed:
+            raise HTTPException(
+                status_code=502,
+                detail="Resolve transaction submitted but not yet confirmed on-chain as 'resolved'",
+            )
+
+    try:
+        record = store.resolve_escrow(req.service_hash, req.in_favor_of, deploy_hash)
+        pgdb.update_escrow_status(req.service_hash, "resolved", deploy_hash)
+        winner = record.sender if req.in_favor_of == "sender" else record.receiver
+        pgdb.bump_reputation(winner, completed=1)
+        _broadcast_event({"type": "escrow_resolved", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
