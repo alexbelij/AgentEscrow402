@@ -13,6 +13,7 @@ import {
   FlaskConical,
   Bot,
   ChevronRight,
+  Layers,
 } from 'lucide-react';
 
 interface NavItem {
@@ -28,6 +29,7 @@ const navItems: NavItem[] = [
   { name: 'Insurance', path: '/console/insurance', icon: Shield },
   { name: 'Risk', path: '/console/risk', icon: Activity },
   { name: 'Contracts', path: '/console/contracts', icon: FileText },
+  { name: 'Advanced Escrow', path: '/console/advanced', icon: Layers },
   { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
   { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
 ];
@@ -70,6 +72,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'Contract Playground',
     desc: 'A developer tool to call escrow contract actions (release, refund, dispute, VRF election) and read the raw API response. Actions only succeed on escrows in a valid state — a fresh pending escrow is provided for terminal-state actions.',
     source: 'tool',
+  },
+  '/console/advanced': {
+    title: 'Advanced Escrow',
+    desc: 'Three advanced escrow primitives beyond the basic lifecycle: escrow with a selectable token type (CSPR/CEP-18/CEP-78, one token per escrow), a linear streaming payout between a start and end time, and a commit-reveal hash-lock on an existing escrow. CEP-18/CEP-78 transfers are currently simulated backend-side, not real on-chain calls.',
+    source: 'demo',
   },
   '/console/agent-demo': {
     title: 'Agent Demo',
