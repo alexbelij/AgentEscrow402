@@ -772,15 +772,22 @@ async def compute_hash(sender: str, receiver: str, amount: int, nonce: str):
 
 
 DEMO_CONSOLE_SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+# Second labelled demo identity ("the other party"), needed for two-sided demo
+# flows where a sender and a receiver must each act (e.g. atomic-swap
+# commit-by-sender / reveal-by-receiver). Matches frontend's DEMO_AGENT_RECEIVER.
+# Still just a fixed, publicly-known placeholder key — no real key material,
+# same trust model as DEMO_CONSOLE_SENDER, just a second named counterparty.
+DEMO_CONSOLE_RECEIVER = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
 DEMO_CONSOLE_SIGNATURE = "a" * 128
+DEMO_CONSOLE_IDENTITIES = {DEMO_CONSOLE_SENDER, DEMO_CONSOLE_RECEIVER}
 
 
 def _extract_sender(request: Request) -> str:
     """Extract sender identity from x402 header or sandbox mode.
 
     Production x402 headers are Ed25519-verified and replay-checked. The hosted
-    console has one explicit, labelled demo bypass so non-wallet visitors can run
-    the testnet UI; it is limited to the known demo sender/signature marker.
+    console has explicit, labelled demo bypasses so non-wallet visitors can run
+    the testnet UI; it is limited to the known demo sender/signature markers.
     """
     cfg = get_config()
     if hasattr(request.state, "payment") and request.state.payment:
@@ -793,7 +800,7 @@ def _extract_sender(request: Request) -> str:
             if is_demo_console:
                 if not cfg.allow_hosted_demo_identity:
                     raise HTTPException(status_code=401, detail="hosted demo x402 identity disabled")
-                if parsed.sender == DEMO_CONSOLE_SENDER and parsed.signature == DEMO_CONSOLE_SIGNATURE:
+                if parsed.sender in DEMO_CONSOLE_IDENTITIES and parsed.signature == DEMO_CONSOLE_SIGNATURE:
                     return parsed.sender
                 raise HTTPException(status_code=401, detail="invalid demo x402 identity")
 

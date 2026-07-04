@@ -8,20 +8,82 @@ import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.db import get_db, InMemoryDB
+from server.sandbox import SandboxStore
 from server.models import EscrowRecord, EscrowStatus, PaymentHeader
-from server.middleware import parse_x402_header
+from server.middleware import (
+    parse_x402_header,
+    _build_signing_payload,
+    _check_replay,
+    _verify_ed25519,
+)
 
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
     # or imported from app.py. For this file generation, we assume it exists.
     from server.app import get_casper as _get_casper
     return _get_casper()
+
+
+def get_sandbox_store() -> "SandboxStore":
+    """Shared SandboxStore instance, same one the main /escrow lifecycle uses.
+
+    Previously these endpoints depended on `InMemoryDB` (server.db's generic
+    scratch key-value store: only get_collection/insert/find) and called
+    db.create_escrow()/db.get_escrow()/db.update_escrow_status() on it - none
+    of those methods exist on InMemoryDB (nor does server/db.py define a
+    module-level get_escrow function). Every one of these calls would have
+    raised AttributeError at runtime the moment a request got this far -
+    confirmed by exercising these endpoints directly. Using the same
+    SandboxStore as /escrow, /release, /refund also lets atomic-swap commit
+    and reveal act on an escrow created through the regular escrow-creation
+    endpoint, not just one created via /escrow/multi-asset.
+    """
+    from server.app import get_sandbox as _get_sandbox
+    return _get_sandbox()
+
+
+async def get_x402_payment(request: Request, config: Config = Depends(get_config)) -> PaymentHeader:
+    """FastAPI dependency that extracts and authorizes the X-Payment header.
+
+    `Depends(parse_x402_header)` (the previous implementation of this
+    dependency) was broken: `parse_x402_header(raw: str)` takes a plain
+    positional string, so FastAPI resolved `raw` as a *required query
+    parameter* instead of reading the `X-Payment` header, and every request
+    to these endpoints therefore 422'd unconditionally regardless of what
+    was sent (confirmed: /escrow/multi-asset, /escrow/stream and both
+    /escrow/atomic-swap/* endpoints have never worked end-to-end). This
+    mirrors the working `_extract_sender`/header-parsing pattern already
+    used by the main /escrow, /release, /refund routes in server/app.py.
+    """
+    from server.app import DEMO_CONSOLE_IDENTITIES, DEMO_CONSOLE_SIGNATURE
+
+    raw = request.headers.get("X-Payment")
+    if not raw:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="X-Payment header required")
+    parsed = parse_x402_header(raw)
+    if not parsed:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid X-Payment header")
+
+    is_demo_console = request.headers.get("X-AE402-Demo-Identity") == "hosted-console"
+    if is_demo_console:
+        if not config.allow_hosted_demo_identity:
+            raise HTTPException(status_code=401, detail="hosted demo x402 identity disabled")
+        if parsed.sender in DEMO_CONSOLE_IDENTITIES and parsed.signature == DEMO_CONSOLE_SIGNATURE:
+            return parsed
+        raise HTTPException(status_code=401, detail="invalid demo x402 identity")
+
+    replay_err = _check_replay(parsed.nonce, parsed.timestamp)
+    if replay_err:
+        raise HTTPException(status_code=401, detail=replay_err)
+    msg = _build_signing_payload(parsed, method=request.method, path=request.url.path)
+    if not _verify_ed25519(parsed.sender, msg, parsed.signature):
+        raise HTTPException(status_code=401, detail="invalid x402 signature")
+    return parsed
 
 
 
@@ -231,10 +293,22 @@ class Cep78Adapter(TokenAdapter):
         return {"symbol": "NFT", "decimals": 0, "name": "CEP-78 NFT"}
 
 
-def get_token_adapter(
-    token_id: TokenIdentifier, casper: CasperClient = Depends(get_casper), config: Config = Depends(get_config)
+def _build_token_adapter(
+    token_id: TokenIdentifier, casper: CasperClient | None, config: Config
 ) -> TokenAdapter:
-    """Dependency to get the correct token adapter based on TokenIdentifier."""
+    """Plain helper (not a FastAPI dependency) that picks the right token adapter.
+
+    Previously this was declared as `Depends(get_token_adapter)` with
+    `token_id: TokenIdentifier` as an un-annotated parameter. FastAPI then
+    treated `token_id` as its own required top-level request-body field
+    (sibling to the endpoint's own `request` body model), so every call
+    that only sent the documented `{receiver, amount, token, ...}` body
+    422'd with "field required: token_id" (and, confusingly, "field
+    required: request" too, since FastAPI no longer treated the single
+    Pydantic model as the whole body once a second body field existed).
+    Now called directly inside each endpoint with the token identifier
+    read from the already-parsed request body.
+    """
     if not casper:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Casper client not initialized")
 
@@ -251,14 +325,16 @@ def get_token_adapter(
 @router.post("/multi-asset", response_model=EscrowRecord, status_code=status.HTTP_201_CREATED)
 async def create_multi_asset_escrow(
     request: MultiAssetEscrowRequest,
-    x402: PaymentHeader = Depends(parse_x402_header),
-    token_adapter: TokenAdapter = Depends(get_token_adapter),
-    db: InMemoryDB = Depends(get_db),
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
 ) -> EscrowRecord:
     """
     Creates a new multi-asset escrow.
     The sender (from X402 header) transfers the specified token amount to the escrow contract.
     """
+    token_adapter = _build_token_adapter(request.token, casper, config)
     sender = x402.sender
     if x402.amount != request.amount:
         raise HTTPException(
@@ -284,20 +360,20 @@ async def create_multi_asset_escrow(
         logger.error("Failed to simulate token transfer: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to initiate token transfer")
 
-    escrow_record = EscrowRecord(
-        sender=sender,
-        receiver=request.receiver,
-        amount=request.amount,
-        service_hash=request.service_hash,
-        status=EscrowStatus.PENDING,
-        created_at=int(time.time()),
-        ttl=request.ttl,
-        deploy_hash=deploy_hash,
-        # In a real system, token details would be part of EscrowRecord or a related table
-        # For now, we'll just store it in the local _multi_asset_escrows dict
-    )
+    try:
+        escrow_record = store.create_escrow(
+            sender=sender,
+            receiver=request.receiver,
+            amount=request.amount,
+            service_hash=request.service_hash,
+            ttl=request.ttl,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    escrow_record.deploy_hash = deploy_hash
+    # Also kept in the local dict so other multi-asset-specific reads (token
+    # type, etc.) stay available without extending the shared SandboxStore.
     _multi_asset_escrows[request.service_hash] = escrow_record
-    db.create_escrow(escrow_record) # Store in main DB for consistency
     logger.info("Multi-asset escrow %s created with deploy_hash %s", request.service_hash[:16], deploy_hash[:16])
     return escrow_record
 
@@ -305,15 +381,17 @@ async def create_multi_asset_escrow(
 @router.post("/stream", response_model=EscrowRecord, status_code=status.HTTP_201_CREATED)
 async def create_streaming_escrow(
     request: StreamEscrowRequest,
-    x402: PaymentHeader = Depends(parse_x402_header),
-    token_adapter: TokenAdapter = Depends(get_token_adapter),
-    db: InMemoryDB = Depends(get_db),
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
 ) -> EscrowRecord:
     """
     Creates a new streaming escrow.
     The sender (from X402 header) deposits the total amount into a streaming contract,
     which then releases funds to the receiver over a specified time period.
     """
+    token_adapter = _build_token_adapter(request.token, casper, config)
     sender = x402.sender
     if x402.amount != request.amount:
         raise HTTPException(
@@ -345,16 +423,17 @@ async def create_streaming_escrow(
         logger.error("Failed to simulate token transfer for streaming escrow: %s", e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to initiate token transfer")
 
-    escrow_record = EscrowRecord(
-        sender=sender,
-        receiver=request.receiver,
-        amount=request.amount,
-        service_hash=request.service_hash,
-        status=EscrowStatus.PENDING,  # Status will change as funds are streamed
-        created_at=int(time.time()),
-        ttl=request.end_time - int(time.time()) + 3600,  # TTL slightly longer than stream duration
-        deploy_hash=deploy_hash,
-    )
+    try:
+        escrow_record = store.create_escrow(
+            sender=sender,
+            receiver=request.receiver,
+            amount=request.amount,
+            service_hash=request.service_hash,
+            ttl=request.end_time - int(time.time()) + 3600,  # TTL slightly longer than stream duration
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    escrow_record.deploy_hash = deploy_hash
     _streaming_escrows[request.service_hash] = {
         "escrow_record": escrow_record,
         "token": request.token,
@@ -363,7 +442,6 @@ async def create_streaming_escrow(
         "streamed_amount": 0,
         "last_payout_time": None,
     }
-    db.create_escrow(escrow_record) # Store in main DB for consistency
     logger.info("Streaming escrow %s created with deploy_hash %s", request.service_hash[:16], deploy_hash[:16])
     return escrow_record
 
@@ -426,8 +504,8 @@ async def get_stream_status(service_hash: str) -> StreamStatusResponse:
 @router.post("/atomic-swap/commit", status_code=status.HTTP_202_ACCEPTED)
 async def commit_atomic_swap(
     request: CommitRequest,
-    x402: PaymentHeader = Depends(parse_x402_header),
-    db: InMemoryDB = Depends(get_db),
+    x402: PaymentHeader = Depends(get_x402_payment),
+    store: SandboxStore = Depends(get_sandbox_store),
 ) -> dict[str, str]:
     """
     Commits a SHA256 hash of a secret preimage for an atomic swap.
@@ -435,9 +513,10 @@ async def commit_atomic_swap(
     """
     # In a real scenario, this would involve a Casper deploy to store the commit_hash
     # on the escrow contract, linked to the service_hash.
-    # The escrow itself would have been created earlier, potentially as a multi-asset escrow.
+    # The escrow itself would have been created earlier, potentially as a multi-asset escrow
+    # or via the regular /escrow endpoint - both are backed by the same SandboxStore.
 
-    escrow = db.get_escrow(request.service_hash)
+    escrow = store.get_escrow(request.service_hash)
     if not escrow:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Escrow not found for commit")
     if escrow.sender != x402.sender:
@@ -457,8 +536,8 @@ async def commit_atomic_swap(
 @router.post("/atomic-swap/reveal", status_code=status.HTTP_200_OK)
 async def reveal_atomic_swap(
     request: RevealRequest,
-    x402: PaymentHeader = Depends(parse_x402_header),
-    db: InMemoryDB = Depends(get_db),
+    x402: PaymentHeader = Depends(get_x402_payment),
+    store: SandboxStore = Depends(get_sandbox_store),
 ) -> dict[str, str]:
     """
     Reveals the secret preimage for an atomic swap.
@@ -473,7 +552,7 @@ async def reveal_atomic_swap(
     if commit_data["revealed"]:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Preimage already revealed")
 
-    escrow = db.get_escrow(request.service_hash)
+    escrow = store.get_escrow(request.service_hash)
     if not escrow:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Escrow not found for reveal")
     # Who can reveal? Typically the other party (receiver) or the committer.
@@ -488,7 +567,12 @@ async def reveal_atomic_swap(
 
     # In a real scenario, this would trigger a Casper deploy to call the `reveal`
     # entry point on the escrow contract, which would then release funds.
-    db.update_escrow_status(request.service_hash, EscrowStatus.RELEASED)
+    # release_escrow requires caller == escrow.sender (the party who committed
+    # the hash-lock), which matches the commit-reveal model here.
+    try:
+        store.release_escrow(request.service_hash, caller=escrow.sender)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     _commit_reveals[request.service_hash]["revealed"] = True
     _commit_reveals[request.service_hash]["preimage"] = request.preimage
     logger.info("Preimage revealed for service_hash %s. Escrow released.", request.service_hash[:16])

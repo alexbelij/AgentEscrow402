@@ -69,9 +69,9 @@ export function buildDemoXPaymentHeader(escrowHash?: string, amount = 0, sender 
   return `x402-v1;${hash};${amount};${sender.toLowerCase()};${Math.floor(Date.now() / 1000)};${nonce};${mockSignature}`;
 }
 
-export function buildDemoPaymentHeaders(escrowHash?: string, amount = 0): HeadersInit {
+export function buildDemoPaymentHeaders(escrowHash?: string, amount = 0, sender = DEMO_AGENT_SENDER): HeadersInit {
   return {
-    'X-Payment': buildDemoXPaymentHeader(escrowHash, amount),
+    'X-Payment': buildDemoXPaymentHeader(escrowHash, amount, sender),
     'X-AE402-Demo-Identity': 'hosted-console',
   };
 }
@@ -228,58 +228,61 @@ export interface EscrowActionRequest {
   wallet_tx_hash?: string;
 }
 
-// Multi-asset Escrow
+// Alt-token escrow, streaming escrow & atomic swap (server/multi_asset.py).
+// NOTE: despite the endpoint path/name, "multi-asset" escrow on this backend
+// escrows a single token per escrow (CSPR, or one CEP-18/CEP-78 contract) —
+// it is not a basket of several assets in one escrow. These interfaces were
+// previously a completely different, unimplemented shape (payer/payee/
+// assets[]/arbiter) that would have 422'd on first use; corrected to match
+// server/multi_asset.py's actual Pydantic models exactly.
+export interface TokenIdentifier {
+  token_type: 'cspr' | 'cep18' | 'cep78';
+  contract_hash?: string; // required for cep18/cep78, omitted for cspr
+}
+
 export interface MultiAssetEscrowRequest {
-  payer: string;
-  payee: string;
-  assets: Array<{
-    amount: string;
-    token_contract: string;
-  }>;
-  arbiter?: string;
-  metadata?: Record<string, any>;
+  receiver: string;
+  amount: number;
+  token: TokenIdentifier;
+  service_hash: string;
+  ttl?: number;
 }
 
 export interface StreamEscrowRequest {
-  payer: string;
-  payee: string;
-  total_amount: string;
-  token_contract: string;
-  duration_seconds: number;
-  interval_seconds: number;
-  arbiter?: string;
-  metadata?: Record<string, any>;
+  receiver: string;
+  amount: number;
+  token: TokenIdentifier;
+  service_hash: string;
+  start_time: number;
+  end_time: number;
 }
 
 export interface StreamStatus {
-  escrow_hash: string;
-  total_amount: string;
-  streamed_amount: string;
-  remaining_amount: string;
-  start_time: string;
-  end_time: string;
-  last_stream_time: string;
+  service_hash: string;
+  total_amount: number;
+  token: TokenIdentifier;
+  receiver: string;
+  sender: string;
+  start_time: number;
+  end_time: number;
+  streamed_amount: number;
+  remaining_amount: number;
   status: EscrowStatus;
+  last_payout_time: number | null;
 }
 
+// Commit-reveal atomic swap: commit a SHA-256 hash of a secret preimage
+// against an *existing* escrow (created via the regular /escrow or
+// /escrow/multi-asset endpoint first), then reveal the preimage later to
+// release it. Not a two-party asset-for-asset swap.
 export interface AtomicSwapCommitRequest {
-  initiator: string;
-  target: string;
-  initiator_asset: {
-    amount: string;
-    token_contract: string;
-  };
-  target_asset: {
-    amount: string;
-    token_contract: string;
-  };
-  hash_lock: string;
-  timelock_seconds: number;
+  service_hash: string;
+  commit_hash: string; // sha256 hex digest of the secret preimage
 }
 
 export interface AtomicSwapRevealRequest {
-  swap_hash: string;
-  secret: string;
+  service_hash: string;
+  preimage: string;
 }
 
 // Agent & Identity
@@ -596,11 +599,13 @@ export const api = {
   computeHash: (data: { value: string }) => fetcher<{ hash: string }>(`/compute-hash?sender=${encodeURIComponent(data.value)}&receiver=${encodeURIComponent(DEMO_AGENT_RECEIVER)}&amount=1&nonce=console`, 'POST'),
 
   // Multi-asset Escrow Endpoints
-  createMultiAssetEscrow: (data: MultiAssetEscrowRequest) => fetcher<TransactionHash>('/escrow/multi-asset', 'POST', data),
-  createStreamEscrow: (data: StreamEscrowRequest) => fetcher<TransactionHash>('/escrow/stream', 'POST', data),
+  createMultiAssetEscrow: (data: MultiAssetEscrowRequest) => fetcher<TransactionHash>('/escrow/multi-asset', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
+  createStreamEscrow: (data: StreamEscrowRequest) => fetcher<TransactionHash>('/escrow/stream', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
   getStreamStatus: (hash: string) => fetcher<StreamStatus>(`/escrow/${hash}/stream-status`, 'GET'),
-  commitAtomicSwap: (data: AtomicSwapCommitRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/commit', 'POST', data),
-  revealAtomicSwap: (data: AtomicSwapRevealRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/reveal', 'POST', data),
+  // Commit must come from the escrow's sender (DEMO_AGENT_SENDER, the default identity every demo escrow is created with).
+  commitAtomicSwap: (data: AtomicSwapCommitRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/commit', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0, DEMO_AGENT_SENDER)),
+  // Reveal must come from the escrow's receiver (DEMO_AGENT_RECEIVER) per server/multi_asset.py's reveal_atomic_swap check.
+  revealAtomicSwap: (data: AtomicSwapRevealRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/reveal', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0, DEMO_AGENT_RECEIVER)),
 
   // Insurance Endpoints
   depositInsurance: (data: DepositInsuranceRequest) => fetcher<TransactionHash>('/insurance/deposit', 'POST', data, buildDemoPaymentHeaders(undefined, data.amount)),
