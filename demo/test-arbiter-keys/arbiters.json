@@ -1,0 +1,32 @@
+[
+  {
+    "i": 1,
+    "pubHex": "0112e33a39f03fba483baf7a62f299a559986112349da0a7630d3e55af854718ae",
+    "accountHashHex": "653a5c993d32abf9aed9603a68ba0fe4c448384b39cefd25a644dc916004db87",
+    "pemPath": "demo/test-arbiter-keys/arbiter_1_secret_key.pem"
+  },
+  {
+    "i": 2,
+    "pubHex": "01a28e3979a681c8c1a1c1a065673c647713363c68b12201066aaa4dfd148ed7cf",
+    "accountHashHex": "83ffef7888ad9daefbeefbda5cb39c45cea9980fae61d31c01795c6cac8d2b08",
+    "pemPath": "demo/test-arbiter-keys/arbiter_2_secret_key.pem"
+  },
+  {
+    "i": 3,
+    "pubHex": "0159823821c9faac713f25765d6f58cee5726e8bd3d83ead4a9e83cab009e3230c",
+    "accountHashHex": "05e10552ee70c4fbbf5349803723604909cfa60fa228177c0ca7d5bc37259eef",
+    "pemPath": "demo/test-arbiter-keys/arbiter_3_secret_key.pem"
+  },
+  {
+    "i": 4,
+    "pubHex": "01628e3697932e64168e65f8784fbe547ec2dadabee2d76951cd9271dd86a2f95d",
+    "accountHashHex": "e3f1428201809881ffdf96d4d60edbd43df8a91c2487564437903db783bb2c91",
+    "pemPath": "demo/test-arbiter-keys/arbiter_4_secret_key.pem"
+  },
+  {
+    "i": 5,
+    "pubHex": "012d703284694bdc6a47be7237f70c075b8d0ca7b9ee1ea560e2eb8b38754932ad",
+    "accountHashHex": "edeef6ad9758ba9ed06c89effbbfd4a5772a38907c219090f60d310585b0de54",
+    "pemPath": "demo/test-arbiter-keys/arbiter_5_secret_key.pem"
+  }
+]

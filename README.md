@@ -279,7 +279,13 @@ client = EscrowClient("http://localhost:8000", sender="my-agent", sandbox=True)
 ```
 See `examples/quickstart.py` (minimal) and `examples/escrow_agent.py` (full
 autonomous buyer/seller lifecycle with a real dispute + AI arbitration call)
-for runnable end-to-end examples.
+for runnable end-to-end examples. `escrow_agent.py` signs real Ed25519
+arbiter votes and resolves the dispute on-chain out of the box, using the
+throwaway, never-funded testnet keypairs committed under
+`demo/test-arbiter-keys/` (see that folder's README for why it's safe to
+ship these particular private keys) — clone and run it, no credentials
+needed, to watch create → dispute → resolve happen for real on Casper
+Testnet.
 
 ### LangChain tool
 ```python
