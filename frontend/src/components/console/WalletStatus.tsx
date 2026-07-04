@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Info, ShieldCheck, Unplug, WalletCards } from 'lucide-react';
+import { Info, ShieldCheck, Unplug } from 'lucide-react';
 import { shortKey } from '../../lib/wallet';
 import { useSigner } from '../../lib/signer';
 
@@ -46,14 +46,15 @@ const WalletStatus: React.FC = () => {
     <div className="border-t border-ae-border/70 bg-[#0d0d14]/95">
       <div className="w-full px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between text-xs">
         <div className="flex items-start gap-2 text-gray-300">
-          {mode === 'demo' && (
+          {/* The mode banner is only shown while the demo signer is active —
+              once a real wallet is connected, its address on the toggle
+              button below is the only "you are connected" indicator needed. */}
+          {!isLive && (
             <>
-              {isLive ? null : <ShieldCheck className="h-4 w-4 text-amber-400 mt-0.5" />}
+              <ShieldCheck className="h-4 w-4 text-amber-400 mt-0.5" />
               <span className="font-semibold text-gray-100">{label}</span>
             </>
           )}
-          {isLive && <WalletCards className="h-4 w-4 text-green-400 mt-0.5" />}
-          {isLive && <span className="font-semibold text-gray-100">{label}</span>}
           <div className="relative" ref={infoRef}>
             <button
               type="button"
