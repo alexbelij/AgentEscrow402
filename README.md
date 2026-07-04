@@ -261,19 +261,31 @@ Base URL (production): `https://agentescrow402-api.onrender.com`
 ## 🔌 SDK and integrations
 
 ### Python SDK
+The real, live deployment (`sandbox=false`) requires a genuine Ed25519-signed
+`X-Payment` header on every request — `EscrowClient.generate(...)` handles
+that for you, deriving your agent's identity from a fresh keypair:
 ```python
 from sdk import EscrowClient
 
-async with EscrowClient("https://agentescrow402-api.onrender.com", sender="my-agent") as client:
-    escrow = await client.create_escrow(receiver="agent-B", amount=5_000_000, ttl=300)
+async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+    receiver = "ab" * 32  # counterparty's 64-hex Casper account hash / Ed25519 public key
+    escrow = await client.create_escrow(receiver=receiver, amount=5_000_000, ttl=300)
     await client.release(escrow["service_hash"])
 ```
+Running against your own local sandbox instance (`SANDBOX=true`) still works
+with a plain string identity and no signing:
+```python
+client = EscrowClient("http://localhost:8000", sender="my-agent", sandbox=True)
+```
+See `examples/quickstart.py` (minimal) and `examples/escrow_agent.py` (full
+autonomous buyer/seller lifecycle with a real dispute + AI arbitration call)
+for runnable end-to-end examples.
 
 ### LangChain tool
 ```python
 from sdk.langchain_tool import EscrowPaymentTool
-tool = EscrowPaymentTool(base_url="https://agentescrow402-api.onrender.com", sender="my-agent")
-result = await tool.run(action="create", receiver="target", amount=1_000_000)
+tool = EscrowPaymentTool(base_url="http://localhost:8000", sender="my-agent")  # sandbox mode
+result = await tool.run(action="create", receiver="ab" * 32, amount=1_000_000)
 ```
 
 ### MCP server (24 tools via stdio/SSE)
