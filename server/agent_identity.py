@@ -159,7 +159,7 @@ async def delegate_capability(
     request: DelegateCapabilityRequest,
     casper: CasperClient = Depends(get_casper),
     config: Config = Depends(get_config),
-) -> dict[str, str]:
+) -> dict[str, str | int]:
     """
     Delegates a specific capability from one agent (delegator) to another (delegatee).
     Requires a cryptographic signature from the delegator.

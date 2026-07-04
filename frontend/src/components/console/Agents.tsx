@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { api, Agent, Reputation, RegisterIdentityRequest, Identity, Capability } from '../../lib/api';
+import { api, Agent, Reputation, RegisterIdentityRequest, Identity, AgentCapabilities, DelegationRecord } from '../../lib/api';
+import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoSigner';
 import {
   Users,
   UserPlus,
@@ -14,6 +15,7 @@ import {
   ShieldCheck,
   DollarSign,
   Scale,
+  KeyRound,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -72,9 +74,10 @@ const Agents: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
   const [agentReputation, setAgentReputation] = useState<Reputation | null>(null);
-  const [agentCapabilities, setAgentCapabilities] = useState<Capability[]>([]);
+  const [agentCapabilities, setAgentCapabilities] = useState<AgentCapabilities | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
 
   const fetchAgents = useCallback(async () => {
@@ -100,7 +103,7 @@ const Agents: React.FC = () => {
     setSelectedAgent(agent);
     setIsDetailModalOpen(true);
     setAgentReputation(null);
-    setAgentCapabilities([]);
+    setAgentCapabilities(null);
 
     try {
       const [reputationRes, capabilitiesRes] = await Promise.all([
@@ -112,7 +115,7 @@ const Agents: React.FC = () => {
       setAgentReputation(reputationRes.data || null);
 
       if (capabilitiesRes.error) console.error('Failed to fetch capabilities:', capabilitiesRes.error);
-      setAgentCapabilities(capabilitiesRes.data || []);
+      setAgentCapabilities(capabilitiesRes.data || null);
     } catch (err) {
       console.error('Failed to fetch agent details:', err);
     }
@@ -186,6 +189,14 @@ const Agents: React.FC = () => {
         >
           <UserPlus className="h-5 w-5 mr-2" />
           Register Agent
+        </button>
+        <button
+          onClick={() => setIsDelegateModalOpen(true)}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-gray-800 hover:bg-gray-700 border border-[#1e1e2e] text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
+          title="Sign and record a real capability delegation between two demo identities"
+        >
+          <KeyRound className="h-5 w-5 mr-2" />
+          Delegate Capability
         </button>
       </div>
 
@@ -308,20 +319,25 @@ const Agents: React.FC = () => {
             )}
 
             <h4 className="text-lg font-semibold text-gray-300 mt-6 mb-3">Capabilities</h4>
-            {agentCapabilities.length > 0 ? (
+            {agentCapabilities && agentCapabilities.total > 0 ? (
               <ul className="space-y-2 bg-gray-800 p-4 rounded-md border border-[#1e1e2e]">
-                {agentCapabilities.map((cap, index) => (
-                  <li key={index} className="flex items-center text-gray-300">
+                {agentCapabilities.own_capabilities.map((cap, index) => (
+                  <li key={`own-${index}`} className="flex items-center text-gray-300">
                     <ShieldCheck className="h-5 w-5 mr-2 text-green-500" />
-                    <span className="font-medium">{cap.capability}</span>
-                    <span className="ml-auto text-gray-400 text-sm">
-                      Delegated by: {(cap.delegated_by || '').substring(0, 8)}... (Expires: {cap.expires_at ? format(new Date(cap.expires_at), 'MMM dd, yyyy') : 'N/A'})
-                    </span>
+                    <span className="font-medium">{cap}</span>
+                    <span className="ml-auto text-gray-400 text-sm">Own capability</span>
+                  </li>
+                ))}
+                {agentCapabilities.delegated_capabilities.map((cap, index) => (
+                  <li key={`delegated-${index}`} className="flex items-center text-gray-300">
+                    <KeyRound className="h-5 w-5 mr-2 text-sky-400" />
+                    <span className="font-medium">{cap}</span>
+                    <span className="ml-auto text-gray-400 text-sm">Delegated to this agent</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-gray-400">No specific capabilities delegated to this agent.</p>
+              <p className="text-gray-400">No capabilities registered or delegated to this agent.</p>
             )}
           </div>
         )}
@@ -332,6 +348,13 @@ const Agents: React.FC = () => {
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
         onRegister={handleRegisterAgent}
+      />
+
+      {/* Delegate Capability Modal */}
+      <DelegateCapabilityModal
+        isOpen={isDelegateModalOpen}
+        onClose={() => setIsDelegateModalOpen(false)}
+        onDelegated={fetchAgents}
       />
     </div>
   );
@@ -436,6 +459,158 @@ const RegisterAgentModal: React.FC<RegisterAgentModalProps> = ({ isOpen, onClose
           </button>
         </div>
       </form>
+    </Modal>
+  );
+};
+
+// Delegate Capability Modal Component
+//
+// Capability delegation requires a genuine Ed25519 signature from the
+// delegator's registered private key (server/agent_identity.py verifies it
+// cryptographically) — this console never holds the private key for an
+// arbitrary existing agent, so this flow generates two fresh local demo
+// keypairs, registers both as agent identities, then signs and submits a
+// real delegation between them. This is a self-contained demonstration of
+// the feature, not a way to delegate rights *from* an arbitrary agent
+// already in the list above.
+interface DelegateCapabilityModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onDelegated: () => void;
+}
+
+const CAPABILITY_PRESETS = [
+  'urn:escrow:release',
+  'urn:escrow:refund',
+  'urn:escrow:dispute',
+  'urn:insurance:claim',
+];
+
+const DelegateCapabilityModal: React.FC<DelegateCapabilityModalProps> = ({ isOpen, onClose, onDelegated }) => {
+  const [capabilityUri, setCapabilityUri] = useState(CAPABILITY_PRESETS[0]);
+  const [durationHours, setDurationHours] = useState('24');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<DelegationRecord | null>(null);
+
+  const reset = () => {
+    setCapabilityUri(CAPABILITY_PRESETS[0]);
+    setDurationHours('24');
+    setError(null);
+    setResult(null);
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  const handleRun = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      // 1. Generate two fresh, local-only demo keypairs.
+      const delegator = generateDemoKeypair();
+      const delegatee = generateDemoKeypair();
+      const delegatorId = `demo-delegator-${delegator.publicKeyHex.slice(0, 8)}`;
+      const delegateeId = `demo-delegatee-${delegatee.publicKeyHex.slice(0, 8)}`;
+
+      // 2. Register both as agent identities so the backend recognizes them.
+      const regA = await api.registerIdentity({ agent_id: delegatorId, public_key: delegator.publicKeyHex, did_document_hash: 'a'.repeat(64) });
+      if (regA.error) throw new Error(`Failed to register delegator identity: ${regA.error}`);
+      const regB = await api.registerIdentity({ agent_id: delegateeId, public_key: delegatee.publicKeyHex, did_document_hash: 'b'.repeat(64) });
+      if (regB.error) throw new Error(`Failed to register delegatee identity: ${regB.error}`);
+
+      // 3. Build the canonical delegation message and sign it for real with
+      // the delegator's freshly generated private key (never sent to the backend).
+      const expiryTimestamp = Math.floor(Date.now() / 1000) + Number(durationHours) * 3600;
+      const delegationMsg = `${delegatorId}:${delegateeId}:${capabilityUri}:${expiryTimestamp}`;
+      const msgHashHex = sha256Hex(delegationMsg);
+      const signature = signDemoMessage(msgHashHex, delegator.privateKeyHex);
+
+      // 4. Submit the delegation; the backend independently re-derives the
+      // same hash and verifies the signature against the delegator's
+      // registered public key before recording it.
+      const res = await api.delegateIdentity({
+        delegator_id: delegatorId,
+        delegatee_id: delegateeId,
+        capability_uri: capabilityUri,
+        expiry_timestamp: expiryTimestamp,
+        signature,
+      });
+      if (res.error) throw new Error(res.error);
+      setResult(res.data || null);
+      onDelegated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Delegation failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} title="Delegate a Capability">
+      <div className="space-y-4">
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100">
+          This generates two fresh Ed25519 keypairs locally in your browser (never your Casper wallet), registers them as
+          demo agent identities, then signs a real delegation message with the delegator's private key. The backend
+          independently verifies that signature cryptographically — it is not a hardcoded demo bypass.
+        </div>
+
+        <label className="space-y-2 block">
+          <span className="text-sm font-medium text-gray-300">Capability URI</span>
+          <select
+            value={capabilityUri}
+            onChange={(e) => setCapabilityUri(e.target.value)}
+            className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none"
+          >
+            {CAPABILITY_PRESETS.map((cap) => (
+              <option key={cap} value={cap}>{cap}</option>
+            ))}
+          </select>
+        </label>
+
+        <Input
+          label="Expires in (hours)"
+          id="delegationDurationHours"
+          type="number"
+          min="1"
+          value={durationHours}
+          onChange={(e) => setDurationHours(e.target.value)}
+        />
+
+        {error && (
+          <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 flex items-center">
+            <XCircle className="h-5 w-5 mr-2" />
+            <p>{error}</p>
+          </div>
+        )}
+
+        {result && (
+          <div className="text-emerald-300 bg-emerald-900/20 border border-emerald-700 rounded-lg p-3 space-y-1 text-sm">
+            <p className="flex items-center"><CheckCircle className="h-5 w-5 mr-2" /> Delegation recorded and signature verified.</p>
+            <p className="font-mono break-all">{result.delegator_id} → {result.delegatee_id}</p>
+            <p>Capability: <span className="font-mono">{result.capability_uri}</span></p>
+            <p>Mode: <span className="font-mono">{result.mode}</span> · Deploy hash: <span className="font-mono">{result.deploy_hash}</span></p>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button type="button" onClick={handleClose} className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors" disabled={loading}>
+            Close
+          </button>
+          <button
+            type="button"
+            onClick={handleRun}
+            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center"
+            disabled={loading}
+          >
+            {loading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+            Generate identities & sign delegation
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 };
