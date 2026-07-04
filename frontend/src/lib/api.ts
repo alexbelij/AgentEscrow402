@@ -5,7 +5,7 @@
 const BASE_URL = '/backend';
 
 // --- Utility Fetcher ---
-interface ApiResponse<T> {
+export interface ApiResponse<T> {
   data: T | null;
   error: string | null;
   status: number | null;
@@ -222,6 +222,10 @@ export interface CreateEscrowRequest {
 export interface EscrowActionRequest {
   service_hash: string;
   reason_hash?: string;  // required only for dispute
+  // Set when a connected wallet already built, signed and submitted the
+  // on-chain transaction directly (live mode). The backend then only
+  // confirms on-chain state instead of signing/submitting itself.
+  wallet_tx_hash?: string;
 }
 
 // Multi-asset Escrow
@@ -359,25 +363,6 @@ export interface ClaimInsuranceRequest {
 }
 
 // Arbitration
-export interface ElectArbiterRequest {
-  initiator_public_key: string;
-  escrow_hash: string;
-  candidate_arbiter: string;
-  reason: string;
-  signature: string;
-}
-
-export interface ElectionStatus {
-  election_id: string;
-  escrow_hash: string;
-  candidate_arbiter: string;
-  status: 'pending' | 'approved' | 'rejected';
-  votes_for: number;
-  votes_against: number;
-  created_at: string;
-  expires_at: string;
-}
-
 export interface Arbiter {
   public_key: string;
   name: string;
@@ -627,8 +612,6 @@ export const api = {
   electVrfArbiter: (data: { dispute_id: string; sender: string; receiver: string; seed_hash: string }) => fetcher<any>('/vrf/elect', 'POST', data),
 
   // Arbitration Endpoints
-  electArbiter: (data: ElectArbiterRequest) => fetcher<TransactionHash>('/arbitration/elect', 'POST', data),
-  getElectionStatus: (id: string) => fetcher<ElectionStatus>(`/arbitration/election/${id}`, 'GET'),
   getArbiters: async (): Promise<ApiResponse<Arbiter[]>> => {
     const res = await fetcher<any>('/arbitration/arbiters', 'GET');
     const raw = res.data?.arbiters || (Array.isArray(res.data) ? res.data : []);

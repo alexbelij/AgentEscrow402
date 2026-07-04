@@ -54,15 +54,23 @@ class EscrowRecord(BaseModel):
 
 class ReleaseRequest(BaseModel):
     service_hash: str = Field(..., min_length=64, max_length=64)
+    # Set when the wallet-connected caller already built, signed (via their
+    # own Casper Wallet/Ledger/MetaMask through CSPR.click) and submitted the
+    # on-chain transaction directly. In that case the backend does not sign
+    # or submit anything itself — it only polls contract state and confirms
+    # the entry point actually executed before updating hosted records.
+    wallet_tx_hash: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class RefundRequest(BaseModel):
     service_hash: str = Field(..., min_length=64, max_length=64)
+    wallet_tx_hash: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class DisputeRequest(BaseModel):
     service_hash: str = Field(..., min_length=64, max_length=64)
     reason_hash: str = Field(..., min_length=64, max_length=64)
+    wallet_tx_hash: str | None = Field(default=None, min_length=1, max_length=128)
 
 
 class ResolveRequest(BaseModel):

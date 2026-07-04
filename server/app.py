@@ -455,18 +455,31 @@ async def release_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    caller = _extract_sender(request)
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
-        try:
-            deploy_hash = await casper.release(req.service_hash)
-        except Exception as exc:
-            logger.error("Casper release failed: %s", exc)
-            raise HTTPException(
-                status_code=502,
-                detail="On-chain release transaction failed; local state unchanged",
-            )
+        if req.wallet_tx_hash:
+            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "released")
+            if not confirmed:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Wallet transaction not yet confirmed on-chain as 'released'; local state unchanged",
+                )
+            deploy_hash = req.wallet_tx_hash
+        else:
+            try:
+                deploy_hash = await casper.release(req.service_hash)
+            except Exception as exc:
+                logger.error("Casper release failed: %s", exc)
+                raise HTTPException(
+                    status_code=502,
+                    detail="On-chain release transaction failed; local state unchanged",
+                )
+
+    existing = store.get_escrow(req.service_hash)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    caller = _extract_release_refund_caller(request, req.wallet_tx_hash, existing.sender)
 
     try:
         record = store.release_escrow(req.service_hash, caller)
@@ -495,18 +508,31 @@ async def refund_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    caller = _extract_sender(request)
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
-        try:
-            deploy_hash = await casper.refund(req.service_hash)
-        except Exception as exc:
-            logger.error("Casper refund failed: %s", exc)
-            raise HTTPException(
-                status_code=502,
-                detail="On-chain refund transaction failed; local state unchanged",
-            )
+        if req.wallet_tx_hash:
+            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "refunded")
+            if not confirmed:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Wallet transaction not yet confirmed on-chain as 'refunded'; local state unchanged",
+                )
+            deploy_hash = req.wallet_tx_hash
+        else:
+            try:
+                deploy_hash = await casper.refund(req.service_hash)
+            except Exception as exc:
+                logger.error("Casper refund failed: %s", exc)
+                raise HTTPException(
+                    status_code=502,
+                    detail="On-chain refund transaction failed; local state unchanged",
+                )
+
+    existing = store.get_escrow(req.service_hash)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    caller = _extract_release_refund_caller(request, req.wallet_tx_hash, existing.sender)
 
     try:
         record = store.refund_escrow(req.service_hash, caller)
@@ -527,28 +553,48 @@ async def dispute_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    # Authorization: only escrow sender or receiver may dispute
-    caller = _extract_sender(request)
-    try:
-        escrow = store.get_escrow(req.service_hash)
-        if caller not in (escrow.sender, escrow.receiver):
-            raise HTTPException(
-                status_code=403,
-                detail="Only escrow sender or receiver may dispute",
-            )
-    except KeyError:
+    escrow = store.get_escrow(req.service_hash)
+    if escrow is None:
         raise HTTPException(status_code=404, detail="Escrow not found")
 
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
-        try:
-            deploy_hash = await casper.dispute(req.service_hash)
-        except Exception as exc:
-            logger.error("Casper dispute failed: %s", exc)
+        if req.wallet_tx_hash:
+            # Authorization for the live-wallet path comes from on-chain
+            # confirmation below: the contract itself only allows the true
+            # sender or receiver to call `dispute`, so a confirmed status
+            # change is strictly stronger proof than an x402 header check.
+            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "disputed")
+            if not confirmed:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Wallet transaction not yet confirmed on-chain as 'disputed'; local state unchanged",
+                )
+            deploy_hash = req.wallet_tx_hash
+        else:
+            # Authorization: only escrow sender or receiver may dispute
+            caller = _extract_sender(request)
+            if caller not in (escrow.sender, escrow.receiver):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Only escrow sender or receiver may dispute",
+                )
+            try:
+                deploy_hash = await casper.dispute(req.service_hash)
+            except Exception as exc:
+                logger.error("Casper dispute failed: %s", exc)
+                raise HTTPException(
+                    status_code=502,
+                    detail="On-chain dispute transaction failed; local state unchanged",
+                )
+    else:
+        # Sandbox mode (no real chain) — still enforce the same x402-based check.
+        caller = _extract_sender(request)
+        if caller not in (escrow.sender, escrow.receiver):
             raise HTTPException(
-                status_code=502,
-                detail="On-chain dispute transaction failed; local state unchanged",
+                status_code=403,
+                detail="Only escrow sender or receiver may dispute",
             )
 
     try:
@@ -761,3 +807,20 @@ def _extract_sender(request: Request) -> str:
     if cfg.sandbox:
         return request.query_params.get("sender", "sandbox-agent-001")
     raise HTTPException(status_code=401, detail="sender identity required")
+
+
+def _extract_release_refund_caller(request: Request, wallet_tx_hash: str | None, escrow_sender: str) -> str:
+    """Resolve the acting caller for release/refund.
+
+    Normal path: verified x402 header (hosted demo signer or a real signed
+    payment intent). Live-wallet path: the x402 header is intentionally not
+    required here — on-chain contract state (already confirmed via
+    `CasperClient.confirm_wallet_lifecycle_tx` before this is called) is
+    strictly stronger proof of authorization than an x402 signature could
+    ever add, since the contract itself only lets the true escrow sender
+    execute release/refund. The caller is simply the escrow's own recorded
+    sender, which is exactly what the on-chain check already verified.
+    """
+    if wallet_tx_hash:
+        return escrow_sender
+    return _extract_sender(request)
