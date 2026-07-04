@@ -670,16 +670,57 @@ async def resolve_escrow(
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
-        try:
-            deploy_hash = await casper.resolve(
-                req.service_hash, req.in_favor_of, req.arbiter_accounts
+        # Casper does not guarantee execution order between two deploys from
+        # the same account submitted moments apart -- if `dispute()` and
+        # `resolve()` land in the *same* block, `resolve()` can execute
+        # first and see status still "pending", reverting with the
+        # contract's "wrong status" error even though our own `/dispute`
+        # call already returned success. Require a fresh, direct on-chain
+        # read (not the local cache) showing "disputed" before submitting,
+        # and retry submission once if the contract still reverts for that
+        # reason (waiting long enough for the next block).
+        for _ in range(6):
+            onchain = await casper.get_escrow(req.service_hash)
+            if onchain is not None and onchain.status.value == "disputed":
+                break
+            await asyncio.sleep(1.5)
+        else:
+            raise HTTPException(
+                status_code=409,
+                detail="Escrow not yet confirmed as 'disputed' on-chain; retry shortly",
             )
-        except Exception as exc:
-            logger.error("Casper resolve failed: %s", exc)
+
+        last_error: str | None = None
+        for attempt in range(2):
+            try:
+                deploy_hash = await casper.resolve(
+                    req.service_hash, req.in_favor_of, req.arbiter_accounts
+                )
+            except Exception as exc:
+                logger.error("Casper resolve submission failed: %s", exc)
+                raise HTTPException(
+                    status_code=502,
+                    detail="On-chain resolve transaction failed to submit; local state unchanged",
+                )
+
+            # Give the deploy a moment to land, then check whether the
+            # contract reverted it (e.g. the same-block race described
+            # above) before trusting the tx hash.
+            await asyncio.sleep(4.0)
+            last_error = await casper.get_deploy_error(deploy_hash)
+            if last_error is None:
+                break
+            logger.warning(
+                "resolve() deploy %s reverted (%s), attempt %d/2", deploy_hash, last_error, attempt + 1
+            )
+            await asyncio.sleep(6.0)  # let the next block pass before retrying
+
+        if last_error is not None:
             raise HTTPException(
                 status_code=502,
-                detail="On-chain resolve transaction failed; local state unchanged",
+                detail=f"On-chain resolve transaction reverted: {last_error}",
             )
+
         confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "resolved")
         if not confirmed:
             raise HTTPException(
