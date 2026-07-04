@@ -1,12 +1,17 @@
 // Casper uses "motes" as the smallest unit: 1 CSPR = 1,000,000,000 motes.
 export const MOTES_PER_CSPR = 1_000_000_000;
 
-/** Convert motes (string | number) to a human CSPR amount. */
-export function motesToCspr(motes: number | string | null | undefined): number {
-  if (motes == null) return 0;
-  const n = typeof motes === 'string' ? Number(motes) : motes;
+/**
+ * The hosted API expresses escrow amounts, volumes, fees and pool balances as
+ * whole CSPR integers (e.g. amount=25000 means 25,000 CSPR), NOT motes.
+ * Confirmed via /estimate (1000 -> net 980, fee 20 = 2%) and /stats volume.
+ * So the display layer must treat the incoming value as CSPR directly.
+ */
+export function motesToCspr(amount: number | string | null | undefined): number {
+  if (amount == null) return 0;
+  const n = typeof amount === 'string' ? Number(amount) : amount;
   if (!isFinite(n)) return 0;
-  return n / MOTES_PER_CSPR;
+  return n;
 }
 
 /** Format motes as a friendly CSPR string, e.g. "100 CSPR". */
@@ -16,9 +21,9 @@ export function formatCspr(motes: number | string | null | undefined, digits = 2
   return `${s} CSPR`;
 }
 
-/** Convert a CSPR amount to integer motes. */
+/** The API accepts amounts as whole CSPR integers, so pass them through. */
 export function csprToMotes(cspr: number): number {
-  return Math.round(cspr * MOTES_PER_CSPR);
+  return Math.round(cspr);
 }
 
 /** Generate a random 64-char hex string (e.g. for a demo service_hash). */
