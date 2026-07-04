@@ -35,7 +35,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
           <h3 className="text-xl font-semibold text-gray-50">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright rounded">
             <XCircle size={24} />
           </button>
         </div>
@@ -154,8 +154,6 @@ const Agents: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Agent Management</h2>
-
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         <strong>What this section is for:</strong> agent identities bind a service agent to a public key, DID document hash, capabilities and reputation. The list is fetched from the live identity/reputation API. If the optional on-chain identity registry is not configured, the backend labels registrations as <span className="font-mono">local_registry</span> instead of pretending they were contract writes. Use the detail icon to inspect reputation and delegated capabilities before trusting an agent.
       </div>
@@ -183,20 +181,20 @@ const Agents: React.FC = () => {
           </select>
         </div>
         <button
-          onClick={() => setIsRegisterModalOpen(true)}
-          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
-          title="Register a DID-style agent identity"
-        >
-          <UserPlus className="h-5 w-5 mr-2" />
-          Register Agent
-        </button>
-        <button
           onClick={() => setIsDelegateModalOpen(true)}
           className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-gray-800 hover:bg-gray-700 border border-[#1e1e2e] text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
           title="Sign and record a real capability delegation between two demo identities"
         >
           <KeyRound className="h-5 w-5 mr-2" />
           Delegate Capability
+        </button>
+        <button
+          onClick={() => setIsRegisterModalOpen(true)}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
+          title="Register a DID-style agent identity"
+        >
+          <UserPlus className="h-5 w-5 mr-2" />
+          Register Agent
         </button>
       </div>
 

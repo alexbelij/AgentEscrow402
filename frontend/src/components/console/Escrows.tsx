@@ -41,10 +41,10 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
           <h3 className="text-xl font-semibold text-gray-50">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-200">
+          <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright rounded">
             <XCircle size={24} />
           </button>
         </div>
@@ -249,8 +249,6 @@ const Escrows: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h2 className="text-3xl font-bold text-gray-50">Escrow Management</h2>
-
       <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
         <strong>What is real here:</strong> every row is loaded from the live backend; new rows are persisted in Neon when the hosted database is connected and otherwise shown as a clearly labelled demo fallback. Create/release/refund/dispute calls go through the same API used by production. The hosted console currently uses a labelled demo <span className="font-mono">X-Payment</span> identity header instead of silently pretending a browser wallet is connected; production clients sign that header with their wallet/agent key.
       </div>
@@ -394,44 +392,61 @@ const Escrows: React.FC = () => {
       <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} title="Escrow Details">
         {selectedEscrow && (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-gray-300">
-              <p className="flex items-center">
-                <Hash className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Hash:</strong> <span className="ml-2 break-all">{selectedEscrow.hash}</span>
-              </p>
-              <p className="flex items-center">
-                <User className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Payer:</strong> <span className="ml-2 break-all">{selectedEscrow.payer}</span>
-              </p>
-              <p className="flex items-center">
-                <User className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Payee:</strong> <span className="ml-2 break-all">{selectedEscrow.payee}</span>
-              </p>
-              <p className="flex items-center">
-                <DollarSign className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Amount:</strong> <span className="ml-2">{formatCspr(selectedEscrow.amount)}</span>
-              </p>
-              <p className="flex items-center">
-                <Coins className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Token:</strong> <span className="ml-2 break-all">{selectedEscrow.token_contract}</span>
-              </p>
-              <p className="flex items-center">
-                {getStatusIcon(selectedEscrow.status)}
-                <strong>Status:</strong> <span className="ml-2 capitalize">{selectedEscrow.status}</span>
-              </p>
-              <p className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Created:</strong> <span className="ml-2">{format(new Date(selectedEscrow.created_at), 'MMM dd, yyyy HH:mm')}</span>
-              </p>
-              <p className="flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Updated:</strong> <span className="ml-2">{format(new Date(selectedEscrow.updated_at), 'MMM dd, yyyy HH:mm')}</span>
-              </p>
-              {selectedEscrow.arbiter && (
-                <p className="flex items-center col-span-full">
-                  <Scale className="h-5 w-5 mr-2 text-amber-500" />
-                  <strong>Arbiter:</strong> <span className="ml-2 break-all">{selectedEscrow.arbiter}</span>
+            <div className="space-y-4 text-gray-300">
+              {/* Full-width, label-above-value rows for long hex identifiers so
+                  the value gets the entire modal width and never wraps into a
+                  cramped 3-line column next to its label. */}
+              <div>
+                <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <Hash className="h-4 w-4 mr-1.5 text-amber-500" /> Hash
+                </div>
+                <p className="font-mono text-sm break-all">{selectedEscrow.hash}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                    <User className="h-4 w-4 mr-1.5 text-amber-500" /> Payer
+                  </div>
+                  <p className="font-mono text-sm break-all">{selectedEscrow.payer}</p>
+                </div>
+                <div>
+                  <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                    <User className="h-4 w-4 mr-1.5 text-amber-500" /> Payee
+                  </div>
+                  <p className="font-mono text-sm break-all">{selectedEscrow.payee}</p>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <Coins className="h-4 w-4 mr-1.5 text-amber-500" /> Token
+                </div>
+                <p className="font-mono text-sm break-all">{selectedEscrow.token_contract}</p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <p className="flex items-center">
+                  <DollarSign className="h-5 w-5 mr-2 text-amber-500" />
+                  <strong>Amount:</strong> <span className="ml-2">{formatCspr(selectedEscrow.amount)}</span>
                 </p>
+                <p className="flex items-center">
+                  {getStatusIcon(selectedEscrow.status)}
+                  <strong>Status:</strong> <span className="ml-2 capitalize">{selectedEscrow.status}</span>
+                </p>
+                <p className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                  <strong>Created:</strong> <span className="ml-2">{format(new Date(selectedEscrow.created_at), 'MMM dd, yyyy HH:mm')}</span>
+                </p>
+                <p className="flex items-center">
+                  <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                  <strong>Updated:</strong> <span className="ml-2">{format(new Date(selectedEscrow.updated_at), 'MMM dd, yyyy HH:mm')}</span>
+                </p>
+              </div>
+              {selectedEscrow.arbiter && (
+                <div>
+                  <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                    <Scale className="h-4 w-4 mr-1.5 text-amber-500" /> Arbiter
+                  </div>
+                  <p className="font-mono text-sm break-all">{selectedEscrow.arbiter}</p>
+                </div>
               )}
             </div>
 

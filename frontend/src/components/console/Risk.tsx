@@ -84,11 +84,7 @@ const Risk: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-50">Risk Intelligence</h2>
-          <p className="text-gray-400 mt-2">IsolationForest model for agent escrow risk, insurance pricing and dispute prevention.</p>
-        </div>
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end">
         <button
           onClick={loadDashboard}
           disabled={loading}

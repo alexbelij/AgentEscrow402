@@ -138,16 +138,6 @@ export default function UseCases() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Use Cases</h1>
-        <p className="text-gray-400 mt-1 max-w-3xl">
-          Four real scenarios AE402 is built for, told in plain language. Every step below links to the actual
-          console panel that runs it against the live backend — nothing here is a separate mock, it&apos;s the same
-          Escrows / Arbitration / Identity Registry / Advanced Escrow panels reused as a guided narrative. Looking for
-          the raw API and SDK instead? See Agent Demo and API Sandbox in the nav.
-        </p>
-      </div>
-
       <div className="space-y-3">
         {SCENARIOS.map((s) => (
           <ScenarioCard key={s.id} scenario={s} open={openId === s.id} onToggle={() => setOpenId(openId === s.id ? '' : s.id)} />
