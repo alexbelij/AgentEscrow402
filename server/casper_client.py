@@ -210,6 +210,25 @@ class CasperClient:
             },
         )
 
+    async def get_deploy_error(self, deploy_hash: str) -> str | None:
+        """Check a submitted deploy's execution result for a contract-level
+        revert (e.g. `User error: N`). Returns None if it executed
+        successfully, the error string if it reverted, or None if the
+        deploy hasn't been included in a finalized block yet (indistinguishable
+        from "still pending" from this RPC alone -- callers should retry).
+        """
+        try:
+            result = await self._rpc("info_get_deploy", {"deploy_hash": deploy_hash})
+        except Exception:
+            return None
+        execution_results = result.get("execution_results") or []
+        if not execution_results:
+            return None
+        outcome = execution_results[0].get("result", {})
+        if "Failure" in outcome:
+            return outcome["Failure"].get("error_message", "unknown execution failure")
+        return None
+
     async def confirm_wallet_lifecycle_tx(
         self,
         service_hash: str,
