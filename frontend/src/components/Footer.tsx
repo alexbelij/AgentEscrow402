@@ -4,7 +4,7 @@ const LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
   { label: 'SDK', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
   { label: 'MCP', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
-  { label: 'Contract', href: 'https://cspr.live/contract/5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467' },
+  { label: 'Contract', href: 'https://testnet.cspr.live/contract/5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467' },
 ]
 
 export default function Footer() {
