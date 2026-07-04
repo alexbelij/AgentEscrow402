@@ -734,6 +734,8 @@ export const api = {
   registerRegistryIdentity: (data: { account_hash: string; display_name: string; capabilities?: RegistryCapability[] }) =>
     fetcher<RegistryIdentity>('/identity-registry/register', 'POST', data),
   getRegistryIdentity: (did: string) => fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}`, 'GET'),
+  getRegistryIdentityByAccount: (accountHash: string) =>
+    fetcher<RegistryIdentity>(`/identity-registry/by-account/${encodeURIComponent(accountHash)}`, 'GET'),
   updateRegistryReputation: (did: string, completed: number, disputed: number) =>
     fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/reputation`, 'POST', { completed, disputed }),
   applyRegistryDecay: (did: string) => fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/decay`, 'POST', {}),

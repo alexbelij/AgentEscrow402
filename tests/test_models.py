@@ -19,7 +19,7 @@ from server.models import (
 class TestEscrowRequest:
     def test_valid_request(self):
         h = "a" * 64
-        req = EscrowRequest(receiver="rcv", amount=1000, service_hash=h)
+        req = EscrowRequest(receiver="ab" * 32, amount=1000, service_hash=h)
         assert req.ttl == 300
         assert req.amount == 1000
 
@@ -39,7 +39,7 @@ class TestEscrowRequest:
 
     def test_custom_ttl(self):
         h = "b" * 64
-        req = EscrowRequest(receiver="r", amount=100, service_hash=h, ttl=600)
+        req = EscrowRequest(receiver="ab" * 32, amount=100, service_hash=h, ttl=600)
         assert req.ttl == 600
 
     def test_ttl_below_min_rejected(self):

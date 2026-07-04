@@ -116,6 +116,38 @@ def test_action_on_unknown_did_is_404():
     assert res.status_code == 404
 
 
+def test_decay_slash_verify_capability_on_unknown_did_are_404():
+    client = _client()
+    ghost = "did:casper:ghost2"
+
+    res = client.post(f"/identity-registry/{ghost}/decay")
+    assert res.status_code == 404
+
+    res = client.post(
+        f"/identity-registry/{ghost}/slash",
+        json={"amount": 10, "reason": "test"},
+    )
+    assert res.status_code == 404
+
+    res = client.post(
+        f"/identity-registry/{ghost}/verify",
+        json={"level": "BASIC"},
+    )
+    assert res.status_code == 404
+
+    res = client.post(
+        f"/identity-registry/{ghost}/capabilities",
+        json={"capability": {"name": "escrow.dispute", "version": "1.0", "description": "d"}},
+    )
+    assert res.status_code == 404
+
+
+def test_get_by_account_unknown_is_404():
+    client = _client()
+    res = client.get("/identity-registry/by-account/no-such-account")
+    assert res.status_code == 404
+
+
 def test_search_filters_by_capability_and_reputation():
     client = _client()
     a = client.post(

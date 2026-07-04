@@ -17,16 +17,21 @@ from server.models import PaymentHeader
 
 class TestParseX402Header:
     def test_valid_header(self):
+        # escrow_hash and sender must be strict 64-char hex, signature
+        # 128-char hex — parse_x402_header rejects anything looser.
         ts = str(int(time.time()))
-        header = f"x402-v1;abc123;1000;sender-001;{ts};nonce1;sig-xyz"
+        escrow_hash = "ab" * 32
+        sender = "cd" * 32
+        signature = "ef" * 64
+        header = f"x402-v1;{escrow_hash};1000;{sender};{ts};nonce123;{signature}"
         result = parse_x402_header(header)
         assert result is not None
         assert result.version == "x402-v1"
-        assert result.escrow_hash == "abc123"
+        assert result.escrow_hash == escrow_hash
         assert result.amount == 1000
-        assert result.sender == "sender-001"
-        assert result.signature == "sig-xyz"
-        assert result.nonce == "nonce1"
+        assert result.sender == sender
+        assert result.signature == signature
+        assert result.nonce == "nonce123"
 
     def test_invalid_version(self):
         header = "x402-v2;abc;100;sender;1000;n;sig"
@@ -58,19 +63,27 @@ class TestParseX402Header:
         assert result is None
 
     def test_valid_hex_hash_accepted(self):
-        h = "abcdef1234567890" * 4
-        header = f"x402-v1;{h};100;sender;0;n;sig"
+        h = "abcdef1234567890" * 4  # 64-char hex
+        sender = "1234567890abcdef" * 4
+        signature = "ab" * 64
+        header = f"x402-v1;{h};100;{sender};0;nonceabcd;{signature}"
         result = parse_x402_header(header)
         assert result is not None
 
     def test_negative_amount_still_parses(self):
-        header = "x402-v1;aabbcc;-5;sender;0;n;sig"
+        h = "aa" * 32
+        sender = "bb" * 32
+        signature = "cc" * 64
+        header = f"x402-v1;{h};-5;{sender};0;nonceabcd;{signature}"
         result = parse_x402_header(header)
         assert result is not None
         assert result.amount == -5
 
     def test_zero_amount(self):
-        header = "x402-v1;aabbcc;0;sender;0;n;sig"
+        h = "aa" * 32
+        sender = "bb" * 32
+        signature = "cc" * 64
+        header = f"x402-v1;{h};0;{sender};0;nonceabcd;{signature}"
         result = parse_x402_header(header)
         assert result is not None
         assert result.amount == 0

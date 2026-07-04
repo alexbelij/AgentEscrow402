@@ -5,7 +5,8 @@ from server.identity_registry import (
     IdentityRegistry,
     AgentIdentity,
     AgentCapability,
-    VerificationLevel
+    VerificationLevel,
+    DIDResolver,
 )
 import asyncio
 
@@ -331,3 +332,60 @@ async def test_metadata_hash_format(registry, sample_capabilities):
     identity = await registry.register(account_hash, "Test Agent", sample_capabilities)
     assert len(identity.metadata_hash) == 64  # SHA-256 hash length
     assert all(c in "0123456789abcdef" for c in identity.metadata_hash)
+
+
+@pytest.mark.asyncio
+async def test_get_statistics_empty_registry(registry):
+    stats = await registry.get_statistics()
+    assert stats == {
+        "total_agents": 0,
+        "avg_reputation": 0.0,
+        "distribution_by_level": {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_get_statistics_with_registered_agents(registry, sample_capabilities):
+    await registry.register("acct1", "Agent One", sample_capabilities)
+    await registry.register("acct2", "Agent Two", sample_capabilities)
+
+    stats = await registry.get_statistics()
+
+    assert stats["total_agents"] == 2
+    assert stats["avg_reputation"] == 50.0
+    assert stats["distribution_by_level"]["UNVERIFIED"] == 2
+
+
+class TestDIDResolver:
+    def test_parse_did_valid(self):
+        assert DIDResolver.parse_did("did:casper:abc123") == ("did", "casper", "abc123")
+
+    def test_parse_did_invalid_format_raises(self):
+        with pytest.raises(ValueError):
+            DIDResolver.parse_did("not-a-did")
+
+    def test_is_valid_did_true(self):
+        assert DIDResolver.is_valid_did("did:casper:abc123") is True
+
+    def test_is_valid_did_false_wrong_method(self):
+        assert DIDResolver.is_valid_did("dud:casper:abc123") is False
+
+    def test_is_valid_did_false_wrong_network(self):
+        assert DIDResolver.is_valid_did("did:ethereum:abc123") is False
+
+    def test_is_valid_did_false_malformed(self):
+        assert DIDResolver.is_valid_did("garbage") is False
+
+    @pytest.mark.asyncio
+    async def test_resolve_delegates_to_registry(self, registry, sample_capabilities):
+        identity = await registry.register("acct-resolve", "Agent", sample_capabilities)
+        resolver = DIDResolver(registry)
+
+        resolved = await resolver.resolve(identity.did)
+
+        assert resolved == identity
+
+    @pytest.mark.asyncio
+    async def test_resolve_unknown_did_returns_none(self, registry):
+        resolver = DIDResolver(registry)
+        assert await resolver.resolve("did:casper:nope") is None
