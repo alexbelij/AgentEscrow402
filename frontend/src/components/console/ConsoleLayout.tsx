@@ -32,9 +32,67 @@ const navItems: NavItem[] = [
   { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
 ];
 
+interface SectionInfo {
+  title: string;
+  desc: string;
+  source: 'demo' | 'live' | 'tool';
+}
+
+// Per-route explanation shown as a banner so every console page tells the
+// visitor what it is, what it is for, and whether the data is live or demo.
+const SECTION_INFO: Record<string, SectionInfo> = {
+  '/console/overview': {
+    title: 'Console Overview',
+    desc: 'Live health of the hosted API and Casper testnet target: persistence status, network mode, deployed contract and escrow volume. Use it to confirm the backend is reachable before running actions.',
+    source: 'live',
+  },
+  '/console/escrows': {
+    title: 'Escrows',
+    desc: 'Every agent-to-agent payment is an escrow: funds are locked, then released, refunded or disputed. Create one, inspect its lifecycle, or act on it. Listed records are seeded demo data for the hosted console, not real on-chain transactions.',
+    source: 'demo',
+  },
+  '/console/agents': {
+    title: 'Agents',
+    desc: 'Agent identities bind a service agent to a public key, capabilities and a reputation score, so counterparties can decide who to trust before locking funds. Listed agents are seeded demo identities for the hosted console.',
+    source: 'demo',
+  },
+  '/console/insurance': {
+    title: 'Insurance Pool',
+    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. On the hosted console the pool is accounted off-chain (the pool contract is not yet deployed to testnet).',
+    source: 'demo',
+  },
+  '/console/risk': {
+    title: 'Risk Scoring',
+    desc: 'An anomaly model scores counterparties and jobs so you can block or warn on high-risk deals before funds are locked, and feed the score into insurance pricing and arbitration routing. Scores shown use seeded demo data.',
+    source: 'demo',
+  },
+  '/console/contracts': {
+    title: 'Contract Playground',
+    desc: 'A developer tool to call escrow contract actions (release, refund, dispute, VRF election) and read the raw API response. Actions only succeed on escrows in a valid state — a fresh pending escrow is provided for terminal-state actions.',
+    source: 'tool',
+  },
+  '/console/agent-demo': {
+    title: 'Agent Demo',
+    desc: 'A guided end-to-end walkthrough of an x402 agent payment: build the payment header, create an escrow, and release it — each step shows the exact request and live response.',
+    source: 'tool',
+  },
+  '/console/sandbox': {
+    title: 'API Sandbox',
+    desc: 'An interactive explorer for every REST endpoint: pick a call on the left, set parameters, and see the live response. Use it to learn the API before wiring the SDK.',
+    source: 'tool',
+  },
+};
+
+const SOURCE_BADGE: Record<SectionInfo['source'], { label: string; cls: string }> = {
+  live: { label: 'Live hosted API', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  demo: { label: 'Seeded demo data · not on-chain', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  tool: { label: 'Developer tool', cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+};
+
 const ConsoleLayout: React.FC = () => {
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
+  const info = SECTION_INFO[location.pathname];
 
   const getBreadcrumbs = () => {
     let currentPath = '';
@@ -95,6 +153,17 @@ const ConsoleLayout: React.FC = () => {
           <ChevronRight className="h-4 w-4 text-gray-600 mx-1" />
           {getBreadcrumbs()}
         </nav>
+        {info && (
+          <div className="mb-6 rounded-lg border border-ae-border bg-ae-card/60 p-4">
+            <div className="flex flex-wrap items-center gap-3 mb-1.5">
+              <h1 className="text-lg font-semibold text-gray-100">{info.title}</h1>
+              <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${SOURCE_BADGE[info.source].cls}`}>
+                {SOURCE_BADGE[info.source].label}
+              </span>
+            </div>
+            <p className="text-sm text-gray-400 leading-relaxed max-w-3xl">{info.desc}</p>
+          </div>
+        )}
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>

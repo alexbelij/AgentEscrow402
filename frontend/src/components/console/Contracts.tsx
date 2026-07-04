@@ -86,7 +86,7 @@ const Contracts: React.FC = () => {
             </div>
             <p className="font-mono text-sm text-gray-300 mt-4 break-all">{contract.hash}</p>
             <a
-              href={`https://testnet.cspr.live/search/${contract.hash}`}
+              href={`https://cspr.live/search/${contract.hash}`}
               target="_blank"
               rel="noreferrer"
               className="inline-block mt-3 text-sm text-amber-400 hover:text-amber-300"
