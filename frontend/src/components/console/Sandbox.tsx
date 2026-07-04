@@ -46,6 +46,14 @@ const Textarea: React.FC<TextareaProps> = ({ label, id, error, ...props }) => (
   </div>
 );
 
+/** A single documented variable: its wire type and what it means, in the
+ * same spirit as a generated OpenAPI/Swagger parameter table. */
+interface FieldDoc {
+  type: string;
+  description: string;
+  required?: boolean;
+}
+
 interface EndpointConfig {
   name: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -54,6 +62,12 @@ interface EndpointConfig {
   initialPathParams?: Record<string, string>;
   initialQueryParams?: Record<string, string>;
   initialBody?: object;
+  /** Docs for `{param}` placeholders in `path`. */
+  pathParamDocs?: Record<string, FieldDoc>;
+  /** Docs for query-string parameters. */
+  queryParamDocs?: Record<string, FieldDoc>;
+  /** Docs for top-level JSON body fields (POST/PUT only). */
+  bodyFieldDocs?: Record<string, FieldDoc>;
   apiCall: (
     pathParams: Record<string, string>,
     queryParams: Record<string, string>,
@@ -82,6 +96,11 @@ const endpoints: EndpointConfig[] = [
     path: '/escrows',
     description: 'Lists escrows with optional filtering and pagination.',
     initialQueryParams: { limit: '10', offset: '0', status: 'pending' },
+    queryParamDocs: {
+      limit: { type: 'integer', description: 'Max rows to return per page.' },
+      offset: { type: 'integer', description: 'Rows to skip, for pagination.' },
+      status: { type: 'string enum: pending | released | disputed | refunded | expired', description: 'Filter to a single escrow lifecycle state.' },
+    },
     apiCall: (p, q) => api.getEscrows({ limit: Number(q.limit), offset: Number(q.offset), status: q.status as any }),
   },
   {
@@ -95,6 +114,12 @@ const endpoints: EndpointConfig[] = [
       service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
       ttl: 300,
     },
+    bodyFieldDocs: {
+      receiver: { type: 'string (hex public key)', description: 'Casper public key of the agent who will receive funds on release.', required: true },
+      amount: { type: 'integer (motes)', description: 'Escrow amount in motes (1 CSPR = 1,000,000,000 motes).', required: true },
+      service_hash: { type: 'string (64-char hex)', description: 'Unique ID for this escrow; also used to look it up, release, or dispute it.', required: true },
+      ttl: { type: 'integer (seconds)', description: 'Time-to-live before the escrow auto-expires and is refundable.', required: false },
+    },
     apiCall: (p, q, b) => api.createEscrow(b as any),
   },
   {
@@ -103,6 +128,9 @@ const endpoints: EndpointConfig[] = [
     path: '/escrow/{hash}',
     description: 'Retrieves details for a specific escrow.',
     initialPathParams: { hash: '1111111111111111111111111111111111111111111111111111111111111111' },
+    pathParamDocs: {
+      hash: { type: 'string (64-char hex)', description: 'The service_hash returned by / used to create the escrow.', required: true },
+    },
     apiCall: (p) => api.getEscrowByHash(p.hash),
   },
   {
@@ -113,6 +141,9 @@ const endpoints: EndpointConfig[] = [
     initialBody: {
       service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
     },
+    bodyFieldDocs: {
+      service_hash: { type: 'string (64-char hex)', description: 'Identifies which pending escrow to release to its receiver.', required: true },
+    },
     apiCall: (p, q, b) => api.releaseEscrow(b as any),
   },
   {
@@ -121,6 +152,9 @@ const endpoints: EndpointConfig[] = [
     path: '/reputation/{agent}',
     description: 'Fetches reputation score for an agent.',
     initialPathParams: { agent: DEMO_AGENT_RECEIVER },
+    pathParamDocs: {
+      agent: { type: 'string (hex public key)', description: 'The agent identity to look up reputation for.', required: true },
+    },
     apiCall: (p) => api.getReputation(p.agent),
   },
   {
@@ -150,6 +184,11 @@ const endpoints: EndpointConfig[] = [
     path: '/insurance/premium-quote',
     description: 'Calculates an insurance premium quote.',
     initialQueryParams: { escrow_amount: '100000000000', agent_id: 'agent-compute-gpt4', service_type: 'general' },
+    queryParamDocs: {
+      escrow_amount: { type: 'integer (motes)', description: 'Escrow size the premium is calculated against.' },
+      agent_id: { type: 'string', description: 'Agent identity the policy would cover.' },
+      service_type: { type: 'string', description: 'Risk category used to weight the premium (e.g. general, compute, data).' },
+    },
     apiCall: (p, q) => api.getPremiumQuote(Number(q.escrow_amount), q.agent_id, q.service_type),
   },
   {
@@ -161,6 +200,11 @@ const endpoints: EndpointConfig[] = [
       agent_id: 'demo-agent-001',
       public_key: DEMO_AGENT_SENDER,
       did_document_hash: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    },
+    bodyFieldDocs: {
+      agent_id: { type: 'string', description: 'Human-readable unique ID for this agent identity.', required: true },
+      public_key: { type: 'string (hex public key)', description: 'Casper public key controlling this identity.', required: true },
+      did_document_hash: { type: 'string (64-char hex)', description: 'Hash of the off-chain DID document describing this agent.', required: true },
     },
     apiCall: (p, q, b) => api.registerIdentity(b as any),
   },
@@ -177,6 +221,9 @@ const endpoints: EndpointConfig[] = [
     path: '/risk/score/{agent}',
     description: 'Scores one agent with IsolationForest features such as volume, TTL and dispute rate.',
     initialPathParams: { agent: DEMO_AGENT_RECEIVER },
+    pathParamDocs: {
+      agent: { type: 'string (hex public key)', description: 'The agent identity to compute an anomaly/risk score for.', required: true },
+    },
     apiCall: (p) => api.getRiskScore(p.agent),
   },
   {
@@ -185,6 +232,12 @@ const endpoints: EndpointConfig[] = [
     path: '/compute-hash',
     description: 'Computes deterministic service_hash from sender, receiver, amount and nonce query parameters.',
     initialQueryParams: { sender: DEMO_AGENT_SENDER, receiver: DEMO_AGENT_RECEIVER, amount: '100000000000', nonce: 'console-demo' },
+    queryParamDocs: {
+      sender: { type: 'string (hex public key)', description: 'The would-be payer of the escrow.' },
+      receiver: { type: 'string (hex public key)', description: 'The would-be payee of the escrow.' },
+      amount: { type: 'integer (motes)', description: 'Escrow amount to bind into the hash.' },
+      nonce: { type: 'string', description: 'Free-form uniqueness salt so repeat requests do not collide.' },
+    },
     apiCall: (p, q) => api.computeServiceHash({ sender: q.sender, receiver: q.receiver, amount: Number(q.amount), nonce: q.nonce }),
   },
   {
@@ -197,6 +250,12 @@ const endpoints: EndpointConfig[] = [
       sender: DEMO_AGENT_SENDER,
       receiver: DEMO_AGENT_RECEIVER,
       seed_hash: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
+    },
+    bodyFieldDocs: {
+      dispute_id: { type: 'string', description: 'Identifier of the dispute this election is for.', required: true },
+      sender: { type: 'string (hex public key)', description: "The escrow's sender — excluded from the candidate arbiter pool.", required: true },
+      receiver: { type: 'string (hex public key)', description: "The escrow's receiver — also excluded from the candidate pool.", required: true },
+      seed_hash: { type: 'string (64-char hex)', description: 'Randomness seed fed into the VRF (or CSPRNG fallback) for a verifiable, unbiased pick.', required: true },
     },
     apiCall: (p, q, b) => api.electVrfArbiter(b as any),
   },
@@ -325,14 +384,20 @@ const Sandbox: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {paramsInPath.map((param) => {
                   const paramName = param.replace(/\{|\}/g, '');
+                  const doc = endpoint.pathParamDocs?.[paramName];
                   return (
                     <label key={paramName} className="space-y-1">
-                      <span className="text-sm text-gray-400">{paramName}</span>
+                      <span className="text-sm text-gray-400 flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono">{paramName}</span>
+                        {doc?.type && <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">{doc.type}</span>}
+                        {doc?.required && <span className="text-[11px] text-red-400">required</span>}
+                      </span>
                       <input
                         value={pathParams[endpoint.name]?.[paramName] || ''}
                         onChange={(e) => setPathParams((prev) => ({ ...prev, [endpoint.name]: { ...prev[endpoint.name], [paramName]: e.target.value } }))}
                         className="w-full h-11 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm"
                       />
+                      {doc?.description && <span className="block text-xs text-gray-500">{doc.description}</span>}
                     </label>
                   );
                 })}
@@ -342,15 +407,25 @@ const Sandbox: React.FC = () => {
 
           <div>
             <h4 className="text-md font-semibold text-gray-300 mb-2">Query parameters</h4>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {Object.keys(currentQueryParams).length === 0 && <p className="text-sm text-gray-500">No query parameters required.</p>}
-              {Object.keys(currentQueryParams).map((key) => (
-                <div key={key} className="grid grid-cols-[160px_minmax(0,1fr)_40px] gap-2">
-                  <input value={key} readOnly className="h-10 px-3 rounded-md bg-gray-800 text-gray-300 border border-gray-700 font-mono text-sm" />
-                  <input value={currentQueryParams[key]} onChange={(e) => setQueryParams((prev) => ({ ...prev, [endpoint.name]: { ...prev[endpoint.name], [key]: e.target.value } }))} className="h-10 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none" />
-                  <button onClick={() => removeQueryParam(key)} className="h-10 inline-flex items-center justify-center text-red-300 hover:text-red-200" title="Remove parameter"><XCircle size={18} /></button>
-                </div>
-              ))}
+              {Object.keys(currentQueryParams).map((key) => {
+                const doc = endpoint.queryParamDocs?.[key];
+                return (
+                  <div key={key} className="space-y-1">
+                    <div className="grid grid-cols-[160px_minmax(0,1fr)_40px] gap-2">
+                      <input value={key} readOnly className="h-10 px-3 rounded-md bg-gray-800 text-gray-300 border border-gray-700 font-mono text-sm" />
+                      <input value={currentQueryParams[key]} onChange={(e) => setQueryParams((prev) => ({ ...prev, [endpoint.name]: { ...prev[endpoint.name], [key]: e.target.value } }))} className="h-10 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none" />
+                      <button onClick={() => removeQueryParam(key)} className="h-10 inline-flex items-center justify-center text-red-300 hover:text-red-200" title="Remove parameter"><XCircle size={18} /></button>
+                    </div>
+                    {doc && (
+                      <p className="text-xs text-gray-500 pl-1">
+                        <span className="font-mono text-gray-400">{doc.type}</span> — {doc.description}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
               <div className="grid grid-cols-[160px_minmax(0,1fr)_auto] gap-2 pt-2">
                 <input value={newQuery.key} onChange={(e) => setNewQuery((q) => ({ ...q, key: e.target.value }))} placeholder="new_key" className="h-10 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm" />
                 <input value={newQuery.value} onChange={(e) => setNewQuery((q) => ({ ...q, value: e.target.value }))} placeholder="value" className="h-10 px-3 rounded-md bg-[#0d0d14] text-gray-50 border border-[#1e1e2e] focus:ring-2 focus:ring-amber-500 outline-none" />
@@ -360,14 +435,40 @@ const Sandbox: React.FC = () => {
           </div>
 
           {(endpoint.method === 'POST' || endpoint.method === 'PUT') && (
-            <Textarea
-              label="Request body (JSON)"
-              id={`${endpoint.name}-body`}
-              value={requestBodies[endpoint.name]}
-              onChange={(e) => setRequestBodies((prev) => ({ ...prev, [endpoint.name]: e.target.value }))}
-              rows={10}
-              placeholder="Enter JSON request body here..."
-            />
+            <div>
+              {endpoint.bodyFieldDocs && (
+                <div className="mb-3 rounded-lg border border-[#1e1e2e] overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-gray-800/60 text-gray-400 text-left">
+                        <th className="px-3 py-2 font-semibold">Field</th>
+                        <th className="px-3 py-2 font-semibold">Type</th>
+                        <th className="px-3 py-2 font-semibold">Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(endpoint.bodyFieldDocs).map(([field, doc]) => (
+                        <tr key={field} className="border-t border-[#1e1e2e]">
+                          <td className="px-3 py-2 font-mono text-gray-200">
+                            {field}{doc.required && <span className="text-red-400 ml-1">*</span>}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-gray-400">{doc.type}</td>
+                          <td className="px-3 py-2 text-gray-400">{doc.description}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Textarea
+                label="Request body (JSON)"
+                id={`${endpoint.name}-body`}
+                value={requestBodies[endpoint.name]}
+                onChange={(e) => setRequestBodies((prev) => ({ ...prev, [endpoint.name]: e.target.value }))}
+                rows={10}
+                placeholder="Enter JSON request body here..."
+              />
+            </div>
           )}
 
           <div className="bg-[#0d0d14] border border-[#1e1e2e] rounded-lg p-4">

@@ -201,7 +201,7 @@ const AgentDemo: React.FC = () => {
         The hosted demo sends a labelled x402-style <span className="font-mono">X-Payment</span> identity header so the live backend can identify the sender without a wallet popup. In production, a wallet/agent signs the same payload with Ed25519 and replay protection.
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_520px] gap-6 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-6 items-start">
         <section className="space-y-4">
           <div className="flex flex-wrap gap-3">
             <button onClick={() => runStep(currentStep)} disabled={overallLoading || currentStep >= demoSteps.length || demoSteps[currentStep]?.disabled} className="flex items-center px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -217,19 +217,41 @@ const AgentDemo: React.FC = () => {
             <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-4 flex items-center"><XCircle className="h-6 w-6 mr-2" /><p>Overall Demo Error: {overallError}</p></div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {demoSteps.map((step, index) => (
-              <div key={step.id} className={`bg-[#12121a] border ${step.status === 'success' ? 'border-green-500/70' : step.status === 'error' ? 'border-red-500/70' : step.status === 'loading' ? 'border-amber-500 animate-pulse' : index === currentStep ? 'border-amber-500/40' : 'border-[#1e1e2e]'} rounded-lg p-5 shadow-md`}>
-                <div className="flex items-start gap-3">
-                  <div className={`rounded-full p-2 ${getStatusColor(step.status)} bg-gray-800 shrink-0`}>{step.status === 'loading' ? <Loader2 className="animate-spin h-5 w-5" /> : <step.icon className="h-5 w-5" />}</div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-50">Step {step.id}: {step.name}</h3>
-                    <p className="text-sm text-gray-400 mt-1">{step.description}</p>
-                    <p className="text-xs text-gray-500 mt-3">Status: <span className="font-mono">{step.status}</span></p>
+          {/* Single-column step list (was a 2-column grid). Completed steps
+              settle to the bottom via CSS `order` and get a green
+              flash-then-fade transition; the upcoming step gets a purple
+              outline instead of amber/red so "next" and "failed" are never
+              visually confused. */}
+          <div className="flex flex-col gap-3">
+            {demoSteps.map((step, index) => {
+              const isNext = index === currentStep && step.status === 'pending';
+              return (
+                <div
+                  key={step.id}
+                  style={{ order: step.status === 'success' ? 100 + step.id : step.id }}
+                  className={`bg-[#12121a] border transition-all duration-500 ease-out rounded-lg p-5 shadow-md ${
+                    step.status === 'success'
+                      ? 'border-green-500/70 bg-green-500/[0.03]'
+                      : step.status === 'error'
+                      ? 'border-red-500/70'
+                      : step.status === 'loading'
+                      ? 'border-amber-500 animate-pulse'
+                      : isNext
+                      ? 'border-ae-accent-bright/70 ring-1 ring-ae-accent-bright/30'
+                      : 'border-[#1e1e2e]'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={`rounded-full p-2 ${getStatusColor(step.status)} bg-gray-800 shrink-0`}>{step.status === 'loading' ? <Loader2 className="animate-spin h-5 w-5" /> : <step.icon className="h-5 w-5" />}</div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-50">Step {step.id}: {step.name}</h3>
+                      <p className="text-sm text-gray-400 mt-1">{step.description}</p>
+                      <p className="text-xs text-gray-500 mt-3">Status: <span className="font-mono">{step.status}</span></p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 

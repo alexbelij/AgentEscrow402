@@ -181,20 +181,20 @@ const Agents: React.FC = () => {
           </select>
         </div>
         <button
-          onClick={() => setIsRegisterModalOpen(true)}
-          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
-          title="Register a DID-style agent identity"
-        >
-          <UserPlus className="h-5 w-5 mr-2" />
-          Register Agent
-        </button>
-        <button
           onClick={() => setIsDelegateModalOpen(true)}
           className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-gray-800 hover:bg-gray-700 border border-[#1e1e2e] text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
           title="Sign and record a real capability delegation between two demo identities"
         >
           <KeyRound className="h-5 w-5 mr-2" />
           Delegate Capability
+        </button>
+        <button
+          onClick={() => setIsRegisterModalOpen(true)}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
+          title="Register a DID-style agent identity"
+        >
+          <UserPlus className="h-5 w-5 mr-2" />
+          Register Agent
         </button>
       </div>
 
