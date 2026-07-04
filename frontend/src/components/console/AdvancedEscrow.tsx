@@ -267,7 +267,7 @@ const AdvancedEscrow: React.FC = () => {
                 <label className={labelCls}>Service hash</label>
                 <div className="flex gap-2">
                   <input className={`${inputCls} font-mono text-sm`} value={tokenServiceHash} onChange={(e) => setTokenServiceHash(e.target.value)} />
-                  <button type="button" onClick={() => setTokenServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
+                  <button type="button" onClick={() => setTokenServiceHash(randomHex64())} aria-label="Generate new service hash" title="Generate new service hash" className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright">
                     <RefreshCw className="h-4 w-4" />
                   </button>
                 </div>
@@ -312,7 +312,7 @@ const AdvancedEscrow: React.FC = () => {
                 <label className={labelCls}>Service hash</label>
                 <div className="flex gap-2">
                   <input className={`${inputCls} font-mono text-sm`} value={streamServiceHash} onChange={(e) => setStreamServiceHash(e.target.value)} />
-                  <button type="button" onClick={() => setStreamServiceHash(randomHex64())} className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700">
+                  <button type="button" onClick={() => setStreamServiceHash(randomHex64())} aria-label="Generate new service hash" title="Generate new service hash" className="px-3 rounded-md bg-gray-800 border border-[#1e1e2e] hover:bg-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright">
                     <RefreshCw className="h-4 w-4" />
                   </button>
                 </div>
