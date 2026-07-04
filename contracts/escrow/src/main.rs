@@ -454,6 +454,26 @@ pub extern "C" fn configure_fee() {
     storage::write(uref, new_fee_bps);
 }
 
+/// Register (replace) the on-chain arbiter list used by `resolve()`
+/// (installer only). Overwrites the whole list -- pass the full desired
+/// set of arbiter account-hash hex strings each time.
+#[no_mangle]
+pub extern "C" fn set_arbiters() {
+    let caller = runtime::get_caller();
+    let installer = read_installer();
+    if caller != installer {
+        runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
+    }
+
+    let arbiters: Vec<String> = runtime::get_named_arg("arbiters");
+
+    let uref = runtime::get_key(ARBITER_LIST)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
+    storage::write(uref, arbiters);
+}
+
 /// Freeze insurance pool payouts (installer only).
 #[no_mangle]
 pub extern "C" fn emergency_freeze() {
@@ -568,6 +588,17 @@ pub extern "C" fn call() {
         EntryPointPayment::Caller,
     ));
     entry_points.add_entry_point(EntityEntryPoint::new(
+        "set_arbiters",
+        vec![Parameter::new(
+            "arbiters",
+            CLType::List(alloc::boxed::Box::new(CLType::String)),
+        )],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+    entry_points.add_entry_point(EntityEntryPoint::new(
         "configure_fee",
         vec![Parameter::new("new_fee_bps", CLType::U64)],
         CLType::Unit,
@@ -599,6 +630,28 @@ pub extern "C" fn call() {
         EntryPointType::Called,
         EntryPointPayment::Caller,
     ));
+
+    // Upgrade path: if this account already has an `escrow_package_hash`
+    // named key (i.e. we are re-running `call()` against an existing
+    // deployment to add new entry points), add a new contract version to
+    // that package instead of creating a brand-new package. This preserves
+    // the existing contract hash's on-chain storage (escrows, reputation,
+    // arbiter_list urefs etc.) -- only the entry-point set changes.
+    if let Some(existing_package_key) = runtime::get_key("escrow_package_hash") {
+        let package_hash_addr = existing_package_key
+            .into_hash_addr()
+            .unwrap_or_revert();
+        let package_hash: casper_types::contracts::ContractPackageHash =
+            package_hash_addr.into();
+        let (contract_hash, _) = storage::add_contract_version(
+            package_hash,
+            entry_points,
+            NamedKeys::new(),
+            alloc::collections::BTreeMap::new(),
+        );
+        runtime::put_key("escrow_contract", contract_hash.into());
+        return;
+    }
 
     let (contract_hash, _) = storage::new_contract(
         entry_points,
