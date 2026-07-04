@@ -26,9 +26,10 @@ declare global {
   }
 }
 
-// Public demo appId until a dedicated one is registered at console.cspr.build.
-// Analytics/rate-limiting only — does not affect signing correctness.
-const CSPRCLICK_APP_ID = (import.meta.env.VITE_CSPRCLICK_APP_ID as string | undefined) || 'csprclick-template'
+// Registered at console.cspr.build for ae402.xyz (Casper Test network,
+// linked CSPR.cloud key "agent"). Not a secret — used for analytics /
+// rate-limiting / feature scoping only. Overridable via env for local dev.
+const CSPRCLICK_APP_ID = (import.meta.env.VITE_CSPRCLICK_APP_ID as string | undefined) || '3411df7f-5185-474e-ba36-b9ec3ecf'
 
 window.clickUIOptions = {
   uiContainer: 'csprclick-ui',
