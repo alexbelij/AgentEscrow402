@@ -50,3 +50,12 @@
 .animate-float-cat { animation: float-cat 5s ease-in-out infinite; }
 .animate-portal-pulse { animation: portal-pulse 4s ease-in-out infinite; }
 .animate-counter-up { animation: counter-up 0.6s ease-out both; }
+
+/* CSPR.click's own ClickUIOptions.showTopBar:false is documented to be
+   silently ignored once accountMenuItems (a required field) is specified —
+   confirmed empirically: the SDK renders its "CSPR Products / Sign in" top
+   bar (class csprclick-top-bar) regardless of that option. AE402 has its
+   own Navbar and its own Connect Wallet button, so this bar is never
+   wanted; force-hide it at the CSS layer since the SDK's own config flag
+   for this doesn't work. */
+.csprclick-top-bar { display: none !important; }
