@@ -75,11 +75,53 @@ internal ROADMAP.md Phase 3/4 items:
               `2139b49ea1fe188727878e769b47b4a2e33c8bcb8967a76f341e0f507a82c387`).
               `tests/test_multi_asset.py` (10 tests) still pass unmodified — they only exercise
               `token_type: cspr`, so CsprAdapter's simulation is untouched by this change.
-            - STILL REMAINING for full B1: update `AdvancedEscrow.tsx` frontend to drop the
-              "currently simulated on the backend" caveat now that the CEP-18 path is real.
-              CEP-78 (NFT) adapter is a separate, still-untouched piece of B1 (same
-              install-from-source approach likely needed if the same stale-wasm issue recurs).
-      - [ ] Update frontend AdvancedEscrow.tsx to remove "simulated" caveat once backend wired.
+            - **DONE 2026-07-05 (CEP-78/NFT side too)**: cloned
+              `casper-ecosystem/cep-78-enhanced-nft` (same pinned `nightly-2025-02-04`
+              toolchain as cep18), built `cep78.wasm` from source (`-Z build-std`, then
+              `wasm-strip`), installed on testnet at **800 CSPR payment** (500 CSPR → "Out of
+              gas"; 1200 CSPR → "Invalid Deploy" — 800 is the sweet spot, consistent with the
+              testnet's ~700-900 CSPR payment ceiling seen earlier for the HTLC upgrade deploy
+              too). Collection "AE402 Test NFT" (AETNFT), Transferable ownership, Public
+              minting, Digital nft_kind, Ordinal identifier mode, built-in CEP78 metadata
+              schema, Immutable, 1000 total supply — contract hash
+              `c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a`
+              (error_message: null, consumed 557/800 CSPR).
+            - New scripts: `server/casper_tx/deploy_cep78_nft.mjs` (install),
+              `server/casper_tx/cep78_mint.mjs` (mint — note: the CEP-78 **built-in** metadata
+              schema needs `{name, token_uri, checksum}`, NOT `symbol` — first mint attempt
+              with `{name, symbol, token_uri}` reverted with `User error: 88`
+              (FailedToParseCep99Metadata) because `checksum` was missing),
+              `server/casper_tx/cep78_transfer.mjs` (transfer — Ordinal mode takes a plain u64
+              `token_id` alongside `source_key`/`target_key`).
+            - **Full real mint+transfer flow verified live**: minted token #0 to the deployer
+              (tx `3a298259ffc9617834df4b3aabd6c4185180b8ffed97dda56533d405ff39d441`, confirmed
+              via the `token_owners` dictionary), then transferred it to the provider test
+              account (tx `c4046eaa79c798f86606b62dbebe24b96b17629632438e945f331818d599bc9d`,
+              confirmed error_message: null), then **independently** re-queried the
+              `token_owners` dictionary and confirmed ownership moved to
+              `account-hash-564bfcce...0b3ed`.
+            - `Cep78Adapter` in `server/multi_asset.py` now calls real on-chain code (no more
+              hardcoded balance=5/symbol=NFT/fake deploy-hash). Added to
+              `server/casper_client.py`: `cep78_mint()`, `cep78_transfer()`,
+              `_get_cep78_named_keys()`, `get_cep78_owner()` (reads `token_owners` dict),
+              `get_cep78_balance()` (counts real ownership across all minted tokens — CEP-78 has
+              no single balanceOf-style dict like CEP-18, so this iterates
+              `0..number_of_minted_tokens-1`; fine for demo-scale collections),
+              `get_cep78_token_info()` (collection name/symbol via named-key urefs). Verified
+              live end-to-end through the wired adapter: token_info →
+              `{symbol: AETNFT, decimals: 0, name: "AE402 Test NFT"}`, provider balance → 1,
+              deployer balance → 0 (matches the transfer above).
+            - `tests/test_multi_asset.py` (10 tests) still pass unmodified.
+            - Committed `c299824` "Wire Cep78Adapter to a real deployed CEP-78 NFT contract
+              (B1)", pushed to `main`.
+      - [x] Update frontend AdvancedEscrow.tsx/ConsoleLayout.tsx to remove "simulated" caveat —
+            **DONE 2026-07-05**, both CEP-18 and CEP-78 copy now say "real on-chain calls".
+            Committed `1415941`, pushed to `main`.
+      - **B1 status: CEP-18 + CEP-78 real on-chain integration is now fully complete.**
+        Remaining B1 scope not yet started: wiring the on-chain HTLC commit_swap/reveal_swap
+        entry points (already deployed, see "ALREADY DONE" section) into the
+        `/atomic-swap/commit` and `/atomic-swap/reveal` REST endpoints, which currently still
+        call the simulated in-memory flow instead of the real contract calls.
 
 ## S5 note (folded into B1)
 CEP-2612 permit is a CEP-18-token feature (gasless approve+deposit); native CSPR escrow already
