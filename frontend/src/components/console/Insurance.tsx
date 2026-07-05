@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api, InsurancePoolStats, PremiumQuote, DepositInsuranceRequest, ClaimInsuranceRequest, Agent } from '../../lib/api';
 import { formatCspr, csprToMotes } from '../../lib/format';
+import { useToast } from '../../lib/toast';
 import {
   Shield,
   DollarSign,
@@ -93,6 +94,7 @@ const Textarea: React.FC<TextareaProps> = ({ label, id, error, ...props }) => (
 
 
 const Insurance: React.FC = () => {
+  const toast = useToast();
   const [poolStats, setPoolStats] = useState<InsurancePoolStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +169,7 @@ const Insurance: React.FC = () => {
     try {
       const res = await api.depositInsurance(formData);
       if (res.error) throw new Error(res.error);
-      alert(`Deposit successful! Deploy Hash: ${res.data?.deploy_hash}`);
+      toast.success(`Deposit successful — deploy hash ${res.data?.deploy_hash}`);
       setIsDepositModalOpen(false);
       fetchPoolStats(); // Refresh stats
     } catch (err) {
@@ -183,7 +185,7 @@ const Insurance: React.FC = () => {
     try {
       const res = await api.claimInsurance(formData);
       if (res.error) throw new Error(res.error);
-      alert(`Claim submitted! Deploy Hash: ${res.data?.deploy_hash}`);
+      toast.success(`Claim submitted — deploy hash ${res.data?.deploy_hash}`);
       setIsClaimModalOpen(false);
       fetchPoolStats(); // Refresh stats
     } catch (err) {

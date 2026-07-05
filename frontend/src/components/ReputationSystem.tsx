@@ -38,7 +38,7 @@ export default function ReputationSystem() {
           <div className="bg-ae-card/60 border border-ae-border rounded-2xl overflow-hidden">
             <div className="px-5 py-3 border-b border-ae-border/60 flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-400 tracking-wide">AGENT LEADERBOARD</span>
-              <span className="text-[10px] text-gray-600">testnet</span>
+              <span className="text-[10px] text-gray-600">illustrative example</span>
             </div>
             <div className="divide-y divide-ae-border/40">
               {agents.map((a, i) => (

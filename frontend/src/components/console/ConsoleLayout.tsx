@@ -168,7 +168,7 @@ function NavRow({ item, collapsed, onNavigate }: { item: NavItem; collapsed: boo
         } ${collapsed ? 'justify-center' : ''}`
       }
     >
-      <Icon className="h-4.5 w-4.5 shrink-0" aria-hidden="true" />
+      <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
       {!collapsed && <span className="truncate">{item.name}</span>}
       {collapsed && (
         <span
@@ -248,16 +248,22 @@ const ConsoleLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] bg-ae-bg text-gray-100 flex">
-      {/* Desktop sidebar — classic dashboard layout: collapsible icon rail
-          (icon + hover/focus tooltip) or full labels, never a scrolling
-          horizontal strip. */}
+    <div className="min-h-screen bg-ae-bg text-gray-100">
+      {/* Desktop sidebar — true dashboard layout: fixed, full viewport
+          height (own logo row included, not shared with any top navbar),
+          collapsible icon rail (icon + hover/focus tooltip) or full labels.
+          overflow-x-hidden guarantees the collapse animation never produces
+          a horizontal scrollbar mid-transition. */}
       <aside
-        className={`hidden lg:flex flex-col shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] border-r border-ae-border bg-ae-card/60 transition-[width] duration-200 ${
+        className={`hidden lg:flex flex-col fixed left-0 top-0 h-screen z-40 border-r border-ae-border bg-ae-card/60 overflow-x-hidden transition-[width] duration-200 ${
           collapsed ? 'w-16' : 'w-64'
         }`}
       >
-        <div className="flex items-center justify-end px-2 py-2 border-b border-ae-border/70">
+        <a href="/" className="flex items-center gap-2 h-14 px-3 border-b border-ae-border/70 shrink-0 overflow-hidden">
+          <img src="/images/logo.webp" alt="AE402" className="h-6 w-6 shrink-0" />
+          {!collapsed && <span className="font-bold text-white text-sm truncate">AgentEscrow402</span>}
+        </a>
+        <div className="flex items-center justify-end px-2 py-2 border-b border-ae-border/70 shrink-0">
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
@@ -272,7 +278,9 @@ const ConsoleLayout: React.FC = () => {
         <SidebarNav collapsed={collapsed} />
       </aside>
 
-      {/* Mobile nav drawer */}
+      {/* Mobile nav drawer — the single menu on small screens: it already
+          contains every sidebar section, so there is no separate "site
+          menu" burger anywhere on console pages. */}
       {mobileNavOpen && (
         <div className="lg:hidden fixed inset-0 z-[70] flex">
           <div className="absolute inset-0 bg-black/60" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
@@ -293,20 +301,29 @@ const ConsoleLayout: React.FC = () => {
         </div>
       )}
 
-      <div className="flex-1 min-w-0 flex flex-col">
-        <div className="lg:hidden sticky top-14 z-40 flex items-center gap-2 border-b border-ae-border bg-ae-card/95 backdrop-blur px-4 py-2.5">
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            aria-label="Open console menu"
-            className="p-2 -ml-2 rounded-lg text-gray-300 hover:text-gray-100 hover:bg-ae-border/50 outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <span className="text-sm font-semibold text-gray-200 truncate">{currentPage?.name || 'Console'}</span>
+      {/* Right column — offset by the sidebar's current width via padding
+          (not a fixed+left calc), so the top bar below (sticky, in normal
+          flow) is automatically confined to this column's box and can
+          never overlap the sidebar or get overlapped itself. */}
+      <div className={`flex flex-col min-h-screen transition-[padding] duration-200 ${collapsed ? 'lg:pl-16' : 'lg:pl-64'}`}>
+        {/* Sticky top bar for this column only: mobile burger row (mobile
+            only) stacked above the wallet/demo-mode bar. Both are in
+            normal document flow, so main content below can never be
+            covered by either. */}
+        <div className="sticky top-0 z-30">
+          <div className="lg:hidden flex items-center gap-2 border-b border-ae-border bg-ae-card/95 backdrop-blur px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Open console menu"
+              className="p-2 -ml-2 rounded-lg text-gray-300 hover:text-gray-100 hover:bg-ae-border/50 outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <span className="text-sm font-semibold text-gray-200 truncate">{currentPage?.name || 'Console'}</span>
+          </div>
+          <WalletStatus />
         </div>
-
-        <WalletStatus />
 
         {/* Main Content Area — full width, no artificial max-width, so the
             sidebar's fixed rail is the only width constraint. */}

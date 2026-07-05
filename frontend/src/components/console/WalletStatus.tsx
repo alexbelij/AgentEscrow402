@@ -36,8 +36,8 @@ const WalletStatus: React.FC = () => {
 
   const label = isLive ? 'Casper Wallet connected (live signing)' : 'Hosted demo signer';
   const description = isLive
-    ? 'Real wallet session via CSPR.click. Write actions in the console below are built and signed by your own key in the browser and submitted to Casper testnet directly — you will see a wallet popup to approve each one. Only works for escrows where your connected account is the sender/receiver, since the contract itself enforces that on-chain.'
-    : 'Hosted console writes use an explicitly labelled demo identity so you can try every flow with zero setup. Switch to "Connect wallet" to sign real testnet transactions with your own Casper Wallet.';
+    ? 'Real wallet session via CSPR.click. On the Escrows page, Release / Refund / Dispute are built and signed by your own key in the browser and submitted to Casper testnet directly — you will see a wallet popup to approve each one. This only works for an escrow where your connected account is the sender (release/refund) or sender/receiver (dispute), since the contract itself enforces that on-chain; on seeded demo escrows your account is very unlikely to match, so those actions will fail on-chain by design, not by bug. Everything else in the console (Agents, Risk, Insurance, Identity Registry) reads live hosted-API data regardless of which identity is active — there is nothing extra to "sign" there.'
+    : 'Hosted console writes use an explicitly labelled demo identity so you can try every flow with zero setup. Switch to "Connect wallet" to sign real testnet transactions with your own Casper Wallet — see the Escrows page for which actions actually submit a wallet-signed transaction.';
 
   const demoAddress = mode === 'demo' ? activePublicKey : undefined;
   const liveAddress = isLive ? activePublicKey : undefined;

@@ -3,6 +3,7 @@ import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Est
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import { useSigner } from '../../lib/signer';
 import { useLifecycleAction } from '../../lib/useLifecycleAction';
+import { useToast } from '../../lib/toast';
 import {
   PlusCircle,
   Eye,
@@ -110,6 +111,7 @@ const Select: React.FC<SelectProps> = ({ label, id, options, error, className = 
 );
 
 const Escrows: React.FC = () => {
+  const toast = useToast();
   const { isLive } = useSigner();
   const { run: runLifecycleAction } = useLifecycleAction();
   const [contractHash, setContractHash] = useState<string | undefined>(undefined);
@@ -185,7 +187,7 @@ const Escrows: React.FC = () => {
     try {
       const res = await api.createEscrow(formData);
       if (res.error) throw new Error(res.error);
-      alert(`Escrow created! Deploy Hash: ${res.data?.deploy_hash}`);
+      toast.success(`Escrow created — deploy hash ${res.data?.deploy_hash}`);
       setIsCreateModalOpen(false);
       fetchEscrows(); // Refresh list
     } catch (err) {
@@ -217,8 +219,17 @@ const Escrows: React.FC = () => {
       setActionSuccess(
         `Action "${actionType}" successful! ${isLive ? 'Transaction hash' : 'Deploy hash'}: ${result.deployHash}`,
       );
+      // Reflect the new terminal status locally right away so the
+      // Confirm/Release/Refund/Dispute buttons disable immediately instead
+      // of staying clickable until the background refresh lands — clicking
+      // again before that would otherwise 400 with "Cannot release escrow
+      // in status released" (etc).
+      const nextStatus: EscrowStatus = actionType === 'release' ? 'released' : actionType === 'refund' ? 'refunded' : 'disputed';
+      setSelectedEscrow((prev) => (prev ? { ...prev, status: nextStatus } : prev));
       fetchEscrows(); // Refresh list
-      // Optionally, close modal after a delay or on user click
+      api.getEscrowByHash(selectedEscrow.hash).then((res) => {
+        if (res.data) setSelectedEscrow(res.data);
+      });
     } catch (err) {
       setActionError(err instanceof Error ? err.message : `Failed to ${actionType} escrow.`);
     } finally {
@@ -416,27 +427,21 @@ const Escrows: React.FC = () => {
                   <p className="font-mono text-sm break-all">{selectedEscrow.payee}</p>
                 </div>
               </div>
-              <div>
-                <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                  <Coins className="h-4 w-4 mr-1.5 text-amber-500" /> Token
-                </div>
-                <p className="font-mono text-sm break-all">{selectedEscrow.token_contract}</p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <p className="flex items-center">
-                  <DollarSign className="h-5 w-5 mr-2 text-amber-500" />
+                  <DollarSign className="h-5 w-5 mr-2 text-amber-500 shrink-0" />
                   <strong>Amount:</strong> <span className="ml-2">{formatCspr(selectedEscrow.amount)}</span>
                 </p>
                 <p className="flex items-center">
                   {getStatusIcon(selectedEscrow.status)}
-                  <strong>Status:</strong> <span className="ml-2 capitalize">{selectedEscrow.status}</span>
+                  <strong className="ml-1">Status:</strong> <span className="ml-2 capitalize">{selectedEscrow.status}</span>
                 </p>
                 <p className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                  <Calendar className="h-5 w-5 mr-2 text-amber-500 shrink-0" />
                   <strong>Created:</strong> <span className="ml-2">{format(new Date(selectedEscrow.created_at), 'MMM dd, yyyy HH:mm')}</span>
                 </p>
                 <p className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2 text-amber-500" />
+                  <Calendar className="h-5 w-5 mr-2 text-amber-500 shrink-0" />
                   <strong>Updated:</strong> <span className="ml-2">{format(new Date(selectedEscrow.updated_at), 'MMM dd, yyyy HH:mm')}</span>
                 </p>
               </div>
@@ -573,8 +578,14 @@ const Escrows: React.FC = () => {
               </button>
               <button
                 onClick={handleAction}
-                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center"
-                disabled={actionLoading}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={
+                  actionLoading ||
+                  !!actionSuccess ||
+                  (actionType === 'dispute'
+                    ? !['pending', 'funded'].includes(selectedEscrow.status)
+                    : !['pending', 'funded', 'disputed'].includes(selectedEscrow.status))
+                }
               >
                 {actionLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
                 Confirm {actionType}
@@ -635,12 +646,21 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
       setFormError('Receiver, amount and service hash are required.');
       return;
     }
+    if (!/^[0-9a-fA-F]{64}$/.test(receiver)) {
+      setFormError('Receiver account hash must be exactly 64 hexadecimal characters.');
+      return;
+    }
     if (isNaN(Number(amount)) || Number(amount) <= 0) {
       setFormError('Amount must be a positive number.');
       return;
     }
     if (!/^[0-9a-fA-F]{64}$/.test(serviceHash)) {
       setFormError('Service hash must be exactly 64 hexadecimal characters.');
+      return;
+    }
+    const ttlNum = Number(ttl);
+    if (ttl && (isNaN(ttlNum) || ttlNum < 60 || ttlNum > 86400)) {
+      setFormError('TTL must be between 60 and 86400 seconds.');
       return;
     }
 
