@@ -14,8 +14,15 @@ Last verified against live testnet + production deploy on 2026-07-05 (contract p
   `checked_sub`.
 - **Emergency freeze is one-way** — The `emergency_freeze` entry point sets a frozen flag but
   there is no `unfreeze` entry point. A contract upgrade is required to resume operations.
-- **Arbiter set is fixed at deploy** — The 5 arbiter addresses are set during contract
-  installation. Rotation requires redeployment.
+- **Arbiter rotation is manual, not fixed at deploy** — The 5 arbiter addresses are set during
+  contract installation but *can* be changed later via the real `set_arbiters` entry point (no
+  redeploy needed) — exposed through `POST /set-arbiters` (`server/admin_api.py`), gated by an
+  admin API key and requiring live/non-sandbox mode. There is no on-chain vote for rotation; it's
+  a single admin-triggered call.
+- **Contract upgrades are ungoverned** — The contract is deployed as a versioned package (this
+  hackathon went v3 → v8), so upgrades don't require redeploying from scratch, but only the
+  deployer account that owns the package URef can push a new version — no timelock, no
+  multi-party approval.
 
 ## Backend
 

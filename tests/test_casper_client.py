@@ -175,3 +175,237 @@ class TestQueryContractDict:
         client._get_state_root_hash = AsyncMock(side_effect=RuntimeError("rpc down"))
         result = await client.query_contract_dict("escrows", "svc-1")
         assert result is None
+
+
+class TestRunNodeScript:
+    """`_run_node_script` shells out to a Node.js casper-js-sdk script for
+    every real on-chain write (create_escrow, release, refund, dispute,
+    resolve, set_arbiters, ...). These error branches (timeout, malformed
+    output, script-reported failure) previously had zero test coverage even
+    though they're exactly what runs against production."""
+
+    @pytest.mark.asyncio
+    async def test_timeout_raises_runtime_error(self, monkeypatch):
+        import asyncio as _asyncio
+
+        client = make_client()
+
+        class _FakeProc:
+            async def communicate(self):
+                await _asyncio.sleep(999)
+
+            def kill(self):
+                self.killed = True
+
+        fake_proc = _FakeProc()
+
+        async def _fake_exec(*args, **kwargs):
+            return fake_proc
+
+        async def _fake_wait_for(coro, timeout):
+            coro.close()
+            raise _asyncio.TimeoutError()
+
+        monkeypatch.setattr(_asyncio, "create_subprocess_exec", _fake_exec)
+        monkeypatch.setattr(_asyncio, "wait_for", _fake_wait_for)
+
+        with pytest.raises(RuntimeError, match="timed out"):
+            await client._run_node_script(pathlib_dummy_script(), {})
+
+    @pytest.mark.asyncio
+    async def test_malformed_json_output_raises(self, monkeypatch):
+        client = make_client()
+        _patch_subprocess(monkeypatch, stdout=b"not json at all", stderr=b"")
+        with pytest.raises(RuntimeError, match="Unexpected script output"):
+            await client._run_node_script(pathlib_dummy_script(), {})
+
+    @pytest.mark.asyncio
+    async def test_script_reported_failure_raises(self, monkeypatch):
+        client = make_client()
+        _patch_subprocess(
+            monkeypatch,
+            stdout=b'{"success": false, "error": "insufficient funds"}',
+            stderr=b"",
+        )
+        with pytest.raises(RuntimeError, match="insufficient funds"):
+            await client._run_node_script(pathlib_dummy_script(), {})
+
+    @pytest.mark.asyncio
+    async def test_success_returns_hash(self, monkeypatch):
+        client = make_client()
+        _patch_subprocess(
+            monkeypatch,
+            stdout=b'{"success": true, "hash": "deploy-abc123"}',
+            stderr=b"",
+        )
+        result = await client._run_node_script(pathlib_dummy_script(), {})
+        assert result == "deploy-abc123"
+
+
+def pathlib_dummy_script():
+    import pathlib
+
+    return pathlib.Path("/tmp/dummy_script.js")
+
+
+def _patch_subprocess(monkeypatch, stdout: bytes, stderr: bytes):
+    import asyncio as _asyncio
+
+    class _FakeProc:
+        async def communicate(self):
+            return stdout, stderr
+
+        def kill(self):
+            pass
+
+    async def _fake_exec(*args, **kwargs):
+        return _FakeProc()
+
+    async def _fake_wait_for(coro, timeout):
+        return await coro
+
+    monkeypatch.setattr(_asyncio, "create_subprocess_exec", _fake_exec)
+    monkeypatch.setattr(_asyncio, "wait_for", _fake_wait_for)
+
+
+class TestLifecycleValidation:
+    """release/refund/dispute all go through the shared `_lifecycle`
+    helper, and resolve/commit_swap/reveal_swap have their own explicit
+    guards -- none of these were exercised before (only create_escrow's
+    validation had test coverage)."""
+
+    @pytest.mark.asyncio
+    async def test_release_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.release("svc-1")
+
+    @pytest.mark.asyncio
+    async def test_release_requires_key_path(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = None
+        with pytest.raises(RuntimeError, match="private key"):
+            await client.release("svc-1")
+
+    @pytest.mark.asyncio
+    async def test_release_success_passes_arbiter_lists(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-release-1")
+        result = await client.release("svc-1", arbiter_pubkeys=["01" + "aa" * 32], arbiter_signatures=["01" + "bb" * 64])
+        assert result == "deploy-release-1"
+
+    @pytest.mark.asyncio
+    async def test_refund_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.refund("svc-1")
+
+    @pytest.mark.asyncio
+    async def test_refund_success(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-refund-1")
+        assert await client.refund("svc-1") == "deploy-refund-1"
+
+    @pytest.mark.asyncio
+    async def test_dispute_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.dispute("svc-1")
+
+    @pytest.mark.asyncio
+    async def test_dispute_success(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-dispute-1")
+        assert await client.dispute("svc-1") == "deploy-dispute-1"
+
+
+class TestResolveValidation:
+    @pytest.mark.asyncio
+    async def test_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.resolve("svc-1", "sender", ["pk"], ["sig"])
+
+    @pytest.mark.asyncio
+    async def test_requires_key_path(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = None
+        with pytest.raises(RuntimeError, match="private key"):
+            await client.resolve("svc-1", "sender", ["pk"], ["sig"])
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_in_favor_of(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(ValueError, match="in_favor_of"):
+            await client.resolve("svc-1", "nobody", ["pk"], ["sig"])
+
+    @pytest.mark.asyncio
+    async def test_rejects_empty_arbiter_pubkeys(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(ValueError, match="non-empty"):
+            await client.resolve("svc-1", "sender", [], [])
+
+    @pytest.mark.asyncio
+    async def test_rejects_mismatched_pubkey_signature_lengths(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(ValueError, match="same length"):
+            await client.resolve("svc-1", "sender", ["pk1", "pk2"], ["sig1"])
+
+    @pytest.mark.asyncio
+    async def test_success(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-resolve-1")
+        result = await client.resolve("svc-1", "receiver", ["pk1"], ["sig1"])
+        assert result == "deploy-resolve-1"
+
+
+class TestAtomicSwapValidation:
+    @pytest.mark.asyncio
+    async def test_commit_swap_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.commit_swap("svc-1", "commit-hash-abc")
+
+    @pytest.mark.asyncio
+    async def test_commit_swap_success(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-commit-1")
+        assert await client.commit_swap("svc-1", "commit-hash-abc") == "deploy-commit-1"
+
+    @pytest.mark.asyncio
+    async def test_reveal_swap_requires_contract_hash(self):
+        client = make_client()
+        client._contract_hash = None
+        with pytest.raises(RuntimeError, match="contract_hash"):
+            await client.reveal_swap("svc-1", "preimage-xyz")
+
+    @pytest.mark.asyncio
+    async def test_reveal_swap_success(self):
+        client = make_client()
+        client._contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-reveal-1")
+        assert await client.reveal_swap("svc-1", "preimage-xyz") == "deploy-reveal-1"

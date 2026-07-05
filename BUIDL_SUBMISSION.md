@@ -23,7 +23,7 @@ AgentEscrow402 deploys a Rust/WASM smart contract on Casper Network that impleme
 ## Live Demo
 🔗 **[ae402.xyz](https://ae402.xyz)** — live console with real escrow data on Casper Testnet
 
-Backend API: `https://ae402-backend.onrender.com`
+Backend API: `https://agentescrow402-api.onrender.com`
 
 Contract: [`50ca3364...`](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664)
 
@@ -46,11 +46,11 @@ Contract: [`50ca3364...`](https://testnet.cspr.live/contract/50ca336428601e9920f
 | Smart contract | Rust → WASM, Casper 2.x, CEP-88 events |
 | Payment server | Python 3.11, FastAPI, Uvicorn |
 | x402 middleware | Custom HTTP 402 header parser + validator |
-| SDK | Python async SDK, LangChain tool, MCP server (7 tools) |
-| Console | Next.js, Vercel |
+| SDK | Python async SDK, LangChain tool, MCP server (24 tools) |
+| Console | React 18 + TypeScript + Vite, hosted on Vercel |
 | Backend hosting | Render |
 | CI | GitHub Actions — lint, pytest, WASM build, cargo test |
-| Tests | 85 Python + 18 Rust = 103 total, all passing |
+| Tests | 376 Python + 29 Rust = 405 total, all passing |
 
 ---
 

@@ -26,7 +26,7 @@
 [NARRATION]: "No intermediary holds the funds. The contract does. And every agent's balance is verifiable on-chain."
 
 [1:10-1:40] DEMO — PAYMENT FLOW
-[SHOW: Operations tab, signing transaction]
+[SHOW: Escrow detail view, Release button, wallet signature popup (or hosted demo-signer flow)]
 [NARRATION]: "When conditions are met, funds release. Cryptographically signed on Casper — immutable, auditable, trustless."
 
 [1:40-2:00] CTA
@@ -50,4 +50,4 @@ Use **Hook A** (terminal) for technical judges. Developers expect CLI/API-first 
 1. **Trustless**: No centralized escrow holder
 2. **On-chain**: Every transaction verifiable via Casper explorer
 3. **x402-native**: Built specifically for HTTP 402 payment flows
-4. **Open source**: Code at github.com/alexbelij/AE402
+4. **Open source**: Code at github.com/alexbelij/AgentEscrow402

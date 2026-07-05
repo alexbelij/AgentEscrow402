@@ -11,6 +11,39 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 *Delivered the console/backend work the 1.1.0 entry below prematurely claimed as shipped.*
 
+### Fixed (2026-07-05)
+- **v8 contract deploy**: `read_release_cap()` used `storage::read::<u64>(uref).unwrap_or_revert()`,
+  which reverted `release()`/`reveal_swap()` with `ApiError::EarlyEndOfStream [17]` whenever a
+  `release_cap` named key existed with the wrong stored type (not just when missing). Fixed to
+  fall back to the default cap on any read failure. Deployed as contract package version 8
+  (`d3ca33d1...c8eeb`, contract_hash `50ca3364...4498664`), verified live with a fresh
+  create → release round trip. Production API's `ESCROW_CONTRACT_HASH` env var was still pointing
+  at the stale v3 hash despite running in live mode — updated and force-redeployed.
+- **Docs audit**: full pass over every doc file (README, ROADMAP, KNOWN_LIMITATIONS, SECURITY,
+  SUBMISSION, BUIDL_SUBMISSION, docs/ARCHITECTURE, docs/SDK, BLOG_POST, SOCIAL_POSTS,
+  VIDEO_SCRIPT) for accuracy against current code. Found and fixed: stale contract hashes (some
+  files still referenced the very first v1 deployment), stale test counts (85/18 instead of
+  333/29), stale MCP tool count (7 instead of 24 — SDK.md's tool table was also missing 17 of the
+  24 real tools), a wrong production API URL (`ae402-backend.onrender.com`, which 404s — real one
+  is `agentescrow402-api.onrender.com`), a wrong frontend framework claim (Next.js — it's actually
+  React + Vite), a wrong dispute-resolution diagram (showed 3 arbiters / 2-of-3 majority instead
+  of the real 5 arbiters / 3-of-5 quorum), an inaccurate KNOWN_LIMITATIONS/SECURITY claim that the
+  contract has no upgrade mechanism and arbiters can't be rotated (both are real, working
+  entry points), and a non-working curl example in BLOG_POST.md (the live API requires a signed
+  x402 header and a `service_hash` field the example didn't include — replaced with the working
+  Python SDK snippet).
+- **CI coverage gate**: `pytest --cov-fail-under=70` had been red on every push since
+  2026-07-04 (all tests passing, coverage stuck at ~67%) as new modules (`casper_client.py`,
+  `db.py`, `event_monitor.py`) grew faster than their test coverage. Added 43 new tests covering
+  previously-untested real logic: the `require_payment` x402 guard's full error-path matrix
+  (missing/malformed header, insufficient amount, invalid signature, replay, method+path binding),
+  `_run_node_script`'s error branches (timeout, malformed JSON, script-reported failure),
+  `release`/`refund`/`dispute`/`resolve`/`commit_swap`/`reveal_swap` input validation and success
+  paths, all 4 admin routes' (`set-release-cap`/`set-arbiters`/`emergency-freeze`, alongside the
+  already-tested `configure-fee`) sandbox/live/upstream-failure paths, and the ed25519-tag pubkey
+  and signature hex decoders in `arbiter_crypto.py`. Coverage is now 70.11% (376 Python tests, up
+  from 333) with the gate met honestly, not by lowering the threshold or excluding files.
+
 ### Added
 - **Advanced Escrow console panel** (`AdvancedEscrow.tsx`) — alt-token escrow (CSPR/CEP-18/CEP-78), linear streaming payouts, and commit-reveal atomic swaps, backed by `server/multi_asset.py`.
 - **Arbitration console panel** (`Arbitration.tsx`) — AI dispute evidence analysis (`server/ai_arbitration.py`, Groq → NVIDIA → heuristic fallback) and VRF-based neutral arbiter election (`server/vrf_election.py`).

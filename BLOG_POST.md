@@ -37,24 +37,26 @@ Here's the flow:
 
 If Agent B never delivers? Agent A calls `/refund` after TTL. Funds return. No dispute needed. No administrator to call.
 
-```bash
-# Create an escrow in one curl
-curl -X POST https://ae402-backend.onrender.com/escrow \
-  -H "Content-Type: application/json" \
-  -d '{"sender":"agent-A","receiver":"agent-B","amount":5000000,"ttl":300}'
+The live deployment requires a real Ed25519-signed x402 header on every write, so the honest
+"one curl" isn't a bare JSON POST — it's three lines of the Python SDK, which signs for you:
 
-# Response:
-{"service_hash":"abc123...","status":"locked","expires_at":1751320000}
+```python
+from sdk.client import EscrowClient
+
+async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+    escrow = await client.create_escrow(receiver="ab" * 32, amount=5_000_000, ttl=300)
+    print(escrow["service_hash"], escrow["status"])
+    # -> abc123...  pending
 ```
 
 ---
 
 ## Demo Walkthrough
 
-Land on **[ae402.xyz](https://ae402.xyz)** and you'll see the live console: a table of escrows with status badges (Locked, Released, Disputed), a real-time event feed, and links to verified Casper Testnet transactions.
+Land on **[ae402.xyz](https://ae402.xyz)** and you'll see the live console: a table of escrows with status badges (Pending, Released, Refunded, Disputed, Expired), a real-time event feed, and links to verified Casper Testnet transactions.
 
 The contract is not a demo — it's deployed:
-[`5dd33e8e...` on testnet.cspr.live](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
+[`50ca3364...` on testnet.cspr.live](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664)
 
 Every escrow you create from the console triggers a real on-chain transaction you can verify independently.
 
@@ -103,10 +105,10 @@ An AI agent SDK can parse this, create an escrow, retry the request, and handle 
 ### Stack
 
 - **Smart contract:** Rust → WASM, Casper 2.x, CEP-88 event standard
-- **Server:** Python 3.11, FastAPI, 85 passing tests
-- **Contract tests:** 18 Rust integration tests
-- **SDK:** Python async client, LangChain tool, MCP server (7 tools)
-- **Console:** Next.js on Vercel
+- **Server:** Python 3.11, FastAPI, 376 passing tests
+- **Contract tests:** 29 Rust integration tests
+- **SDK:** Python async client, LangChain tool, MCP server (24 tools)
+- **Console:** React 18 + TypeScript + Vite, on Vercel
 
 ---
 
@@ -120,7 +122,7 @@ The escrow primitive is live and tested. The next layer is agent discovery — a
 
 The code is open source: **[github.com/alexbelij/AgentEscrow402](https://github.com/alexbelij/AgentEscrow402)**
 
-The backend is live: `https://ae402-backend.onrender.com`
+The backend is live: `https://agentescrow402-api.onrender.com`
 
 If you're building AI agents that need to transact — fork it, extend it, or just use the API. HTTP 402 is alive. Let's build the agentic economy on top of it.
 

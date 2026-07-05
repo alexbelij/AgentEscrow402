@@ -556,6 +556,120 @@ class TestAdminRoutes:
         finally:
             app.dependency_overrides.clear()
 
+    def test_set_release_cap_sandbox_mode_rejected(self):
+        client = self._client(admin_api_key="secret123", sandbox=True)
+        try:
+            resp = client.post(
+                "/admin/set-release-cap",
+                json={"new_cap_motes": 1_000_000_000_000},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 409
+        finally:
+            app.dependency_overrides.clear()
+
+    def _client_with_mock_casper(self, admin_api_key="secret123"):
+        """Live (non-sandbox) mode with a fake CasperClient so the
+        on-chain-submission success path (deploy_hash return) is exercised
+        without needing a real testnet connection."""
+        from server import admin_api
+        from server.config import get_config as admin_get_config
+
+        cfg = Config(sandbox=False, admin_api_key=admin_api_key)
+
+        class _FakeCasper:
+            async def configure_fee(self, new_fee_bps):
+                return "deadbeef" * 8
+
+            async def set_release_cap(self, new_cap_motes):
+                return "cafebabe" * 8
+
+            async def set_arbiters(self, arbiters):
+                return "12345678" * 8
+
+            async def emergency_freeze(self):
+                return "87654321" * 8
+
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[admin_get_config] = lambda: cfg
+        app.dependency_overrides[admin_api._get_casper] = lambda: _FakeCasper()
+        return TestClient(app)
+
+    def test_configure_fee_success(self):
+        client = self._client_with_mock_casper()
+        try:
+            resp = client.post(
+                "/admin/configure-fee",
+                json={"new_fee_bps": 300},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["deploy_hash"] == "deadbeef" * 8
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_set_release_cap_success(self):
+        client = self._client_with_mock_casper()
+        try:
+            resp = client.post(
+                "/admin/set-release-cap",
+                json={"new_cap_motes": 1_000_000_000_000},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["deploy_hash"] == "cafebabe" * 8
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_set_arbiters_success(self):
+        client = self._client_with_mock_casper()
+        try:
+            resp = client.post(
+                "/admin/set-arbiters",
+                json={"arbiters": [RECEIVER_HEX] * 5},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["deploy_hash"] == "12345678" * 8
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_emergency_freeze_success(self):
+        client = self._client_with_mock_casper()
+        try:
+            resp = client.post(
+                "/admin/emergency-freeze",
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 200
+            assert resp.json()["deploy_hash"] == "87654321" * 8
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_configure_fee_upstream_failure_returns_502(self):
+        from server import admin_api
+        from server.config import get_config as admin_get_config
+
+        cfg = Config(sandbox=False, admin_api_key="secret123")
+
+        class _FailingCasper:
+            async def configure_fee(self, new_fee_bps):
+                raise RuntimeError("rpc timeout")
+
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[admin_get_config] = lambda: cfg
+        app.dependency_overrides[admin_api._get_casper] = lambda: _FailingCasper()
+        try:
+            client = TestClient(app)
+            resp = client.post(
+                "/admin/configure-fee",
+                json={"new_fee_bps": 300},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 502
+        finally:
+            app.dependency_overrides.clear()
+
 
 class TestComputeHashEndpoint:
     def test_compute_hash(self, client):

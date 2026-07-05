@@ -383,12 +383,12 @@ Full SDK reference → [docs/SDK.md](docs/SDK.md)
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-uv run --active python -m pytest -q          # 333 tests (server logic, x402, identity, risk, multi-asset)
+uv run --active python -m pytest -q          # 376 tests (server logic, x402, identity, risk, multi-asset)
 cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTLC, arbitration)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
-**Current status: 333/333 Python + 29/29 Rust tests passing.** (One test,
+**Current status: 376/376 Python + 29/29 Rust tests passing.** (One test,
 `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
 in-memory identity-registry state sharing between test files — not a production code bug, tracked
 in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).) NVIDIA API-assisted security review

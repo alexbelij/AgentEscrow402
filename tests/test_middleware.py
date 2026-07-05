@@ -5,12 +5,17 @@ from __future__ import annotations
 import hashlib
 import time
 
+import pytest
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from starlette.requests import Request
+
 from server.middleware import (
     _build_signing_payload,
     _check_replay,
     _used_nonces,
     compute_service_hash,
     parse_x402_header,
+    require_payment,
 )
 from server.models import PaymentHeader
 
@@ -164,3 +169,148 @@ class TestSigningPayload:
         p1 = _build_signing_payload(ph, method="POST", path="/escrow")
         p2 = _build_signing_payload(ph, method="POST", path="/release")
         assert p1 != p2
+
+
+class TestRequirePaymentDecorator:
+    """`require_payment` is a self-contained x402 payment guard exported by
+    this module. Production (`server/app.py::_extract_sender`) inlines the
+    same parse/replay/verify calls itself rather than using this decorator
+    directly, but the decorator is still public API (used by any route
+    that imports it) and had zero direct test coverage before this --
+    only its sub-helpers were tested in isolation."""
+
+    def _request(self, headers: dict[str, str], method: str = "POST", path: str = "/protected") -> Request:
+        raw_headers = [(k.lower().encode(), v.encode()) for k, v in headers.items()]
+        scope = {
+            "type": "http",
+            "method": method,
+            "path": path,
+            "headers": raw_headers,
+            "query_string": b"",
+            "client": ("test", 0),
+            "server": ("test", 80),
+        }
+        return Request(scope)
+
+    def _sign(self, key: Ed25519PrivateKey, escrow_hash, amount, sender, ts, nonce, method, path):
+        unsigned = PaymentHeader(
+            escrow_hash=escrow_hash, amount=amount, sender=sender,
+            signature="0" * 128, timestamp=ts, nonce=nonce,
+        )
+        msg = _build_signing_payload(unsigned, method=method, path=path)
+        return key.sign(msg).hex()
+
+    @pytest.mark.asyncio
+    async def test_missing_header_returns_402(self):
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True}
+
+        resp = await handler(self._request({}))
+        assert resp.status_code == 402
+        import json
+        assert json.loads(resp.body)["error"] == "payment_required"
+
+    @pytest.mark.asyncio
+    async def test_malformed_header_returns_400(self):
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True}
+
+        resp = await handler(self._request({"X-Payment": "garbage;not;valid"}))
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_insufficient_amount_returns_402(self):
+        @require_payment(min_amount=10_000)
+        async def handler(request: Request):
+            return {"ok": True}
+
+        key = Ed25519PrivateKey.generate()
+        sender = key.public_key().public_bytes_raw().hex()
+        ts, nonce = str(int(time.time())), "nonceabc"
+        escrow_hash = "ab" * 32
+        sig = self._sign(key, escrow_hash, 100, sender, ts, nonce, "POST", "/protected")
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{sig}"
+        resp = await handler(self._request({"X-Payment": header}))
+        assert resp.status_code == 402
+
+    @pytest.mark.asyncio
+    async def test_invalid_signature_returns_401(self):
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True}
+
+        key = Ed25519PrivateKey.generate()
+        sender = key.public_key().public_bytes_raw().hex()
+        ts, nonce = str(int(time.time())), "noncedef"
+        escrow_hash = "ab" * 32
+        bad_sig = "11" * 64  # well-formed hex, wrong signature
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{bad_sig}"
+        resp = await handler(self._request({"X-Payment": header}))
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_replayed_nonce_returns_401(self):
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True}
+
+        key = Ed25519PrivateKey.generate()
+        sender = key.public_key().public_bytes_raw().hex()
+        ts, nonce = str(int(time.time())), "noncerepeat1"
+        escrow_hash = "ab" * 32
+        sig = self._sign(key, escrow_hash, 100, sender, ts, nonce, "POST", "/protected")
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{sig}"
+        first = await handler(self._request({"X-Payment": header}))
+        assert first == {"ok": True}
+        second = await handler(self._request({"X-Payment": header}))
+        assert second.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_valid_signed_request_succeeds(self):
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True, "sender": request.state.payment.sender}
+
+        key = Ed25519PrivateKey.generate()
+        sender = key.public_key().public_bytes_raw().hex()
+        ts, nonce = str(int(time.time())), "noncegood1"
+        escrow_hash = "ab" * 32
+        sig = self._sign(key, escrow_hash, 100, sender, ts, nonce, "POST", "/protected")
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{sig}"
+        result = await handler(self._request({"X-Payment": header}))
+        assert result == {"ok": True, "sender": sender}
+
+    @pytest.mark.asyncio
+    async def test_signature_bound_to_path_rejects_reuse_on_other_route(self):
+        """A signature valid for POST /protected must not verify against a
+        different path -- proves method+path binding actually matters."""
+        @require_payment()
+        async def handler(request: Request):
+            return {"ok": True}
+
+        key = Ed25519PrivateKey.generate()
+        sender = key.public_key().public_bytes_raw().hex()
+        ts, nonce = str(int(time.time())), "noncebound1"
+        escrow_hash = "ab" * 32
+        sig = self._sign(key, escrow_hash, 100, sender, ts, nonce, "POST", "/protected")
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{sig}"
+        resp = await handler(self._request({"X-Payment": header}, path="/other"))
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_verify_sig_false_skips_signature_check(self):
+        """Sandbox mode (verify_sig=False) accepts a well-formed but
+        cryptographically bogus signature as long as replay checks pass --
+        exactly the documented sandbox behavior, now actually exercised."""
+        @require_payment(verify_sig=False)
+        async def handler(request: Request):
+            return {"ok": True}
+
+        ts, nonce = str(int(time.time())), "noncesandbox1"
+        escrow_hash = "ab" * 32
+        sender = "cd" * 32
+        header = f"x402-v1;{escrow_hash};100;{sender};{ts};{nonce};{'0' * 128}"
+        result = await handler(self._request({"X-Payment": header}))
+        assert result == {"ok": True}

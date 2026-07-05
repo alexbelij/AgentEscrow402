@@ -74,17 +74,39 @@ pip install mcp[sse] uvicorn starlette
 python -m sdk.mcp_server --transport sse --port 8402
 ```
 
-**Available tools:**
+**Available tools (24, grouped by domain):**
 
 | Tool | Description |
 |------|-------------|
+| **Escrow lifecycle** | |
 | `create_escrow` | Lock funds between sender and receiver |
 | `release_escrow` | Release funds to receiver |
 | `refund_escrow` | Return funds to sender |
-| `dispute_escrow` | Open a dispute |
-| `get_escrow` | Check escrow status |
-| `get_reputation` | Query agent reputation |
-| `build_x402_header` | Build x402 payment header |
+| `dispute_escrow` | Open a dispute on an active escrow |
+| `get_escrow` | Fetch the current status and details of an escrow |
+| `list_escrows` | List all escrows with optional status filter |
+| `get_escrow_history` | Get the full state-change history of an escrow |
+| `build_x402_header` | Build an x402 payment header for HTTP requests |
+| `compute_hash` | Compute the service hash for a sender-receiver-amount tuple |
+| `estimate_fee` | Estimate fees and insurance cost for a given escrow amount |
+| **Reputation & stats** | |
+| `get_reputation` | Query the on-chain reputation score of an agent |
+| `list_agents` | List all known agents with their reputation scores |
+| `get_stats` | Get aggregate escrow statistics: total count, volume, success rate |
+| `get_events` | Get recent escrow events (creates, releases, disputes) |
+| `health_check` | Check API and blockchain connection health status |
+| **AI arbitration** | |
+| `submit_dispute_arbitration` | Submit a dispute for AI-assisted arbitration |
+| `get_arbitration_result` | Get the AI arbitration verdict and reasoning for a dispute |
+| `appeal_arbitration` | Appeal an AI arbitration decision within the allowed window |
+| **Risk scoring** | |
+| `calculate_risk_score` | Compute a composite risk score for an agent/transaction |
+| `get_risk_report` | Retrieve a detailed risk breakdown for an agent or escrow |
+| `set_risk_threshold` | Configure the auto-reject threshold for high-risk transactions |
+| **Identity registry** | |
+| `register_identity` | Register a new agent identity with KYC-level credentials on-chain |
+| `verify_identity` | Verify an agent's identity and credential status |
+| `revoke_identity` | Revoke an agent's identity credentials (admin only) |
 
 ## x402 Header Format
 

@@ -12,7 +12,12 @@ import tempfile
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
 
-from server.arbiter_crypto import build_resolve_message, count_valid_votes
+from server.arbiter_crypto import (
+    _pubkey_from_hex,
+    _signature_bytes_from_hex,
+    build_resolve_message,
+    count_valid_votes,
+)
 from sdk.arbiter_signing import sign_arbiter_vote
 
 
@@ -118,3 +123,40 @@ class TestCanonicalMessageFormat:
     def test_message_binds_service_hash_and_verdict(self):
         assert build_resolve_message("abc", "sender") == b"resolve:abc:sender"
         assert build_resolve_message("abc", "receiver") != build_resolve_message("abc", "sender")
+
+
+class TestPubkeyFromHex:
+    """Direct tests for the ed25519-tag-prefixed pubkey/signature hex
+    decoders these routines feed into count_valid_votes -- previously only
+    exercised indirectly through the "malformed hex does not crash" case."""
+
+    def test_rejects_missing_ed25519_tag(self):
+        assert _pubkey_from_hex("aa" * 32) is None  # no "01" tag prefix
+
+    def test_rejects_invalid_hex_after_tag(self):
+        assert _pubkey_from_hex("01" + "zz" * 32) is None
+
+    def test_rejects_wrong_length_key(self):
+        assert _pubkey_from_hex("01" + "aa" * 10) is None  # too short
+
+    def test_accepts_valid_ed25519_pubkey(self):
+        key = Ed25519PrivateKey.generate()
+        raw_hex = key.public_key().public_bytes_raw().hex()
+        assert _pubkey_from_hex("01" + raw_hex) is not None
+
+
+class TestSignatureBytesFromHex:
+    def test_rejects_missing_ed25519_tag(self):
+        assert _signature_bytes_from_hex("bb" * 64) is None
+
+    def test_rejects_invalid_hex_after_tag(self):
+        assert _signature_bytes_from_hex("01" + "zz" * 64) is None
+
+    def test_rejects_wrong_length_signature(self):
+        assert _signature_bytes_from_hex("01" + "aa" * 10) is None
+
+    def test_accepts_valid_length_signature(self):
+        sig_hex = "01" + "aa" * 64
+        result = _signature_bytes_from_hex(sig_hex)
+        assert result is not None
+        assert len(result) == 64
