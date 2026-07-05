@@ -26,6 +26,8 @@ _CREATE_SCRIPT = _SCRIPT_DIR / "create_escrow.mjs"
 _LIFECYCLE_SCRIPT = _SCRIPT_DIR / "lifecycle.mjs"
 _RESOLVE_SCRIPT = _SCRIPT_DIR / "resolve.mjs"
 _CEP18_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep18_transfer.mjs"
+_CEP78_MINT_SCRIPT = _SCRIPT_DIR / "cep78_mint.mjs"
+_CEP78_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep78_transfer.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -451,6 +453,157 @@ class CasperClient:
         named_keys = await self._get_cep18_named_keys(contract_hash)
         info: dict[str, Any] = {"symbol": None, "decimals": None, "name": None}
         for field, rpc_key in (("name", "name"), ("symbol", "symbol"), ("decimals", "decimals")):
+            uref = named_keys.get(rpc_key)
+            if not uref:
+                continue
+            result = await self._rpc("query_global_state", {"key": uref, "state_identifier": None})
+            info[field] = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
+        return info
+
+    # ── CEP-78 (NFT) ────────────────────────────────────────────────────────
+
+    async def cep78_mint(
+        self, contract_hash: str, owner_hex: str, name: str, token_uri: str, checksum: str = ""
+    ) -> str:
+        """Call the CEP-78 `mint` entry point. Returns tx hash. Uses the
+        contract's built-in CEP78 metadata schema (name/token_uri/checksum;
+        checksum defaults to all-zeros placeholder for demo tokens since we
+        don't compute real asset hashes here)."""
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        owner_hex = (
+            owner_hex.replace("account-hash-", "") if owner_hex.startswith("account-hash-") else owner_hex
+        )
+        if len(owner_hex) != 64:
+            raise ValueError(f"owner must be 64-char hex account hash, got: {owner_hex!r}")
+
+        return await self._run_node_script(
+            _CEP78_MINT_SCRIPT,
+            {
+                "CONTRACT_HASH": contract_hash,
+                "OWNER_HEX": owner_hex,
+                "NAME": name,
+                "TOKEN_URI": token_uri,
+                "CHECKSUM": checksum or "0" * 68,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def cep78_transfer(
+        self, contract_hash: str, token_id: int, source_hex: str, target_hex: str
+    ) -> str:
+        """Call the CEP-78 `transfer` entry point (Ordinal identifier mode).
+        Returns tx hash. Note: the contract requires the deploy's caller to
+        be the token owner/approved account, so `source_hex` must correspond
+        to the signing key configured on this client (custodial-demo model,
+        same as create_escrow/cep18_transfer)."""
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        source_hex = (
+            source_hex.replace("account-hash-", "") if source_hex.startswith("account-hash-") else source_hex
+        )
+        target_hex = (
+            target_hex.replace("account-hash-", "") if target_hex.startswith("account-hash-") else target_hex
+        )
+        if len(source_hex) != 64 or len(target_hex) != 64:
+            raise ValueError("source/target must be 64-char hex account hashes")
+
+        return await self._run_node_script(
+            _CEP78_TRANSFER_SCRIPT,
+            {
+                "CONTRACT_HASH": contract_hash,
+                "TOKEN_ID": str(token_id),
+                "SOURCE_HEX": source_hex,
+                "TARGET_HEX": target_hex,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def _get_cep78_named_keys(self, contract_hash: str) -> dict[str, str]:
+        """Named keys of a CEP-78 contract entity, cached per contract_hash."""
+        cache = getattr(self, "_cep78_named_keys_cache", None)
+        if cache is None:
+            cache = {}
+            self._cep78_named_keys_cache = cache
+        if contract_hash in cache:
+            return cache[contract_hash]
+        result = await self._rpc(
+            "state_get_entity",
+            {"entity_identifier": {"ContractHash": f"contract-{contract_hash}"}},
+        )
+        named_keys = result["entity"]["Contract"]["contract"]["named_keys"]
+        parsed = {nk["name"]: nk["key"] for nk in named_keys}
+        cache[contract_hash] = parsed
+        return parsed
+
+    async def get_cep78_owner(self, contract_hash: str, token_id: int) -> str | None:
+        """Real on-chain owner (account-hash-... string) of an Ordinal-mode
+        CEP-78 token, via the contract's `token_owners` dictionary."""
+        named_keys = await self._get_cep78_named_keys(contract_hash)
+        owners_uref = named_keys.get("token_owners")
+        if not owners_uref:
+            raise RuntimeError(f"contract {contract_hash} has no 'token_owners' named key")
+
+        srh = await self._get_state_root_hash()
+        try:
+            result = await self._rpc(
+                "state_get_dictionary_item",
+                {
+                    "state_root_hash": srh,
+                    "dictionary_identifier": {
+                        "URef": {"seed_uref": owners_uref, "dictionary_item_key": str(token_id)}
+                    },
+                },
+            )
+        except RuntimeError:
+            return None
+        return result.get("stored_value", {}).get("CLValue", {}).get("parsed")
+
+    async def get_cep78_balance(self, contract_hash: str, account_hash_hex: str) -> int:
+        """Real on-chain CEP-78 NFT count owned by an account. CEP-78 has no
+        single 'balanceOf' dictionary (unlike CEP-18); this counts matches by
+        checking the `token_owners` dictionary entry for every minted token
+        id (0..number_of_minted_tokens-1). Fine for demo-scale collections
+        (this AE402 test collection has total_token_supply=1000 but only a
+        handful of tokens actually minted during testing)."""
+        account_hash_hex = (
+            account_hash_hex.replace("account-hash-", "")
+            if account_hash_hex.startswith("account-hash-")
+            else account_hash_hex
+        )
+        target = f"account-hash-{account_hash_hex}"
+        named_keys = await self._get_cep78_named_keys(contract_hash)
+        minted_uref = named_keys.get("number_of_minted_tokens")
+        if not minted_uref:
+            raise RuntimeError(f"contract {contract_hash} has no 'number_of_minted_tokens' named key")
+        minted_result = await self._rpc("query_global_state", {"key": minted_uref, "state_identifier": None})
+        minted_count = minted_result.get("stored_value", {}).get("CLValue", {}).get("parsed") or 0
+
+        owners = await asyncio.gather(
+            *[self.get_cep78_owner(contract_hash, i) for i in range(int(minted_count))]
+        )
+        return sum(1 for owner in owners if owner == target)
+
+    async def get_cep78_token_info(self, contract_hash: str) -> dict[str, Any]:
+        """Real on-chain CEP-78 collection metadata (name/symbol/total supply/minted count)."""
+        named_keys = await self._get_cep78_named_keys(contract_hash)
+        info: dict[str, Any] = {
+            "collection_name": None,
+            "collection_symbol": None,
+            "total_token_supply": None,
+            "number_of_minted_tokens": None,
+        }
+        field_map = {
+            "collection_name": "collection_name",
+            "collection_symbol": "collection_symbol",
+            "total_token_supply": "total_token_supply",
+            "number_of_minted_tokens": "number_of_minted_tokens",
+        }
+        for field, rpc_key in field_map.items():
             uref = named_keys.get(rpc_key)
             if not uref:
                 continue
