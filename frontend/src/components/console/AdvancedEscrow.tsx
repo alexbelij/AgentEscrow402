@@ -247,9 +247,9 @@ const AdvancedEscrow: React.FC = () => {
           <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6">
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
               Escrows a single token per escrow, selectable as native CSPR, a CEP-18 fungible token, or a CEP-78 NFT
-              (endpoint is named "multi-asset" but does not combine several assets in one escrow). CEP-18/CEP-78 transfers
-              are currently simulated on the backend (no real on-chain call yet) — the response's deploy hash is a
-              placeholder, exactly like the rest of this hosted demo console.
+              (endpoint is named "multi-asset" but does not combine several assets in one escrow). CEP-18 transfers are
+              real on-chain calls against a deployed testnet token contract. CEP-78 (NFT) transfers are still simulated
+              on the backend (no real on-chain call yet) — for CEP-78 only, the response's deploy hash is a placeholder.
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
@@ -294,7 +294,8 @@ const AdvancedEscrow: React.FC = () => {
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
               Deposits the full amount up front, then releases it to the receiver linearly between a start and end
               timestamp. Streamed/remaining amounts are computed live from elapsed time — read them from the status
-              card on the right. Same simulated-transfer caveat as the alt-token escrow applies to CEP-18/CEP-78 tokens.
+              card on the right. Same real-vs-simulated split as the alt-token escrow applies here: CEP-18 transfers are
+              real on-chain calls, CEP-78 (NFT) transfers are still simulated.
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>

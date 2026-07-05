@@ -120,7 +120,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/advanced': {
     title: 'Advanced Escrow',
-    desc: 'Three advanced escrow primitives beyond the basic lifecycle: escrow with a selectable token type (CSPR/CEP-18/CEP-78, one token per escrow), a linear streaming payout between a start and end time, and a commit-reveal hash-lock on an existing escrow. CEP-18/CEP-78 transfers are currently simulated backend-side, not real on-chain calls.',
+    desc: 'Three advanced escrow primitives beyond the basic lifecycle: escrow with a selectable token type (CSPR/CEP-18/CEP-78, one token per escrow), a linear streaming payout between a start and end time, and a commit-reveal hash-lock on an existing escrow. CEP-18 transfers are real on-chain calls against a deployed testnet token; CEP-78 (NFT) transfers are still simulated backend-side.',
     source: 'demo',
   },
   '/console/arbitration': {
