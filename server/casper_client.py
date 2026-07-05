@@ -25,6 +25,7 @@ _SCRIPT_DIR = pathlib.Path(__file__).parent / "casper_tx"
 _CREATE_SCRIPT = _SCRIPT_DIR / "create_escrow.mjs"
 _LIFECYCLE_SCRIPT = _SCRIPT_DIR / "lifecycle.mjs"
 _RESOLVE_SCRIPT = _SCRIPT_DIR / "resolve.mjs"
+_CEP18_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep18_transfer.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -343,6 +344,119 @@ class CasperClient:
             )
         except (IndexError, ValueError, TypeError):
             return ReputationRecord(agent=agent)
+
+    # ── CEP-18 token operations ────────────────────────────────────────────
+    #
+    # Real on-chain CEP-18 support (B1). Uses the same "Node.js subprocess
+    # for writes, direct JSON-RPC for reads" split as the rest of this
+    # client. `contract_hash` here is the *token's* contract hash (distinct
+    # from `self._contract_hash`, which is always the escrow contract) --
+    # every multi-asset escrow can reference a different CEP-18 token.
+    #
+    # Custodial-demo model: like create_escrow()/_lifecycle(), the actual
+    # on-chain call is always signed by this client's configured operator
+    # key (self._key_path). The x402 `sender` field is the logical payer
+    # whose signed x402 header authorized the payment off-chain; the
+    # operator key is the funded account that actually holds/moves the
+    # AE402 demo token on testnet. This mirrors how CSPR escrow funding
+    # already works in create_escrow().
+
+    async def cep18_transfer(self, contract_hash: str, recipient_hex: str, amount: int) -> str:
+        """Call the CEP-18 `transfer` entry point. Returns tx hash."""
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        recipient_hex = (
+            recipient_hex.replace("account-hash-", "")
+            if recipient_hex.startswith("account-hash-")
+            else recipient_hex
+        )
+        if len(recipient_hex) != 64:
+            raise ValueError(f"recipient must be 64-char hex account hash, got: {recipient_hex!r}")
+
+        return await self._run_node_script(
+            _CEP18_TRANSFER_SCRIPT,
+            {
+                "CONTRACT_HASH": contract_hash,
+                "RECIPIENT_HEX": recipient_hex,
+                "AMOUNT": str(amount),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def _get_cep18_named_keys(self, contract_hash: str) -> dict[str, str]:
+        """Named keys of a CEP-18 contract entity (uref-per-field storage:
+        name/symbol/decimals/total_supply are plain urefs, balances/
+        allowances are dictionary seed-urefs). Cached per contract_hash for
+        the lifetime of this client instance."""
+        cache = getattr(self, "_cep18_named_keys_cache", None)
+        if cache is None:
+            cache = {}
+            self._cep18_named_keys_cache = cache
+        if contract_hash in cache:
+            return cache[contract_hash]
+        result = await self._rpc(
+            "state_get_entity",
+            {"entity_identifier": {"ContractHash": f"contract-{contract_hash}"}},
+        )
+        named_keys = result["entity"]["Contract"]["contract"]["named_keys"]
+        parsed = {nk["name"]: nk["key"] for nk in named_keys}
+        cache[contract_hash] = parsed
+        return parsed
+
+    async def get_cep18_balance(self, contract_hash: str, account_hash_hex: str) -> int:
+        """Real on-chain CEP-18 balance for an account, via the contract's
+        `balances` dictionary (dictionary_item_key = base64(0x00 + account
+        hash bytes), matching casper-ecosystem/cep18's own client-js
+        `balanceOf` implementation)."""
+        import base64
+
+        account_hash_hex = (
+            account_hash_hex.replace("account-hash-", "")
+            if account_hash_hex.startswith("account-hash-")
+            else account_hash_hex
+        )
+        named_keys = await self._get_cep18_named_keys(contract_hash)
+        balances_uref = named_keys.get("balances")
+        if not balances_uref:
+            raise RuntimeError(f"contract {contract_hash} has no 'balances' named key")
+
+        key_bytes = bytes([0]) + bytes.fromhex(account_hash_hex)
+        dictionary_item_key = base64.b64encode(key_bytes).decode()
+
+        srh = await self._get_state_root_hash()
+        try:
+            result = await self._rpc(
+                "state_get_dictionary_item",
+                {
+                    "state_root_hash": srh,
+                    "dictionary_identifier": {
+                        "URef": {
+                            "seed_uref": balances_uref,
+                            "dictionary_item_key": dictionary_item_key,
+                        }
+                    },
+                },
+            )
+        except RuntimeError:
+            # No entry yet for this account => balance 0 (same as CEP-18's
+            # own reference client: absence of a dict entry means zero).
+            return 0
+        parsed = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
+        return int(parsed) if parsed is not None else 0
+
+    async def get_cep18_token_info(self, contract_hash: str) -> dict[str, Any]:
+        """Real on-chain CEP-18 token metadata (name/symbol/decimals)."""
+        named_keys = await self._get_cep18_named_keys(contract_hash)
+        info: dict[str, Any] = {"symbol": None, "decimals": None, "name": None}
+        for field, rpc_key in (("name", "name"), ("symbol", "symbol"), ("decimals", "decimals")):
+            uref = named_keys.get(rpc_key)
+            if not uref:
+                continue
+            result = await self._rpc("query_global_state", {"key": uref, "state_identifier": None})
+            info[field] = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
+        return info
 
     async def close(self) -> None:
         await self._http.aclose()
