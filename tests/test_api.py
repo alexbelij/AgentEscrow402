@@ -354,6 +354,209 @@ class TestResolveEndpoint:
             app.dependency_overrides.clear()
 
 
+class TestReleaseCapApproval:
+    """A1 hardening: /release requires arbiter-quorum cap-approval when the
+    escrow amount exceeds Config.release_cap_motes (mirrors the on-chain
+    require_arbiter_cap_approval check in contracts/escrow/src/main.rs)."""
+
+    @staticmethod
+    def _make_arbiters(n: int):
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        keys = [Ed25519PrivateKey.generate() for _ in range(n)]
+        pubkeys = tuple("01" + k.public_key().public_bytes_raw().hex() for k in keys)
+        return keys, pubkeys
+
+    @staticmethod
+    def _sign(key, service_hash: str) -> str:
+        message = f"release:{service_hash}:cap_approval".encode()
+        return "01" + key.sign(message).hex()
+
+    def _client_with_arbiters(self, sandbox_store, pubkeys, release_cap_motes=1000):
+        cfg = Config(
+            sandbox=True,
+            arbiter_pubkeys=pubkeys,
+            arbiter_threshold=3,
+            release_cap_motes=release_cap_motes,
+        )
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[get_sandbox] = lambda: sandbox_store
+        return TestClient(app)
+
+    def test_below_cap_release_succeeds_without_signatures(self, sandbox_store):
+        _, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys, release_cap_motes=1000)
+        try:
+            h = _hash("cap-below")
+            client.post(
+                "/escrow",
+                json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+                params={"sender": "payer"},
+            )
+            resp = client.post("/release", json={"service_hash": h}, params={"sender": "payer"})
+            assert resp.status_code == 200, resp.text
+            assert resp.json()["status"] == "released"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_above_cap_release_without_signatures_rejected(self, sandbox_store):
+        _, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys, release_cap_motes=100)
+        try:
+            h = _hash("cap-above-no-sig")
+            client.post(
+                "/escrow",
+                json={"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h},
+                params={"sender": "payer"},
+            )
+            resp = client.post("/release", json={"service_hash": h}, params={"sender": "payer"})
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_above_cap_release_with_valid_quorum_succeeds(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys, release_cap_motes=100)
+        try:
+            h = _hash("cap-above-ok")
+            client.post(
+                "/escrow",
+                json={"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h},
+                params={"sender": "payer"},
+            )
+            sigs = [self._sign(k, h) for k in keys[:3]]
+            resp = client.post(
+                "/release",
+                json={
+                    "service_hash": h,
+                    "arbiter_pubkeys": list(pubkeys[:3]),
+                    "arbiter_signatures": sigs,
+                },
+                params={"sender": "payer"},
+            )
+            assert resp.status_code == 200, resp.text
+            assert resp.json()["status"] == "released"
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_above_cap_release_below_threshold_rejected(self, sandbox_store):
+        keys, pubkeys = self._make_arbiters(5)
+        client = self._client_with_arbiters(sandbox_store, pubkeys, release_cap_motes=100)
+        try:
+            h = _hash("cap-above-too-few")
+            client.post(
+                "/escrow",
+                json={"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h},
+                params={"sender": "payer"},
+            )
+            sigs = [self._sign(k, h) for k in keys[:2]]  # only 2, need 3
+            resp = client.post(
+                "/release",
+                json={
+                    "service_hash": h,
+                    "arbiter_pubkeys": list(pubkeys[:2]),
+                    "arbiter_signatures": sigs,
+                },
+                params={"sender": "payer"},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+
+class TestAdminRoutes:
+    """Installer-only admin endpoints (server/admin_api.py). Sandbox/no-key
+    combinations are exercised here; live on-chain submission is covered by
+    the CasperClient unit tests, not here (no real chain in CI)."""
+
+    def _client(self, admin_api_key="", sandbox=True):
+        from server.config import get_config as admin_get_config
+
+        cfg = Config(sandbox=sandbox, admin_api_key=admin_api_key)
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[admin_get_config] = lambda: cfg
+        return TestClient(app)
+
+    def test_disabled_without_admin_api_key(self):
+        client = self._client(admin_api_key="")
+        try:
+            resp = client.post("/admin/configure-fee", json={"new_fee_bps": 300})
+            assert resp.status_code == 503
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_rejects_missing_header(self):
+        client = self._client(admin_api_key="secret123")
+        try:
+            resp = client.post("/admin/configure-fee", json={"new_fee_bps": 300})
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_rejects_wrong_header(self):
+        client = self._client(admin_api_key="secret123")
+        try:
+            resp = client.post(
+                "/admin/configure-fee",
+                json={"new_fee_bps": 300},
+                headers={"X-Admin-Key": "wrong"},
+            )
+            assert resp.status_code == 403
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_accepted_key_but_sandbox_mode_rejected(self):
+        # Right key, but admin ops require live mode (a real Casper client) --
+        # sandbox mode has nothing on-chain to configure.
+        client = self._client(admin_api_key="secret123", sandbox=True)
+        try:
+            resp = client.post(
+                "/admin/configure-fee",
+                json={"new_fee_bps": 300},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 409
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_configure_fee_validates_bps_range(self):
+        client = self._client(admin_api_key="secret123", sandbox=True)
+        try:
+            resp = client.post(
+                "/admin/configure-fee",
+                json={"new_fee_bps": 5000},  # > 1000 max
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_set_arbiters_rejects_empty_list(self):
+        client = self._client(admin_api_key="secret123", sandbox=True)
+        try:
+            resp = client.post(
+                "/admin/set-arbiters",
+                json={"arbiters": []},
+                headers={"X-Admin-Key": "secret123"},
+            )
+            assert resp.status_code == 422
+        finally:
+            app.dependency_overrides.clear()
+
+    def test_emergency_freeze_endpoint_reachable(self):
+        client = self._client(admin_api_key="secret123", sandbox=True)
+        try:
+            resp = client.post(
+                "/admin/emergency-freeze",
+                headers={"X-Admin-Key": "secret123"},
+            )
+            # Sandbox mode => 409 (no live Casper client), not 404/403 --
+            # confirms the route + auth gate are wired correctly.
+            assert resp.status_code == 409
+        finally:
+            app.dependency_overrides.clear()
+
+
 class TestComputeHashEndpoint:
     def test_compute_hash(self, client):
         resp = client.post(

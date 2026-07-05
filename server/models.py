@@ -60,6 +60,13 @@ class ReleaseRequest(BaseModel):
     # or submit anything itself — it only polls contract state and confirms
     # the entry point actually executed before updating hosted records.
     wallet_tx_hash: str | None = Field(default=None, min_length=1, max_length=128)
+    # A1 hardening: only required (and only checked, on-chain and here) when
+    # this escrow's amount exceeds the contract's release_cap. Below cap,
+    # omit both or leave as empty lists. Each pubkey/signature pair is a
+    # real Ed25519 signature by a registered arbiter over
+    # "release:{service_hash}:cap_approval" — see arbiter_crypto.build_cap_approval_message.
+    arbiter_pubkeys: list[str] = Field(default_factory=list)
+    arbiter_signatures: list[str] = Field(default_factory=list)
 
 
 class RefundRequest(BaseModel):
@@ -82,6 +89,26 @@ class ResolveRequest(BaseModel):
     # account-hash. arbiter_pubkeys[i] must correspond to arbiter_signatures[i].
     arbiter_pubkeys: list[str]
     arbiter_signatures: list[str]
+
+
+# ---------------------------------------------------------------------------
+# Installer-only admin request models (configure_fee / set_release_cap /
+# set_arbiters / emergency_freeze entry points)
+# ---------------------------------------------------------------------------
+
+
+class ConfigureFeeRequest(BaseModel):
+    new_fee_bps: int = Field(..., ge=0, le=1000, description="Basis points, contract max 1000 = 10%")
+
+
+class SetReleaseCapRequest(BaseModel):
+    new_cap_motes: int = Field(..., gt=0, description="New A1 release cap, in motes")
+
+
+class SetArbitersRequest(BaseModel):
+    arbiters: list[str] = Field(
+        ..., min_length=1, description="Full replacement arbiter_list — hex-encoded Ed25519 pubkeys"
+    )
 
 
 class ReputationRecord(BaseModel):

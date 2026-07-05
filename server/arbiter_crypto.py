@@ -30,6 +30,16 @@ def build_resolve_message(service_hash: str, in_favor_of: str) -> bytes:
     return f"resolve:{service_hash}:{in_favor_of}".encode("utf-8")
 
 
+def build_cap_approval_message(action: str, service_hash: str) -> bytes:
+    """Canonical message an arbiter signs to approve an above-cap
+    release()/reveal_swap() payout (A1 hardening).
+
+    Must exactly match `build_cap_approval_message` in the Rust contract.
+    `action` is "release" or "reveal_swap".
+    """
+    return f"{action}:{service_hash}:cap_approval".encode("utf-8")
+
+
 def _pubkey_from_hex(pubkey_hex: str) -> Ed25519PublicKey | None:
     if not pubkey_hex.lower().startswith(ED25519_TAG_HEX):
         return None  # only ed25519 arbiter keys are supported (secp256k1 arbiters not modeled)
@@ -72,6 +82,28 @@ def count_valid_votes(
     exact escrow + verdict.
     """
     message = build_resolve_message(service_hash, in_favor_of)
+    return count_valid_votes_for_message(pubkeys, signatures, registered, message)
+
+
+def count_valid_cap_approval_votes(
+    pubkeys: list[str],
+    signatures: list[str],
+    registered: tuple[str, ...],
+    action: str,
+    service_hash: str,
+) -> int:
+    """Same as `count_valid_votes`, but for the A1 above-cap release()/
+    reveal_swap() approval message instead of a resolve() verdict vote."""
+    message = build_cap_approval_message(action, service_hash)
+    return count_valid_votes_for_message(pubkeys, signatures, registered, message)
+
+
+def count_valid_votes_for_message(
+    pubkeys: list[str],
+    signatures: list[str],
+    registered: tuple[str, ...],
+    message: bytes,
+) -> int:
     seen: set[str] = set()
     valid = 0
     for pubkey_hex, sig_hex in zip(pubkeys, signatures):

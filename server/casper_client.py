@@ -29,6 +29,7 @@ _CEP18_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep18_transfer.mjs"
 _CEP78_MINT_SCRIPT = _SCRIPT_DIR / "cep78_mint.mjs"
 _CEP78_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep78_transfer.mjs"
 _SWAP_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "swap_lifecycle.mjs"
+_ADMIN_OPS_SCRIPT = _SCRIPT_DIR / "admin_ops.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -153,8 +154,23 @@ class CasperClient:
             },
         )
 
-    async def release(self, service_hash: str) -> str:
-        return await self._lifecycle("release", service_hash)
+    async def release(
+        self,
+        service_hash: str,
+        arbiter_pubkeys: list[str] | None = None,
+        arbiter_signatures: list[str] | None = None,
+    ) -> str:
+        """Submit `release` tx.
+
+        `arbiter_pubkeys`/`arbiter_signatures` are only required (and only
+        checked on-chain) when this escrow's amount exceeds the contract's
+        A1 release_cap -- see `require_arbiter_cap_approval` in
+        contracts/escrow/src/main.rs. Below cap, pass None/empty lists;
+        the contract accepts empty vecs there.
+        """
+        return await self._lifecycle(
+            "release", service_hash, arbiter_pubkeys or [], arbiter_signatures or []
+        )
 
     async def refund(self, service_hash: str) -> str:
         return await self._lifecycle("refund", service_hash)
@@ -205,22 +221,29 @@ class CasperClient:
             },
         )
 
-    async def _lifecycle(self, entry_point: str, service_hash: str) -> str:
+    async def _lifecycle(
+        self,
+        entry_point: str,
+        service_hash: str,
+        arbiter_pubkeys: list[str] | None = None,
+        arbiter_signatures: list[str] | None = None,
+    ) -> str:
         if not self._contract_hash:
             raise RuntimeError("contract_hash not configured")
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
-            _LIFECYCLE_SCRIPT,
-            {
-                "CONTRACT_HASH": self._contract_hash,
-                "ENTRY_POINT": entry_point,
-                "SERVICE_HASH": service_hash,
-                "PEM_PATH": self._key_path,
-                "KEY_ALGO": "secp256k1",
-                "CASPER_RPC": self._rpc_url,
-            },
-        )
+        env = {
+            "CONTRACT_HASH": self._contract_hash,
+            "ENTRY_POINT": entry_point,
+            "SERVICE_HASH": service_hash,
+            "PEM_PATH": self._key_path,
+            "KEY_ALGO": "secp256k1",
+            "CASPER_RPC": self._rpc_url,
+        }
+        if entry_point == "release":
+            env["ARBITER_PUBKEYS_JSON"] = json.dumps(arbiter_pubkeys or [])
+            env["ARBITER_SIGNATURES_JSON"] = json.dumps(arbiter_signatures or [])
+        return await self._run_node_script(_LIFECYCLE_SCRIPT, env)
 
     async def commit_swap(self, service_hash: str, commit_hash: str) -> str:
         """Submit on-chain `commit_swap` tx (HTLC atomic-swap first step).
@@ -246,13 +269,22 @@ class CasperClient:
             },
         )
 
-    async def reveal_swap(self, service_hash: str, preimage: str) -> str:
+    async def reveal_swap(
+        self,
+        service_hash: str,
+        preimage: str,
+        arbiter_pubkeys: list[str] | None = None,
+        arbiter_signatures: list[str] | None = None,
+    ) -> str:
         """Submit on-chain `reveal_swap` tx (HTLC atomic-swap second step).
         The contract itself has no caller-identity check here (the HTLC
         model: knowing the preimage IS the authorization) -- a successful
         call verifies sha256(preimage) == commit_hash on-chain and directly
         releases escrowed funds to the receiver as part of the same
-        transaction. Returns tx hash."""
+        transaction. Above the A1 release_cap, an arbiter quorum is also
+        required (`arbiter_pubkeys`/`arbiter_signatures`) -- see
+        `require_arbiter_cap_approval` in main.rs; below cap pass
+        None/empty lists. Returns tx hash."""
         if not self._contract_hash:
             raise RuntimeError("contract_hash not configured")
         if not self._key_path:
@@ -264,9 +296,56 @@ class CasperClient:
                 "ENTRY_POINT": "reveal_swap",
                 "SERVICE_HASH": service_hash,
                 "PREIMAGE": preimage,
+                "ARBITER_PUBKEYS_JSON": json.dumps(arbiter_pubkeys or []),
+                "ARBITER_SIGNATURES_JSON": json.dumps(arbiter_signatures or []),
                 "PEM_PATH": self._key_path,
                 "KEY_ALGO": "secp256k1",
                 "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    # ── Installer-only administrative operations ───────────────────────────
+    # All four calls below only succeed on-chain if this client's configured
+    # key is the contract's installer account (ERR_UNAUTHORIZED otherwise).
+    # API-level access control lives in server/admin_api.py.
+
+    async def configure_fee(self, new_fee_bps: int) -> str:
+        """Update the insurance fee (basis points, contract-enforced max 1000 = 10%)."""
+        return await self._admin_op("configure_fee", {"NEW_FEE_BPS": str(new_fee_bps)})
+
+    async def set_release_cap(self, new_cap_motes: int) -> str:
+        """Update the A1 release cap (motes) above which release()/reveal_swap()
+        require arbiter-quorum cap-approval. Self-heals the release_cap named
+        key into existence on first call for entities upgraded before it existed."""
+        return await self._admin_op("set_release_cap", {"NEW_CAP_MOTES": str(new_cap_motes)})
+
+    async def set_arbiters(self, arbiters: list[str]) -> str:
+        """Replace the whole on-chain arbiter_list used by resolve() and the
+        A1 cap-approval quorum check. Pass the full desired list, not a delta."""
+        if not arbiters:
+            raise ValueError("arbiters must be non-empty")
+        return await self._admin_op("set_arbiters", {"ARBITERS_JSON": json.dumps(arbiters)})
+
+    async def emergency_freeze(self) -> str:
+        """Freeze insurance-pool payouts. One-way on-chain: the contract has
+        no unfreeze entry point (known limitation, tracked in the AE402
+        skill's remaining-limitations list) -- use only as a last resort."""
+        return await self._admin_op("emergency_freeze", {})
+
+    async def _admin_op(self, entry_point: str, extra_env: dict[str, str]) -> str:
+        if not self._contract_hash:
+            raise RuntimeError("contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _ADMIN_OPS_SCRIPT,
+            {
+                "CONTRACT_HASH": self._contract_hash,
+                "ENTRY_POINT": entry_point,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                **extra_env,
             },
         )
 
