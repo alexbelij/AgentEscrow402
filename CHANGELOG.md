@@ -79,7 +79,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 ### Added
 
 #### Smart Contract (Rust/WASM — Casper Testnet)
-- **Escrow contract deployed** to Casper Testnet at [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
+- **Escrow contract deployed** to Casper Testnet at [`50ca3364...`](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664)
 - `create_escrow` entry point — lock funds with time-to-live (TTL) and service hash
 - `release` entry point — sender confirms delivery; funds transfer to receiver atomically
 - `refund` entry point — sender reclaims funds after TTL expiry; no arbiter required
