@@ -248,7 +248,7 @@ export default function IdentityRegistry() {
           )}
 
           <div className="flex items-end gap-2 mb-3">
-            <div className="flex-1">
+            <div className="w-20 shrink-0">
               <label className="block text-xs font-medium text-gray-400 mb-1">Min reputation</label>
               <input
                 type="number"
@@ -257,12 +257,12 @@ export default function IdentityRegistry() {
                 className="w-full p-2 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] text-sm"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="block text-xs font-medium text-gray-400 mb-1">Min verification</label>
               <select
                 value={minVerification}
                 onChange={(e) => setMinVerification(e.target.value as VerificationLevel)}
-                className="w-full p-2 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] text-sm"
+                className="w-full p-2 pr-1 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] text-xs sm:text-sm"
               >
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>

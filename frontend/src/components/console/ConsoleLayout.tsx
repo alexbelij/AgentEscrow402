@@ -77,7 +77,7 @@ const ALL_ITEMS = NAV_GROUPS.flatMap((g) => g.items);
 interface SectionInfo {
   title: string;
   desc: string;
-  source: 'demo' | 'live' | 'tool';
+  source: 'demo' | 'live' | 'tool' | 'guide';
 }
 
 // Per-route explanation shown once, right under the page title, so every
@@ -92,7 +92,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   '/console/use-cases': {
     title: 'Use Cases',
     desc: 'Four narrative scenarios for non-technical reviewers — what AE402 is for, in plain language — with each step linking straight into the real panel that runs it (Escrows, Arbitration, Identity Registry, Advanced Escrow, Insurance, Risk). No separate logic: this page is a guided front door to the same live console.',
-    source: 'tool',
+    source: 'guide',
   },
   '/console/escrows': {
     title: 'Escrows',
@@ -127,12 +127,12 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   '/console/arbitration': {
     title: 'Arbitration',
     desc: 'AI-powered dispute evidence analysis (real LLM call with a deterministic heuristic fallback, tries Groq then NVIDIA NIM then a local model) and VRF-based neutral arbiter election, both run live against the real backend. In production these feed the escrow /dispute → /resolve lifecycle.',
-    source: 'tool',
+    source: 'live',
   },
   '/console/identity-registry': {
     title: 'Identity Registry',
     desc: 'A DID reputation/staking layer (real backend, in-memory in this sandbox): register a did:casper:<account> identity, record completed/disputed deals to build cumulative reputation, apply time-based reputation decay, slash stake for bad behavior, advance verification level, and search agents by capability/reputation/verification. Separate from the public-key identity + capability delegation registry on the Agents page.',
-    source: 'tool',
+    source: 'live',
   },
   '/console/agent-demo': {
     title: 'Agent Demo',
@@ -154,6 +154,7 @@ const SOURCE_BADGE: Record<SectionInfo['source'], { label: string; cls: string }
   live: { label: 'Live hosted API', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
   demo: { label: 'Testnet · seeded records', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
   tool: { label: 'Developer tool', cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+  guide: { label: 'Guided walkthrough', cls: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
 };
 
 const SIDEBAR_STORAGE_KEY = 'ae402_console_sidebar_collapsed';
