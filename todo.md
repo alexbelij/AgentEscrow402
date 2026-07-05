@@ -12,10 +12,16 @@ do a fresh targeted audit later if Alexey flags a specific remaining UX complain
 Approved by Alexey 2026-07-05 to close these AE402-specific items instead of unvalidated
 internal ROADMAP.md Phase 3/4 items:
 
-- [ ] S4 — Legitimize planned features with official Casper reference patterns:
-      - `two-party-multi-sig` pattern → escrow release/resolve flow
-      - `casper-private-auction` pattern → commit-reveal (feeds into B1)
+- [x] S3 — README "What Is Real / What Is Simulated" block — **DONE 2026-07-05**, added as its
+      own README section with an evidence-linked table, plus rewrote docs/KNOWN_LIMITATIONS.md
+      (it had stale claims, e.g. calling real Ed25519 x402 verification a "placeholder").
+- [x] S4 — Legitimize planned features with official Casper reference patterns:
+      - `two-party-multi-sig` pattern → escrow release/resolve flow — **DONE**, resolve() already
+        uses a real 3-of-5 Ed25519 arbiter quorum, same shape as the official pattern.
+      - `casper-private-auction` pattern → commit-reveal (feeds into B1) — **DONE**, the HTLC
+        commit_swap/reveal_swap entry points already implement this, verified live.
       Goal: reduce bug risk by reusing audited/official patterns instead of inventing from scratch.
+      No further action needed — both patterns were already applied by the time this was reviewed.
 - [ ] S5 — CEP-2612 Permit Extension: gasless approve+deposit in one transaction (real UX win,
       official standard, ~half day estimated).
 - [ ] B1 — MultiAssetEscrow CEP-18/78 + commit-reveal (uses S4 reference). Real feature, bigger.
