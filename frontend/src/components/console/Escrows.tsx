@@ -4,6 +4,7 @@ import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import { useSigner } from '../../lib/signer';
 import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import { useToast } from '../../lib/toast';
+import ExplorerLink from './ExplorerLink';
 import {
   PlusCircle,
   Eye,
@@ -112,7 +113,7 @@ const Select: React.FC<SelectProps> = ({ label, id, options, error, className = 
 
 const Escrows: React.FC = () => {
   const toast = useToast();
-  const { isLive } = useSigner();
+  const { isLive, activePublicKey } = useSigner();
   const { run: runLifecycleAction } = useLifecycleAction();
   const [contractHash, setContractHash] = useState<string | undefined>(undefined);
   const [escrows, setEscrows] = useState<Escrow[]>([]);
@@ -134,29 +135,33 @@ const Escrows: React.FC = () => {
   const [pageSize] = useState(10);
   const [filterStatus, setFilterStatus] = useState<EscrowStatus | 'all'>('all');
   const [totalEscrows, setTotalEscrows] = useState(0);
+  // "Only mine" is client-side: the hosted API has no payer/payee query
+  // param, so when this is on we widen the fetch (bypassing normal
+  // pagination) and filter locally against the active connected key.
+  const [onlyMine, setOnlyMine] = useState(false);
 
   const fetchEscrows = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const params: { limit?: number; offset?: number; status?: EscrowStatus } = {
-        limit: pageSize,
-        offset: (currentPage - 1) * pageSize,
-      };
+      const params: { limit?: number; offset?: number; status?: EscrowStatus } = onlyMine
+        ? { limit: 200, offset: 0 }
+        : { limit: pageSize, offset: (currentPage - 1) * pageSize };
       if (filterStatus !== 'all') {
         params.status = filterStatus;
       }
       const res = await api.getEscrows(params);
       if (res.error) throw new Error(res.error);
-      setEscrows(res.data || []);
-      setTotalEscrows((res.data as any)?.total ?? res.data?.length ?? 0);
+      const rows = res.data || [];
+      setEscrows(rows);
+      setTotalEscrows(onlyMine ? rows.length : ((res.data as any)?.total ?? rows.length));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch escrows.');
       console.error('Escrow fetch error:', err);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, pageSize, filterStatus]);
+  }, [currentPage, pageSize, filterStatus, onlyMine]);
 
   useEffect(() => {
     fetchEscrows();
@@ -256,7 +261,11 @@ const Escrows: React.FC = () => {
     }
   };
 
-  const totalPages = Math.ceil(totalEscrows / pageSize);
+  const visibleEscrows =
+    onlyMine && activePublicKey
+      ? escrows.filter((e) => e.payer === activePublicKey || e.payee === activePublicKey)
+      : escrows;
+  const totalPages = onlyMine ? 1 : Math.ceil(totalEscrows / pageSize);
 
   return (
     <div className="space-y-8">
@@ -293,6 +302,28 @@ const Escrows: React.FC = () => {
           >
             <RefreshCw size={20} />
           </button>
+          <label
+            className={`hidden sm:flex h-12 items-center gap-2 px-3 rounded-md border text-sm shrink-0 whitespace-nowrap transition-colors ${
+              !activePublicKey
+                ? 'border-[#1e1e2e] text-gray-600 cursor-not-allowed'
+                : onlyMine
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200 cursor-pointer'
+                : 'border-[#1e1e2e] text-gray-400 hover:text-gray-200 cursor-pointer'
+            }`}
+            title={!activePublicKey ? 'Connect a wallet or use the demo signer to filter by identity' : undefined}
+          >
+            <input
+              type="checkbox"
+              checked={onlyMine}
+              disabled={!activePublicKey}
+              onChange={(e) => {
+                setOnlyMine(e.target.checked);
+                setCurrentPage(1);
+              }}
+              className="accent-amber-500"
+            />
+            Only mine
+          </label>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
@@ -314,8 +345,12 @@ const Escrows: React.FC = () => {
             <XCircle className="h-6 w-6 mr-2" />
             <p>Error: {error}</p>
           </div>
-        ) : escrows.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No escrows found.</div>
+        ) : visibleEscrows.length === 0 ? (
+          <div className="p-6 text-center text-gray-400">
+            {onlyMine
+              ? 'No escrows found where your active identity is payer or payee (checked against the last 200 records).'
+              : 'No escrows found.'}
+          </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">
@@ -331,16 +366,16 @@ const Escrows: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1e1e2e]">
-                {escrows.map((escrow) => (
+                {visibleEscrows.map((escrow) => (
                   <tr key={escrow.hash} className="hover:bg-gray-800 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {escrow.hash.substring(0, 8)}...{escrow.hash.substring(escrow.hash.length - 8)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {escrow.payer.substring(0, 8)}...
+                      <ExplorerLink value={escrow.payer}>{escrow.payer.substring(0, 8)}...</ExplorerLink>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {escrow.payee.substring(0, 8)}...
+                      <ExplorerLink value={escrow.payee}>{escrow.payee.substring(0, 8)}...</ExplorerLink>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       {formatCspr(escrow.amount)}
@@ -418,13 +453,17 @@ const Escrows: React.FC = () => {
                   <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                     <User className="h-4 w-4 mr-1.5 text-amber-500" /> Payer
                   </div>
-                  <p className="font-mono text-sm break-all">{selectedEscrow.payer}</p>
+                  <p className="font-mono text-sm break-all">
+                    <ExplorerLink value={selectedEscrow.payer}>{selectedEscrow.payer}</ExplorerLink>
+                  </p>
                 </div>
                 <div>
                   <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                     <User className="h-4 w-4 mr-1.5 text-amber-500" /> Payee
                   </div>
-                  <p className="font-mono text-sm break-all">{selectedEscrow.payee}</p>
+                  <p className="font-mono text-sm break-all">
+                    <ExplorerLink value={selectedEscrow.payee}>{selectedEscrow.payee}</ExplorerLink>
+                  </p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -21,6 +21,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Github,
 } from 'lucide-react';
 
 interface NavItem {
@@ -95,12 +96,12 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/escrows': {
     title: 'Escrows',
-    desc: 'Every agent-to-agent payment is an escrow: funds are locked, then released, refunded or disputed. Create one, inspect its lifecycle, or act on it. Listed records are seeded demo data for the hosted console, not real on-chain transactions.',
+    desc: 'Every agent-to-agent payment is an escrow: funds are locked, then released, refunded or disputed. Create one, inspect its lifecycle, or act on it. Listed records are real API/DB rows seeded on the Casper testnet-backed hosted console (not yet triggered by your own actions or fake placeholders) — create your own below to see a live row join them.',
     source: 'demo',
   },
   '/console/agents': {
     title: 'Agents',
-    desc: 'Agent identities bind a service agent to a public key, capabilities and a reputation score, so counterparties can decide who to trust before locking funds. Listed agents are seeded demo identities for the hosted console.',
+    desc: 'Agent identities bind a service agent to a public key, capabilities and a reputation score, so counterparties can decide who to trust before locking funds. Listed agents are real API/DB rows seeded on the hosted console (not fake placeholders) — register your own below to see it join the list.',
     source: 'demo',
   },
   '/console/insurance': {
@@ -110,7 +111,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/risk': {
     title: 'Risk Scoring',
-    desc: 'An anomaly model scores counterparties and jobs so you can block or warn on high-risk deals before funds are locked, and feed the score into insurance pricing and arbitration routing. Scores shown use seeded demo data.',
+    desc: 'An anomaly model scores counterparties and jobs so you can block or warn on high-risk deals before funds are locked, and feed the score into insurance pricing and arbitration routing. Scores shown are computed live over the seeded testnet escrow dataset above, not static placeholders.',
     source: 'demo',
   },
   '/console/contracts': {
@@ -145,9 +146,13 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
 };
 
+// "demo" here means "real hosted API + DB records that were seeded for this
+// console, not activity from your own actions" — never a fake/static
+// placeholder. The badge and copy call this out explicitly (testnet /
+// seeded record, not "demo" alone) so it doesn't read as a stub.
 const SOURCE_BADGE: Record<SectionInfo['source'], { label: string; cls: string }> = {
   live: { label: 'Live hosted API', cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  demo: { label: 'Seeded demo data · not on-chain', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  demo: { label: 'Testnet · seeded records', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
   tool: { label: 'Developer tool', cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
 };
 
@@ -259,7 +264,12 @@ const ConsoleLayout: React.FC = () => {
           collapsed ? 'w-16' : 'w-64'
         }`}
       >
-        <a href="/" className="flex items-center gap-2 h-14 px-3 border-b border-ae-border/70 shrink-0 overflow-hidden">
+        <a
+          href="/"
+          className={`flex items-center gap-2 h-14 border-b border-ae-border/70 shrink-0 overflow-hidden ${
+            collapsed ? 'justify-center px-0' : 'px-3'
+          }`}
+        >
           <img src="/images/logo.webp" alt="AE402" className="h-6 w-6 shrink-0" />
           {!collapsed && <span className="font-bold text-white text-sm truncate">AgentEscrow402</span>}
         </a>
@@ -280,26 +290,55 @@ const ConsoleLayout: React.FC = () => {
 
       {/* Mobile nav drawer — the single menu on small screens: it already
           contains every sidebar section, so there is no separate "site
-          menu" burger anywhere on console pages. */}
-      {mobileNavOpen && (
-        <div className="lg:hidden fixed inset-0 z-[70] flex">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
-          <div className="relative w-72 max-w-[85vw] h-full bg-ae-card border-r border-ae-border flex flex-col">
-            <div className="flex items-center justify-between px-3 py-3 border-b border-ae-border/70">
-              <span className="text-sm font-semibold text-gray-200">Console menu</span>
-              <button
-                type="button"
-                onClick={() => setMobileNavOpen(false)}
-                aria-label="Close menu"
-                className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-ae-border/50"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <SidebarNav collapsed={false} onNavigate={() => setMobileNavOpen(false)} />
+          menu" burger anywhere on console pages. Always mounted (not
+          conditionally rendered) so the open/close transform transition can
+          actually animate both ways instead of popping in/out instantly. */}
+      <div
+        className={`lg:hidden fixed inset-0 z-[70] flex transition-opacity duration-300 ${
+          mobileNavOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden={!mobileNavOpen}
+      >
+        <div className="absolute inset-0 bg-black/60" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+        <div
+          className={`relative w-72 max-w-[85vw] h-full bg-ae-card border-r border-ae-border flex flex-col transition-transform duration-300 ease-out ${
+            mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <div className="flex items-center justify-between px-3 py-3 border-b border-ae-border/70">
+            <a href="/" className="flex items-center gap-2">
+              <img src="/images/logo.webp" alt="AE402" className="h-6 w-6 shrink-0" />
+              <span className="font-bold text-white text-sm truncate">AgentEscrow402</span>
+            </a>
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Close menu"
+              className="p-2 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-ae-border/50"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <SidebarNav collapsed={false} onNavigate={() => setMobileNavOpen(false)} />
+          <div className="border-t border-ae-border/70 px-3 py-3 flex items-center justify-between shrink-0">
+            <a
+              href="/"
+              className="text-xs font-medium text-gray-400 hover:text-gray-100 transition-colors"
+            >
+              ← Back to landing
+            </a>
+            <a
+              href="https://github.com/alexbelij/AgentEscrow402"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View source on GitHub"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-ae-border/50"
+            >
+              <Github className="h-4 w-4" />
+            </a>
           </div>
         </div>
-      )}
+      </div>
 
       {/* Right column — offset by the sidebar's current width via padding
           (not a fixed+left calc), so the top bar below (sticky, in normal
