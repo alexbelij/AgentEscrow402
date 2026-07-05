@@ -110,7 +110,7 @@ export default function Hero() {
             Casper testnet · x402 escrow · AI agent trust layer
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-extrabold text-white leading-[1.15] mb-5 tracking-tight max-w-xl">
+          <h1 className="text-4xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-[1.2] mb-5 tracking-tight">
             Commercial escrow rails for{' '}
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">autonomous AI work</span>
           </h1>
