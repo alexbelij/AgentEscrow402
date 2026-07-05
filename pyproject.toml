@@ -11,3 +11,15 @@ known-first-party = ["server", "sdk"]
 [tool.black]
 line-length = 120
 target-version = ["py311"]
+
+[tool.pytest.ini_options]
+# tests/test_e2e_live.py is a standalone smoke-test script (module-level
+# code + sys.exit(1), no pytest test functions) meant to be run directly
+# against the live Render backend (`python tests/test_e2e_live.py`), not
+# collected by pytest. It matches the test_*.py glob by accident, and its
+# sys.exit(1) on a live-network hiccup (backend cold start, transient
+# timeout) crashes pytest's collection with an INTERNALERROR instead of a
+# normal, isolated test failure — this caused two flaky red CI runs in one
+# session even though nothing in the actual codebase was broken. Ignore it
+# in automated CI; run it manually when you want a live-deployment check.
+addopts = "--ignore=tests/test_e2e_live.py"
