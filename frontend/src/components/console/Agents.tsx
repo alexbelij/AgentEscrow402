@@ -2,6 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { api, Agent, Reputation, RegisterIdentityRequest, Identity, AgentCapabilities, DelegationRecord } from '../../lib/api';
 import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoSigner';
 import { useToast } from '../../lib/toast';
+import { useSigner } from '../../lib/signer';
+import ExplorerLink from './ExplorerLink';
 import {
   Users,
   UserPlus,
@@ -81,6 +83,8 @@ const Agents: React.FC = () => {
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isDelegateModalOpen, setIsDelegateModalOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
+  const [onlyMine, setOnlyMine] = useState(false);
+  const { activePublicKey } = useSigner();
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -139,7 +143,9 @@ const Agents: React.FC = () => {
     }
   };
 
-  const filteredAgents = statusFilter === 'all' ? agents : agents.filter((agent) => agent.status === statusFilter);
+  const filteredAgents = (statusFilter === 'all' ? agents : agents.filter((agent) => agent.status === statusFilter)).filter(
+    (agent) => !onlyMine || !activePublicKey || agent.public_key === activePublicKey,
+  );
 
   const getStatusColor = (status: Agent['status']) => {
     switch (status) {
@@ -181,6 +187,25 @@ const Agents: React.FC = () => {
             <option value="inactive">Inactive</option>
             <option value="suspended">Suspended</option>
           </select>
+          <label
+            className={`hidden sm:flex h-12 items-center gap-2 px-3 rounded-md border text-sm shrink-0 whitespace-nowrap transition-colors ${
+              !activePublicKey
+                ? 'border-[#1e1e2e] text-gray-600 cursor-not-allowed'
+                : onlyMine
+                ? 'border-amber-500/40 bg-amber-500/10 text-amber-200 cursor-pointer'
+                : 'border-[#1e1e2e] text-gray-400 hover:text-gray-200 cursor-pointer'
+            }`}
+            title={!activePublicKey ? 'Connect a wallet or use the demo signer to filter by identity' : undefined}
+          >
+            <input
+              type="checkbox"
+              checked={onlyMine}
+              disabled={!activePublicKey}
+              onChange={(e) => setOnlyMine(e.target.checked)}
+              className="accent-amber-500"
+            />
+            Only mine
+          </label>
         </div>
         <button
           onClick={() => setIsDelegateModalOpen(true)}
@@ -231,7 +256,9 @@ const Agents: React.FC = () => {
                   <tr key={agent.public_key} className="hover:bg-gray-800 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{agent.name || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {agent.public_key.length > 20 ? `${agent.public_key.substring(0, 12)}...${agent.public_key.substring(agent.public_key.length - 8)}` : agent.public_key}
+                      <ExplorerLink value={agent.public_key}>
+                        {agent.public_key.length > 20 ? `${agent.public_key.substring(0, 12)}...${agent.public_key.substring(agent.public_key.length - 8)}` : agent.public_key}
+                      </ExplorerLink>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       <Star className="h-4 w-4 text-yellow-400 mr-1" /> {(agent.reputation_score ?? 0).toFixed(2)}
@@ -272,7 +299,7 @@ const Agents: React.FC = () => {
               </p>
               <p className="flex items-center col-span-full">
                 <Hash className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Public Key:</strong> <span className="ml-2 break-all">{selectedAgent.public_key}</span>
+                <strong>Public Key:</strong> <span className="ml-2 break-all"><ExplorerLink value={selectedAgent.public_key}>{selectedAgent.public_key}</ExplorerLink></span>
               </p>
               <p className="flex items-center">
                 <Star className="h-5 w-5 mr-2 text-amber-500" />
