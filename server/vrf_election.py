@@ -1,6 +1,6 @@
 """VRF-based arbiter election for AgentEscrow402.
 
-Task 4 implementation: On-chain VRF via vrf-arbiter contract.
+On-chain VRF via the deployed vrf-arbiter contract:
 - Calls `elect_arbiter` entry point on deployed vrf-arbiter contract
 - Parses `selected_arbiters_csv` from on-chain contract state
 - Falls back to local cryptographic selection if contract unavailable

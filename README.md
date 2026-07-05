@@ -57,6 +57,14 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 | **Multi-sig dispute resolution** | ✅ 3-of-5 arbiter vote | ⚠️ Facilitator decides | ⚠️ Manual |
 | **Zero human facilitation** | ✅ Fully agentic | ⚠️ Needs setup | ❌ Always human |
 | **Casper Network native** | ✅ WASM contract | ❌ EVM only | — |
+| **Multi-asset escrow** | ✅ CSPR, CEP-18, CEP-78 (real on-chain) | ❌ Single asset | — |
+| **Atomic secret-for-payment swap** | ✅ SHA-256 HTLC commit/reveal | ❌ Not supported | — |
+| **AI-assisted dispute triage** | ✅ Evidence scoring feeds the arbiter vote | ❌ None | ❌ None |
+| **Sybil-resistant agent identity** | ✅ DID registry, staking + slashing | ❌ None | — |
+| **Post-quantum metadata confidentiality** | ✅ ML-KEM-768 hybrid encryption | ❌ None | — |
+
+See [what's real vs. simulated](#-what-is-real-vs-simulated) for exactly which of these are live
+on-chain today versus API-level.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -93,6 +101,10 @@ Agent A                    Payment Server                 Casper Network
 **x402 header format:** `X-Payment: x402-v1;<escrow_hash>;<amount>;<sender>;<timestamp>;<nonce>;<signature>`
 
 Protected endpoints return `402 Payment Required` with machine-readable terms when the header is missing.
+
+This is the base happy-path lifecycle. The dispute-resolution vote, HTLC atomic-swap
+commit/reveal, and multi-asset (CEP-18/CEP-78) flows each have their own diagram in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) rather than being crammed into this one.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -241,9 +253,15 @@ Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ## 📸 Screenshots
 
-| Homepage — HTTP 402 flow | Console — escrow table | Escrow detail — release flow |
+Real screenshots of the live deployment (captured 2026-07-05, not mockups):
+
+| Homepage | Console overview |
+|---|---|
+| ![Homepage](docs/screenshots/01-homepage.png) | ![Console overview](docs/screenshots/02-console-overview.png) |
+
+| Escrows table | Escrow detail | Arbitration (AI dispute analysis) |
 |---|---|---|
-| ![Homepage](docs/screenshots/01-homepage.png) | ![Console](docs/screenshots/02-console.png) | ![Escrow detail](docs/screenshots/03-escrow-detail.png) |
+| ![Escrows](docs/screenshots/03-escrows.png) | ![Escrow detail](docs/screenshots/04-escrow-detail.png) | ![Arbitration](docs/screenshots/05-arbitration.png) |
 
 > Live at [ae402.xyz](https://ae402.xyz) · [ae402.xyz/console/overview](https://ae402.xyz/console/overview)
 
@@ -255,22 +273,27 @@ Detailed diagrams → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 Deployed on Casper Testnet:
 
-| Contract | Hash |
-|---|---|
-| Core Escrow | `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) |
-| Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` |
-| Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` |
-| VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` |
+| Contract | Hash | Explorer |
+|---|---|---|
+| Core Escrow | `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) | [view](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664) |
+| Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
+| Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` | [view](https://testnet.cspr.live/contract/e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61) |
+| VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` | [view](https://testnet.cspr.live/contract/5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f) |
+| CEP-18 test token (AETUSD) | `c93d7d59e73b213e4351f4e11f2a5217a6aa872bb18d378b3f5f230f29883e7d` | [view](https://testnet.cspr.live/contract/c93d7d59e73b213e4351f4e11f2a5217a6aa872bb18d378b3f5f230f29883e7d) |
 
 | Entry point | Description |
 |---|---|
 | `create_escrow` | Lock funds with TTL and service hash |
-| `release` | Confirm delivery → funds to receiver |
+| `release` | Confirm delivery → funds to receiver (arbiter-quorum-gated above the release cap) |
 | `refund` | Reclaim after TTL expiry |
 | `dispute` | Open a contested payment |
 | `resolve` | 3-of-5 arbiter vote → auto-payout |
+| `commit_swap` | HTLC atomic-swap: sender locks a SHA-256 hash of a secret |
+| `reveal_swap` | HTLC atomic-swap: anyone who knows the secret releases funds |
 | `configure_fee` | Set insurance pool fee (basis points) |
-| `emergency_freeze` | Pause all state changes |
+| `set_release_cap` | Update the amount above which an arbiter-quorum approval is required |
+| `set_arbiters` | Rotate the 5-account arbiter pool (no redeploy needed) |
+| `emergency_freeze` | Pause all state changes (one-way — no unfreeze entry point) |
 
 Security status: latest changed code was reviewed through NVIDIA API and no concrete HIGH blockers were reported for the console/Neon patch. Full production hardening and legacy test-suite modernization are still tracked in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 

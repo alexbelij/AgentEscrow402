@@ -1,3 +1,12 @@
+"""Composite risk scoring for AgentEscrow402.
+
+Lightweight IsolationForest-style anomaly scoring over counterparty
+history, amount heuristics, and chain patterns. Consumed by
+server/risk_api.py, which wires it to real on-chain transaction data.
+"""
+
+from __future__ import annotations
+
 import math
 import os
 import random
