@@ -41,7 +41,7 @@ AgentEscrow402 enables machine-to-machine payments using the x402 HTTP payment p
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS |
 | Database | PostgreSQL (Neon) |
 | Hosting | Vercel (frontend), Render (API) |
-| Tests | pytest (85 Python) + cargo test (18 Rust) |
+| Tests | pytest (376 Python) + cargo test (29 Rust) |
 | CI/CD | GitHub Actions |
 
 ## Hackathon Requirements Checklist

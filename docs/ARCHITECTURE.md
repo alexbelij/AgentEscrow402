@@ -46,6 +46,9 @@ sequenceDiagram
 
 ## Dispute Resolution
 
+The arbiter pool is 5 registered accounts; `resolve()` requires a quorum of at least 3 valid,
+deduplicated Ed25519 arbiter signatures over the verdict payload (3-of-5 multi-sig).
+
 ```mermaid
 sequenceDiagram
     participant P as Party
@@ -54,15 +57,19 @@ sequenceDiagram
     participant A1 as Arbiter 1
     participant A2 as Arbiter 2
     participant A3 as Arbiter 3
+    participant A4 as Arbiter 4
+    participant A5 as Arbiter 5
 
     P->>S: POST /dispute {service_hash, reason}
     S->>C: dispute(service_hash)
     Note over C: Status = DISPUTED
 
-    A1->>C: resolve(hash, RELEASE)
-    A2->>C: resolve(hash, RELEASE)
-    A3->>C: resolve(hash, REFUND)
-    Note over C: 2/3 = RELEASE wins
+    Note over A1,A5: Off-chain: arbiters sign the verdict (RELEASE or REFUND)
+    A1->>S: sign(RELEASE)
+    A2->>S: sign(RELEASE)
+    A3->>S: sign(RELEASE)
+    S->>C: resolve(hash, RELEASE, [sig_A1, sig_A2, sig_A3])
+    Note over C: verify_arbiter_quorum: 3 valid signatures >= threshold (3-of-5)
     C->>C: transfer funds to receiver
 ```
 
