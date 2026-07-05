@@ -31,12 +31,20 @@ declare global {
 // rate-limiting / feature scoping only. Overridable via env for local dev.
 const CSPRCLICK_APP_ID = (import.meta.env.VITE_CSPRCLICK_APP_ID as string | undefined) || '3411df7f-5185-474e-ba36-b9ec3ecf'
 
+// NOTE: per @make-software/csprclick-core-types' own ClickUIOptions doc
+// comment, "showTopBar: false" is silently ignored ("has no effect and the
+// top bar is shown") the moment you also specify defaultTheme, network
+// settings, or (per testing) a non-empty accountMenuItems array — which is
+// exactly the "CSPR Products / Sign in" bar Mali saw reappear across the top
+// of the site once the required #csprclick-ui mount div came back. AE402
+// has its own Navbar/connect button and never wants that bar, so this
+// config is intentionally minimal: no defaultTheme, no accountMenuItems
+// beyond the one required to keep TS happy, no networkSettings.
 window.clickUIOptions = {
   uiContainer: 'csprclick-ui',
   rootAppElement: '#root',
   showTopBar: false, // AE402 has its own Navbar; we render our own connect button
-  defaultTheme: 'dark',
-  accountMenuItems: ['AccountCardMenuItem', 'CopyHashMenuItem'],
+  accountMenuItems: ['CopyHashMenuItem'],
 }
 
 window.clickSDKOptions = {
