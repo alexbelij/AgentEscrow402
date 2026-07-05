@@ -25,6 +25,21 @@ internal ROADMAP.md Phase 3/4 items:
             a deployed casper-ecosystem/cep18 test token). Backend /atomic-swap/commit and
             /atomic-swap/reveal still call the simulated in-memory flow, not the new on-chain
             entry points yet — wire them up next.
+            - BLOCKER found 2026-07-05: prebuilt official `cep18.wasm` from GitHub release
+              v1.2.0 (nightly-2025-02-04v1.2.0, built ~Apr 2024) install/upgrade args parse
+              fine (verified correct bytesrepr encoding via RPC echo of the deploy: name/symbol/
+              decimals/total_supply/enable_mint_burn all round-trip correctly), payment fine
+              (500 CSPR, ruled out "out of gas"), but wasm execution fails with
+              `ApiError::EarlyEndOfStream [17]` — a low-level VM bytesrepr error, not a
+              Cep18Error application error. Root cause suspected: this prebuilt wasm predates
+              some testnet protocol/host-function change (same class of issue we already hit
+              upgrading our own escrow contract this session — Casper 2.0 vs older SDK
+              assumptions). NEXT STEP: build cep18 from source using its pinned
+              `nightly-2025-02-04` toolchain + `build-std` + `wasm-strip` (Makefile at
+              /work/temp/cep18_ref, wasm cloned there) instead of the prebuilt release, then
+              retry install. Deployer has plenty of CSPR for repeated attempts.
+            - Scripts added: server/casper_tx/deploy_cep18_token.mjs (install/upgrade CEP-18
+              token contract, correct args verified — safe to reuse once wasm rebuilt).
       - [ ] Update frontend AdvancedEscrow.tsx to remove "simulated" caveat once backend wired.
 
 ## S5 note (folded into B1)
