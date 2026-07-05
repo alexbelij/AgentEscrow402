@@ -40,6 +40,29 @@ internal ROADMAP.md Phase 3/4 items:
               retry install. Deployer has plenty of CSPR for repeated attempts.
             - Scripts added: server/casper_tx/deploy_cep18_token.mjs (install/upgrade CEP-18
               token contract, correct args verified — safe to reuse once wasm rebuilt).
+            - **RESOLVED 2026-07-05**: blocker confirmed to be the stale prebuilt wasm, not our
+              args. Installed rustup + `nightly-2025-02-04` (cep18's pinned toolchain) +
+              wasm32 target + rust-src, downloaded a static `wasm-strip` binary (no root/apt in
+              sandbox, used prebuilt WebAssembly/wabt 1.0.41 release instead of `apt install
+              wabt`), built `cep18.wasm` from source with `-Z build-std=std,panic_abort` per the
+              project's own Makefile, then `wasm-strip`'d it. **Installed cleanly on testnet on
+              the first try** (error_message: null) — contract hash
+              `c93d7d59e73b213e4351f4e11f2a5217a6aa872bb18d378b3f5f230f29883e7d`, token "AE402
+              Test USD" (AETUSD), 6 decimals, 1,000,000 total supply, enable_mint_burn=1 (all
+              held by deployer initially).
+            - **Real token transfer verified on-chain**: called `transfer` (deployer → provider
+              test account, 50 AETUSD = 50000000 base units) — confirmed success
+              (error_message: null), then independently queried the CEP-18 `balances`
+              dictionary via `state_get_dictionary_item` and confirmed the provider's on-chain
+              balance is exactly 50000000. Full real ERC20-equivalent flow now proven working,
+              not just install.
+            - New script: server/casper_tx/cep18_transfer.mjs (calls `transfer` entry point via
+              ContractCallBuilder).
+            - REMAINING for B1: wire `server/multi_asset.py`'s `Cep18Adapter`
+              (transfer_to_escrow/simulated methods) to call this real deployed token contract
+              instead of logging "Simulating...", and update `AdvancedEscrow.tsx` to drop the
+              "simulated" caveat once done. CEP-78 (NFT) adapter is a separate, still-untouched
+              piece of B1.
       - [ ] Update frontend AdvancedEscrow.tsx to remove "simulated" caveat once backend wired.
 
 ## S5 note (folded into B1)
