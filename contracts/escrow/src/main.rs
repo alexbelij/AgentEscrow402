@@ -34,6 +34,7 @@ const ERR_ALREADY_COMMITTED: u16 = 15;
 const ERR_NO_COMMIT: u16 = 16;
 const ERR_INVALID_PREIMAGE: u16 = 17;
 const ERR_ALREADY_REVEALED: u16 = 18;
+const ERR_CAP_EXCEEDED: u16 = 19;
 
 // ── Storage keys ─────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ const POOL_FROZEN_KEY: &str = "pool_frozen";
 const INSTALLER_KEY: &str = "installer";
 const CONTRACT_PURSE: &str = "contract_purse";
 const INSURANCE_PURSE: &str = "insurance_purse";
+const RELEASE_CAP_KEY: &str = "release_cap";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -55,6 +57,13 @@ const MAX_TTL: u64 = 86_400;
 const MAX_FEE_BPS: u64 = 1_000;
 const DEFAULT_FEE_BPS: u64 = 200;
 const DECAY_PERCENT_PER_WEEK: u64 = 5;
+// 1000 CSPR (motes, 1 CSPR = 1e9 motes). Agent-signed release()/reveal_swap()
+// calls at or below this cap execute unilaterally (as before). Anything
+// above it is an A1 "no unilateral withdraw above cap" guard: the caller
+// must additionally supply a quorum of arbiter signatures (same
+// registered arbiter set / threshold used by resolve()), i.e. propose ->
+// human/multisig approve, never a bare agent-key spend past the cap.
+const DEFAULT_RELEASE_CAP_MOTES: u64 = 1_000_000_000_000;
 
 const STATUS_PENDING: u8 = 0;
 const STATUS_RELEASED: u8 = 1;
@@ -173,6 +182,28 @@ fn compute_fee(amount: U512, bps: u64) -> U512 {
     amount * U512::from(bps) / U512::from(10_000u64)
 }
 
+/// Reads the release cap (motes). Defensive by design: `release_cap` is a
+/// named key introduced after this contract's original install, and
+/// Casper's `add_contract_version` upgrade path (see `call()`) does not
+/// retroactively add new named keys to an already-deployed entity. Rather
+/// than requiring every upgraded entity to have been re-initialized with
+/// this exact key (fragile / easy to silently break release() for
+/// existing deployments), fall back to the default cap if the key is
+/// missing instead of reverting. `set_release_cap()` self-heals the key
+/// into existence (create-if-absent) the first time an installer calls it.
+fn read_release_cap() -> U512 {
+    let cap_motes = match runtime::get_key(RELEASE_CAP_KEY) {
+        Some(key) => {
+            let uref = key.into_uref().unwrap_or_revert();
+            storage::read(uref)
+                .unwrap_or_revert()
+                .unwrap_or(DEFAULT_RELEASE_CAP_MOTES)
+        }
+        None => DEFAULT_RELEASE_CAP_MOTES,
+    };
+    U512::from(cap_motes)
+}
+
 /// Canonical message an arbiter signs to cast a resolve() vote. Binding the
 /// exact service_hash and verdict into the signed message prevents a vote
 /// signature from being replayed for a different escrow or a different
@@ -183,6 +214,83 @@ fn build_resolve_message(service_hash: &str, in_favor_of: &str) -> String {
     msg.push(':');
     msg.push_str(in_favor_of);
     msg
+}
+
+/// Canonical message an arbiter signs to approve an above-cap release/
+/// reveal_swap call. `action` distinguishes the two entry points so a
+/// signature collected for one can't be replayed against the other, and
+/// binding service_hash prevents replay across different escrows.
+fn build_cap_approval_message(action: &str, service_hash: &str) -> String {
+    let mut msg = String::from(action);
+    msg.push(':');
+    msg.push_str(service_hash);
+    msg.push_str(":cap_approval");
+    msg
+}
+
+/// Shared arbiter-quorum verification: checks that at least `threshold`
+/// *distinct*, *registered* arbiters produced a valid Ed25519 signature
+/// over `message`, and returns the number of valid, deduplicated votes.
+/// Used by both `resolve()` (dispute verdict) and the above-cap guard in
+/// `release()`/`reveal_swap()` (A1: no unilateral agent-key spend above
+/// cap, only propose -> arbiter/human quorum approve).
+fn verify_arbiter_quorum(
+    message: &str,
+    registered: &[String],
+    pubkeys: &[String],
+    signatures: &[String],
+) -> u64 {
+    if pubkeys.len() != signatures.len() {
+        return 0;
+    }
+    let mut seen = Vec::<String>::new();
+    let mut valid_count: u64 = 0;
+    for (pubkey_hex, sig_hex) in pubkeys.iter().zip(signatures.iter()) {
+        if seen.contains(pubkey_hex) || !registered.contains(pubkey_hex) {
+            continue;
+        }
+        let Ok(public_key) = PublicKey::from_hex(pubkey_hex.as_bytes()) else {
+            continue;
+        };
+        let Ok(signature) = Signature::from_hex(sig_hex.as_bytes()) else {
+            continue;
+        };
+        if crypto::verify(message.as_bytes(), &signature, &public_key).is_ok() {
+            valid_count += 1;
+            seen.push(pubkey_hex.clone());
+        }
+    }
+    valid_count
+}
+
+/// Reads the registered arbiter list + threshold (same source `resolve()`
+/// uses) and reverts with `ERR_CAP_EXCEEDED` unless a valid quorum of
+/// arbiter signatures over `build_cap_approval_message(action, service_hash)`
+/// is present. Called only when the release amount exceeds the cap.
+fn require_arbiter_cap_approval(
+    action: &str,
+    service_hash: &str,
+    arbiter_pubkeys: &[String],
+    arbiter_signatures: &[String],
+) {
+    let threshold_uref = runtime::get_key(ARBITER_THRESHOLD)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
+    let threshold: u64 = storage::read(threshold_uref).unwrap_or_revert().unwrap_or(3);
+
+    let arb_uref = runtime::get_key(ARBITER_LIST)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
+    let registered: Vec<String> = storage::read(arb_uref).unwrap_or_revert().unwrap_or_default();
+
+    let message = build_cap_approval_message(action, service_hash);
+    let valid_count =
+        verify_arbiter_quorum(&message, &registered, arbiter_pubkeys, arbiter_signatures);
+    if valid_count < threshold {
+        runtime::revert(ApiError::User(ERR_CAP_EXCEEDED));
+    }
 }
 
 /// Hex-encode raw bytes (lowercase), no external crate needed.
@@ -309,12 +417,18 @@ pub extern "C" fn escrow() {
     write_escrow(dict, &service_hash, record);
 }
 
-/// Release escrowed funds to the service provider.
+/// Release escrowed funds to the service provider. A1 guard: if `amount`
+/// exceeds the on-chain release cap, the sender alone can no longer
+/// authorize the transfer -- a quorum of registered-arbiter signatures
+/// over `build_cap_approval_message("release", service_hash)` must also be
+/// supplied (propose -> human/multisig approve for anything above cap).
 #[no_mangle]
 pub extern "C" fn release() {
     require_not_frozen();
 
     let service_hash: String = runtime::get_named_arg("service_hash");
+    let arbiter_pubkeys: Vec<String> = runtime::get_named_arg("arbiter_pubkeys");
+    let arbiter_signatures: Vec<String> = runtime::get_named_arg("arbiter_signatures");
     let caller = runtime::get_caller();
 
     let dict = get_dict_uref(ESCROWS_DICT);
@@ -326,6 +440,16 @@ pub extern "C" fn release() {
     }
     if caller.to_string() != sender_str {
         runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
+    }
+
+    let amount = parse_u512(&amount_str);
+    if amount > read_release_cap() {
+        require_arbiter_cap_approval(
+            "release",
+            &service_hash,
+            &arbiter_pubkeys,
+            &arbiter_signatures,
+        );
     }
 
     do_release_funds(
@@ -380,12 +504,19 @@ pub extern "C" fn commit_swap() {
 /// releasing funds to the escrow's receiver. This replaces the fully
 /// backend-simulated atomic-swap flow that previously just flipped
 /// in-memory state with no on-chain hash verification at all.
+/// A1 guard: same above-cap arbiter-quorum requirement as `release()`,
+/// checked against `build_cap_approval_message("reveal_swap", service_hash)`
+/// -- the HTLC secret alone is no longer sufficient authorization for an
+/// above-cap payout, closing the same unilateral-withdraw gap on this
+/// second release path.
 #[no_mangle]
 pub extern "C" fn reveal_swap() {
     require_not_frozen();
 
     let service_hash: String = runtime::get_named_arg("service_hash");
     let preimage: String = runtime::get_named_arg("preimage");
+    let arbiter_pubkeys: Vec<String> = runtime::get_named_arg("arbiter_pubkeys");
+    let arbiter_signatures: Vec<String> = runtime::get_named_arg("arbiter_signatures");
 
     let commits = get_dict_uref(SWAP_COMMITS_DICT);
     let (commit_hash, revealed): (String, bool) =
@@ -406,6 +537,16 @@ pub extern "C" fn reveal_swap() {
         read_escrow(dict, &service_hash);
     if status != STATUS_PENDING as u64 {
         runtime::revert(ApiError::User(ERR_INVALID_STATUS));
+    }
+
+    let amount = parse_u512(&amount_str);
+    if amount > read_release_cap() {
+        require_arbiter_cap_approval(
+            "reveal_swap",
+            &service_hash,
+            &arbiter_pubkeys,
+            &arbiter_signatures,
+        );
     }
 
     storage::dictionary_put(commits, &service_hash, (commit_hash, true));
@@ -630,6 +771,34 @@ pub extern "C" fn configure_fee() {
     storage::write(uref, new_fee_bps);
 }
 
+/// Update the A1 release cap in motes (installer only). Above this amount,
+/// `release()`/`reveal_swap()` require an arbiter-quorum cap-approval on
+/// top of their normal authorization (sender / correct HTLC preimage) --
+/// see `require_arbiter_cap_approval`. Self-heals the `release_cap` named
+/// key into existence on first call if this entity predates it (see
+/// `read_release_cap` doc comment for why upgrades can't always add it).
+#[no_mangle]
+pub extern "C" fn set_release_cap() {
+    let caller = runtime::get_caller();
+    let installer = read_installer();
+    if caller != installer {
+        runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
+    }
+
+    let new_cap_motes: u64 = runtime::get_named_arg("new_cap_motes");
+
+    match runtime::get_key(RELEASE_CAP_KEY) {
+        Some(key) => {
+            let uref = key.into_uref().unwrap_or_revert();
+            storage::write(uref, new_cap_motes);
+        }
+        None => {
+            let uref = storage::new_uref(new_cap_motes);
+            runtime::put_key(RELEASE_CAP_KEY, uref.into());
+        }
+    }
+}
+
 /// Register (replace) the on-chain arbiter list used by `resolve()`
 /// (installer only). Overwrites the whole list -- pass the full desired
 /// set of arbiter hex-encoded Ed25519 public keys (AsymmetricType::to_hex
@@ -701,6 +870,7 @@ pub extern "C" fn call() {
     let frozen_uref = storage::new_uref(false);
     let threshold_uref = storage::new_uref(3u64);
     let arbiter_uref = storage::new_uref(Vec::<String>::new());
+    let release_cap_uref = storage::new_uref(DEFAULT_RELEASE_CAP_MOTES);
 
     let mut named_keys = NamedKeys::new();
     named_keys.insert(CONTRACT_PURSE.into(), contract_purse.into());
@@ -709,6 +879,7 @@ pub extern "C" fn call() {
     named_keys.insert(POOL_FROZEN_KEY.into(), frozen_uref.into());
     named_keys.insert(ARBITER_THRESHOLD.into(), threshold_uref.into());
     named_keys.insert(ARBITER_LIST.into(), arbiter_uref.into());
+    named_keys.insert(RELEASE_CAP_KEY.into(), release_cap_uref.into());
     named_keys.insert(INSTALLER_KEY.into(), Key::Account(installer));
 
     let mut entry_points = EntryPoints::new();
@@ -728,7 +899,17 @@ pub extern "C" fn call() {
     ));
     entry_points.add_entry_point(EntityEntryPoint::new(
         "release",
-        vec![Parameter::new("service_hash", CLType::String)],
+        vec![
+            Parameter::new("service_hash", CLType::String),
+            Parameter::new(
+                "arbiter_pubkeys",
+                CLType::List(alloc::boxed::Box::new(CLType::String)),
+            ),
+            Parameter::new(
+                "arbiter_signatures",
+                CLType::List(alloc::boxed::Box::new(CLType::String)),
+            ),
+        ],
         CLType::Unit,
         EntryPointAccess::Public,
         EntryPointType::Called,
@@ -766,6 +947,14 @@ pub extern "C" fn call() {
         vec![
             Parameter::new("service_hash", CLType::String),
             Parameter::new("preimage", CLType::String),
+            Parameter::new(
+                "arbiter_pubkeys",
+                CLType::List(alloc::boxed::Box::new(CLType::String)),
+            ),
+            Parameter::new(
+                "arbiter_signatures",
+                CLType::List(alloc::boxed::Box::new(CLType::String)),
+            ),
         ],
         CLType::Unit,
         EntryPointAccess::Public,
@@ -805,6 +994,14 @@ pub extern "C" fn call() {
     entry_points.add_entry_point(EntityEntryPoint::new(
         "configure_fee",
         vec![Parameter::new("new_fee_bps", CLType::U64)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "set_release_cap",
+        vec![Parameter::new("new_cap_motes", CLType::U64)],
         CLType::Unit,
         EntryPointAccess::Public,
         EntryPointType::Called,
