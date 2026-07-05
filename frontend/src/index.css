@@ -59,3 +59,20 @@
    wanted; force-hide it at the CSS layer since the SDK's own config flag
    for this doesn't work. */
 .csprclick-top-bar { display: none !important; }
+
+/* The #csprclick-ui mount div itself (required — see lib/click.tsx) still
+   reserves ~40px of static-flow height for that hidden top bar, pushing
+   every real page element down by 40px. Take it out of normal document
+   flow entirely so it can never affect layout, while still letting any
+   actual modal/dropdown inside it render (those use their own fixed
+   positioning, e.g. .ReactModal__Overlay below, which is relative to the
+   viewport regardless of an ancestor's position). */
+#csprclick-ui { position: absolute; top: 0; left: 0; height: 0; overflow: visible; }
+
+/* The CSPR.click sign-in modal (a react-modal instance) ships with a fairly
+   low z-index (17) that sits *below* our own fixed/sticky chrome (sidebar
+   z-40, mobile drawer z-70, toast stack z-100, console top bar z-30) — on
+   short viewports the modal was getting visually covered by those. Force
+   it above everything in our own stacking order. */
+.ReactModal__Overlay { z-index: 1000 !important; }
+.ReactModal__Content { z-index: 1001 !important; }

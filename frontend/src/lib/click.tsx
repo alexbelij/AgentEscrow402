@@ -33,17 +33,18 @@ const CSPRCLICK_APP_ID = (import.meta.env.VITE_CSPRCLICK_APP_ID as string | unde
 
 // NOTE: per @make-software/csprclick-core-types' own ClickUIOptions doc
 // comment, "showTopBar: false" is silently ignored ("has no effect and the
-// top bar is shown") the moment you also specify defaultTheme, network
-// settings, or (per testing) a non-empty accountMenuItems array — which is
-// exactly the "CSPR Products / Sign in" bar Mali saw reappear across the top
-// of the site once the required #csprclick-ui mount div came back. AE402
-// has its own Navbar/connect button and never wants that bar, so this
-// config is intentionally minimal: no defaultTheme, no accountMenuItems
-// beyond the one required to keep TS happy, no networkSettings.
+// top bar is shown") the moment you also specify defaultTheme, network, or
+// account settings — and empirically it's ignored even without those, as
+// long as the required accountMenuItems field is present at all. So this
+// flag can't be trusted either way; we hide the resulting `.csprclick-top-bar`
+// via CSS instead (see index.css) and are therefore free to set
+// defaultTheme: 'dark' here purely so the Sign-in modal itself matches the
+// site's dark theme instead of defaulting to light/white.
 window.clickUIOptions = {
   uiContainer: 'csprclick-ui',
   rootAppElement: '#root',
-  showTopBar: false, // AE402 has its own Navbar; we render our own connect button
+  showTopBar: false, // ignored by the SDK either way — hidden via CSS instead
+  defaultTheme: 'dark',
   accountMenuItems: ['CopyHashMenuItem'],
 }
 
