@@ -3,7 +3,7 @@
 This directory contains the **5 Ed25519 private keys** for the throwaway
 "arbiter" accounts registered as the multisig dispute-resolution committee
 on our **Casper Testnet** deployment of the Core Escrow contract
-(`dca7e926af8aac73fc1104e1bb9a52b0035a9196bef5de8336557ea34cec69d6`).
+(`50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664`).
 
 ## What these keys are
 

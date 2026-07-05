@@ -12,7 +12,7 @@
 | Landing Page | https://ae402.xyz |
 | Console | https://ae402.xyz/console |
 | Backend API | https://agentescrow402-api.onrender.com |
-| Testnet Contract | [dca7e926...cec69d6](https://testnet.cspr.live/contract/dca7e926af8aac73fc1104e1bb9a52b0035a9196bef5de8336557ea34cec69d6) |
+| Testnet Contract | [50ca3364...4498664](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664) |
 | Demo Video | _TBD_ |
 
 ## Track
@@ -30,7 +30,7 @@ AgentEscrow402 enables machine-to-machine payments using the x402 HTTP payment p
 ## On-Chain Components
 
 - `escrow.wasm` — Escrow create, release, refund, dispute, resolve + insurance pool + reputation tracking
-- Contract hash: `dca7e926af8aac73fc1104e1bb9a52b0035a9196bef5de8336557ea34cec69d6`
+- Contract hash: `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664`
 
 ## Tech Stack
 

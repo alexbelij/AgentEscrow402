@@ -4,7 +4,7 @@
 
 # AgentEscrow402
 
-### HTTP 402 × Casper Network: autonomous escrow for AI-to-AI micropayments
+## HTTP 402 × Casper Network: autonomous escrow for AI-to-AI micropayments
 
 *Agents pay agents. On-chain. No humans in the loop.*
 
@@ -32,12 +32,14 @@
 - [Quickstart](#-quickstart)
 - [Architecture](#-architecture)
 - [Screenshots](#-screenshots)
+- [What is real vs. simulated](#-what-is-real-vs-simulated)
+- [Use cases](#-use-cases)
 - [Smart contract](#-smart-contract)
 - [API reference](#-api-reference)
 - [SDK and integrations](#-sdk-and-integrations)
 - [Tech stack](#-tech-stack)
 - [Testing](#-testing)
-- [Team](#-team)
+- [All documentation](#-all-documentation)
 - [License](#-license)
 
 </details>
@@ -62,7 +64,8 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 
 ## ⚙️ How it works
 
-Four steps. Fully autonomous.
+Four steps, no human signature required mid-flow (see [verified on-chain transactions](#-testing)
+and [what's real vs. simulated](#-what-is-real-vs-simulated) for the exact scope of that claim).
 
 1. **Agent A creates escrow** — locks funds in a time-locked Casper contract with a TTL and service hash
 2. **Agent B verifies payment** — checks the x402 header against the on-chain escrow before serving work
@@ -148,6 +151,58 @@ curl -X POST http://localhost:8000/release \
 
 ---
 
+## 🔍 What is real vs. simulated
+
+Judging a hackathon project means separating "works in a demo" from "works on-chain." Here's the
+honest breakdown, verified against the current deployment (contract package `d3ca33d1...c8eeb`,
+version 8, updated 2026-07-05):
+
+| Component | Status | Evidence |
+|---|---|---|
+| Escrow create / release / refund / dispute / resolve | ✅ **Real on-chain** | Real Casper testnet transactions in live mode (`SANDBOX=false`, what production runs); see [Verified on-chain](#-testing) |
+| HTLC atomic-swap (`commit_swap` / `reveal_swap`) | ✅ **Real on-chain** | SHA-256 commit/reveal entry points, live round-trip with cross-account reveal |
+| CEP-18 (fungible token) transfers | ✅ **Real on-chain** | Deployed test token AETUSD, transfer + balance read against live contract state |
+| CEP-78 (NFT) mint/transfer | ✅ **Real on-chain** | Deployed test collection AETNFT, mint + transfer + ownership read against live contract state |
+| x402 signature verification | ✅ **Real crypto** | Ed25519 verify (`cryptography` lib) + nonce replay protection, not a stub |
+| Reputation scoring, staking, slashing | ✅ **Real logic** | Exponential decay + stake-weighted slashing in `identity_registry_api.py` |
+| Arbiter multisig resolution | ✅ **Real crypto** | Real Ed25519 3-of-5 quorum check over the escrow/verdict payload, replay-proof |
+| Payment streaming (`/escrow/stream`) | ⚠️ **API-level simulation** | Streamed/remaining amount computed from wall-clock time in the backend; not an on-chain per-tick release yet |
+| Hosted console demo-signer | ⚠️ **Explicit, labelled bypass** | One fixed public demo identity + signature, gated by `ALLOW_HOSTED_DEMO_IDENTITY`, so browser visitors without a wallet can try the console — never used in the signature-verification code path for real requests |
+| TEE-attested proofs, on-chain ZK-KYC, cross-chain bridge | ❌ **Not implemented** | Roadmap ideas only — would need real TEE hardware or a ZK circuit; out of scope for the hackathon deadline, see [ROADMAP.md](ROADMAP.md) |
+
+Full detail (including smart-contract-level caveats like the missing reentrancy guard) is in
+[docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) — kept current, not a one-time snapshot.
+
+<div align="right"><a href="#readme-top">↑ back to top</a></div>
+
+---
+
+## 🧩 Use cases
+
+Concrete scenarios this unlocks today, not hypotheticals:
+
+1. **Autonomous data-provider agents** — an AI agent buys a single API call, dataset row, or model
+   inference from another agent, pays through escrow, and the seller only gets funds once the
+   buyer confirms receipt. No invoicing, no manual reconciliation, no trusted intermediary holding
+   the money.
+2. **Multi-agent pipelines with built-in recourse** — a chain of agents (scraper → summarizer →
+   translator) each escrow-pay the next step; if any step fails to deliver, the TTL-based refund
+   or the 3-of-5 arbiter dispute path returns funds automatically instead of the payer eating the
+   loss.
+3. **Reputation-gated marketplaces** — buyers can filter sellers by on-chain reputation score
+   (exponential decay + slashing) before ever escrowing funds, so bad actors lose standing
+   automatically rather than needing a human moderator.
+4. **Cross-asset agent payments** — an agent can be paid in native CSPR, a fungible token
+   (CEP-18), or even receive an NFT (CEP-78) as proof-of-service, all through the same escrow
+   lifecycle and the same x402 header.
+5. **Atomic secret-for-payment swaps** — the HTLC `commit_swap`/`reveal_swap` flow lets a seller
+   release a secret (an API key, a decryption key, a proof) *only* in the same transaction that
+   pays them — either both happen or neither does.
+
+<div align="right"><a href="#readme-top">↑ back to top</a></div>
+
+---
+
 ## 🧱 Architecture
 
 ```mermaid
@@ -202,7 +257,7 @@ Deployed on Casper Testnet:
 
 | Contract | Hash |
 |---|---|
-| Core Escrow | `dca7e926af8aac73fc1104e1bb9a52b0035a9196bef5de8336557ea34cec69d6` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) |
+| Core Escrow | `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` |
 | Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` |
 | VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` |
@@ -325,19 +380,52 @@ Full SDK reference → [docs/SDK.md](docs/SDK.md)
 
 ## 🧪 Testing
 
-Current validation status for the hosted demo branch:
-
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py
+uv run --active python -m pytest -q          # 333 tests (server logic, x402, identity, risk, multi-asset)
+cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTLC, arbitration)
+ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
-The custom business-logic runner is green, live smoke checks cover health/stats/escrow create+release/risk/VRF/insurance, and NVIDIA API security review reported no concrete HIGH blockers for the latest console/Neon patch. The legacy full pytest suite is not currently green because several tests still target older endpoint/model contracts; do not treat this repository as fully audited production code until that suite is modernized.
+**Current status: 333/333 Python + 29/29 Rust tests passing.** (One test,
+`test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
+in-memory identity-registry state sharing between test files — not a production code bug, tracked
+in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).) NVIDIA API-assisted security review
+reported no concrete HIGH blockers for the latest console/Neon/contract patch.
+
+### Verified on-chain (this is not simulated — real testnet transactions)
+
+| Flow | Deploy/tx hash | Result |
+|---|---|---|
+| Escrow create (CSPR) | `a3c5da80...f6f40a8ad` | ✅ processed |
+| `release()` on the current (v8, fixed) contract | `0184cc2b...06c3ee53` | ✅ processed, no error |
+| HTLC atomic-swap upgrade deploy | `2211685a...29c7aaa2` | ✅ processed |
+| HTLC `commit_swap` → `reveal_swap`, revealed by a *different* account than the committer | live round-trip on testnet, same session | ✅ funds transferred (2.94 CSPR), cross-account reveal confirmed |
+| CEP-18 token transfer (AETUSD) | `2139b49e...07a82c387` | ✅ balance confirmed via `state_get_dictionary_item` |
+| CEP-78 NFT mint (AETNFT) | `3a298259...f39d441` | ✅ ownership confirmed via `token_owners` dict |
+| CEP-78 NFT transfer (AETNFT) | `c4046eaa...d599bc9d` | ✅ ownership confirmed via `token_owners` dict |
+
+All hashes are independently verifiable on [testnet.cspr.live](https://testnet.cspr.live) or via
+`https://api.testnet.cspr.cloud/deploys/{hash}`.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
 ---
+
+## 📚 All documentation
+
+| Doc | What's in it |
+|---|---|
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Detailed component/sequence diagrams |
+| [docs/SDK.md](docs/SDK.md) | Python SDK, LangChain tool, MCP server (24 tools) reference |
+| [docs/openapi.yaml](docs/openapi.yaml) | Full OpenAPI schema for the REST API |
+| [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | What's genuinely a gap vs. what's just intentional demo scope |
+| [ROADMAP.md](ROADMAP.md) | Shipped vs. planned, phase by phase |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [SUBMISSION.md](SUBMISSION.md) | Hackathon submission summary (links, track, checklist) |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, PR conventions |
+| [SECURITY.md](SECURITY.md) | Vulnerability disclosure, key-handling policy |
 
 ## 📝 License
 
@@ -352,6 +440,8 @@ The custom business-logic runner is green, live smoke checks cover health/stats/
 Built for **[Casper Agentic Buildathon 2026](https://dorahacks.io/)** · Deployed on **[Casper Testnet](https://testnet.cspr.live/)**
 
 *[ae402.xyz](https://ae402.xyz) · [API Docs](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md)*
+
+*Last verified against commit `5937c09` / contract package `d3ca33d1...c8eeb` v8 (`50ca3364...4498664`), 2026-07-05.*
 
 </div>
 

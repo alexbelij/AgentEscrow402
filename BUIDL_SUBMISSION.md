@@ -25,7 +25,7 @@ AgentEscrow402 deploys a Rust/WASM smart contract on Casper Network that impleme
 
 Backend API: `https://ae402-backend.onrender.com`
 
-Contract: [`5dd33e8e...`](https://testnet.cspr.live/contract/5dd33e8e79789d386832a80c39006002383fa44dd76ba677cae3279f3a134451)
+Contract: [`50ca3364...`](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664)
 
 ---
 

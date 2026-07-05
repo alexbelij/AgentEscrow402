@@ -2,34 +2,39 @@
 
 > x402-compatible payment middleware for AI agents on Casper Network
 
+*Last verified against commit `5937c09` / testnet contract v8 (`50ca3364...4498664`), 2026-07-05.*
+
 ---
 
-## Current State (Hackathon v1.0)
+## Current State (Hackathon submission)
 
-- [x] Smart contract deployed on Casper testnet (`5dd33e8e...134451`)
+- [x] Smart contract deployed on Casper testnet, package `d3ca33d1...c8eeb`, currently version 8
+      (`50ca3364...4498664`) — 8 in-place upgrades preserving escrow state
 - [x] FastAPI backend with PostgreSQL (Neon) persistence
 - [x] Python SDK (`EscrowClient`) + LangChain `EscrowPaymentTool`
-- [x] MCP server exposing 7 escrow tools
+- [x] MCP server exposing **24** escrow/identity/risk/arbitration tools (`sdk/mcp_server.py`)
 - [x] React console at ae402.xyz/console
-- [x] Reputation scoring with decay formula
-- [x] Insurance pool (2% fee on release)
-- [x] 103 tests passing (85 Python + 18 Rust)
+- [x] Reputation scoring with exponential decay + staking-aware slashing
+      (`server/identity_registry_api.py`)
+- [x] Insurance pool (configurable fee on release)
+- [x] EscrowManager Factory + VRF arbiter election + Agent Identity Registry (DID-style,
+      capabilities, staking) — all real, wired endpoints, not stubs
+- [x] Multi-token escrow: real on-chain CEP-18 (fungible) and CEP-78 (NFT) transfers, verified
+      live (mint/transfer/balance round-tripped against deployed test tokens)
+- [x] On-chain HTLC atomic-swap (`commit_swap`/`reveal_swap`) — SHA-256 commit/reveal, verified
+      live end-to-end with a different account revealing than the one that committed
+- [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
+- [x] Post-quantum ML-KEM metadata encryption
+- [x] 333 automated tests (Python + Rust); see [Testing](README.md#-testing) for current pass rate
 - [x] CI/CD via GitHub Actions
 
-## Phase 2 — Core Upgrades
+## Phase 2 — Remaining core upgrades
 
-- [ ] EscrowManager Factory (CEP-86) — single deploy manages all escrows
-- [ ] Multi-token escrow (CSPR + CEP-18 + CEP-78 via `TokenAdapter` trait)
-- [ ] VRF arbiter election via `casper_random_bytes` + keccak256
-- [ ] AI arbitration agent — LLM-powered dispute analysis with recommendations
-- [ ] Dynamic insurance pool — risk-based premiums with reputation decay
-- [ ] Agent Identity Registry — on-chain DID (did:casper:) + capabilities + staking
-- [ ] MCP server expansion to 15+ tools with JSON-Schema registry
 - [ ] Property-based testing with invariant checks (Hypothesis + proptest)
-- [ ] Post-quantum key encapsulation (ML-KEM, FIPS 203) for escrow metadata
-- [ ] ML risk scoring (Isolation Forest) — anomaly detection in transaction patterns
-- [ ] Commit-reveal for escrow creation (front-running protection)
-- [ ] Demo/Real data toggle in console
+- [ ] Payment streaming (`/escrow/stream`) currently computes streamed/remaining amounts at the
+      API layer only — upgrading to real on-chain per-tick vesting is still open
+- [ ] MCP JSON-Schema registry for the existing 24 tools (schema generation, not new tools)
+- [ ] Demo/Real data toggle in console (partially done via `WalletStatus` demo-mode banner)
 
 ## Phase 3 — Advanced
 
