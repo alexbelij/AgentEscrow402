@@ -30,6 +30,10 @@ const ERR_DUPLICATE_HASH: u16 = 11;
 const ERR_INSUFFICIENT_SIGS: u16 = 12;
 const ERR_ZERO_AMOUNT: u16 = 13;
 const ERR_POOL_FROZEN: u16 = 14;
+const ERR_ALREADY_COMMITTED: u16 = 15;
+const ERR_NO_COMMIT: u16 = 16;
+const ERR_INVALID_PREIMAGE: u16 = 17;
+const ERR_ALREADY_REVEALED: u16 = 18;
 
 // ── Storage keys ─────────────────────────────────────────────────────
 
@@ -38,6 +42,7 @@ const REPUTATION_DICT: &str = "reputation";
 const ARBITER_LIST: &str = "arbiter_list";
 const ARBITER_THRESHOLD: &str = "arbiter_threshold";
 const FEE_BPS_KEY: &str = "fee_bps";
+const SWAP_COMMITS_DICT: &str = "swap_commits";
 const POOL_FROZEN_KEY: &str = "pool_frozen";
 const INSTALLER_KEY: &str = "installer";
 const CONTRACT_PURSE: &str = "contract_purse";
@@ -180,6 +185,74 @@ fn build_resolve_message(service_hash: &str, in_favor_of: &str) -> String {
     msg
 }
 
+/// Hex-encode raw bytes (lowercase), no external crate needed.
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        out.push(HEX[(b >> 4) as usize] as char);
+        out.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    out
+}
+
+/// SHA-256 digest of `preimage`, hex-encoded. Used for the atomic-swap
+/// hash-lock (commit_swap/reveal_swap): the sender commits this hash up
+/// front, the receiver must later produce the exact preimage that hashes
+/// to it (classic HTLC pattern) before funds release. Uses the audited
+/// `sha2` crate (no_std) rather than a hand-rolled hash, since Casper's
+/// contract host API does not expose a generic hash function to
+/// arbitrary contract code (only blake2b internally for its own storage
+/// keys, not callable from contract code).
+fn sha256_hex(preimage: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(preimage);
+    hex_encode(&digest)
+}
+
+/// Move the escrowed funds to `receiver`, mark the escrow released, and
+/// bump the receiver's reputation. Shared by `release()` (sender-authorized)
+/// and `reveal_swap()` (hash-lock-authorized) so both paths use one
+/// audited fund-movement implementation instead of two copies that could
+/// drift apart.
+fn do_release_funds(
+    dict: URef,
+    service_hash: &str,
+    sender_str: String,
+    receiver_str: String,
+    amount_str: String,
+    created_at: u64,
+    ttl: u64,
+    stored_fee_bps: u64,
+) {
+    let amount = parse_u512(&amount_str);
+    let insurance_fee = compute_fee(amount, stored_fee_bps);
+    let net_amount = amount - insurance_fee;
+
+    let receiver = parse_account(&receiver_str);
+    let contract_purse = get_dict_uref(CONTRACT_PURSE);
+    system::transfer_from_purse_to_account(contract_purse, receiver, net_amount, None)
+        .unwrap_or_revert();
+
+    let updated: EscrowRecord = (
+        (sender_str, receiver_str.clone(), amount_str),
+        (service_hash.to_string(), STATUS_RELEASED as u64, created_at),
+        (ttl, stored_fee_bps),
+    );
+    write_escrow(dict, service_hash, updated);
+
+    let rep_dict = get_dict_uref(REPUTATION_DICT);
+    let ((completed, disputed, slashed), (_, _)) = read_rep(rep_dict, &receiver_str);
+    let new_completed = completed.saturating_add(1);
+    let now: u64 = runtime::get_blocktime().into();
+    let score = reputation_score(new_completed, disputed, 0);
+    write_rep(
+        rep_dict,
+        &receiver_str,
+        ((new_completed, disputed, slashed), (now, score)),
+    );
+}
+
 // ── Entry points ─────────────────────────────────────────────────────
 
 /// Lock CSPR in escrow until service completes or TTL expires.
@@ -255,32 +328,97 @@ pub extern "C" fn release() {
         runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
     }
 
-    // Use fee_bps captured at escrow creation, not the current global fee
-    let amount = parse_u512(&amount_str);
-    let insurance_fee = compute_fee(amount, stored_fee_bps);
-    let net_amount = amount - insurance_fee;
-
-    let receiver = parse_account(&receiver_str);
-    let contract_purse = get_dict_uref(CONTRACT_PURSE);
-    system::transfer_from_purse_to_account(contract_purse, receiver, net_amount, None)
-        .unwrap_or_revert();
-
-    let updated: EscrowRecord = (
-        (sender_str.clone(), receiver_str.clone(), amount_str),
-        (service_hash.clone(), STATUS_RELEASED as u64, created_at),
-        (ttl, stored_fee_bps),
+    do_release_funds(
+        dict,
+        &service_hash,
+        sender_str,
+        receiver_str,
+        amount_str,
+        created_at,
+        ttl,
+        stored_fee_bps,
     );
-    write_escrow(dict, &service_hash, updated);
+}
 
-    let rep_dict = get_dict_uref(REPUTATION_DICT);
-    let ((completed, disputed, slashed), (_, _)) = read_rep(rep_dict, &receiver_str);
-    let new_completed = completed.saturating_add(1);
-    let now: u64 = runtime::get_blocktime().into();
-    let score = reputation_score(new_completed, disputed, 0);
-    write_rep(
-        rep_dict,
-        &receiver_str,
-        ((new_completed, disputed, slashed), (now, score)),
+/// Commit a hash-lock for an atomic swap (HTLC pattern). Only the escrow's
+/// sender may commit, and only once per escrow (no overwriting a hash after
+/// the fact). `commit_hash` must be the hex-encoded SHA-256 digest of a
+/// preimage the sender will disclose off-chain to the receiver once the
+/// counter-condition (e.g. a transfer on another chain) is satisfied.
+#[no_mangle]
+pub extern "C" fn commit_swap() {
+    require_not_frozen();
+
+    let service_hash: String = runtime::get_named_arg("service_hash");
+    let commit_hash: String = runtime::get_named_arg("commit_hash");
+    let caller = runtime::get_caller();
+
+    let dict = get_dict_uref(ESCROWS_DICT);
+    let ((sender_str, _, _), (_, status, _), _) = read_escrow(dict, &service_hash);
+
+    if status != STATUS_PENDING as u64 {
+        runtime::revert(ApiError::User(ERR_INVALID_STATUS));
+    }
+    if caller.to_string() != sender_str {
+        runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
+    }
+
+    let commits = get_dict_uref(SWAP_COMMITS_DICT);
+    let existing: Option<(String, bool)> =
+        storage::dictionary_get(commits, &service_hash).unwrap_or_revert();
+    if existing.is_some() {
+        runtime::revert(ApiError::User(ERR_ALREADY_COMMITTED));
+    }
+    // (commit_hash, revealed)
+    storage::dictionary_put(commits, &service_hash, (commit_hash, false));
+}
+
+/// Reveal the preimage for a previously committed hash-lock. Anyone who
+/// knows the correct preimage may call this (matches the HTLC model: the
+/// secret itself is the authorization, not the caller's identity) -- the
+/// contract verifies `sha256(preimage) == commit_hash` on-chain before
+/// releasing funds to the escrow's receiver. This replaces the fully
+/// backend-simulated atomic-swap flow that previously just flipped
+/// in-memory state with no on-chain hash verification at all.
+#[no_mangle]
+pub extern "C" fn reveal_swap() {
+    require_not_frozen();
+
+    let service_hash: String = runtime::get_named_arg("service_hash");
+    let preimage: String = runtime::get_named_arg("preimage");
+
+    let commits = get_dict_uref(SWAP_COMMITS_DICT);
+    let (commit_hash, revealed): (String, bool) =
+        storage::dictionary_get(commits, &service_hash)
+            .unwrap_or_revert()
+            .unwrap_or_revert_with(ApiError::User(ERR_NO_COMMIT));
+    if revealed {
+        runtime::revert(ApiError::User(ERR_ALREADY_REVEALED));
+    }
+
+    let computed = sha256_hex(preimage.as_bytes());
+    if computed != commit_hash {
+        runtime::revert(ApiError::User(ERR_INVALID_PREIMAGE));
+    }
+
+    let dict = get_dict_uref(ESCROWS_DICT);
+    let ((sender_str, receiver_str, amount_str), (_, status, created_at), (ttl, stored_fee_bps)) =
+        read_escrow(dict, &service_hash);
+    if status != STATUS_PENDING as u64 {
+        runtime::revert(ApiError::User(ERR_INVALID_STATUS));
+    }
+
+    storage::dictionary_put(commits, &service_hash, (commit_hash, true));
+
+    do_release_funds(
+        dict,
+        &service_hash,
+        sender_str,
+        receiver_str,
+        amount_str,
+        created_at,
+        ttl,
+        stored_fee_bps,
     );
 }
 
@@ -607,6 +745,28 @@ pub extern "C" fn call() {
     entry_points.add_entry_point(EntityEntryPoint::new(
         "dispute",
         vec![Parameter::new("service_hash", CLType::String)],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "commit_swap",
+        vec![
+            Parameter::new("service_hash", CLType::String),
+            Parameter::new("commit_hash", CLType::String),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "reveal_swap",
+        vec![
+            Parameter::new("service_hash", CLType::String),
+            Parameter::new("preimage", CLType::String),
+        ],
         CLType::Unit,
         EntryPointAccess::Public,
         EntryPointType::Called,

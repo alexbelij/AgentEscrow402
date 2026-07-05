@@ -1,90 +1,73 @@
-# Console UX overhaul — todo (from Alexey's 2026-07-04 message)
+# AE402 — active task list (2026-07-05)
 
-## Global (all console pages)
-- [ ] explanation block must come AFTER the page title, not before, and must not duplicate the text under the title
-- [ ] title row + text below it should span full width on one line (not ~50% as now)
-- [ ] check font sizes, contrast ratio, keyboard navigation across console (accessibility pass) — item 12
+## STATUS NOTE
+Console UX overhaul (sidebar rework, wallet toggle, overview links/graph, escrow modal,
+contracts/agents layout, arbitration+demo result placement, sandbox API docs, a11y labels,
+WalletStatus demo-mode banner) is **already merged into main** (commits e792c16, e10d7c8,
+a95406f, 6f00ad1 — verified via `git branch --contains`/`git log`). The old 32-item checklist
+below is STALE and should not be treated as still-open backlog. Keeping it only for reference;
+do a fresh targeted audit later if Alexey flags a specific remaining UX complaint.
 
-## Navigation / layout
-- [ ] Nav currently scrolls both vertically and horizontally — bug. Replace with classic dashboard left sidebar:
-      collapsible to icon-only rail (icon + tooltip on hover), full mode = icon + label, no tooltip.
-      Rethink page grouping — maybe merge some pages / add nesting (sub-menus).
-- [ ] /console currently mixes real console sections, demo tools, and dev docs — separate/decompose into distinct
-      groups/sections (we already discussed this decomposition).
-- [ ] Content area is constrained/narrow while nav takes fixed width oddly — make everything use full width (item under nav point 1).
-- [ ] Under sidebar, full-width "Hosted demo signer" block (point 1, 2nd list).
+## CURRENT PRIORITY — from master_task_list.md (real competitor research, other thread)
+Approved by Alexey 2026-07-05 to close these AE402-specific items instead of unvalidated
+internal ROADMAP.md Phase 3/4 items:
 
-## Overview page (/console/overview)
-- [ ] Total Volume — reduce font size
-- [ ] Contract target — should link to explorer
-- [ ] Other stats — link to explorer or relevant console section where applicable
-- [ ] Missing useful metric widgets — overview should show full network/project state: nice animated
-      charts/graphs, realtime logs/activity feed
-- [ ] Unify block font sizes/styles (currently inconsistent & too large)
+- [ ] S4 — Legitimize planned features with official Casper reference patterns:
+      - `two-party-multi-sig` pattern → escrow release/resolve flow
+      - `casper-private-auction` pattern → commit-reveal (feeds into B1)
+      Goal: reduce bug risk by reusing audited/official patterns instead of inventing from scratch.
+- [ ] S5 — CEP-2612 Permit Extension: gasless approve+deposit in one transaction (real UX win,
+      official standard, ~half day estimated).
+- [ ] B1 — MultiAssetEscrow CEP-18/78 + commit-reveal (uses S4 reference). Real feature, bigger.
+      - [x] On-chain HTLC hash-lock (commit_swap/reveal_swap entry points) — DONE, see below.
+      - [ ] Real CEP-18/CEP-78 token integration (replace fully-simulated Cep18Adapter/
+            Cep78Adapter/CsprAdapter in server/multi_asset.py with real on-chain calls against
+            a deployed casper-ecosystem/cep18 test token). Backend /atomic-swap/commit and
+            /atomic-swap/reveal still call the simulated in-memory flow, not the new on-chain
+            entry points yet — wire them up next.
+      - [ ] Update frontend AdvancedEscrow.tsx to remove "simulated" caveat once backend wired.
 
-## Escrows (/console/escrows)
-- [ ] confirm real data (not fake/demo passed as real)
-- [ ] Rework modal — hash column wraps to 3 lines due to narrow width
+## S5 note (folded into B1)
+CEP-2612 permit is a CEP-18-token feature (gasless approve+deposit); native CSPR escrow already
+requires sender-signed session-wasm so permit doesn't apply there. Deliver S5 together with B1's
+CEP-18 integration as a "CEP-2612-inspired" (not byte-exact standard) permit flow, not standalone.
 
-## Agents (/console/agents)
-- [ ] "Register agent" button should be to the right, after "Delegate..."
-- [ ] Can we add real data alongside demo data?
+## ALREADY DONE (do not duplicate)
+- [x] On-chain HTLC atomic-swap hash-lock (SHA-256 commit/reveal), contracts/escrow/src/main.rs:
+      - New entry points `commit_swap(service_hash, commit_hash)` (sender-only, once, PENDING-only)
+        and `reveal_swap(service_hash, preimage)` (callable by anyone — HTLC pattern, secret =
+        authorization; verifies sha256(preimage)==commit_hash on-chain, then releases funds via
+        shared `do_release_funds()` also used by release()).
+      - Used audited `sha2` no_std crate (Casper contracts expose no generic on-chain hash host
+        function).
+      - 22/22 Rust tests pass (18 original + 4 new HTLC unit tests), 322/322 Python tests pass.
+      - Deployed as in-place contract upgrade on testnet (state preserved — same
+        contract_package_hash d3ca33d1..., new entity hash f3bfbd7c...). Deploy hash
+        2211685a43a04a7ccff760ab345bec4c3315f8cb5b3f93a6778c67da29c7aaa2 (700 CSPR payment
+        needed for this large wasm upgrade; smaller payments hit "Out of gas").
+      - **Live e2e verified on-chain 2026-07-05**: created real escrow (requester→provider,
+        3 CSPR) → commit_swap by sender → reveal_swap by a *different* account (provider,
+        proving the "anyone can reveal" HTLC semantic) with correct preimage → transfer of
+        2.94 CSPR confirmed in the reveal transaction's on-chain effects. Full lifecycle works,
+        not just unit tests.
+      - Gotcha: these are Casper 2.0 Transactions, not legacy Deploys — poll via
+        `info_get_transaction` with `{"transaction_hash":{"Version1":"<hash>"}}`, not
+        `info_get_deploy` (returns "No such deploy" for these).
+      - New script: server/casper_tx/swap_lifecycle.mjs (submits commit_swap/reveal_swap via
+        ContractCallBuilder, mirrors existing lifecycle.mjs).
+- [x] A1 no-withdraw-path — verified: release()/refund() only ever pay the fixed sender/receiver
+      recorded at escrow creation; resolve() requires 3-of-5 Ed25519 arbiter multisig. No entrypoint
+      allows unilateral/arbitrary withdrawal.
+- [x] B8 Agent Identity Registry — wired, not stub (identity_registry.py / identity_registry_api.py).
+- [x] resolve() crypto-hardening (real Ed25519 arbiter multisig, replay-proof) — commit 1fedc77.
+- [x] Console UX overhaul — merged into main (see STATUS NOTE above).
 
-## Contracts (/console/contracts)
-- [ ] Reposition "Fresh escrow" (per Alexey — check exact placement issue)
-- [ ] "Receiver" column — widen at the expense of "Amount (CSPR)" so full address fits
-
-## Advanced Escrow (/console/advanced)
-- [ ] Results currently render below the form — move to the right side; question excess empty space
-
-## Arbitration (/console/arbitration)
-- [ ] Results show both below and to the side — all results should render on the right only
-
-## Agent Demo (/console/agent-demo)
-- [ ] "Result" column — double width
-- [ ] Steps: render in a single left column list (not 2-column like /sandbox)
-- [ ] Completed step: green + animate move to end of list
-- [ ] Next step: purple outline (design accent color), not red
-- [ ] Reset: steps return to original style/position; "Current request & result" panel clears output
-
-## Sandbox (/console/sandbox)
-- [ ] Missing variable/type descriptions like proper API docs
-
-## Demo signer / wallet connect UI
-- [ ] "Demo signer" connect button doesn't switch to active/connected style — add style
-- [ ] On connect: button text becomes demo wallet address (like real wallet-connect buttons do)
-- [ ] Remove demo wallet address shown to the right of "Demo · not your key" badge; remove the badge
-      entirely — button style itself communicates demo mode
-- [ ] "Disconnect" + "Hosted demo signer" (with icon before label) shown only while demo wallet connected
-- [ ] Add (i) info icon to the right of the label; move long explanatory text into a tooltip shown on
-      click/tap; tooltip dismisses on click of (i) again or click-outside/tap-outside
-
-## Process
-- Work in blocks, report progress to Alexey per block (heavy scope — 1:1 DM, no other channels).
-- Verify against CI-parity checks (frontend: tsc --noEmit + npm run build) before each report.
-
-## CRITICAL FINDING (this session) — resolve() dispute path non-functional
-- Deployed escrow contract's `resolve()` (3-of-5 arbiter multisig) can NEVER succeed: on-chain `arbiter_list` is empty (verified via query_global_state), and there is no post-install entry point to add arbiters.
-- Backend/SDK never call `resolve()` at all — `ResolveRequest` model exists in server/models.py but is unused (no endpoint, no casper_client method, no node script wiring).
-- Demo script (examples/escrow_agent.py) "bad" scenario calls /release after dispute -> fails (contract + local sandbox both require status==pending for release/refund).
-- Fix requires: contract upgrade (add installer-only `set_arbiters`/`add_arbiter` entry point via package-hash upgrade deploy) + backend `/resolve` endpoint + casper_client.resolve() + node script + 5 real/test arbiter accounts.
-- Rust toolchain now installed in sandbox (rustup, wasm32-unknown-unknown target) — `cargo build --release --target wasm32-unknown-unknown -p escrow` verified working.
-- Awaiting Alexey's go-ahead on contract upgrade + arbiter account list before implementing.
-
-## resolve()/arbiter-list fix — STATUS UPDATE (this session)
-- [x] Added `set_arbiters(arbiters: Vec<String>)` installer-only entry point to `contracts/escrow/src/main.rs`.
-- [x] Modified `call()` to detect existing `escrow_package_hash` and use `storage::add_contract_version` (upgrade path) instead of `storage::new_contract` (preserves existing escrows/reputation).
-- [x] Compiled wasm, verified `set_arbiters` string present in binary.
-- [x] Deployed contract upgrade on-chain via `deploy_contract_legacy.mjs` (400 CSPR payment; 150 CSPR was insufficient — "Out of gas"). Deploy hash `89fb3c3d86ac3ae67f2ff2b60cae83a46d05b68edd69faba60400af17eee83ce`, block 8396150, error_message: null.
-  - **IMPORTANT**: upgrade created a NEW contract entity hash `3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e`, distinct from OLD `5d5c7551f9289b4679f798f3a90d7cfce7bfb10d0dd729186b16b48b5a7a1467` used everywhere (frontend Contracts.tsx, backend .env CONTRACT_HASH). The package hash (`hash-d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) is stable across versions — should be the long-term reference, not the entity hash.
-  - **TODO**: update backend `.env`/`server/config.py` `ESCROW_CONTRACT_HASH` and frontend `Contracts.tsx` Core Escrow hash to the NEW entity hash `3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e` (or migrate config to reference the package hash + latest-version lookup instead of a fixed entity hash, to avoid this break on every future upgrade).
-- [x] Generated 5 test arbiter Ed25519 keypairs (`server/casper_tx/gen_arbiters.mjs`); pems at `/work/temp/keys/arbiters/arbiter_{1-5}_secret_key.pem` (became permission-denied mid-session due to sandbox user-context switch; hashes/pubkeys recorded in Slack report and in this repo's chat history).
-- [x] Registered the 5 arbiters on-chain via new `server/casper_tx/set_arbiters.mjs` script, called against the NEW contract hash. Deploy hash `a73cc0d0a35f43295674355a5bdb9f509b076ff3abf8c5d4bf5a6cdfcfef4a0d`, block 8396191, error_message: null.
-- [x] **Verified via `query_global_state`** on `hash-3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e` path `["arbiter_list"]` — returns all 5 registered arbiter account-hashes. Multisig arbiter list is now real and populated.
-- [ ] **STILL TODO (next)**: 
-  1. Wire `/resolve` FastAPI endpoint in `server/app.py` using existing (currently unused) `ResolveRequest` model.
-  2. Add `resolve()` method to `server/casper_client.py` (build+sign+submit a `resolve` deploy against the NEW contract hash with `service_hash`, `in_favor_of`, `arbiter_accounts` args).
-  3. Add resolve support to sandbox path (`server/sandbox.py`) so `--scenario bad` in `examples/escrow_agent.py` can complete end-to-end (currently fails after dispute because `release`/`refund` still require `status pending`, and `resolve` isn't called anywhere).
-  4. Update `.env`/`config.py`/`Contracts.tsx` to the new contract hash (see note above); consider making all 4 contract hashes backend-configurable per other agent's suggestion.
-  5. Re-run `examples/escrow_agent.py --scenario bad` end-to-end against production backend to prove full dispute→resolve→release lifecycle works on real testnet.
-  6. Fix stale hash in `SUBMISSION.md`.
+## EXPLICITLY OUT OF SCOPE FOR THIS THREAD
+- A2 (volume of real testnet transactions / Agent Factory + Runner) — handled by the separate
+  analytics/research thread. Do not duplicate per Alexey's "не мешай разные ветки" instruction.
+- Phase 4 (mainnet, external audit, bridge, formal verification, compliance) — not required by
+  hackathon rules (testnet prototype only) and not supported by competitor research as valuable
+  pre-hackathon. Reasonable to defer post-hackathon.
+- Internal ROADMAP.md Phase 3 items not present in master_task_list.md (Threshold MPC/Shamir,
+  flash-loan protection, gaming-reward escrow) — not validated by real competitor research;
+  do not implement blindly ("features for feature's sake").

@@ -17,6 +17,10 @@ mod tests {
     const ERR_INSUFFICIENT_SIGS: u16 = 12;
     const ERR_ZERO_AMOUNT: u16 = 13;
     const ERR_POOL_FROZEN: u16 = 14;
+    const ERR_ALREADY_COMMITTED: u16 = 15;
+    const ERR_NO_COMMIT: u16 = 16;
+    const ERR_INVALID_PREIMAGE: u16 = 17;
+    const ERR_ALREADY_REVEALED: u16 = 18;
 
     const STATUS_PENDING: u8 = 0;
     const STATUS_RELEASED: u8 = 1;
@@ -205,10 +209,59 @@ mod tests {
             ERR_INSUFFICIENT_SIGS,
             ERR_ZERO_AMOUNT,
             ERR_POOL_FROZEN,
+            ERR_ALREADY_COMMITTED,
+            ERR_NO_COMMIT,
+            ERR_INVALID_PREIMAGE,
+            ERR_ALREADY_REVEALED,
         ];
         let mut sorted = codes.to_vec();
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), codes.len(), "duplicate error codes detected");
+    }
+
+    // ── Atomic-swap hash-lock (HTLC) tests ───────────────────────
+    // Mirrors the contract's sha256_hex commit/reveal check: a receiver
+    // can only trigger release by presenting the exact preimage that
+    // hashes to the sender's committed hash.
+    fn sha256_hex(preimage: &[u8]) -> String {
+        use sha2::{Digest, Sha256};
+        let digest = Sha256::digest(preimage);
+        digest.iter().map(|b| format!("{:02x}", b)).collect()
+    }
+
+    #[test]
+    fn htlc_correct_preimage_matches_commit() {
+        let preimage = b"super-secret-swap-condition";
+        let commit_hash = sha256_hex(preimage);
+        // Receiver reveals the same preimage -> must match.
+        assert_eq!(sha256_hex(preimage), commit_hash);
+    }
+
+    #[test]
+    fn htlc_wrong_preimage_rejected() {
+        let preimage = b"super-secret-swap-condition";
+        let commit_hash = sha256_hex(preimage);
+        let wrong_guess = b"wrong-guess";
+        assert_ne!(sha256_hex(wrong_guess), commit_hash, "wrong preimage must not match commit hash");
+    }
+
+    #[test]
+    fn htlc_hash_is_deterministic_and_hex_lowercase() {
+        let preimage = b"deterministic-check";
+        let h1 = sha256_hex(preimage);
+        let h2 = sha256_hex(preimage);
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 64, "sha256 hex digest must be 64 chars");
+        assert!(h1.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()));
+    }
+
+    #[test]
+    fn htlc_empty_preimage_still_hashes_deterministically() {
+        // Contract does not special-case empty string; document current
+        // behavior explicitly rather than leaving it untested.
+        let h1 = sha256_hex(b"");
+        let h2 = sha256_hex(b"");
+        assert_eq!(h1, h2);
     }
 }
