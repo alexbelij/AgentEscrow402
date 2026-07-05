@@ -233,33 +233,41 @@ class CsprAdapter(TokenAdapter):
 
 
 class Cep18Adapter(TokenAdapter):
-    """Adapter for CEP-18 tokens."""
+    """Adapter for CEP-18 tokens.
+
+    Backed by a real deployed CEP-18 contract on casper-test (see
+    server/casper_tx/cep18_transfer.mjs + CasperClient.cep18_transfer/
+    get_cep18_balance/get_cep18_token_info). Custodial-demo model: the
+    on-chain `transfer` call is signed by the client's configured operator
+    key (same account that deployed the escrow/insurance-pool/VRF-arbiter
+    contracts and the token itself), same as CsprAdapter's escrow funding.
+    """
 
     async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
         if not token_id.contract_hash:
             raise ValueError("CEP-18 token requires contract_hash")
         logger.info(
-            "Simulating CEP-18 transfer of %s units from %s to escrow for contract %s",
+            "CEP-18 transfer of %s units from %s to escrow for contract %s",
             amount,
             sender,
             token_id.contract_hash[:16],
         )
-        # This would involve a Casper deploy to call the CEP-18 `transfer_from`
-        # method on the token contract, with the escrow contract as the spender.
-        return "deploy-hash-cep18-" + str(int(time.time()))
+        return await self._casper.cep18_transfer(token_id.contract_hash, receiver, amount)
 
     async def get_balance(self, account_hash: str, token_id: TokenIdentifier) -> int:
         if not token_id.contract_hash:
             raise ValueError("CEP-18 token requires contract_hash")
-        logger.info("Simulating CEP-18 balance query for %s on contract %s", account_hash, token_id.contract_hash[:16])
-        # Query CEP-18 contract for balance
-        return 100_000_000  # Example balance
+        return await self._casper.get_cep18_balance(token_id.contract_hash, account_hash)
 
     async def get_token_info(self, token_id: TokenIdentifier) -> dict[str, Any]:
         if not token_id.contract_hash:
             raise ValueError("CEP-18 token requires contract_hash")
-        # Query CEP-18 contract for metadata
-        return {"symbol": "CEP18", "decimals": 9, "name": "CEP-18 Token"}
+        info = await self._casper.get_cep18_token_info(token_id.contract_hash)
+        return {
+            "symbol": info.get("symbol") or "CEP18",
+            "decimals": info.get("decimals") if info.get("decimals") is not None else 9,
+            "name": info.get("name") or "CEP-18 Token",
+        }
 
 
 class Cep78Adapter(TokenAdapter):

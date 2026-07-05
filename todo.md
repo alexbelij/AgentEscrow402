@@ -58,11 +58,27 @@ internal ROADMAP.md Phase 3/4 items:
               not just install.
             - New script: server/casper_tx/cep18_transfer.mjs (calls `transfer` entry point via
               ContractCallBuilder).
-            - REMAINING for B1: wire `server/multi_asset.py`'s `Cep18Adapter`
-              (transfer_to_escrow/simulated methods) to call this real deployed token contract
-              instead of logging "Simulating...", and update `AdvancedEscrow.tsx` to drop the
-              "simulated" caveat once done. CEP-78 (NFT) adapter is a separate, still-untouched
-              piece of B1.
+            - **DONE 2026-07-05 (later same day)**: `Cep18Adapter` in `server/multi_asset.py`
+              now calls real on-chain code, no more simulation. Added
+              `CasperClient.cep18_transfer()` (writes, via
+              `server/casper_tx/cep18_transfer.mjs` subprocess, custodial-demo model — same
+              operator key that signs escrow create/release/refund also signs the CEP-18
+              `transfer` call), `get_cep18_balance()` (reads the real `balances` dict via
+              `state_get_dictionary_item`, dictionary_item_key = base64(0x00 + account hash
+              bytes), same scheme as cep18's own client-js `balanceOf`), and
+              `get_cep18_token_info()` (reads name/symbol/decimals via `query_global_state` on
+              the contract's plain named-key urefs). All three verified live against the
+              deployed AETUSD contract (`c93d7d59...83e7d`): token_info returned
+              `{symbol: AETUSD, decimals: 6, name: "AE402 Test USD"}`, balance query returned the
+              correct on-chain 50000000 for the provider test account, and a fresh 1 AETUSD
+              transfer through the wired adapter path succeeded (new tx hash
+              `2139b49ea1fe188727878e769b47b4a2e33c8bcb8967a76f341e0f507a82c387`).
+              `tests/test_multi_asset.py` (10 tests) still pass unmodified — they only exercise
+              `token_type: cspr`, so CsprAdapter's simulation is untouched by this change.
+            - STILL REMAINING for full B1: update `AdvancedEscrow.tsx` frontend to drop the
+              "currently simulated on the backend" caveat now that the CEP-18 path is real.
+              CEP-78 (NFT) adapter is a separate, still-untouched piece of B1 (same
+              install-from-source approach likely needed if the same stale-wasm issue recurs).
       - [ ] Update frontend AdvancedEscrow.tsx to remove "simulated" caveat once backend wired.
 
 ## S5 note (folded into B1)
