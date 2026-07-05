@@ -11,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from server import arbiter_crypto
 from server.casper_client import CasperClient
 from server.config import Config, get_config
 from server.sandbox import SandboxStore
@@ -188,6 +189,11 @@ class RevealRequest(BaseModel):
 
     service_hash: str = Field(..., min_length=64, max_length=64)
     preimage: str = Field(..., min_length=1, description="The secret preimage to reveal")
+    # A1 hardening: only required (and only checked, on-chain and here) when
+    # this escrow's amount exceeds the contract's release_cap. See
+    # arbiter_crypto.build_cap_approval_message("reveal_swap", service_hash).
+    arbiter_pubkeys: list[str] = Field(default_factory=list)
+    arbiter_signatures: list[str] = Field(default_factory=list)
 
 
 class TokenAdapter(abc.ABC):
@@ -613,10 +619,41 @@ async def reveal_atomic_swap(
     if computed_hash != commit_data["commit_hash"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid preimage: hash mismatch")
 
+    if len(request.arbiter_pubkeys) != len(request.arbiter_signatures):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="arbiter_pubkeys and arbiter_signatures must have the same length",
+        )
+    # A1 hardening fast-fail: above release_cap, the HTLC secret alone is no
+    # longer sufficient authorization — an arbiter-quorum cap-approval is
+    # also required (mirrors require_arbiter_cap_approval in main.rs).
+    if escrow.amount > cfg.release_cap_motes and cfg.arbiter_pubkeys:
+        valid_votes = arbiter_crypto.count_valid_cap_approval_votes(
+            request.arbiter_pubkeys,
+            request.arbiter_signatures,
+            cfg.arbiter_pubkeys,
+            "reveal_swap",
+            request.service_hash,
+        )
+        if valid_votes < cfg.arbiter_threshold:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Escrow amount exceeds release_cap ({cfg.release_cap_motes} motes); "
+                    f"only {valid_votes} valid arbiter cap-approval signature(s), "
+                    f"need >= {cfg.arbiter_threshold}"
+                ),
+            )
+
     deploy_hash = ""
     if not cfg.sandbox and casper is not None:
         try:
-            deploy_hash = await casper.reveal_swap(request.service_hash, request.preimage)
+            deploy_hash = await casper.reveal_swap(
+                request.service_hash,
+                request.preimage,
+                request.arbiter_pubkeys,
+                request.arbiter_signatures,
+            )
         except Exception as exc:
             logger.error("On-chain reveal_swap failed: %s", exc)
             raise HTTPException(

@@ -45,6 +45,7 @@ from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
 from server.risk_api import router as risk_router
 from server.identity_registry_api import router as identity_registry_router
+from server.admin_api import router as admin_router
 try:
     from server.mlkem_crypto import generate_keypair, encrypt_metadata, EncryptedMetadata
     _MLKEM_AVAILABLE = True
@@ -220,6 +221,7 @@ app.include_router(vrf_router)
 app.include_router(identity_router)
 app.include_router(risk_router)
 app.include_router(identity_registry_router)
+app.include_router(admin_router)
 
 
 # ---------------------------------------------------------------------------
@@ -495,6 +497,43 @@ async def release_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
+    """Release escrowed funds to the receiver.
+
+    A1 hardening: if this escrow's amount exceeds the contract's
+    `release_cap`, `arbiter_pubkeys`/`arbiter_signatures` must carry a
+    quorum of registered-arbiter signatures over
+    "release:{service_hash}:cap_approval" (see arbiter_crypto.
+    build_cap_approval_message) — same fast-fail-then-on-chain-enforced
+    pattern as /resolve. Below cap, empty lists are fine.
+    """
+    existing = store.get_escrow(req.service_hash)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
+        raise HTTPException(
+            status_code=422,
+            detail="arbiter_pubkeys and arbiter_signatures must have the same length",
+        )
+
+    if existing.amount > cfg.release_cap_motes and cfg.arbiter_pubkeys:
+        valid_votes = arbiter_crypto.count_valid_cap_approval_votes(
+            req.arbiter_pubkeys,
+            req.arbiter_signatures,
+            cfg.arbiter_pubkeys,
+            "release",
+            req.service_hash,
+        )
+        if valid_votes < cfg.arbiter_threshold:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Escrow amount exceeds release_cap ({cfg.release_cap_motes} motes); "
+                    f"only {valid_votes} valid arbiter cap-approval signature(s), "
+                    f"need >= {cfg.arbiter_threshold}"
+                ),
+            )
+
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
@@ -508,7 +547,9 @@ async def release_escrow(
             deploy_hash = req.wallet_tx_hash
         else:
             try:
-                deploy_hash = await casper.release(req.service_hash)
+                deploy_hash = await casper.release(
+                    req.service_hash, req.arbiter_pubkeys, req.arbiter_signatures
+                )
             except Exception as exc:
                 logger.error("Casper release failed: %s", exc)
                 raise HTTPException(
@@ -516,9 +557,6 @@ async def release_escrow(
                     detail="On-chain release transaction failed; local state unchanged",
                 )
 
-    existing = store.get_escrow(req.service_hash)
-    if existing is None:
-        raise HTTPException(status_code=404, detail="Escrow not found")
     caller = _extract_release_refund_caller(request, req.wallet_tx_hash, existing.sender)
 
     try:

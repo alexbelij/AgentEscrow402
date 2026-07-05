@@ -31,6 +31,17 @@ class Config:
     # callers a fast, clear 4xx instead of waiting for an on-chain revert).
     arbiter_pubkeys: tuple[str, ...] = ()
     arbiter_threshold: int = 3
+    # A1 hardening: mirrors the on-chain `release_cap` default (see
+    # DEFAULT_RELEASE_CAP_MOTES in contracts/escrow/src/main.rs). Used only
+    # for the backend's fast-fail check in /release and /escrow/atomic-swap/
+    # reveal; the contract's own on-chain value is authoritative. Keep in
+    # sync if set_release_cap() is ever called to change the on-chain cap.
+    release_cap_motes: int = 1_000_000_000_000
+    # Shared secret required (via X-Admin-Key header) to reach the
+    # installer-only admin routes (configure_fee/set_release_cap/
+    # set_arbiters/emergency_freeze). Empty by default => those routes are
+    # disabled (fail closed), not open, until explicitly configured.
+    admin_api_key: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -79,6 +90,8 @@ class Config:
                 p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()
             ),
             arbiter_threshold=int(os.getenv("ARBITER_THRESHOLD", "3")),
+            release_cap_motes=int(os.getenv("RELEASE_CAP_MOTES", "1000000000000")),
+            admin_api_key=os.getenv("ADMIN_API_KEY", ""),
         )
 
 
