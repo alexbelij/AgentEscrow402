@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Estimate } from '../../lib/api';
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import { useSigner } from '../../lib/signer';
@@ -41,7 +42,13 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
-  return (
+  // Portalled to <body> instead of rendered inline: this component is one of
+  // several page sections wrapped in the page's own `space-y-8` container,
+  // whose Tailwind sibling-margin utility (`> * + * { margin-top: 2rem }`)
+  // was otherwise landing on this overlay too since it's a later sibling —
+  // pushing the "fixed inset-0" overlay down ~32px instead of covering the
+  // full viewport. A portal escapes that ancestor entirely.
+  return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
@@ -52,7 +59,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
         </div>
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

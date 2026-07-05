@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { api, Agent, Reputation, RegisterIdentityRequest, Identity, AgentCapabilities, DelegationRecord } from '../../lib/api';
 import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoSigner';
 import { useToast } from '../../lib/toast';
@@ -33,7 +34,10 @@ interface ModalProps {
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
-  return (
+  // Portalled to <body>: see identical comment in Escrows.tsx's Modal — the
+  // page's own `space-y-8` sibling-margin utility was otherwise pushing this
+  // "fixed inset-0" overlay ~32px down from the real viewport top.
+  return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
@@ -44,7 +48,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
         </div>
         <div className="p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
