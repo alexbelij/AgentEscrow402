@@ -21,6 +21,7 @@ mod tests {
     const ERR_NO_COMMIT: u16 = 16;
     const ERR_INVALID_PREIMAGE: u16 = 17;
     const ERR_ALREADY_REVEALED: u16 = 18;
+    const ERR_CAP_EXCEEDED: u16 = 19;
 
     const STATUS_PENDING: u8 = 0;
     const STATUS_RELEASED: u8 = 1;
@@ -213,11 +214,82 @@ mod tests {
             ERR_NO_COMMIT,
             ERR_INVALID_PREIMAGE,
             ERR_ALREADY_REVEALED,
+            ERR_CAP_EXCEEDED,
         ];
         let mut sorted = codes.to_vec();
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), codes.len(), "duplicate error codes detected");
+    }
+
+    // ── A1 release cap / arbiter cap-approval tests ──────────────
+    // Mirrors the contract's cap-check + quorum-counting logic (see
+    // read_release_cap / verify_arbiter_quorum in main.rs) at the pure
+    // math/logic level, matching the existing test style in this file
+    // (no full CasperVM execution engine here).
+    const DEFAULT_RELEASE_CAP_MOTES: u64 = 1_000_000_000_000;
+
+    fn requires_cap_approval(amount_motes: u64, cap_motes: u64) -> bool {
+        amount_motes > cap_motes
+    }
+
+    #[test]
+    fn amount_at_or_below_cap_needs_no_approval() {
+        assert!(!requires_cap_approval(DEFAULT_RELEASE_CAP_MOTES, DEFAULT_RELEASE_CAP_MOTES));
+        assert!(!requires_cap_approval(1, DEFAULT_RELEASE_CAP_MOTES));
+    }
+
+    #[test]
+    fn amount_above_cap_needs_approval() {
+        assert!(requires_cap_approval(DEFAULT_RELEASE_CAP_MOTES + 1, DEFAULT_RELEASE_CAP_MOTES));
+    }
+
+    // Dedup + threshold counting logic, mirroring verify_arbiter_quorum
+    // (a registered arbiter can't have their vote counted twice, and an
+    // unregistered "arbiter" contributes nothing even with a valid sig).
+    fn count_quorum(registered: &[&str], claimed_pubkeys: &[&str]) -> u64 {
+        let mut seen: Vec<&str> = Vec::new();
+        let mut count = 0u64;
+        for pk in claimed_pubkeys {
+            if seen.contains(pk) || !registered.contains(pk) {
+                continue;
+            }
+            seen.push(pk);
+            count += 1;
+        }
+        count
+    }
+
+    #[test]
+    fn quorum_counts_distinct_registered_votes() {
+        let registered = ["a1", "a2", "a3", "a4", "a5"];
+        assert_eq!(count_quorum(&registered, &["a1", "a2", "a3"]), 3);
+    }
+
+    #[test]
+    fn quorum_ignores_duplicate_votes_from_same_arbiter() {
+        let registered = ["a1", "a2", "a3", "a4", "a5"];
+        assert_eq!(count_quorum(&registered, &["a1", "a1", "a1"]), 1);
+    }
+
+    #[test]
+    fn quorum_ignores_unregistered_pubkeys() {
+        let registered = ["a1", "a2", "a3", "a4", "a5"];
+        assert_eq!(count_quorum(&registered, &["a1", "not-an-arbiter", "a2"]), 2);
+    }
+
+    #[test]
+    fn quorum_below_threshold_is_insufficient() {
+        let registered = ["a1", "a2", "a3", "a4", "a5"];
+        let threshold = 3u64;
+        assert!(count_quorum(&registered, &["a1", "a2"]) < threshold);
+    }
+
+    #[test]
+    fn quorum_at_threshold_is_sufficient() {
+        let registered = ["a1", "a2", "a3", "a4", "a5"];
+        let threshold = 3u64;
+        assert!(count_quorum(&registered, &["a1", "a2", "a3"]) >= threshold);
     }
 
     // ── Atomic-swap hash-lock (HTLC) tests ───────────────────────
