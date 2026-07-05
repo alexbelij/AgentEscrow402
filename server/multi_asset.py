@@ -271,34 +271,43 @@ class Cep18Adapter(TokenAdapter):
 
 
 class Cep78Adapter(TokenAdapter):
-    """Adapter for CEP-78 NFTs."""
+    """Adapter for CEP-78 NFTs.
+
+    Backed by a real deployed CEP-78 (Ordinal identifier mode) contract on
+    casper-test (see server/casper_tx/cep78_mint.mjs, cep78_transfer.mjs +
+    CasperClient.cep78_transfer/get_cep78_balance/get_cep78_owner/
+    get_cep78_token_info). Custodial-demo model, same as Cep18Adapter/
+    CsprAdapter: the on-chain `transfer` call is signed by the client's
+    configured operator key. `amount` is reused as the NFT's ordinal
+    `token_id` (there is no fungible quantity for an NFT transfer).
+    """
 
     async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
         if not token_id.contract_hash:
             raise ValueError("CEP-78 token requires contract_hash")
-        # For NFTs, amount typically refers to token_id (e.g., NFT ID)
+        # For NFTs, `amount` carries the ordinal token_id (e.g., NFT #3).
         logger.info(
-            "Simulating CEP-78 NFT transfer of token_id %s from %s to escrow for contract %s",
+            "CEP-78 NFT transfer of token_id %s from %s to escrow for contract %s",
             amount,
             sender,
             token_id.contract_hash[:16],
         )
-        # This would involve a Casper deploy to call the CEP-78 `transfer`
-        # method on the token contract.
-        return "deploy-hash-cep78-" + str(int(time.time()))
+        return await self._casper.cep78_transfer(token_id.contract_hash, amount, sender, receiver)
 
     async def get_balance(self, account_hash: str, token_id: TokenIdentifier) -> int:
         if not token_id.contract_hash:
             raise ValueError("CEP-78 token requires contract_hash")
-        logger.info("Simulating CEP-78 NFT count query for %s on contract %s", account_hash, token_id.contract_hash[:16])
-        # Query CEP-78 contract for NFT count owned by account
-        return 5  # Example NFT count
+        return await self._casper.get_cep78_balance(token_id.contract_hash, account_hash)
 
     async def get_token_info(self, token_id: TokenIdentifier) -> dict[str, Any]:
         if not token_id.contract_hash:
             raise ValueError("CEP-78 token requires contract_hash")
-        # Query CEP-78 contract for metadata
-        return {"symbol": "NFT", "decimals": 0, "name": "CEP-78 NFT"}
+        info = await self._casper.get_cep78_token_info(token_id.contract_hash)
+        return {
+            "symbol": info.get("collection_symbol") or "NFT",
+            "decimals": 0,
+            "name": info.get("collection_name") or "CEP-78 NFT",
+        }
 
 
 def _build_token_adapter(
