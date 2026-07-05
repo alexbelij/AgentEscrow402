@@ -28,6 +28,7 @@ _RESOLVE_SCRIPT = _SCRIPT_DIR / "resolve.mjs"
 _CEP18_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep18_transfer.mjs"
 _CEP78_MINT_SCRIPT = _SCRIPT_DIR / "cep78_mint.mjs"
 _CEP78_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep78_transfer.mjs"
+_SWAP_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "swap_lifecycle.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -215,6 +216,54 @@ class CasperClient:
                 "CONTRACT_HASH": self._contract_hash,
                 "ENTRY_POINT": entry_point,
                 "SERVICE_HASH": service_hash,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def commit_swap(self, service_hash: str, commit_hash: str) -> str:
+        """Submit on-chain `commit_swap` tx (HTLC atomic-swap first step).
+        The contract requires the deploy's caller to be the escrow's sender
+        -- this client always signs with the configured operator key, so
+        this only works correctly for escrows where that operator key *is*
+        the sender (true for escrows created through this same custodial
+        backend). Returns tx hash."""
+        if not self._contract_hash:
+            raise RuntimeError("contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _SWAP_LIFECYCLE_SCRIPT,
+            {
+                "CONTRACT_HASH": self._contract_hash,
+                "ENTRY_POINT": "commit_swap",
+                "SERVICE_HASH": service_hash,
+                "COMMIT_HASH": commit_hash,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def reveal_swap(self, service_hash: str, preimage: str) -> str:
+        """Submit on-chain `reveal_swap` tx (HTLC atomic-swap second step).
+        The contract itself has no caller-identity check here (the HTLC
+        model: knowing the preimage IS the authorization) -- a successful
+        call verifies sha256(preimage) == commit_hash on-chain and directly
+        releases escrowed funds to the receiver as part of the same
+        transaction. Returns tx hash."""
+        if not self._contract_hash:
+            raise RuntimeError("contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _SWAP_LIFECYCLE_SCRIPT,
+            {
+                "CONTRACT_HASH": self._contract_hash,
+                "ENTRY_POINT": "reveal_swap",
+                "SERVICE_HASH": service_hash,
+                "PREIMAGE": preimage,
                 "PEM_PATH": self._key_path,
                 "KEY_ALGO": "secp256k1",
                 "CASPER_RPC": self._rpc_url,

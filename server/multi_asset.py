@@ -523,21 +523,35 @@ async def commit_atomic_swap(
     request: CommitRequest,
     x402: PaymentHeader = Depends(get_x402_payment),
     store: SandboxStore = Depends(get_sandbox_store),
+    cfg: Config = Depends(get_config),
+    casper: CasperClient | None = Depends(get_casper),
 ) -> dict[str, str]:
     """
     Commits a SHA256 hash of a secret preimage for an atomic swap.
     This is the first step in a commit-reveal scheme.
-    """
-    # In a real scenario, this would involve a Casper deploy to store the commit_hash
-    # on the escrow contract, linked to the service_hash.
-    # The escrow itself would have been created earlier, potentially as a multi-asset escrow
-    # or via the regular /escrow endpoint - both are backed by the same SandboxStore.
 
+    Live mode calls the deployed escrow contract's real `commit_swap` entry
+    point (contracts/escrow/src/main.rs), which enforces on-chain that the
+    caller is the escrow's sender and that no commit already exists for this
+    service_hash -- see CasperClient.commit_swap. Sandbox mode (or no casper
+    client configured) keeps the previous purely in-memory simulation.
+    """
     escrow = store.get_escrow(request.service_hash)
     if not escrow:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Escrow not found for commit")
     if escrow.sender != x402.sender:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only sender can commit to this escrow")
+
+    deploy_hash = ""
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.commit_swap(request.service_hash, request.commit_hash)
+        except Exception as exc:
+            logger.error("On-chain commit_swap failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain commit_swap transaction failed; local state unchanged",
+            )
 
     _commit_reveals[request.service_hash] = {
         "commit_hash": request.commit_hash,
@@ -545,9 +559,16 @@ async def commit_atomic_swap(
         "timestamp": int(time.time()),
         "revealed": False,
         "preimage": None,
+        "deploy_hash": deploy_hash,
     }
-    logger.info("Commit hash %s stored for service_hash %s by %s", request.commit_hash[:16], request.service_hash[:16], x402.sender[:8])
-    return {"message": "Commit hash stored successfully. Awaiting reveal."}
+    logger.info(
+        "Commit hash %s stored for service_hash %s by %s%s",
+        request.commit_hash[:16],
+        request.service_hash[:16],
+        x402.sender[:8],
+        f" (on-chain tx {deploy_hash[:16]})" if deploy_hash else "",
+    )
+    return {"message": "Commit hash stored successfully. Awaiting reveal.", "deploy_hash": deploy_hash}
 
 
 @router.post("/atomic-swap/reveal", status_code=status.HTTP_200_OK)
@@ -555,11 +576,21 @@ async def reveal_atomic_swap(
     request: RevealRequest,
     x402: PaymentHeader = Depends(get_x402_payment),
     store: SandboxStore = Depends(get_sandbox_store),
+    cfg: Config = Depends(get_config),
+    casper: CasperClient | None = Depends(get_casper),
 ) -> dict[str, str]:
     """
     Reveals the secret preimage for an atomic swap.
     The contract verifies the preimage against the previously committed hash.
-    If valid, the escrow can be released.
+    If valid, the escrow is released.
+
+    Live mode calls the deployed escrow contract's real `reveal_swap` entry
+    point, which verifies sha256(preimage) == commit_hash *on-chain* and
+    releases escrowed funds directly to the receiver as part of the same
+    transaction (the HTLC model: the contract has no caller-identity check
+    here, knowing the preimage IS the authorization) -- see
+    CasperClient.reveal_swap. We still verify the hash locally first so we
+    can return a clean 400 instead of paying gas for a doomed on-chain call.
     """
     import hashlib
 
@@ -582,15 +613,33 @@ async def reveal_atomic_swap(
     if computed_hash != commit_data["commit_hash"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid preimage: hash mismatch")
 
-    # In a real scenario, this would trigger a Casper deploy to call the `reveal`
-    # entry point on the escrow contract, which would then release funds.
-    # release_escrow requires caller == escrow.sender (the party who committed
-    # the hash-lock), which matches the commit-reveal model here.
+    deploy_hash = ""
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.reveal_swap(request.service_hash, request.preimage)
+        except Exception as exc:
+            logger.error("On-chain reveal_swap failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain reveal_swap transaction failed; local state unchanged",
+            )
+        # The contract's reveal_swap already verified the preimage and
+        # released funds to the receiver on-chain as part of this same
+        # transaction (the HTLC model has no separate caller-identity check
+        # there). We still record it through the same local state-machine
+        # transition as sandbox mode below, using escrow.sender as `caller`
+        # -- this is a local bookkeeping call only, the on-chain fund
+        # movement already happened and does not depend on this succeeding.
     try:
-        store.release_escrow(request.service_hash, caller=escrow.sender)
+        store.release_escrow(request.service_hash, caller=escrow.sender, deploy_hash=deploy_hash)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+
     _commit_reveals[request.service_hash]["revealed"] = True
     _commit_reveals[request.service_hash]["preimage"] = request.preimage
-    logger.info("Preimage revealed for service_hash %s. Escrow released.", request.service_hash[:16])
-    return {"message": "Preimage revealed successfully. Escrow released."}
+    logger.info(
+        "Preimage revealed for service_hash %s. Escrow released.%s",
+        request.service_hash[:16],
+        f" (on-chain tx {deploy_hash[:16]})" if deploy_hash else "",
+    )
+    return {"message": "Preimage revealed successfully. Escrow released.", "deploy_hash": deploy_hash}
