@@ -138,6 +138,22 @@ const Escrows: React.FC = () => {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
+  // Gate lifecycle actions by identity: the contract itself only allows the
+  // true sender (release/refund) or sender/receiver (dispute) to call these
+  // entry points via `get_caller()`, regardless of demo vs live signing mode.
+  // `activePublicKey` already reflects whichever identity is currently active
+  // (live wallet key when connected, demo signer key otherwise) — comparing
+  // it against the escrow's own payer/payee catches both directions: a demo
+  // escrow acted on by a connected real wallet, and a live-wallet escrow
+  // acted on by the demo signer.
+  const canActOnEscrow = (escrow: Escrow, action: 'release' | 'refund' | 'dispute'): boolean => {
+    if (!activePublicKey) return false;
+    const me = activePublicKey.toLowerCase();
+    const isSender = escrow.payer?.toLowerCase() === me;
+    const isReceiver = escrow.payee?.toLowerCase() === me;
+    return action === 'dispute' ? isSender || isReceiver : isSender;
+  };
+
   // Pagination and Filtering
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -539,7 +555,15 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={!['pending', 'funded', 'disputed'].includes(selectedEscrow.status)}
+                disabled={
+                  !['pending', 'funded', 'disputed'].includes(selectedEscrow.status) ||
+                  !canActOnEscrow(selectedEscrow, 'release')
+                }
+                title={
+                  canActOnEscrow(selectedEscrow, 'release')
+                    ? undefined
+                    : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
+                }
                 className="flex items-center px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Send className="h-5 w-5 mr-2" /> Release
@@ -551,7 +575,15 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={!['pending', 'funded', 'disputed'].includes(selectedEscrow.status)}
+                disabled={
+                  !['pending', 'funded', 'disputed'].includes(selectedEscrow.status) ||
+                  !canActOnEscrow(selectedEscrow, 'refund')
+                }
+                title={
+                  canActOnEscrow(selectedEscrow, 'refund')
+                    ? undefined
+                    : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
+                }
                 className="flex items-center px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <Undo2 className="h-5 w-5 mr-2" /> Refund
@@ -563,7 +595,15 @@ const Escrows: React.FC = () => {
                   setActionError(null);
                   setActionSuccess(null);
                 }}
-                disabled={!['pending', 'funded'].includes(selectedEscrow.status)}
+                disabled={
+                  !['pending', 'funded'].includes(selectedEscrow.status) ||
+                  !canActOnEscrow(selectedEscrow, 'dispute')
+                }
+                title={
+                  canActOnEscrow(selectedEscrow, 'dispute')
+                    ? undefined
+                    : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender or receiver — the contract would reject this on-chain`
+                }
                 className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <AlertTriangle className="h-5 w-5 mr-2" /> Dispute
