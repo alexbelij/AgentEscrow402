@@ -75,7 +75,7 @@ export default function Scenarios() {
           In Practice
         </h2>
         <p className="text-gray-500 text-center mb-12 max-w-lg mx-auto text-sm">
-          Real agent interactions powered by x402 escrow payments
+          Illustrative agent-to-agent workflows, each one mapped step-by-step to the real x402 escrow lifecycle
         </p>
 
         {/* Tabs */}

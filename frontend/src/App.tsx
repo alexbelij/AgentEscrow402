@@ -1,10 +1,11 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import PaymentFlow from './components/PaymentFlow'
 import X402Protocol from './components/X402Protocol'
 import ReputationSystem from './components/ReputationSystem'
+import Capabilities from './components/Capabilities'
 import SDKSection from './components/SDKSection'
 import Scenarios from './components/Scenarios'
 import FAQ from './components/FAQ'
@@ -43,6 +44,7 @@ function Landing() {
       <PaymentFlow />
       <X402Protocol />
       <ReputationSystem />
+      <Capabilities />
       <Scenarios />
       <SDKSection />
       <FAQ />
@@ -53,6 +55,12 @@ function Landing() {
 export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const closeMobile = useCallback(() => setMobileOpen(false), [])
+  const location = useLocation()
+  // Console pages own their entire layout (fixed full-height sidebar + its
+  // own sticky top bar) — the marketing Navbar/Footer would double up with
+  // that and break the fixed-offset math, so they only render on the
+  // marketing site.
+  const isConsole = location.pathname.startsWith('/console')
 
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : ''
@@ -62,8 +70,8 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <ScrollToTop />
-      <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
-      <main className="flex-1" onClick={mobileOpen ? closeMobile : undefined}>
+      {!isConsole && <Navbar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />}
+      <main className={isConsole ? 'flex-1' : 'flex-1'} onClick={!isConsole && mobileOpen ? closeMobile : undefined}>
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/console" element={<ConsoleLayout />}>
@@ -84,7 +92,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </main>
-      <Footer />
+      {!isConsole && <Footer />}
     </div>
   )
 }

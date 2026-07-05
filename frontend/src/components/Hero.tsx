@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { Github } from 'lucide-react'
 
 export default function Hero() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -94,7 +95,7 @@ export default function Hero() {
 
       {/* Content - left side */}
       <div className="ae-section relative z-20 py-32">
-        <div className="max-w-xl">
+        <div className="max-w-2xl">
           {/* Mobile mascot - small, inline, above text */}
           <div className="md:hidden flex justify-center mb-6">
             <img
@@ -109,9 +110,9 @@ export default function Hero() {
             Casper testnet · x402 escrow · AI agent trust layer
           </div>
 
-          <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-white leading-[1.08] mb-5 tracking-tight">
-            Commercial escrow rails<br/>
-            for <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">autonomous AI work</span>
+          <h1 className="text-4xl sm:text-5xl lg:text-[3.4rem] font-extrabold text-white leading-[1.15] mb-5 tracking-tight max-w-xl">
+            Commercial escrow rails for{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">autonomous AI work</span>
           </h1>
 
           <p className="text-lg text-gray-300 mb-8 leading-relaxed max-w-md">
@@ -124,6 +125,7 @@ export default function Hero() {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
             </a>
             <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-ae-border text-gray-300 font-medium hover:border-gray-500 hover:text-white transition-colors">
+              <Github className="w-4 h-4" />
               GitHub
             </a>
           </div>

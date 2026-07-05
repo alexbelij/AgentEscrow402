@@ -1,35 +1,27 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
-import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, BookOpen, Plug, FileCode, Activity } from 'lucide-react'
+import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, Activity, Grid3x3 } from 'lucide-react'
 
+// This Navbar only renders on the marketing site (App.tsx skips it on
+// /console/* routes — the console owns its own fixed sidebar + top bar).
 const NAV_ITEMS = [
   { label: 'HOME', href: '/#home', icon: Home },
   { label: 'FLOW', href: '/#flow', icon: Repeat },
   { label: 'X402', href: '/#x402', icon: Shield },
   { label: 'REPUTATION', href: '/#reputation', icon: Activity },
+  { label: 'CAPABILITIES', href: '/#capabilities', icon: Grid3x3 },
   { label: 'SDK', href: '/#developers', icon: Code },
   { label: 'FAQ', href: '/#faq', icon: HelpCircle },
 ]
 
-const CONSOLE_ITEMS = [
-  { label: 'Landing', href: '/', icon: Home },
-]
-
 const EXTERNAL_LINKS = [
-  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', icon: FileCode },
-  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: BookOpen },
-  { label: 'MCP Server', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk', icon: Plug },
-  { label: 'Contracts', href: 'https://testnet.cspr.live/contract/3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e', icon: Shield },
+  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
+  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
 ]
 
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
-  const location = useLocation()
-  const isLanding = location.pathname === '/'
-  const isConsole = location.pathname.startsWith('/console')
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
-    if (!isLanding) return
     const sections = NAV_ITEMS.map(n => n.href.replace('/#', '')).filter(Boolean)
     const observer = new IntersectionObserver(
       entries => {
@@ -44,9 +36,7 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
       if (el) observer.observe(el)
     })
     return () => observer.disconnect()
-  }, [isLanding])
-
-  const navItems = isConsole ? CONSOLE_ITEMS : NAV_ITEMS
+  }, [])
 
   return (
     <>
@@ -60,9 +50,9 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
 
           {/* Desktop nav — always visible */}
           <div className="hidden md:flex items-center gap-6 ml-8 flex-1">
-            {navItems.map(item => {
+            {NAV_ITEMS.map(item => {
               const sectionId = item.href.replace('/#', '')
-              const isActive = isLanding && activeSection === sectionId
+              const isActive = activeSection === sectionId
               const Icon = item.icon
               return (
                 <a
@@ -81,26 +71,14 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             })}
           </div>
 
-          {/* Desktop external links (on console page) */}
-          {isConsole && (
-            <div className="hidden lg:flex items-center gap-3 mr-4">
-              {EXTERNAL_LINKS.slice(0, 2).map(link => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-1 text-[10px] text-gray-600 hover:text-ae-accent transition-colors"
-                >
-                  <link.icon size={10} />
-                  {link.label}
-                  <ExternalLink size={8} />
-                </a>
-              ))}
-            </div>
-          )}
-
           <div className="flex items-center gap-3">
+            <a
+              href="/console/overview"
+              className="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-ae-accent text-white text-xs font-semibold hover:bg-ae-accent-bright transition-colors"
+            >
+              <LayoutDashboard size={13} />
+              Console
+            </a>
             <button
               onClick={() => setMobileOpen(!mobileOpen)}
               className="md:hidden text-gray-400 hover:text-white"
@@ -133,6 +111,14 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
                 {item.label}
               </a>
             ))}
+            <a
+              href="/console/overview"
+              onClick={() => setMobileOpen(false)}
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg bg-ae-accent text-white text-sm font-semibold hover:bg-ae-accent-bright transition-colors"
+            >
+              <LayoutDashboard size={14} />
+              Console
+            </a>
             <div className="w-16 h-px bg-ae-border my-4" />
           </div>
           <div className="flex flex-wrap justify-center gap-4 pb-10 px-6">

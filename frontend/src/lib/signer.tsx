@@ -47,7 +47,11 @@ export const SignerProvider = ({ children }: { children: ReactNode }) => {
       ready,
       connect: () => {
         setMode('live')
-        clickRef?.signIn()
+        // If a CSPR.click session is already alive (e.g. the visitor switched
+        // to the demo signer and back without disconnecting), just switch
+        // the active mode back to it instead of popping the wallet-select
+        // dialog again for an already-connected account.
+        if (!livePublicKey) clickRef?.signIn()
       },
       useDemo: () => {
         setMode('demo')

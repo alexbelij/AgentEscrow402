@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { api, Agent, Reputation, RegisterIdentityRequest, Identity, AgentCapabilities, DelegationRecord } from '../../lib/api';
 import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoSigner';
+import { useToast } from '../../lib/toast';
 import {
   Users,
   UserPlus,
@@ -69,6 +70,7 @@ const Input: React.FC<InputProps> = ({ label, id, error, ...props }) => (
 );
 
 const Agents: React.FC = () => {
+  const toast = useToast();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +129,7 @@ const Agents: React.FC = () => {
     try {
       const res = await api.registerIdentity(formData);
       if (res.error) throw new Error(res.error);
-      alert(`Agent registered! Deploy Hash: ${res.data?.deploy_hash}`);
+      toast.success(`Agent registered — deploy hash ${res.data?.deploy_hash}`);
       setIsRegisterModalOpen(false);
       fetchAgents(); // Refresh list
     } catch (err) {

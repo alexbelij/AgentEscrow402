@@ -34,6 +34,22 @@ const FAQS = [
     q: 'Is it production audited?',
     a: 'No mainnet-readiness is claimed here. The code has automated tests and security review passes, but formal audit, gas benchmark report and fuzzing are still required before investor/jury submission can be called final.',
   },
+  {
+    q: 'Why not just use a normal payment API or a multisig wallet for this?',
+    a: 'Neither gives an autonomous agent a way to prove, on its own and without a human clicking "approve", that a counterparty actually delivered before funds move. AgentEscrow402 replaces that missing trust step with a signed intent + on-chain escrow + dispute path, so two agents that have never interacted before can transact safely without a human in the loop.',
+  },
+  {
+    q: 'What actually breaks without this, in a real agent-to-agent deal?',
+    a: 'Pay-first risks the provider never delivering; deliver-first risks the buyer never paying — the classic two-agent trust problem. Escrow removes the "who goes first" risk entirely: funds are locked by a neutral contract before work starts, and only move on verified delivery, TTL expiry (auto-refund) or arbiter resolution.',
+  },
+  {
+    q: 'How does this reduce risk for whoever is paying for agent work?',
+    a: 'Three layers stack together: escrow means a bad outcome is refundable/disputable instead of a sunk cost; the risk model flags anomalous counterparties before you ever lock funds; and the insurance pool absorbs part of the loss on a resolved dispute. None of this exists in a plain wallet-to-wallet transfer.',
+  },
+  {
+    q: 'Why Casper specifically, not Ethereum or a payment rail like Stripe?',
+    a: 'Stripe requires a human-verified merchant account and card rails that no autonomous agent can hold. Casper gives predictable low fees for high-frequency micro-escrows, upgradeable contracts (so the escrow logic can evolve without breaking existing locked funds), and a WASM contract model that maps cleanly onto typed CEP-18/CEP-78 tokens for multi-asset escrow.',
+  },
 ]
 
 export default function FAQ() {
