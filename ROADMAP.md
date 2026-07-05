@@ -25,7 +25,8 @@
       live end-to-end with a different account revealing than the one that committed
 - [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
 - [x] Post-quantum ML-KEM metadata encryption
-- [x] 333 automated tests (Python + Rust); see [Testing](README.md#-testing) for current pass rate
+- [x] 376 Python + 29 Rust automated tests (405 total); see [Testing](README.md#-testing) for
+      current pass rate
 - [x] CI/CD via GitHub Actions
 
 ## Phase 2 — Remaining core upgrades
