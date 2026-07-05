@@ -538,12 +538,16 @@ async def release_escrow(
 
     if not cfg.sandbox and casper is not None:
         if req.wallet_tx_hash:
-            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "released")
+            confirmed, revert_reason = await casper.confirm_wallet_lifecycle_tx(
+                req.service_hash, "released", deploy_hash=req.wallet_tx_hash
+            )
             if not confirmed:
-                raise HTTPException(
-                    status_code=502,
-                    detail="Wallet transaction not yet confirmed on-chain as 'released'; local state unchanged",
+                detail = (
+                    f"On-chain release transaction reverted: {revert_reason}"
+                    if revert_reason
+                    else "Wallet transaction not yet confirmed on-chain as 'released'; local state unchanged"
                 )
+                raise HTTPException(status_code=502, detail=detail)
             deploy_hash = req.wallet_tx_hash
         else:
             try:
@@ -590,12 +594,16 @@ async def refund_escrow(
 
     if not cfg.sandbox and casper is not None:
         if req.wallet_tx_hash:
-            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "refunded")
+            confirmed, revert_reason = await casper.confirm_wallet_lifecycle_tx(
+                req.service_hash, "refunded", deploy_hash=req.wallet_tx_hash
+            )
             if not confirmed:
-                raise HTTPException(
-                    status_code=502,
-                    detail="Wallet transaction not yet confirmed on-chain as 'refunded'; local state unchanged",
+                detail = (
+                    f"On-chain refund transaction reverted: {revert_reason}"
+                    if revert_reason
+                    else "Wallet transaction not yet confirmed on-chain as 'refunded'; local state unchanged"
                 )
+                raise HTTPException(status_code=502, detail=detail)
             deploy_hash = req.wallet_tx_hash
         else:
             try:
@@ -643,12 +651,16 @@ async def dispute_escrow(
             # confirmation below: the contract itself only allows the true
             # sender or receiver to call `dispute`, so a confirmed status
             # change is strictly stronger proof than an x402 header check.
-            confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "disputed")
+            confirmed, revert_reason = await casper.confirm_wallet_lifecycle_tx(
+                req.service_hash, "disputed", deploy_hash=req.wallet_tx_hash
+            )
             if not confirmed:
-                raise HTTPException(
-                    status_code=502,
-                    detail="Wallet transaction not yet confirmed on-chain as 'disputed'; local state unchanged",
+                detail = (
+                    f"On-chain dispute transaction reverted: {revert_reason}"
+                    if revert_reason
+                    else "Wallet transaction not yet confirmed on-chain as 'disputed'; local state unchanged"
                 )
+                raise HTTPException(status_code=502, detail=detail)
             deploy_hash = req.wallet_tx_hash
         else:
             # Authorization: only escrow sender or receiver may dispute
@@ -791,11 +803,17 @@ async def resolve_escrow(
                 detail=f"On-chain resolve transaction reverted: {last_error}",
             )
 
-        confirmed = await casper.confirm_wallet_lifecycle_tx(req.service_hash, "resolved")
+        confirmed, revert_reason = await casper.confirm_wallet_lifecycle_tx(
+            req.service_hash, "resolved", deploy_hash=deploy_hash
+        )
         if not confirmed:
             raise HTTPException(
                 status_code=502,
-                detail="Resolve transaction submitted but not yet confirmed on-chain as 'resolved'",
+                detail=(
+                    f"On-chain resolve transaction reverted: {revert_reason}"
+                    if revert_reason
+                    else "Resolve transaction submitted but not yet confirmed on-chain as 'resolved'"
+                ),
             )
 
     try:

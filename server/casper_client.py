@@ -373,25 +373,44 @@ class CasperClient:
         service_hash: str,
         expected_status: str,
         *,
+        deploy_hash: str | None = None,
         attempts: int = 10,
         delay_seconds: float = 1.5,
-    ) -> bool:
+    ) -> tuple[bool, str | None]:
         """Poll on-chain contract state until it reflects a wallet-submitted
         release/refund/dispute call, or give up.
 
         We deliberately do NOT try to parse the deploy's execution result to
-        decide success — Casper contract state is the source of truth, and
+        decide *success* — Casper contract state is the source of truth, and
         the contract itself enforces `get_caller()` == sender/receiver for
         these entry points. If the on-chain `escrows` dict shows the expected
         status, the wallet's own signed transaction genuinely executed the
         entry point as that caller; there is nothing left to trust.
+
+        On timeout (still not confirmed after all attempts), we *do* take
+        one look at the deploy's own execution result purely to improve the
+        error message: a deploy that reverted (e.g. "User error: N" from a
+        `get_caller()` mismatch when a real wallet tries to act on an escrow
+        it isn't the sender/receiver of) is a permanent failure, not a slow
+        one, and the caller-facing message should say so instead of
+        suggesting the user "wait and refresh".
+
+        Returns (confirmed, revert_reason). `revert_reason` is only ever set
+        when `confirmed` is False and we found a concrete on-chain failure.
         """
         for _ in range(attempts):
             record = await self.get_escrow(service_hash)
             if record is not None and record.status.value == expected_status:
-                return True
+                return True, None
             await asyncio.sleep(delay_seconds)
-        return False
+
+        revert_reason: str | None = None
+        if deploy_hash:
+            try:
+                revert_reason = await self.get_deploy_error(deploy_hash)
+            except Exception:
+                logger.exception("Failed to check deploy execution result for %s", deploy_hash)
+        return False, revert_reason
 
     # ── Read operations (direct JSON-RPC) ─────────────────────────────────
 
