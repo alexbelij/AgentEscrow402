@@ -195,9 +195,18 @@ fn read_release_cap() -> U512 {
     let cap_motes = match runtime::get_key(RELEASE_CAP_KEY) {
         Some(key) => {
             let uref = key.into_uref().unwrap_or_revert();
-            storage::read(uref)
-                .unwrap_or_revert()
-                .unwrap_or(DEFAULT_RELEASE_CAP_MOTES)
+            // Defensive on type mismatch too, not just a missing key: if some
+            // other code path ever wrote `release_cap` with a different
+            // CLValue type than u64, `storage::read::<u64>` returns
+            // Err(bytesrepr::Error) rather than panicking the whole
+            // release()/reveal_swap() flow. Treat any read failure the same
+            // as "key absent" -- fall back to the default cap -- since a
+            // release cap misconfiguration should never be able to brick
+            // fund release entirely.
+            match storage::read::<u64>(uref) {
+                Ok(Some(v)) => v,
+                _ => DEFAULT_RELEASE_CAP_MOTES,
+            }
         }
         None => DEFAULT_RELEASE_CAP_MOTES,
     };

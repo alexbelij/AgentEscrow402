@@ -94,7 +94,11 @@ async function main() {
     .build();
 
   await tx.sign(sk);
-  const client = new RpcClient(new HttpHandler(RPC));
+  const _handler = new HttpHandler(RPC);
+if (process.env.CSPR_CLOUD_API_KEY) {
+  _handler.setCustomHeaders({ Authorization: process.env.CSPR_CLOUD_API_KEY });
+}
+const client = new RpcClient(_handler);
   const res = await client.putTransaction(tx);
   const hash = res.transactionHash?.toHex?.() || JSON.stringify(res.transactionHash);
 

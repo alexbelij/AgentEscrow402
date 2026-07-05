@@ -61,8 +61,13 @@ async function main() {
   // Sign using deploy.sign(privateKey) — the SDK's built-in method
   await deploy.sign(sk);
 
-  // Submit
-  const client = new RpcClient(new HttpHandler(RPC));
+  // Submit. node.testnet.cspr.cloud requires an Authorization header
+  // (CSPR_CLOUD_API_KEY) -- without it the RPC returns 401 Unauthorized.
+  const handler = new HttpHandler(RPC);
+  if (process.env.CSPR_CLOUD_API_KEY) {
+    handler.setCustomHeaders({ Authorization: process.env.CSPR_CLOUD_API_KEY });
+  }
+  const client = new RpcClient(handler);
   const result = await client.putDeploy(deploy);
 
   const txHash = typeof result === 'string'
