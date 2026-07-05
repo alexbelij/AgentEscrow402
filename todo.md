@@ -117,11 +117,20 @@ internal ROADMAP.md Phase 3/4 items:
       - [x] Update frontend AdvancedEscrow.tsx/ConsoleLayout.tsx to remove "simulated" caveat —
             **DONE 2026-07-05**, both CEP-18 and CEP-78 copy now say "real on-chain calls".
             Committed `1415941`, pushed to `main`.
-      - **B1 status: CEP-18 + CEP-78 real on-chain integration is now fully complete.**
-        Remaining B1 scope not yet started: wiring the on-chain HTLC commit_swap/reveal_swap
-        entry points (already deployed, see "ALREADY DONE" section) into the
-        `/atomic-swap/commit` and `/atomic-swap/reveal` REST endpoints, which currently still
-        call the simulated in-memory flow instead of the real contract calls.
+      - [x] Wire `/atomic-swap/commit` and `/atomic-swap/reveal` to the real on-chain
+            `commit_swap`/`reveal_swap` entry points — **DONE 2026-07-05**. Added
+            `CasperClient.commit_swap()`/`reveal_swap()` (reuse existing
+            `server/casper_tx/swap_lifecycle.mjs`). Both endpoints now follow the same
+            sandbox/live split as `/release`/`/refund`/`/dispute`: live mode submits the real
+            tx first (502 + untouched local state on failure), then mirrors the result into
+            `SandboxStore`. Reveal still checks the preimage hash locally first (clean 400
+            instead of paying gas for a doomed tx). 263 relevant tests pass (need
+            `pytest-asyncio` installed for `test_casper_client.py` — sandbox default `uv run`
+            invocation lacked it, false-negative if forgotten). Committed `8a39694`, pushed to
+            `main`.
+      - **B1 status: FULLY COMPLETE.** CEP-18 + CEP-78 real on-chain token integration, and
+        the on-chain HTLC atomic-swap commit/reveal flow, are both wired end-to-end and
+        verified live on testnet. No known remaining B1 scope.
 
 ## S5 note (folded into B1)
 CEP-2612 permit is a CEP-18-token feature (gasless approve+deposit); native CSPR escrow already
