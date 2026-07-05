@@ -1,3 +1,13 @@
+"""DID-based agent identity registry (ERC-8004 style) for AgentEscrow402.
+
+In-memory reputation/staking store: registration, verification levels,
+cumulative reputation from completed/disputed deals, time-based reputation
+decay, stake slashing, and capability search. Exposed over HTTP via
+server/identity_registry_api.py.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import hashlib
 import json as _json

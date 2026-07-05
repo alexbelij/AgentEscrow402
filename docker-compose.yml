@@ -7,3 +7,4 @@ services:
     env_file: .env
     environment:
       - SANDBOX=true
+      - PORT=8000

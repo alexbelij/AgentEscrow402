@@ -1,4 +1,4 @@
-"""Risk scoring API for AgentEscrow402 — Task 6.
+"""Risk scoring API for AgentEscrow402.
 
 Wires the IsolationForest (risk_scoring.py) to real on-chain tx data,
 exposes GET /risk-score/{agent} and a dashboard summary endpoint.

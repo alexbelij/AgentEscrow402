@@ -28,6 +28,49 @@ on our **Casper Testnet** deployment of the Core Escrow contract
 - Their only power is to sign one specific message format for one specific
   contract's arbiter vote — nothing else.
 
+## How to test with these keys
+
+These keys are picked up automatically by `examples/escrow_agent.py` (default
+`ARBITER_KEYS_DIR=demo/test-arbiter-keys`), which runs the full buyer/seller
+lifecycle including a real dispute + real arbiter multisig resolve. This is
+the fastest way to independently verify the 3-of-5 arbiter flow described in
+[docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md):
+
+```bash
+# Against the live production API (real testnet transactions):
+python examples/escrow_agent.py --api-url https://agentescrow402-api.onrender.com --scenario bad
+
+# Or against your own local server (sandbox mode, no real chain calls):
+uvicorn server.app:app --reload &
+python examples/escrow_agent.py --scenario bad
+```
+
+The `bad` scenario runs a buyer who disputes a delivery; the script signs the
+dispute vote with 3 of these 5 keys (`sign_arbiter_vote` in
+`sdk/arbiter_signing.py`) and calls `/resolve`, which the backend submits
+on-chain as a real `resolve()` transaction — the contract itself verifies
+each Ed25519 signature against the registered `arbiter_list` before paying
+out. Watch for a `deploy_hash` in the output and confirm it on
+[testnet.cspr.live](https://testnet.cspr.live) to see the real multisig
+quorum check execute.
+
+To sign an arbiter vote manually (e.g. to test `/resolve` directly via curl
+or the SDK) without running the full scenario script:
+
+```python
+from sdk.arbiter_signing import sign_arbiter_vote
+
+pubkey_hex, signature_hex = sign_arbiter_vote(
+    "demo/test-arbiter-keys/arbiter_1_secret_key.pem",
+    service_hash="<64-char hex service_hash of the disputed escrow>",
+    in_favor_of="receiver",  # or "sender"
+)
+```
+
+Repeat with `arbiter_2_secret_key.pem` and `arbiter_3_secret_key.pem` (or any
+3 of the 5) to assemble the `arbiter_pubkeys`/`arbiter_signatures` lists that
+`POST /resolve` expects — 3 valid signatures is quorum for this contract.
+
 ## Why they're committed here
 
 Committing real, unfunded, single-purpose demo keys makes the submission

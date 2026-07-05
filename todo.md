@@ -6,10 +6,10 @@ contracts/agents layout, arbitration+demo result placement, sandbox API docs, a1
 WalletStatus demo-mode banner) is **already merged into main** (commits e792c16, e10d7c8,
 a95406f, 6f00ad1 — verified via `git branch --contains`/`git log`). The old 32-item checklist
 below is STALE and should not be treated as still-open backlog. Keeping it only for reference;
-do a fresh targeted audit later if Alexey flags a specific remaining UX complaint.
+do a fresh targeted audit later if the project owner flags a specific remaining UX complaint.
 
 ## CURRENT PRIORITY — from master_task_list.md (real competitor research, other thread)
-Approved by Alexey 2026-07-05 to close these AE402-specific items instead of unvalidated
+Approved 2026-07-05 to close these AE402-specific items instead of unvalidated
 internal ROADMAP.md Phase 3/4 items:
 
 - [x] S3 — README "What Is Real / What Is Simulated" block — **DONE 2026-07-05**, added as its
@@ -23,10 +23,13 @@ internal ROADMAP.md Phase 3/4 items:
       Goal: reduce bug risk by reusing audited/official patterns instead of inventing from scratch.
       No further action needed — both patterns were already applied by the time this was reviewed.
 - [ ] S5 — CEP-2612 Permit Extension: gasless approve+deposit in one transaction (real UX win,
-      official standard, ~half day estimated).
-- [ ] B1 — MultiAssetEscrow CEP-18/78 + commit-reveal (uses S4 reference). Real feature, bigger.
+      official standard, ~half day estimated). **NOT STARTED** — no code references CEP-2612/permit
+      anywhere in the repo; the "folded into B1" note below was a plan, not a completion record.
+- [x] B1 — MultiAssetEscrow CEP-18/78 + commit-reveal (uses S4 reference). **FULLY COMPLETE**
+      2026-07-05, see full detail below (checkbox was stale -- the sub-items and "B1 status:
+      FULLY COMPLETE" note further down already documented this).
       - [x] On-chain HTLC hash-lock (commit_swap/reveal_swap entry points) — DONE, see below.
-      - [ ] Real CEP-18/CEP-78 token integration (replace fully-simulated Cep18Adapter/
+      - [x] Real CEP-18/CEP-78 token integration (replace fully-simulated Cep18Adapter/
             Cep78Adapter/CsprAdapter in server/multi_asset.py with real on-chain calls against
             a deployed casper-ecosystem/cep18 test token). Backend /atomic-swap/commit and
             /atomic-swap/reveal still call the simulated in-memory flow, not the new on-chain
@@ -175,7 +178,7 @@ CEP-18 integration as a "CEP-2612-inspired" (not byte-exact standard) permit flo
 
 ## EXPLICITLY OUT OF SCOPE FOR THIS THREAD
 - A2 (volume of real testnet transactions / Agent Factory + Runner) — handled by the separate
-  analytics/research thread. Do not duplicate per Alexey's "не мешай разные ветки" instruction.
+  analytics/research thread. Do not duplicate -- keep separate task threads isolated per instruction.
 - Phase 4 (mainnet, external audit, bridge, formal verification, compliance) — not required by
   hackathon rules (testnet prototype only) and not supported by competitor research as valuable
   pre-hackathon. Reasonable to defer post-hackathon.
