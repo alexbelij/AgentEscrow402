@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   api,
   DEMO_AGENT_RECEIVER,
+  TEST_CEP18_CONTRACT_HASH,
   TokenIdentifier,
   MultiAssetEscrowRequest,
   StreamEscrowRequest,
@@ -39,12 +40,30 @@ function TokenSelect({ value, onChange }: { value: TokenIdentifier; onChange: (t
       {value.token_type !== 'cspr' && (
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1">Contract hash (64 hex)</label>
-          <input
-            value={value.contract_hash || ''}
-            onChange={(e) => onChange({ ...value, contract_hash: e.target.value })}
-            placeholder={'c'.repeat(64)}
-            className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
-          />
+          <div className="flex gap-2">
+            <input
+              value={value.contract_hash || ''}
+              onChange={(e) => onChange({ ...value, contract_hash: e.target.value })}
+              placeholder={'c'.repeat(64)}
+              className="flex-1 p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
+            />
+            {value.token_type === 'cep18' && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...value, contract_hash: TEST_CEP18_CONTRACT_HASH })}
+                title="Fill in this project's own AETUSD test token, deployed on casper-test"
+                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm whitespace-nowrap"
+              >
+                Use test AETUSD
+              </button>
+            )}
+          </div>
+          {value.token_type === 'cep18' && (
+            <p className="text-xs text-gray-500 mt-1">
+              No CEP-18 token of your own on testnet? Click "Use test AETUSD" to use this project's
+              own test token (contract hash <code>{TEST_CEP18_CONTRACT_HASH.slice(0, 10)}...</code>).
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -95,7 +114,7 @@ const AdvancedEscrow: React.FC = () => {
   const [tokenAmount, setTokenAmount] = useState('1000000000');
   const [tokenServiceHash, setTokenServiceHash] = useState(randomHex64());
   const [tokenIdentifier, setTokenIdentifier] = useState<TokenIdentifier>({ token_type: 'cspr' });
-  const [tokenTtl, setTokenTtl] = useState('300');
+  const [tokenTtl, setTokenTtl] = useState('3600');
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [tokenResult, setTokenResult] = useState<TransactionHash | null>(null);
