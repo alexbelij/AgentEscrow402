@@ -434,6 +434,11 @@ reported no concrete HIGH blockers for the latest console/Neon/contract patch.
 All hashes are independently verifiable on [testnet.cspr.live](https://testnet.cspr.live) or via
 `https://api.testnet.cspr.cloud/deploys/{hash}`.
 
+**Bulk on-chain volume:** beyond the curated flows above, **312/312** additional
+`create_escrow` deploys were submitted and confirmed on testnet with **zero failures**
+(same account/contract as above). Full deploy-hash-by-deploy-hash log:
+[docs/evidence/bulk_escrow_tx_log.jsonl](docs/evidence/bulk_escrow_tx_log.jsonl).
+
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
 ---

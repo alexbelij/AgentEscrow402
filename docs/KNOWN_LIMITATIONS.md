@@ -43,6 +43,12 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   payment-streaming primitive yet.
 - **Single-process only** — The global `casper_client` instance is not thread-safe for
   multi-worker deployments.
+- **`escrow-manager.batch_release`/`batch_cancel` lack a cap/quorum guard** — Unlike
+  `create_batch()` (wired and live-verified, see [README](../README.md#-verified-on-chain-this-is-not-simulated--real-testnet-transactions)),
+  the manager contract's `batch_release`/`batch_cancel` entry points don't enforce the same
+  per-escrow amount cap or arbiter-quorum check that the single-escrow `release`/`resolve` path
+  does. They are dead code — nothing in the backend or SDK currently calls them — so this is not
+  an active vulnerability, but the guard should be added before either entry point is wired up.
 
 ## General
 
