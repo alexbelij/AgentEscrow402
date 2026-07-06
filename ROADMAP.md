@@ -36,7 +36,9 @@
       invariants, 3 Hypothesis cases (`tests/test_property_based.py`) for the API-layer fee split
 - [ ] Payment streaming (`/escrow/stream`) currently computes streamed/remaining amounts at the
       API layer only — upgrading to real on-chain per-tick vesting is still open
-- [ ] MCP JSON-Schema registry for the existing 24 tools (schema generation, not new tools)
+- [x] MCP JSON-Schema registry for the existing 24 tools — see
+      [docs/mcp_tools_schema.json](docs/mcp_tools_schema.json) (stale checkbox, feature already
+      shipped in `69cd14f`)
 - [ ] Demo/Real data toggle in console (partially done via `WalletStatus` demo-mode banner)
 
 ## Phase 3 — Advanced
@@ -46,7 +48,8 @@
 - [ ] Gaming-reward escrow type with Merkle proof of results
 - [ ] Agent-vs-Agent simulation testing framework
 - [ ] Fuzz testing for smart contracts (cargo fuzz)
-- [ ] Gas benchmark report
+- [x] Gas benchmark report — see [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md), real testnet
+      numbers per entry point sampled from the bulk-tx evidence log
 
 ## Phase 4 — Mainnet & Ecosystem
 
