@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.middleware import _verify_ed25519
+from server.middleware import _verify_signature
 
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
@@ -198,7 +198,7 @@ async def delegate_capability(
         except Exception as exc:
             logger.warning("Casper signature verification unavailable, trying local Ed25519 check: %s", exc)
     if not is_valid:
-        is_valid = _verify_ed25519(signer_public_key, msg_hash.encode("utf-8"), request.signature)
+        is_valid = _verify_signature(signer_public_key, msg_hash.encode("utf-8"), request.signature)
     if not is_valid:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
