@@ -564,11 +564,13 @@ const Escrows: React.FC = () => {
                   setActionSuccess(null);
                 }}
                 disabled={
-                  !['pending', 'funded', 'disputed'].includes(selectedEscrow.status) ||
+                  !['pending', 'funded'].includes(selectedEscrow.status) ||
                   !canActOnEscrow(selectedEscrow, 'release')
                 }
                 title={
-                  canActOnEscrow(selectedEscrow, 'release')
+                  selectedEscrow.status === 'disputed'
+                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter resolves it; not yet available in this console'
+                    : canActOnEscrow(selectedEscrow, 'release')
                     ? undefined
                     : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
                 }
@@ -584,11 +586,13 @@ const Escrows: React.FC = () => {
                   setActionSuccess(null);
                 }}
                 disabled={
-                  !['pending', 'funded', 'disputed'].includes(selectedEscrow.status) ||
+                  !['pending', 'funded'].includes(selectedEscrow.status) ||
                   !canActOnEscrow(selectedEscrow, 'refund')
                 }
                 title={
-                  canActOnEscrow(selectedEscrow, 'refund')
+                  selectedEscrow.status === 'disputed'
+                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter resolves it; not yet available in this console'
+                    : canActOnEscrow(selectedEscrow, 'refund')
                     ? undefined
                     : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
                 }
@@ -679,7 +683,7 @@ const Escrows: React.FC = () => {
                   !!actionSuccess ||
                   (actionType === 'dispute'
                     ? !['pending', 'funded'].includes(selectedEscrow.status)
-                    : !['pending', 'funded', 'disputed'].includes(selectedEscrow.status))
+                    : !['pending', 'funded'].includes(selectedEscrow.status))
                 }
               >
                 {actionLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
@@ -707,7 +711,7 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
   const [receiver, setReceiver] = useState('');
   const [amount, setAmount] = useState('');
   const [serviceHash, setServiceHash] = useState(randomHex64());
-  const [ttl, setTtl] = useState('300');
+  const [ttl, setTtl] = useState('3600');
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [estimateLoading, setEstimateLoading] = useState(false);
   const [estimateError, setEstimateError] = useState<string | null>(null);
@@ -757,8 +761,8 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
       return;
     }
     const ttlNum = Number(ttl);
-    if (ttl && (isNaN(ttlNum) || ttlNum < 60 || ttlNum > 86400)) {
-      setFormError('TTL must be between 60 and 86400 seconds.');
+    if (ttl && (isNaN(ttlNum) || ttlNum < 300 || ttlNum > 86400)) {
+      setFormError('TTL must be between 300 and 86400 seconds (5 min minimum — shorter windows tend to expire mid-test).');
       return;
     }
 
@@ -770,7 +774,7 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
           receiver,
           amount: grossMotes,
           service_hash: serviceHash,
-          ttl: Number(ttl) || 300,
+          ttl: Number(ttl) || 3600,
         },
         estimate?.net_amount ?? grossMotes,
       );
@@ -852,13 +856,13 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
           </button>
         </div>
         <Input
-          label="TTL (seconds)"
+          label="TTL (seconds, min 300 = 5 min)"
           id="ttl"
           type="number"
           value={ttl}
           onChange={(e) => setTtl(e.target.value)}
-          placeholder="300"
-          min="60"
+          placeholder="3600"
+          min="300"
           max="86400"
         />
 
