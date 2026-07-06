@@ -53,6 +53,7 @@ class CasperClient:
 
     def __init__(self, cfg: Config) -> None:
         self._contract_hash = cfg.contract_hash
+        self._insurance_contract_hash = cfg.insurance_contract_hash
         self._key_path = cfg.casper_private_key_path
         self._rpc_url = RPC_TESTNET  # always use the working testnet node
         self._http = httpx.AsyncClient(timeout=30.0)
@@ -466,6 +467,49 @@ class CasperClient:
             record = await self.get_escrow(service_hash)
             if record is not None:
                 return True, None
+            await asyncio.sleep(delay_seconds)
+
+        revert_reason: str | None = None
+        if deploy_hash:
+            try:
+                revert_reason = await self.get_deploy_error(deploy_hash)
+            except Exception:
+                logger.exception("Failed to check deploy execution result for %s", deploy_hash)
+        return False, revert_reason
+
+    async def confirm_wallet_insurance_claim(
+        self,
+        claimant_account_hash: str,
+        escrow_id: str,
+        *,
+        deploy_hash: str | None = None,
+        attempts: int = 20,
+        delay_seconds: float = 2.5,
+    ) -> tuple[bool, str | None]:
+        """Poll the insurance-pool contract's `claims` dict until it shows a
+        wallet-submitted `claim()` call for this claimant/escrow_id, or give
+        up. Mirrors `confirm_wallet_lifecycle_tx` -- on-chain state (not the
+        deploy's own execution result) is the source of truth, since the
+        contract's `claim()` entry point pays out to `runtime::get_caller()`
+        directly; if the dict shows `last_escrow_id == escrow_id` for this
+        claimant's account hash, the wallet's own signed transaction genuinely
+        executed and was paid.
+
+        `claimant_account_hash` must be the `account-hash-{hex}` formatted
+        string (matches how the Rust contract's `AccountHash::to_string()`
+        keys the `claims` dictionary) -- NOT a raw public key hex.
+        """
+        if not self._insurance_contract_hash:
+            return False, "insurance contract hash not configured"
+        for _ in range(attempts):
+            raw = await self.query_contract_dict(
+                "claims", claimant_account_hash, contract_hash=self._insurance_contract_hash
+            )
+            parsed = raw.get("parsed") if raw else None
+            if parsed and isinstance(parsed, list) and len(parsed) >= 3:
+                last_escrow_id = parsed[2]
+                if last_escrow_id == escrow_id:
+                    return True, None
             await asyncio.sleep(delay_seconds)
 
         revert_reason: str | None = None

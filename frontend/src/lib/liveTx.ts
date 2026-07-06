@@ -170,6 +170,58 @@ export async function sendCreateEscrowTx(
   }
 }
 
+/**
+ * Build + sign + submit an insurance-pool `claim()` call via the connected
+ * wallet. Unlike `deposit()`/`create_batch()` (which need a `source_purse`
+ * URef and therefore a session-wasm module, see `sendCreateEscrowTx`),
+ * `claim()` takes no purse argument at all -- it only reads the contract's
+ * own purse and pays out directly to `runtime::get_caller()`. That means a
+ * plain `ContractCallBuilder` stored-contract call (exactly the
+ * `sendLifecycleTx` shape) is sufficient; no new session-wasm capability is
+ * needed here.
+ */
+export async function sendInsuranceClaimTx(
+  clickRef: ICSPRClickSDK,
+  opts: {
+    insuranceContractHash: string
+    escrowId: string
+    amountMotes: number | string
+    evidence: string
+    senderPublicKeyHex: string
+  },
+): Promise<LiveTxResult> {
+  try {
+    const args = Args.fromMap({
+      escrow_id: CLValue.newCLString(opts.escrowId),
+      amount: CLValue.newCLUInt512(String(opts.amountMotes)),
+      evidence: CLValue.newCLString(opts.evidence),
+    })
+
+    const tx = new ContractCallBuilder()
+      .byHash(opts.insuranceContractHash)
+      .entryPoint('claim')
+      .runtimeArgs(args)
+      .from(PublicKey.fromHex(opts.senderPublicKeyHex))
+      .chainName(CASPER_CHAIN_NAME)
+      .payment(LIFECYCLE_PAYMENT_MOTES)
+      .build()
+
+    const res = await clickRef.send(tx.toJSON() as object, opts.senderPublicKeyHex)
+
+    if (res?.transactionHash) {
+      return { ok: true, transactionHash: res.transactionHash }
+    }
+    if (res?.cancelled) {
+      return { ok: false, cancelled: true }
+    }
+    const rawError = (res as any)?.error ?? (res as any)?.errorData ?? 'Unknown error from wallet SDK'
+    const errorMessage = typeof rawError === 'string' ? rawError : JSON.stringify(rawError)
+    return { ok: false, cancelled: false, error: errorMessage }
+  } catch (err: any) {
+    return { ok: false, cancelled: false, error: err?.message || String(err) }
+  }
+}
+
 /** Fetch the compiled escrow_funder.wasm session module bytes from the backend. */
 export async function fetchEscrowFunderWasm(): Promise<Uint8Array> {
   const res = await fetch('/backend/wasm/escrow_funder')

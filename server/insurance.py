@@ -72,6 +72,20 @@ class InsuranceClaimRequest(BaseModel):
 
     escrow_hash: str = Field(..., min_length=64, max_length=64, description="Service hash of the disputed escrow")
     reason: str = Field(..., min_length=10, description="Reason for the claim")
+    # Live-wallet path (see sendInsuranceClaimTx in frontend/src/lib/liveTx.ts):
+    # when set, the connected wallet itself already built+signed+submitted a
+    # real `claim()` call to the insurance-pool contract (which pays out to
+    # `runtime::get_caller()` directly on-chain) -- the backend only confirms
+    # the resulting on-chain state instead of ever holding the payout key.
+    wallet_tx_hash: str | None = Field(default=None, description="Transaction hash of a wallet-submitted on-chain claim() call")
+    sender_public_key_hex: str | None = Field(
+        default=None,
+        description="Connected wallet's public key hex, matched against the escrow's recorded sender/receiver (required when wallet_tx_hash is set)",
+    )
+    claimant_account_hash: str | None = Field(
+        default=None,
+        description="account-hash-{hex} of the connected wallet, used to poll the on-chain claims dict (required when wallet_tx_hash is set)",
+    )
 
 
 class PremiumQuoteRequest(BaseModel):
@@ -157,8 +171,23 @@ async def file_insurance_claim(
     Allows an agent to file a claim against the insurance pool for a disputed or failed escrow.
     Includes basic fraud detection.
     """
-    x402 = _extract_payment_from_request(http_request)
-    claimant = x402.sender
+    if request.wallet_tx_hash:
+        # Live-wallet path (see sendInsuranceClaimTx in liveTx.ts): the
+        # connected wallet already built+signed+submitted the real claim()
+        # call itself, so there's no x402 header to verify identity from --
+        # the wallet's own public key hex (matched against the escrow's
+        # recorded sender/receiver below) is the claimant, and on-chain
+        # confirmation (after eligibility checks) is the actual proof of
+        # payout, not this endpoint.
+        if not request.sender_public_key_hex or not request.claimant_account_hash:
+            raise HTTPException(
+                status_code=422,
+                detail="sender_public_key_hex and claimant_account_hash are required when wallet_tx_hash is set",
+            )
+        claimant = request.sender_public_key_hex
+    else:
+        x402 = _extract_payment_from_request(http_request)
+        claimant = x402.sender
 
     escrow = None
     if hasattr(db, "get_escrow"):
@@ -210,32 +239,62 @@ async def file_insurance_claim(
 
     logger.info("Agent %s filing claim for escrow %s. Reason: %s", claimant[:8], request.escrow_hash[:16], request.reason[:50])
 
-    # Simulate Casper deploy to record the claim on the insurance contract
-    try:
-        # deploy_hash = await casper.call_contract(
-        #     contract_hash=config.insurance_contract_hash,
-        #     entry_point="file_claim",
-        #     args={"escrow_hash": request.escrow_hash, "claimant": claimant, "reason": request.reason},
-        # )
-        deploy_hash = f"deploy-hash-insurance-claim-{int(time.time())}"
+    if request.wallet_tx_hash:
+        # Live-wallet path: the wallet already submitted a real `claim()`
+        # call to the insurance-pool contract (pays out to its own
+        # get_caller() on-chain) -- confirm it actually landed instead of
+        # trusting the request. Casper's own claim() enforces cooldown /
+        # max-coverage-of-pool-balance itself; if this dict entry updated
+        # with our escrow_id, the payout genuinely happened.
+        if casper is None:
+            raise HTTPException(status_code=502, detail="Casper client unavailable to confirm on-chain claim")
+        confirmed, revert_reason = await casper.confirm_wallet_insurance_claim(
+            request.claimant_account_hash, request.escrow_hash, deploy_hash=request.wallet_tx_hash
+        )
+        if not confirmed:
+            detail = (
+                f"On-chain claim transaction reverted: {revert_reason}"
+                if revert_reason
+                else "Wallet transaction not yet confirmed on-chain; local state unchanged"
+            )
+            raise HTTPException(status_code=502, detail=detail)
+        deploy_hash = request.wallet_tx_hash
         _insurance_pool["total_claims_filed"] += 1
         _claims[request.escrow_hash] = {
             "claimant": claimant,
             "escrow_hash": request.escrow_hash,
             "amount": escrow_amount,
             "reason": request.reason,
-            "status": "pending",
+            "status": "paid",
             "filed_at": int(time.time()),
             "deploy_hash": deploy_hash,
         }
-        # For simplicity, immediately approve and pay out if no complex arbitration
+        # Real on-chain payout already happened via the contract's own
+        # purse -- this is just the local dashboard/accounting mirror.
         _insurance_pool["total_claims_paid"] += escrow_amount
         _insurance_pool["total_assets"] -= escrow_amount
-        _claims[request.escrow_hash]["status"] = "paid"
-
-    except Exception as e:
-        logger.error("Failed to process insurance claim for %s: %s", claimant[:8], e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain")
+    else:
+        # Simulated/demo path (no real on-chain insurance-pool contract call
+        # yet) -- kept as-is for the hosted-console demo identity flow.
+        try:
+            deploy_hash = f"deploy-hash-insurance-claim-{int(time.time())}"
+            _insurance_pool["total_claims_filed"] += 1
+            _claims[request.escrow_hash] = {
+                "claimant": claimant,
+                "escrow_hash": request.escrow_hash,
+                "amount": escrow_amount,
+                "reason": request.reason,
+                "status": "pending",
+                "filed_at": int(time.time()),
+                "deploy_hash": deploy_hash,
+            }
+            # For simplicity, immediately approve and pay out if no complex arbitration
+            _insurance_pool["total_claims_paid"] += escrow_amount
+            _insurance_pool["total_assets"] -= escrow_amount
+            _claims[request.escrow_hash]["status"] = "paid"
+        except Exception as e:
+            logger.error("Failed to process insurance claim for %s: %s", claimant[:8], e)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain")
 
     logger.info("Claim for escrow %s by %s processed. Deploy hash: %s", request.escrow_hash[:16], claimant[:8], deploy_hash[:16])
     return {"message": "Claim filed and processed successfully", "deploy_hash": deploy_hash}

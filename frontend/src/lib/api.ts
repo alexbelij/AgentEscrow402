@@ -397,10 +397,17 @@ export interface DepositInsuranceRequest {
 }
 
 export interface ClaimInsuranceRequest {
-  claimer_public_key: string;
+  // claimer_public_key/signature are demo-mode-only free-text fields (the
+  // backend never actually verifies them as a real signature) — optional
+  // because the live-wallet path (see useInsuranceClaimAction) derives
+  // identity from the connected wallet + on-chain confirmation instead.
+  claimer_public_key?: string;
   escrow_hash: string;
   reason: string;
-  signature: string;
+  signature?: string;
+  wallet_tx_hash?: string;
+  sender_public_key_hex?: string;
+  claimant_account_hash?: string;
 }
 
 // Arbitration

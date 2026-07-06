@@ -19,6 +19,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useSigner } from '../../lib/signer';
+import { useInsuranceClaimAction } from '../../lib/useInsuranceClaimAction';
 
 // Reusable Modal Component (from Escrows.tsx)
 interface ModalProps {
@@ -114,6 +116,16 @@ const Insurance: React.FC = () => {
 
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const { isLive } = useSigner();
+  const { run: runInsuranceClaim } = useInsuranceClaimAction();
+  const [insuranceContractHash, setInsuranceContractHash] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    api.getContracts().then((res) => {
+      const match = res.data?.find((c) => c.name === 'Insurance Pool');
+      if (match) setInsuranceContractHash(match.hash);
+    });
+  }, []);
 
   const fetchPoolStats = async () => {
     setLoading(true);
@@ -188,9 +200,35 @@ const Insurance: React.FC = () => {
     setLoading(true); // Use a separate loading for forms if needed
     setError(null);
     try {
-      const res = await api.claimInsurance(formData);
-      if (res.error) throw new Error(res.error);
-      toast.success(`Claim submitted — deploy hash ${res.data?.deploy_hash}`);
+      if (isLive) {
+        // Live-wallet path: the connected wallet itself signs+submits a
+        // real claim() call (see useInsuranceClaimAction) — the on-chain
+        // contract pays out to the wallet's own get_caller() directly, so
+        // this only works with whatever that wallet's claims-cooldown /
+        // pool-coverage limits actually allow, exactly as requested.
+        const escrowRes = await api.getEscrowByHash(formData.escrow_hash);
+        if (escrowRes.error || !escrowRes.data) {
+          throw new Error(escrowRes.error || 'Escrow not found — cannot determine claim amount');
+        }
+        const result = await runInsuranceClaim(
+          formData.escrow_hash,
+          formData.reason,
+          escrowRes.data.amount,
+          insuranceContractHash,
+        );
+        if (!result.ok) {
+          if (result.cancelled) {
+            setError('Cancelled in wallet.');
+            return;
+          }
+          throw new Error(result.error);
+        }
+        toast.success(`Claim confirmed on-chain — transaction hash ${result.deployHash}`);
+      } else {
+        const res = await api.claimInsurance(formData);
+        if (res.error) throw new Error(res.error);
+        toast.success(`Claim submitted — deploy hash ${res.data?.deploy_hash}`);
+      }
       setIsClaimModalOpen(false);
       fetchPoolStats(); // Refresh stats
     } catch (err) {
@@ -379,7 +417,7 @@ const Insurance: React.FC = () => {
       <DepositInsuranceModal isOpen={isDepositModalOpen} onClose={() => setIsDepositModalOpen(false)} onDeposit={handleDeposit} />
 
       {/* Claim Modal */}
-      <ClaimInsuranceModal isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} onClaim={handleClaim} />
+      <ClaimInsuranceModal isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} onClaim={handleClaim} isLive={isLive} />
     </div>
   );
 };
@@ -506,13 +544,14 @@ interface ClaimInsuranceModalProps {
   isOpen: boolean;
   onClose: () => void;
   onClaim: (data: ClaimInsuranceRequest) => void;
+  isLive: boolean;
 }
 
-const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClose, onClaim }) => {
+const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClose, onClaim, isLive }) => {
   const [claimerPublicKey, setClaimerPublicKey] = useState('');
   const [escrowHash, setEscrowHash] = useState('');
   const [reason, setReason] = useState('');
-  const [signature, setSignature] = useState(''); // Placeholder
+  const [signature, setSignature] = useState(''); // Placeholder — demo mode only
   const [formError, setFormError] = useState<string | null>(null);
   const [claimLoading, setClaimLoading] = useState(false);
 
@@ -520,7 +559,7 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
     e.preventDefault();
     setFormError(null);
 
-    if (!claimerPublicKey || !escrowHash || !reason || !signature) {
+    if (!escrowHash || !reason || (!isLive && (!claimerPublicKey || !signature))) {
       setFormError('All fields are required.');
       return;
     }
@@ -548,14 +587,23 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Submit Insurance Claim">
       <form onSubmit={handleSubmit}>
-        <Input
-          label="Claimer Public Key"
-          id="claimerPublicKey"
-          value={claimerPublicKey}
-          onChange={(e) => setClaimerPublicKey(e.target.value)}
-          placeholder="e.g., 0123..."
-          required
-        />
+        {isLive && (
+          <div className="mb-4 text-xs text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-md p-3">
+            Live mode: your connected wallet signs the real on-chain <code>claim()</code> call and receives the
+            payout directly to its own purse — subject to the pool's cooldown and max-coverage limits enforced by
+            the contract itself. No public key or signature fields needed below.
+          </div>
+        )}
+        {!isLive && (
+          <Input
+            label="Claimer Public Key"
+            id="claimerPublicKey"
+            value={claimerPublicKey}
+            onChange={(e) => setClaimerPublicKey(e.target.value)}
+            placeholder="e.g., 0123..."
+            required
+          />
+        )}
         <Input
           label="Escrow Hash"
           id="claimEscrowHash"
@@ -572,14 +620,16 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
           placeholder="Describe why you are filing this claim..."
           required
         />
-        <Input
-          label="Signature / identity note"
-          id="claimSignature"
-          value={signature}
-          onChange={(e) => setSignature(e.target.value)}
-          placeholder="e.g., 0123..."
-          required
-        />
+        {!isLive && (
+          <Input
+            label="Signature / identity note"
+            id="claimSignature"
+            value={signature}
+            onChange={(e) => setSignature(e.target.value)}
+            placeholder="e.g., 0123..."
+            required
+          />
+        )}
 
         {formError && (
           <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 mb-4 flex items-center">
