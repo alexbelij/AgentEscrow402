@@ -17,7 +17,7 @@ import pytest
 
 from server.casper_client import CasperClient
 from server.config import Config
-from server.models import EscrowStatus
+from server.models import EscrowRecord, EscrowStatus
 
 
 def make_client() -> CasperClient:
@@ -409,3 +409,115 @@ class TestAtomicSwapValidation:
         client._key_path = "/tmp/key.pem"
         client._run_node_script = AsyncMock(return_value="deploy-reveal-1")
         assert await client.reveal_swap("svc-1", "preimage-xyz") == "deploy-reveal-1"
+
+
+def _fake_escrow_record(status: EscrowStatus = EscrowStatus.PENDING) -> EscrowRecord:
+    return EscrowRecord(
+        sender="sender-hash",
+        receiver="receiver-hash",
+        amount=1_000_000_000,
+        service_hash="svc-wallet-1",
+        status=status,
+        created_at=1_700_000_000,
+        ttl=3600,
+    )
+
+
+class TestGetDeployError:
+    @pytest.mark.asyncio
+    async def test_returns_none_on_rpc_error(self):
+        client = make_client()
+        client._rpc = AsyncMock(side_effect=RuntimeError("rpc down"))
+        assert await client.get_deploy_error("deploy-1") is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_execution_results_yet(self):
+        client = make_client()
+        client._rpc = AsyncMock(return_value={"execution_results": []})
+        assert await client.get_deploy_error("deploy-1") is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_success(self):
+        client = make_client()
+        client._rpc = AsyncMock(
+            return_value={"execution_results": [{"result": {"Success": {}}}]}
+        )
+        assert await client.get_deploy_error("deploy-1") is None
+
+    @pytest.mark.asyncio
+    async def test_returns_error_message_on_failure(self):
+        client = make_client()
+        client._rpc = AsyncMock(
+            return_value={
+                "execution_results": [
+                    {"result": {"Failure": {"error_message": "User error: 5"}}}
+                ]
+            }
+        )
+        assert await client.get_deploy_error("deploy-1") == "User error: 5"
+
+
+class TestConfirmWalletLifecycleTx:
+    @pytest.mark.asyncio
+    async def test_confirms_on_first_matching_status(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=_fake_escrow_record(EscrowStatus.RELEASED))
+        confirmed, reason = await client.confirm_wallet_lifecycle_tx(
+            "svc-wallet-1", "released", attempts=3, delay_seconds=0
+        )
+        assert confirmed is True
+        assert reason is None
+
+    @pytest.mark.asyncio
+    async def test_times_out_and_reports_revert_reason(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=_fake_escrow_record(EscrowStatus.PENDING))
+        client.get_deploy_error = AsyncMock(return_value="User error: 7")
+        confirmed, reason = await client.confirm_wallet_lifecycle_tx(
+            "svc-wallet-1", "released", deploy_hash="deploy-abc", attempts=2, delay_seconds=0
+        )
+        assert confirmed is False
+        assert reason == "User error: 7"
+
+    @pytest.mark.asyncio
+    async def test_times_out_without_deploy_hash_gives_no_reason(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=None)
+        confirmed, reason = await client.confirm_wallet_lifecycle_tx(
+            "svc-wallet-1", "released", attempts=2, delay_seconds=0
+        )
+        assert confirmed is False
+        assert reason is None
+
+
+class TestConfirmWalletCreatedEscrow:
+    @pytest.mark.asyncio
+    async def test_confirms_once_record_exists_on_chain(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=_fake_escrow_record())
+        confirmed, reason = await client.confirm_wallet_created_escrow(
+            "svc-wallet-1", attempts=3, delay_seconds=0
+        )
+        assert confirmed is True
+        assert reason is None
+
+    @pytest.mark.asyncio
+    async def test_times_out_and_reports_revert_reason(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=None)
+        client.get_deploy_error = AsyncMock(return_value="Mint error: 4 (InvalidAccessRights)")
+        confirmed, reason = await client.confirm_wallet_created_escrow(
+            "svc-wallet-1", deploy_hash="deploy-xyz", attempts=2, delay_seconds=0
+        )
+        assert confirmed is False
+        assert reason == "Mint error: 4 (InvalidAccessRights)"
+
+    @pytest.mark.asyncio
+    async def test_times_out_without_deploy_hash_gives_no_reason(self):
+        client = make_client()
+        client.get_escrow = AsyncMock(return_value=None)
+        confirmed, reason = await client.confirm_wallet_created_escrow(
+            "svc-wallet-1", attempts=2, delay_seconds=0
+        )
+        assert confirmed is False
+        assert reason is None
