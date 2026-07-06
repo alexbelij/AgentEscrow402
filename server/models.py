@@ -65,6 +65,34 @@ class EscrowRecord(BaseModel):
     mlkem_algorithm: str | None = None
 
 
+class BatchEscrowItem(BaseModel):
+    """A single escrow spec within a batch-create request."""
+
+    receiver: str = Field(
+        ...,
+        pattern=r"^(account-hash-)?[0-9a-fA-F]{64}$",
+        description="Casper account hash of the receiver (raw 64-hex or account-hash- prefixed)",
+    )
+    amount: int = Field(..., gt=0, description="Amount in motes")
+    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
+
+
+class BatchEscrowRequest(BaseModel):
+    """Request to create up to 50 escrows in a single on-chain deploy via
+    escrow-manager.create_batch()."""
+
+    escrows: list[BatchEscrowItem] = Field(..., min_length=1, max_length=50)
+
+
+class BatchEscrowResponse(BaseModel):
+    """Result of a batch escrow creation."""
+
+    deploy_hash: str | None = None
+    created: int
+    records: list[EscrowRecord]
+
+
 class ReleaseRequest(BaseModel):
     service_hash: str = Field(..., min_length=64, max_length=64)
     # Set when the wallet-connected caller already built, signed (via their
