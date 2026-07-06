@@ -334,10 +334,19 @@ class CasperClient:
         return await self._admin_op("set_arbiters", {"ARBITERS_JSON": json.dumps(arbiters)})
 
     async def emergency_freeze(self) -> str:
-        """Freeze insurance-pool payouts. One-way on-chain: the contract has
-        no unfreeze entry point (known limitation, tracked in the AE402
-        skill's remaining-limitations list) -- use only as a last resort."""
+        """Freeze escrow-contract state changes (release/refund/dispute/
+        resolve/commit_swap/reveal_swap all check `require_not_frozen()`).
+        Reversible via `unfreeze()` -- see below."""
         return await self._admin_op("emergency_freeze", {})
+
+    async def unfreeze(self) -> str:
+        """Resume operations after `emergency_freeze` (installer only).
+        Added in commit 4a63775 -- previously freezing was one-way and
+        required a full contract upgrade to resume; that limitation no
+        longer applies to contracts deployed with `unfreeze` in their
+        entry_points (verify via `state_get_item` if unsure which source
+        version a given deployed contract_hash corresponds to)."""
+        return await self._admin_op("unfreeze", {})
 
     async def _admin_op(self, entry_point: str, extra_env: dict[str, str]) -> str:
         if not self._contract_hash:

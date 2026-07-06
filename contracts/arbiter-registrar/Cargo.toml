@@ -1,0 +1,19 @@
+[package]
+name = "arbiter-registrar"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+casper-contract = "5.1"
+casper-types = "6.0"
+
+[[bin]]
+name = "arbiter-registrar"
+path = "src/main.rs"
+bench = false
+doctest = false
+test = false
+
+[profile.release]
+codegen-units = 1
+lto = true
