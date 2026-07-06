@@ -3,9 +3,9 @@
 Covers the remaining contract entry points that aren't part of the normal
 escrow lifecycle (escrow/release/refund/dispute/resolve/commit_swap/
 reveal_swap, all wired elsewhere): `configure_fee`, `set_release_cap`
-(new, A1 hardening), `set_arbiters`, `emergency_freeze`.
+(new, A1 hardening), `set_arbiters`, `emergency_freeze`, `unfreeze`.
 
-All four only succeed on-chain if the backend's configured deployer key IS
+All five only succeed on-chain if the backend's configured deployer key IS
 the contract's installer account (the contract itself reverts with
 ERR_UNAUTHORIZED otherwise) -- this router adds a second, API-level gate
 on top of that: every route requires a matching `X-Admin-Key` header
@@ -126,10 +126,9 @@ async def emergency_freeze(
     cfg: Config = Depends(get_config),
     casper: CasperClient | None = Depends(_get_casper),
 ) -> dict[str, str]:
-    """Freeze insurance-pool payouts. WARNING: one-way on-chain -- the
-    contract has no unfreeze entry point (known limitation). Use only as a
-    last resort (e.g. a discovered exploit) since there is no going back
-    without a further contract upgrade."""
+    """Freeze escrow-contract state changes (release/refund/dispute/resolve/
+    commit_swap/reveal_swap). Reversible -- see `POST /admin/unfreeze`.
+    Use as a last resort (e.g. a discovered exploit) while investigating."""
     if cfg.sandbox or casper is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -140,4 +139,25 @@ async def emergency_freeze(
     except Exception as exc:
         logger.error("emergency_freeze failed: %s", exc)
         raise HTTPException(status_code=502, detail="On-chain emergency_freeze transaction failed")
-    return {"message": "emergency_freeze submitted (one-way, no unfreeze exists)", "deploy_hash": deploy_hash}
+    return {"message": "emergency_freeze submitted", "deploy_hash": deploy_hash}
+
+
+@router.post("/unfreeze", dependencies=[Depends(_require_admin_key)])
+async def unfreeze(
+    cfg: Config = Depends(get_config),
+    casper: CasperClient | None = Depends(_get_casper),
+) -> dict[str, str]:
+    """Resume operations after `emergency_freeze` (installer-only on-chain
+    check, plus the same X-Admin-Key gate as every other route in this
+    file)."""
+    if cfg.sandbox or casper is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="unfreeze requires live (non-sandbox) mode with a configured Casper client",
+        )
+    try:
+        deploy_hash = await casper.unfreeze()
+    except Exception as exc:
+        logger.error("unfreeze failed: %s", exc)
+        raise HTTPException(status_code=502, detail="On-chain unfreeze transaction failed")
+    return {"message": "unfreeze submitted", "deploy_hash": deploy_hash}

@@ -279,7 +279,7 @@ Deployed on Casper Testnet:
 | Core Escrow | `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) | [view](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
 | Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` | [view](https://testnet.cspr.live/contract/e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61) |
-| VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` | [view](https://testnet.cspr.live/contract/5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f) |
+| VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 
 | Entry point | Description |
@@ -294,7 +294,8 @@ Deployed on Casper Testnet:
 | `configure_fee` | Set insurance pool fee (basis points) |
 | `set_release_cap` | Update the amount above which an arbiter-quorum approval is required |
 | `set_arbiters` | Rotate the 5-account arbiter pool (no redeploy needed) |
-| `emergency_freeze` | Pause all state changes (one-way — no unfreeze entry point) |
+| `emergency_freeze` | Pause all state changes (installer-only) |
+| `unfreeze` | Resume operations after `emergency_freeze` (installer-only) |
 
 Security status: latest changed code was reviewed through NVIDIA API and no concrete HIGH blockers were reported for the console/Neon patch. Full production hardening and legacy test-suite modernization are still tracked in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 

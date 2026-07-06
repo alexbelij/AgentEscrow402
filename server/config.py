@@ -102,7 +102,13 @@ class Config:
             ),
             vrf_contract_hash=os.getenv(
                 "VRF_CONTRACT_HASH",
-                "5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f",
+                # 78ae2870... is the redeployed vrf-arbiter contract with the
+                # register_arbiter() session-arg fix (top-level "amount" arg
+                # required by the node's Mint ARG_AMOUNT spending-limit check;
+                # see contracts/arbiter-registrar/src/main.rs commit history).
+                # The old 5d65bedf... contract's register_arbiter() write path
+                # always failed with Mint error 21 (UnapprovedSpendingAmount).
+                "78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93",
             ),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
             arbiter_pubkeys=tuple(
