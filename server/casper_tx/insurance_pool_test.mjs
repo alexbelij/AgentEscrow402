@@ -43,7 +43,7 @@ const tx = new ContractCallBuilder()
   .runtimeArgs(args)
   .from(sk.publicKey)
   .chainName('casper-test')
-  .payment(process.env.PAYMENT_MOTES || '10000000000')
+  .payment(Number(process.env.PAYMENT_MOTES || '10000000000'))
   .build();
 await tx.sign(sk);
 const handler = new HttpHandler(RPC);
