@@ -436,13 +436,16 @@ reported no concrete HIGH blockers for the latest console/Neon/contract patch.
 All hashes are independently verifiable on [testnet.cspr.live](https://testnet.cspr.live) or via
 `https://api.testnet.cspr.cloud/deploys/{hash}`.
 
-**Bulk on-chain volume:** beyond the curated flows above, **329/329** additional deploys were
-submitted and confirmed on testnet with **zero failures** (same account/contract as above) —
-not just `create_escrow` spam, but the full escrow lifecycle: 163 `create_escrow`, 156
+**Bulk on-chain volume:** beyond the curated flows above, **349/349** additional deploys were
+submitted and confirmed on testnet with **zero failures** (same escrow contract as above) —
+not just `create_escrow` spam, but the full escrow lifecycle: 173 `create_escrow`, 166
 `release`, 4 sender-initiated `refund`, and 3 full `dispute` → 3-of-5 arbiter-multisig
 `resolve` cycles (signed live with the same `demo/test-arbiter-keys/` used by
 [`examples/escrow_agent.py`](examples/escrow_agent.py), confirming the arbiter set survived
-the v8→v9 in-place contract upgrade). Full deploy-hash-by-deploy-hash log:
+the v8→v9 in-place contract upgrade). 20 of the 349 (10 `create`/`release` pairs) use the
+10 pre-generated `agent_01`..`agent_10` accounts as the counterparty receiver, so the log
+also demonstrates multi-agent-wallet participation, not just a single sender/receiver pair.
+Full deploy-hash-by-deploy-hash log:
 [docs/evidence/bulk_escrow_tx_log.jsonl](docs/evidence/bulk_escrow_tx_log.jsonl).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
