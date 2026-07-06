@@ -25,13 +25,15 @@
       live end-to-end with a different account revealing than the one that committed
 - [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
 - [x] Post-quantum ML-KEM metadata encryption
-- [x] 376 Python + 29 Rust automated tests (405 total); see [Testing](README.md#-testing) for
-      current pass rate
+- [x] 437 Python + 40 Rust automated tests (477 total, incl. Hypothesis/proptest property-based
+      invariant tests); see [Testing](README.md#-testing) for current pass rate
 - [x] CI/CD via GitHub Actions
 
 ## Phase 2 — Remaining core upgrades
 
-- [ ] Property-based testing with invariant checks (Hypothesis + proptest)
+- [x] Property-based testing with invariant checks (Hypothesis + proptest) — 9 proptest cases
+      (`contracts/tests/src/property_tests.rs`) covering fee/insurance/TTL/quorum/reputation/HTLC
+      invariants, 3 Hypothesis cases (`tests/test_property_based.py`) for the API-layer fee split
 - [ ] Payment streaming (`/escrow/stream`) currently computes streamed/remaining amounts at the
       API layer only — upgrading to real on-chain per-tick vesting is still open
 - [ ] MCP JSON-Schema registry for the existing 24 tools (schema generation, not new tools)
