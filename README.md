@@ -276,9 +276,9 @@ Deployed on Casper Testnet:
 
 | Contract | Hash | Explorer |
 |---|---|---|
-| Core Escrow | `50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`) | [view](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664) |
+| Core Escrow | `612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`, v9) | [view](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
-| Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` | [view](https://testnet.cspr.live/contract/e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61) |
+| Insurance Pool | `e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929` (A1-hardened redeploy — the old `e36b958d...` had a fully public `claim()`/`withdraw()`, superseded) | [view](https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929) |
 | VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 
@@ -436,9 +436,13 @@ reported no concrete HIGH blockers for the latest console/Neon/contract patch.
 All hashes are independently verifiable on [testnet.cspr.live](https://testnet.cspr.live) or via
 `https://api.testnet.cspr.cloud/deploys/{hash}`.
 
-**Bulk on-chain volume:** beyond the curated flows above, **312/312** additional
-`create_escrow` deploys were submitted and confirmed on testnet with **zero failures**
-(same account/contract as above). Full deploy-hash-by-deploy-hash log:
+**Bulk on-chain volume:** beyond the curated flows above, **329/329** additional deploys were
+submitted and confirmed on testnet with **zero failures** (same account/contract as above) —
+not just `create_escrow` spam, but the full escrow lifecycle: 163 `create_escrow`, 156
+`release`, 4 sender-initiated `refund`, and 3 full `dispute` → 3-of-5 arbiter-multisig
+`resolve` cycles (signed live with the same `demo/test-arbiter-keys/` used by
+[`examples/escrow_agent.py`](examples/escrow_agent.py), confirming the arbiter set survived
+the v8→v9 in-place contract upgrade). Full deploy-hash-by-deploy-hash log:
 [docs/evidence/bulk_escrow_tx_log.jsonl](docs/evidence/bulk_escrow_tx_log.jsonl).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
@@ -473,7 +477,7 @@ Built for **[Casper Agentic Buildathon 2026](https://dorahacks.io/)** · Deploye
 
 *[ae402.xyz](https://ae402.xyz) · [API Docs](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md)*
 
-*Last verified against commit `5937c09` / contract package `d3ca33d1...c8eeb` v8 (`50ca3364...4498664`), 2026-07-05.*
+*Last verified against commit `4b125f1` / contract package `d3ca33d1...c8eeb` v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 </div>
 

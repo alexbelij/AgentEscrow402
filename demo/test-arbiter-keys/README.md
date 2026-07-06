@@ -12,7 +12,12 @@ on our **Casper Testnet** deployment of the Core Escrow contract
   they are not real, funded testnet accounts, just keypairs.
 - Registered on-chain via `set_arbiters` as the 5 addresses whose Ed25519
   signatures the contract accepts as valid arbiter votes (3-of-5 threshold)
-  for `resolve()` on **this specific escrow contract only**.
+  for `resolve()` on **this specific escrow contract only**. Confirmed still
+  valid after the v8→v9 in-place upgrade (current contract hash
+  `612cead2...ddd9ec`, same package `d3ca33d1...c8eeb`) — a real
+  `dispute`→`resolve` cycle signed with these same 5 keys against the current
+  live contract is recorded in
+  [docs/evidence/bulk_escrow_tx_log.jsonl](../../docs/evidence/bulk_escrow_tx_log.jsonl).
 - They are used by `sdk/arbiter_signing.py` / `examples/escrow_agent.py`
   to produce real signatures over the canonical vote message
   `resolve:{service_hash}:{in_favor_of}`, so graders/reviewers can run the
