@@ -56,7 +56,7 @@ async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as c
 Land on **[ae402.xyz](https://ae402.xyz)** and you'll see the live console: a table of escrows with status badges (Pending, Released, Refunded, Disputed, Expired), a real-time event feed, and links to verified Casper Testnet transactions.
 
 The contract is not a demo — it's deployed:
-[`50ca3364...` on testnet.cspr.live](https://testnet.cspr.live/contract/50ca336428601e9920f3493112cad452c4b9359b1a88fd8893441b41c4498664)
+[`612cead2...` on testnet.cspr.live](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec)
 
 Every escrow you create from the console triggers a real on-chain transaction you can verify independently.
 

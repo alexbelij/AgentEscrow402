@@ -2,14 +2,14 @@
 
 > x402-compatible payment middleware for AI agents on Casper Network
 
-*Last verified against commit `5937c09` / testnet contract v8 (`50ca3364...4498664`), 2026-07-05.*
+*Last verified against commit `4b125f1` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 ---
 
 ## Current State (Hackathon submission)
 
-- [x] Smart contract deployed on Casper testnet, package `d3ca33d1...c8eeb`, currently version 8
-      (`50ca3364...4498664`) — 8 in-place upgrades preserving escrow state
+- [x] Smart contract deployed on Casper testnet, package `d3ca33d1...c8eeb`, currently version 9
+      (`612cead2...ddd9ec`) — 9 in-place upgrades preserving escrow state
 - [x] FastAPI backend with PostgreSQL (Neon) persistence
 - [x] Python SDK (`EscrowClient`) + LangChain `EscrowPaymentTool`
 - [x] MCP server exposing **24** escrow/identity/risk/arbitration tools (`sdk/mcp_server.py`)

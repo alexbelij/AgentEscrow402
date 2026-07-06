@@ -6,6 +6,19 @@ Last verified against live testnet + production deploy on 2026-07-06 (contract p
 Upgrade deploy `3be11314...dabedfe`, confirmed on-chain (`error_message: null`,
 `contract_version: 9`), 800 CSPR payment (100/300 CSPR both hit "Out of gas").
 
+**2026-07-07 A1 re-verification (`escrow-manager.create_batch()`):** `create_batch()` only
+transfers funds *into* the contract purse (a deposit, mirroring `create_escrow`'s own funding
+step) — it has no withdrawal path at all, so the A1 "no unilateral agent-key withdraw above cap"
+invariant doesn't apply to it directly. The two entry points on `escrow-manager` that *can* move
+funds out, `batch_release`/`batch_cancel`, remain unreachable dead code (confirmed again via
+repo-wide grep across `server/`, `sdk/`, `frontend/src` — only `create_batch()` is ever called)
+and still lack the per-escrow cap/arbiter-quorum guard the single-escrow `release()`/`resolve()`
+path enforces; do not wire them up without adding that guard first. Also extended
+`docs/evidence/bulk_escrow_tx_log.jsonl` this session with 4 real `refund` and 3 real
+`dispute`→3-of-5-arbiter-`resolve` cycles (all on the current v9 contract, confirmed via
+CSPR.cloud) — previously the bulk log only had `create`/`release` pairs represented in the
+README's description (the file itself already had releases; the README text just undersold it).
+
 v9 fixed 3 items that used to be listed here: reentrancy-style checks-effects-interactions
 ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
 `ERR_FEE_EXCEEDS_AMOUNT`), and a new `unfreeze()` entry point (previously freezing was one-way).
@@ -49,6 +62,19 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   per-escrow amount cap or arbiter-quorum check that the single-escrow `release`/`resolve` path
   does. They are dead code — nothing in the backend or SDK currently calls them — so this is not
   an active vulnerability, but the guard should be added before either entry point is wired up.
+
+## Frontend
+
+- **`frontend/src/components/AgentMarketplace.tsx` is dead code with hardcoded mock agents**
+  (`mockAgents` array) — never imported/rendered anywhere in `App.tsx`/console routes (confirmed
+  via repo-wide grep), so it's not an active bug, but it doesn't call the real `/agents` or
+  `/search/agents` endpoints either. Recommend deleting it or wiring it to the real endpoints
+  before submission, so a judge browsing the file tree doesn't find an unused mock-data component
+  (same category of issue flagged and removed on the RWA-Sentinel project this session).
+- **`escrow-manager.create_batch()` (bulk escrow creation) has no console UI** — the only caller
+  is the `POST /escrows/batch` backend endpoint itself (used by the bulk on-chain evidence
+  script), confirmed via grep across `frontend/src`. If bulk creation is meant to be a
+  user-facing feature rather than an internal evidence-generation tool, it currently isn't one.
 
 ## General
 
