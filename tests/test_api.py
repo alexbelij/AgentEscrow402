@@ -7,7 +7,9 @@ import hashlib
 import pytest
 from fastapi.testclient import TestClient
 
-from server.app import app, get_config, get_sandbox
+from unittest.mock import AsyncMock
+
+from server.app import app, get_config, get_sandbox, get_casper
 from server.config import Config
 from server.sandbox import SandboxStore
 
@@ -117,6 +119,117 @@ class TestEscrowEndpoint:
     def test_get_nonexistent_escrow(self, client):
         resp = client.get(f"/escrow/{_hash('missing')}")
         assert resp.status_code == 404
+
+
+class TestWasmEscrowFunderEndpoint:
+    def test_serves_wasm_bytes(self, client):
+        resp = client.get("/wasm/escrow_funder")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/wasm"
+        assert len(resp.content) > 0
+
+
+class TestLiveWalletCreateEscrow:
+    """`/escrow` POST when `wallet_tx_hash` is set — live-wallet path from
+    `useCreateEscrowAction` (frontend), see server/casper_client.py
+    `confirm_wallet_created_escrow`."""
+
+    @pytest.fixture
+    def live_client(self, sandbox_store):
+        cfg = Config(sandbox=False)
+        mock_casper = AsyncMock()
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[get_sandbox] = lambda: sandbox_store
+        app.dependency_overrides[get_casper] = lambda: mock_casper
+        with TestClient(app) as c:
+            yield c, mock_casper
+        app.dependency_overrides.clear()
+
+    def test_requires_sender_public_key_hex(self, live_client):
+        c, _ = live_client
+        h = _hash("wallet-missing-sender")
+        resp = c.post(
+            "/escrow",
+            json={
+                "receiver": RECEIVER_HEX,
+                "amount": 5000,
+                "service_hash": h,
+                "wallet_tx_hash": "deploy-abc",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_confirmed_wallet_tx_creates_record(self, live_client):
+        c, mock_casper = live_client
+        mock_casper.confirm_wallet_created_escrow = AsyncMock(return_value=(True, None))
+        h = _hash("wallet-confirmed")
+        resp = c.post(
+            "/escrow",
+            json={
+                "receiver": RECEIVER_HEX,
+                "amount": 5000,
+                "service_hash": h,
+                "wallet_tx_hash": "deploy-abc",
+                "sender_public_key_hex": "01" + "ab" * 32,
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["deploy_hash"] == "deploy-abc"
+        assert body["sender"] == "01" + "ab" * 32
+        mock_casper.confirm_wallet_created_escrow.assert_awaited_once()
+
+    def test_unconfirmed_wallet_tx_returns_502_with_revert_reason(self, live_client):
+        c, mock_casper = live_client
+        mock_casper.confirm_wallet_created_escrow = AsyncMock(
+            return_value=(False, "Mint error: 4 (InvalidAccessRights)")
+        )
+        h = _hash("wallet-reverted")
+        resp = c.post(
+            "/escrow",
+            json={
+                "receiver": RECEIVER_HEX,
+                "amount": 5000,
+                "service_hash": h,
+                "wallet_tx_hash": "deploy-def",
+                "sender_public_key_hex": "01" + "cd" * 32,
+            },
+        )
+        assert resp.status_code == 502
+        assert "InvalidAccessRights" in resp.json()["detail"]
+
+    def test_unconfirmed_wallet_tx_without_revert_reason_still_502(self, live_client):
+        c, mock_casper = live_client
+        mock_casper.confirm_wallet_created_escrow = AsyncMock(return_value=(False, None))
+        h = _hash("wallet-pending")
+        resp = c.post(
+            "/escrow",
+            json={
+                "receiver": RECEIVER_HEX,
+                "amount": 5000,
+                "service_hash": h,
+                "wallet_tx_hash": "deploy-ghi",
+                "sender_public_key_hex": "01" + "ef" * 32,
+            },
+        )
+        assert resp.status_code == 502
+        assert "not yet confirmed" in resp.json()["detail"]
+
+    def test_non_wallet_live_path_uses_hosted_casper_create_escrow(self, live_client):
+        c, mock_casper = live_client
+        mock_casper.create_escrow = AsyncMock(return_value="deploy-hosted-1")
+        h = _hash("hosted-live")
+        resp = c.post(
+            "/escrow",
+            json={
+                "receiver": RECEIVER_HEX,
+                "amount": 5000,
+                "service_hash": h,
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["deploy_hash"] == "deploy-hosted-1"
+        mock_casper.create_escrow.assert_awaited_once()
 
 
 class TestReleaseEndpoint:
