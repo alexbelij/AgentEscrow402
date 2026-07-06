@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from server import arbiter_crypto
 from server.casper_client import CasperClient
 from server.config import Config, get_config
 from server.db import get_db, InMemoryDB, get_reputation_db
@@ -86,6 +87,16 @@ class InsuranceClaimRequest(BaseModel):
         default=None,
         description="account-hash-{hex} of the connected wallet, used to poll the on-chain claims dict (required when wallet_tx_hash is set)",
     )
+    # Backend-submitted path (no connected wallet / no wallet_tx_hash): the
+    # caller must have already collected a quorum of real arbiter votes over
+    # `arbiter_crypto.build_insurance_claim_message(escrow_hash, <backend
+    # operator account hash>, amount)` -- see
+    # server/config.py:casper_operator_account_hash for the exact account
+    # hash to bind votes to, since the backend operator key is the one that
+    # signs+submits the on-chain claim() deploy (contracts/insurance-pool's
+    # A1 arbiter-quorum fix requires these on every claim()/withdraw()).
+    arbiter_pubkeys: list[str] = Field(default_factory=list)
+    arbiter_signatures: list[str] = Field(default_factory=list)
 
 
 class PremiumQuoteRequest(BaseModel):
@@ -139,21 +150,45 @@ async def deposit_to_insurance_pool(
 
     logger.info("Agent %s depositing %s motes into insurance pool.", depositor[:8], request.amount)
 
-    # Simulate Casper deploy to transfer funds to the insurance contract
-    # In a real scenario, this would be a contract call to `deposit`
-    try:
-        # deploy_hash = await casper.call_contract(
-        #     contract_hash=config.insurance_contract_hash,
-        #     entry_point="deposit",
-        #     args={"amount": request.amount, "depositor": depositor},
-        #     payment_amount=request.amount,
-        # )
+    # Real on-chain deposit: the x402 header above is this agent's
+    # off-chain-signed authorization/accounting record (same custodial
+    # model as create_escrow/cep18_permit -- the backend operator key is
+    # the actual on-chain funds source), and the pool-funder session-wasm
+    # moves real CSPR into the insurance-pool contract's purse. Demo
+    # console requests (no configured Casper client/contract) still fall
+    # back to the in-memory-only simulation so the hosted demo keeps
+    # working without live credentials.
+    if casper is None or not config.insurance_package_hash:
         deploy_hash = f"deploy-hash-insurance-deposit-{int(time.time())}"
         _insurance_pool["total_assets"] += request.amount
-        _insurance_pool["total_premiums_collected"] += request.amount # Can be used for premiums or direct deposits
+        _insurance_pool["total_premiums_collected"] += request.amount
+        logger.info("Deposit of %s motes by %s recorded (demo/no-chain mode). Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
+        return {"message": "Deposit successful (demo mode, no live Casper client configured)", "deploy_hash": deploy_hash}
+
+    try:
+        deploy_hash = await casper.deposit_to_insurance_pool(request.amount)
     except Exception as e:
-        logger.error("Failed to process insurance deposit for %s: %s", depositor[:8], e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process deposit on-chain")
+        logger.error("Failed to submit insurance deposit deploy for %s: %s", depositor[:8], e)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to submit deposit transaction on-chain: {e}")
+
+    # Poll for a revert before declaring success -- the session-wasm's own
+    # cross-contract call can fail (e.g. contract paused) even though the
+    # deploy itself was accepted by the node.
+    revert_reason: str | None = None
+    for _ in range(8):
+        await asyncio.sleep(2.5)
+        try:
+            revert_reason = await casper.get_deploy_error(deploy_hash)
+        except Exception:
+            revert_reason = None
+        if revert_reason is not None:
+            break
+    if revert_reason:
+        logger.error("Insurance deposit deploy %s reverted: %s", deploy_hash[:16], revert_reason)
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Deposit transaction reverted on-chain: {revert_reason}")
+
+    _insurance_pool["total_assets"] += request.amount
+    _insurance_pool["total_premiums_collected"] += request.amount
 
     logger.info("Deposit of %s motes by %s successful. Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
     return {"message": "Deposit successful", "deploy_hash": deploy_hash}
@@ -273,9 +308,70 @@ async def file_insurance_claim(
         # purse -- this is just the local dashboard/accounting mirror.
         _insurance_pool["total_claims_paid"] += escrow_amount
         _insurance_pool["total_assets"] -= escrow_amount
+    elif casper is not None and config.insurance_contract_hash and request.arbiter_pubkeys:
+        # Backend-submitted path: caller supplied a quorum of real arbiter
+        # votes (collected off-chain, e.g. via `sdk/arbiter_signing.py`-
+        # style signing over `arbiter_crypto.build_insurance_claim_message`)
+        # instead of building+signing the on-chain tx themselves. The
+        # backend operator key submits the deploy and is the on-chain
+        # claimant/payout recipient (A1 fix requires this quorum on every
+        # claim() -- see contracts/insurance-pool/src/main.rs).
+        if len(request.arbiter_pubkeys) != len(request.arbiter_signatures):
+            raise HTTPException(status_code=422, detail="arbiter_pubkeys and arbiter_signatures must have the same length")
+        if config.arbiter_pubkeys:
+            valid_votes = arbiter_crypto.count_valid_insurance_claim_votes(
+                request.arbiter_pubkeys,
+                request.arbiter_signatures,
+                config.arbiter_pubkeys,
+                request.escrow_hash,
+                config.casper_operator_account_hash,
+                escrow_amount,
+            )
+            if valid_votes < config.arbiter_threshold:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"only {valid_votes} valid arbiter signature(s), need >= {config.arbiter_threshold}",
+                )
+        try:
+            deploy_hash = await casper.claim_from_insurance_pool(
+                request.escrow_hash,
+                escrow_amount,
+                request.arbiter_pubkeys,
+                request.arbiter_signatures,
+                evidence=request.reason,
+            )
+        except Exception as e:
+            logger.error("Failed to submit insurance claim deploy for %s: %s", claimant[:8], e)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to submit claim transaction on-chain: {e}")
+
+        confirmed, revert_reason = await casper.confirm_wallet_insurance_claim(
+            config.casper_operator_account_hash, request.escrow_hash, deploy_hash=deploy_hash
+        )
+        if not confirmed:
+            detail = (
+                f"On-chain claim transaction reverted: {revert_reason}"
+                if revert_reason
+                else "Claim transaction not yet confirmed on-chain; local state unchanged"
+            )
+            raise HTTPException(status_code=502, detail=detail)
+
+        _insurance_pool["total_claims_filed"] += 1
+        _claims[request.escrow_hash] = {
+            "claimant": claimant,
+            "escrow_hash": request.escrow_hash,
+            "amount": escrow_amount,
+            "reason": request.reason,
+            "status": "paid",
+            "filed_at": int(time.time()),
+            "deploy_hash": deploy_hash,
+        }
+        _insurance_pool["total_claims_paid"] += escrow_amount
+        _insurance_pool["total_assets"] -= escrow_amount
     else:
-        # Simulated/demo path (no real on-chain insurance-pool contract call
-        # yet) -- kept as-is for the hosted-console demo identity flow.
+        # Simulated/demo path: no live Casper client/contract configured, or
+        # no arbiter votes supplied yet (e.g. hosted-console demo identity
+        # flow) -- keeps the hosted demo functional without live credentials
+        # or a full off-chain arbiter-signing round trip.
         try:
             deploy_hash = f"deploy-hash-insurance-claim-{int(time.time())}"
             _insurance_pool["total_claims_filed"] += 1

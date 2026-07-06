@@ -40,6 +40,32 @@ def build_cap_approval_message(action: str, service_hash: str) -> bytes:
     return f"{action}:{service_hash}:cap_approval".encode("utf-8")
 
 
+def build_insurance_claim_message(escrow_id: str, claimant_account_hash: str, amount: int) -> bytes:
+    """Canonical message an arbiter signs to approve an insurance-pool
+    `claim()` payout (A1 hardening, see `build_claim_message` in
+    contracts/insurance-pool/src/main.rs). `claimant_account_hash` must be
+    the raw lowercase-hex account hash (no `account-hash-` prefix) of
+    whichever account will actually submit+sign the on-chain `claim()`
+    deploy -- the contract binds the vote to `runtime::get_caller()`, not
+    to any identity carried in the request body.
+    """
+    return f"claim:{escrow_id}:{claimant_account_hash}:{amount}".encode("utf-8")
+
+
+def count_valid_insurance_claim_votes(
+    pubkeys: list[str],
+    signatures: list[str],
+    registered: tuple[str, ...],
+    escrow_id: str,
+    claimant_account_hash: str,
+    amount: int,
+) -> int:
+    """Same as `count_valid_votes`, but for an insurance-pool `claim()`
+    payout approval message instead of an escrow resolve() verdict."""
+    message = build_insurance_claim_message(escrow_id, claimant_account_hash, amount)
+    return count_valid_votes_for_message(pubkeys, signatures, registered, message)
+
+
 def _pubkey_from_hex(pubkey_hex: str) -> Ed25519PublicKey | None:
     if not pubkey_hex.lower().startswith(ED25519_TAG_HEX):
         return None  # only ed25519 arbiter keys are supported (secp256k1 arbiters not modeled)
