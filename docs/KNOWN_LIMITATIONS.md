@@ -43,7 +43,6 @@ Last verified against live testnet + production deploy on 2026-07-05 (contract p
   `server/multi_asset.py`, but there is no on-chain per-tick release; the underlying escrow is
   released the same way as a normal escrow. Fine for demoing the UX pattern, not a production
   payment-streaming primitive yet.
-- **No rate limiting** — The FastAPI server does not implement request rate limiting.
 - **Single-process only** — The global `casper_client` instance is not thread-safe for
   multi-worker deployments.
 
