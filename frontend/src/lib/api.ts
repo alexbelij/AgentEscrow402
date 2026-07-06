@@ -217,6 +217,13 @@ export interface CreateEscrowRequest {
   amount: number;        // amount in motes (1 CSPR = 1e9 motes)
   service_hash: string;  // 64-char hex identifier for the service
   ttl?: number;          // time-to-live in seconds (60..86400), default 300
+  // Live-wallet path only (see useCreateEscrowAction/liveTx.ts): set when
+  // the connected wallet already built, signed and submitted a session-wasm
+  // transaction that funds this escrow's deposit from its own purse. The
+  // backend then only polls on-chain state to confirm, instead of signing
+  // or submitting anything itself.
+  wallet_tx_hash?: string;
+  sender_public_key_hex?: string;
 }
 
 export interface EscrowActionRequest {

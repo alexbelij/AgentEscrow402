@@ -4,6 +4,7 @@ import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Est
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import { useSigner } from '../../lib/signer';
 import { useLifecycleAction } from '../../lib/useLifecycleAction';
+import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
 import ExplorerLink from './ExplorerLink';
 import {
@@ -123,6 +124,7 @@ const Escrows: React.FC = () => {
   const toast = useToast();
   const { isLive, activePublicKey } = useSigner();
   const { run: runLifecycleAction } = useLifecycleAction();
+  const { run: runCreateEscrowAction } = useCreateEscrowAction();
   const [contractHash, setContractHash] = useState<string | undefined>(undefined);
   const [escrows, setEscrows] = useState<Escrow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,13 +212,19 @@ const Escrows: React.FC = () => {
     }
   };
 
-  const handleCreateEscrow = async (formData: CreateEscrowRequest) => {
+  const handleCreateEscrow = async (formData: CreateEscrowRequest, netAmountMotes: number) => {
     setLoading(true); // Use a separate loading for forms if needed
     setError(null);
     try {
-      const res = await api.createEscrow(formData);
-      if (res.error) throw new Error(res.error);
-      toast.success(`Escrow created — deploy hash ${res.data?.deploy_hash}`);
+      const result = await runCreateEscrowAction(formData, contractHash, netAmountMotes);
+      if (!result.ok) {
+        if (result.cancelled) {
+          setError('Cancelled in wallet.');
+          return;
+        }
+        throw new Error(result.error);
+      }
+      toast.success(`Escrow created — ${isLive ? 'transaction hash' : 'deploy hash'} ${result.deployHash}`);
       setIsCreateModalOpen(false);
       fetchEscrows(); // Refresh list
     } catch (err) {
@@ -689,7 +697,10 @@ const Escrows: React.FC = () => {
 interface CreateEscrowModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (data: CreateEscrowRequest) => void;
+  // netAmountMotes is the fee-adjusted deposit amount (from /estimate) —
+  // needed by the live-wallet path, which must deposit the same net amount
+  // on-chain that the backend will record locally (see useCreateEscrowAction).
+  onCreate: (data: CreateEscrowRequest, netAmountMotes: number) => void;
 }
 
 const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, onCreate }) => {
@@ -753,12 +764,16 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
 
     setCreateLoading(true);
     try {
-      await onCreate({
-        receiver,
-        amount: csprToMotes(Number(amount)),
-        service_hash: serviceHash,
-        ttl: Number(ttl) || 300,
-      });
+      const grossMotes = csprToMotes(Number(amount));
+      await onCreate(
+        {
+          receiver,
+          amount: grossMotes,
+          service_hash: serviceHash,
+          ttl: Number(ttl) || 300,
+        },
+        estimate?.net_amount ?? grossMotes,
+      );
       // Reset form on successful creation (handled by parent component's onCreate)
       setReceiver('');
       setAmount('');

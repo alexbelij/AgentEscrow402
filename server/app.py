@@ -8,6 +8,7 @@ import logging
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -387,6 +388,29 @@ async def list_escrows(
     return {"escrows": page_records, "total": total, "page": page, "limit": limit}
 
 
+@app.get("/wasm/escrow_funder")
+async def wasm_escrow_funder():
+    """Serve the session-wasm module used to fund an escrow's on-chain
+    deposit directly from a caller's own main purse (see
+    `sendCreateEscrowTx` in frontend/src/lib/liveTx.ts). Session code
+    executed under the signer's own account context is the only way the
+    Casper execution engine grants legitimate elevated purse access — a
+    plain stored-contract call cannot (see wallet_frontend_gotchas skill
+    notes on `Mint error: 4` / InvalidAccessRights). This is the exact same
+    compiled artifact the backend's own hosted-key flow already runs
+    (`server/casper_tx/escrow_funder.wasm`); serving it lets the connected
+    wallet sign+submit it itself instead.
+    """
+    wasm_path = Path(__file__).resolve().parent / "casper_tx" / "escrow_funder.wasm"
+    if not wasm_path.exists():
+        raise HTTPException(status_code=500, detail="escrow_funder.wasm not found on server")
+    return StreamingResponse(
+        iter([wasm_path.read_bytes()]),
+        media_type="application/wasm",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
 @app.post("/escrow", response_model=EscrowRecord)
 async def create_escrow(
     req: EscrowRequest,
@@ -395,7 +419,15 @@ async def create_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
-    sender = _extract_sender(request)
+    if req.wallet_tx_hash:
+        if not req.sender_public_key_hex:
+            raise HTTPException(
+                status_code=422,
+                detail="sender_public_key_hex is required when wallet_tx_hash is set",
+            )
+        sender = req.sender_public_key_hex
+    else:
+        sender = _extract_sender(request)
 
     # Apply insurance fee
     net_amount, fee = _apply_insurance_fee(req.amount, cfg.insurance_fee_bps)
@@ -438,13 +470,26 @@ async def create_escrow(
             raise HTTPException(status_code=409, detail="Escrow creation conflict")
 
     # Live mode — deploy to Casper
-    deploy_hash = await casper.create_escrow(
-        sender=sender,
-        receiver=req.receiver,
-        amount=net_amount,
-        service_hash=req.service_hash,
-        ttl=req.ttl,
-    )
+    if req.wallet_tx_hash:
+        confirmed, revert_reason = await casper.confirm_wallet_created_escrow(
+            req.service_hash, deploy_hash=req.wallet_tx_hash
+        )
+        if not confirmed:
+            detail = (
+                f"On-chain create-escrow transaction reverted: {revert_reason}"
+                if revert_reason
+                else "Wallet transaction not yet confirmed on-chain; local state unchanged"
+            )
+            raise HTTPException(status_code=502, detail=detail)
+        deploy_hash = req.wallet_tx_hash
+    else:
+        deploy_hash = await casper.create_escrow(
+            sender=sender,
+            receiver=req.receiver,
+            amount=net_amount,
+            service_hash=req.service_hash,
+            ttl=req.ttl,
+        )
     now = int(time.time())
     record = EscrowRecord(
         sender=sender,

@@ -27,11 +27,24 @@ import {
   CLValue,
   ContractCallBuilder,
   PublicKey,
+  SessionBuilder,
 } from 'casper-js-sdk'
 import type { ICSPRClickSDK } from '@make-software/csprclick-core-types'
 
 export const CASPER_CHAIN_NAME = 'casper-test'
 export const LIFECYCLE_PAYMENT_MOTES = 5_000_000_000 // matches lifecycle.mjs
+// Matches server/casper_tx/create_escrow.mjs — proven sufficient for the
+// escrow_funder.wasm session module (deploy + one purse-to-purse transfer).
+export const CREATE_ESCROW_PAYMENT_MOTES = 12_000_000_000
+
+function hexToBytes(hex: string): Uint8Array {
+  const clean = hex.length % 2 === 0 ? hex : `0${hex}`
+  const out = new Uint8Array(clean.length / 2)
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(clean.substring(i * 2, i * 2 + 2), 16)
+  }
+  return out
+}
 
 export type LifecycleEntryPoint = 'release' | 'refund' | 'dispute'
 
@@ -78,4 +91,76 @@ export async function sendLifecycleTx(
   } catch (err: any) {
     return { ok: false, cancelled: false, error: err?.message || String(err) }
   }
+}
+
+/**
+ * Build + sign + submit a create-escrow deposit via the connected wallet.
+ *
+ * Unlike release/refund/dispute (plain `ContractCallBuilder` calls), the
+ * escrow contract's `escrow()` entry point needs a `source_purse: URef` to
+ * pull the deposit from — and Casper's execution engine strips access
+ * rights from any purse URef passed as an external argument to a *stored*
+ * contract call (confirmed on testnet: `Mint error: 4` /
+ * `InvalidAccessRights`; see skills/web3_development/references/
+ * wallet_frontend_gotchas.md). Only *session* code executing under the
+ * signer's own account context can legitimately pull from its own main
+ * purse via `account::get_main_purse()`. So this builds a `SessionBuilder`
+ * transaction around `escrow_funder.wasm` (fetched from the backend, which
+ * itself already runs this exact compiled module today via its hosted-key
+ * flow) instead of a stored-contract-call — same wasm, now signed by the
+ * connected wallet instead of the backend's PEM key.
+ */
+export async function sendCreateEscrowTx(
+  clickRef: ICSPRClickSDK,
+  opts: {
+    contractHash: string
+    receiverHex: string // 64-char hex account hash, no "account-hash-" prefix
+    amountMotes: number | string
+    serviceHash: string
+    ttlSeconds: number
+    senderPublicKeyHex: string
+    wasmBytes: Uint8Array
+  },
+): Promise<LiveTxResult> {
+  try {
+    const args = Args.fromMap({
+      contract: CLValue.newCLByteArray(hexToBytes(opts.contractHash)),
+      receiver: CLValue.newCLByteArray(hexToBytes(opts.receiverHex)),
+      amount: CLValue.newCLUInt512(String(opts.amountMotes)),
+      service_hash: CLValue.newCLString(opts.serviceHash),
+      ttl: CLValue.newCLUint64(opts.ttlSeconds),
+    })
+
+    const tx = new SessionBuilder()
+      .from(PublicKey.fromHex(opts.senderPublicKeyHex))
+      .wasm(opts.wasmBytes)
+      .runtimeArgs(args)
+      .chainName(CASPER_CHAIN_NAME)
+      .payment(CREATE_ESCROW_PAYMENT_MOTES)
+      .build()
+
+    const res = await clickRef.send(tx.toJSON() as object, opts.senderPublicKeyHex)
+
+    if (res?.transactionHash) {
+      return { ok: true, transactionHash: res.transactionHash }
+    }
+    if (res?.cancelled) {
+      return { ok: false, cancelled: true }
+    }
+    const rawError = (res as any)?.error ?? (res as any)?.errorData ?? 'Unknown error from wallet SDK'
+    const errorMessage = typeof rawError === 'string' ? rawError : JSON.stringify(rawError)
+    return { ok: false, cancelled: false, error: errorMessage }
+  } catch (err: any) {
+    return { ok: false, cancelled: false, error: err?.message || String(err) }
+  }
+}
+
+/** Fetch the compiled escrow_funder.wasm session module bytes from the backend. */
+export async function fetchEscrowFunderWasm(): Promise<Uint8Array> {
+  const res = await fetch('/backend/wasm/escrow_funder')
+  if (!res.ok) {
+    throw new Error(`Failed to fetch escrow_funder.wasm: HTTP ${res.status}`)
+  }
+  const buf = await res.arrayBuffer()
+  return new Uint8Array(buf)
 }
