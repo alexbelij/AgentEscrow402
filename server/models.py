@@ -30,6 +30,19 @@ class EscrowRequest(BaseModel):
     amount: int = Field(..., gt=0, description="Amount in motes")
     service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
+    # Set when the wallet-connected caller already built, signed (via their
+    # own Casper Wallet/Ledger/MetaMask through CSPR.click) and submitted a
+    # session-wasm transaction that funds this escrow's deposit directly
+    # from their own main purse (see `sendCreateEscrowTx` in
+    # frontend/src/lib/liveTx.ts). In that case the backend does not sign
+    # or submit anything itself — it only polls contract state and confirms
+    # the escrow actually exists on-chain before creating hosted records.
+    wallet_tx_hash: str | None = Field(default=None, min_length=1, max_length=128)
+    # The connected wallet's own public key (hex) — recorded locally as
+    # `sender` so the console's identity-gating (Escrows.tsx `canActOnEscrow`)
+    # matches the real on-chain sender. Required whenever `wallet_tx_hash`
+    # is set; ignored otherwise (identity comes from `_extract_sender`).
+    sender_public_key_hex: str | None = Field(default=None, min_length=1, max_length=140)
 
 
 class EscrowRecord(BaseModel):
