@@ -567,3 +567,123 @@ class TestConfirmWalletCreatedEscrow:
         )
         assert confirmed is False
         assert reason is None
+
+
+class TestDepositToInsurancePool:
+    @pytest.mark.asyncio
+    async def test_requires_package_hash(self):
+        client = make_client()
+        client._insurance_package_hash = ""
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(RuntimeError, match="insurance_package_hash"):
+            await client.deposit_to_insurance_pool(1000)
+
+    @pytest.mark.asyncio
+    async def test_requires_key_path(self):
+        client = make_client()
+        client._insurance_package_hash = "pkg" * 20
+        client._key_path = None
+        with pytest.raises(RuntimeError, match="private key"):
+            await client.deposit_to_insurance_pool(1000)
+
+    @pytest.mark.asyncio
+    async def test_requires_wasm_present(self, monkeypatch):
+        import pathlib
+
+        client = make_client()
+        client._insurance_package_hash = "pkg" * 20
+        client._key_path = "/tmp/key.pem"
+        monkeypatch.setattr(pathlib.Path, "exists", lambda self: False)
+        with pytest.raises(RuntimeError, match="pool-funder wasm"):
+            await client.deposit_to_insurance_pool(1000)
+
+    @pytest.mark.asyncio
+    async def test_success_returns_hash(self, monkeypatch):
+        import pathlib
+
+        client = make_client()
+        client._insurance_package_hash = "pkg" * 20
+        client._key_path = "/tmp/key.pem"
+        monkeypatch.setattr(pathlib.Path, "exists", lambda self: True)
+        client._run_node_script = AsyncMock(return_value="deploy-pool-deposit-1")
+        result = await client.deposit_to_insurance_pool(500_000_000)
+        assert result == "deploy-pool-deposit-1"
+
+
+class TestClaimFromInsurancePool:
+    @pytest.mark.asyncio
+    async def test_requires_contract_hash(self):
+        client = make_client()
+        client._insurance_contract_hash = ""
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(RuntimeError, match="insurance_contract_hash"):
+            await client.claim_from_insurance_pool("e1", 1000, ["pk1"], ["sig1"])
+
+    @pytest.mark.asyncio
+    async def test_requires_key_path(self):
+        client = make_client()
+        client._insurance_contract_hash = "contract-hash"
+        client._key_path = None
+        with pytest.raises(RuntimeError, match="private key"):
+            await client.claim_from_insurance_pool("e1", 1000, ["pk1"], ["sig1"])
+
+    @pytest.mark.asyncio
+    async def test_rejects_empty_or_mismatched_arbiter_lists(self):
+        client = make_client()
+        client._insurance_contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        with pytest.raises(ValueError, match="arbiter_pubkeys"):
+            await client.claim_from_insurance_pool("e1", 1000, [], [])
+        with pytest.raises(ValueError, match="arbiter_pubkeys"):
+            await client.claim_from_insurance_pool("e1", 1000, ["pk1", "pk2"], ["sig1"])
+
+    @pytest.mark.asyncio
+    async def test_success_returns_hash(self):
+        client = make_client()
+        client._insurance_contract_hash = "contract-hash"
+        client._key_path = "/tmp/key.pem"
+        client._run_node_script = AsyncMock(return_value="deploy-pool-claim-1")
+        result = await client.claim_from_insurance_pool(
+            "e1", 1000, ["pk1", "pk2", "pk3"], ["sig1", "sig2", "sig3"], evidence="proof"
+        )
+        assert result == "deploy-pool-claim-1"
+
+
+class TestConfirmWalletInsuranceClaim:
+    @pytest.mark.asyncio
+    async def test_requires_insurance_contract_hash(self):
+        client = make_client()
+        client._insurance_contract_hash = ""
+        confirmed, reason = await client.confirm_wallet_insurance_claim("aa" * 32, "e1")
+        assert confirmed is False
+        assert reason == "insurance contract hash not configured"
+
+    @pytest.mark.asyncio
+    async def test_strips_account_hash_prefix_before_querying(self):
+        client = make_client()
+        client._insurance_contract_hash = "contract-hash"
+        seen_keys = []
+
+        async def _fake_query(dict_name, key, contract_hash=None):
+            seen_keys.append(key)
+            return {"parsed": ["x", 0, "e1"]}
+
+        client.query_contract_dict = _fake_query
+        confirmed, reason = await client.confirm_wallet_insurance_claim(
+            "account-hash-" + "aa" * 32, "e1", attempts=1, delay_seconds=0
+        )
+        assert confirmed is True
+        assert reason is None
+        assert seen_keys == ["aa" * 32]  # prefix stripped, not passed through raw
+
+    @pytest.mark.asyncio
+    async def test_times_out_and_reports_revert_reason(self):
+        client = make_client()
+        client._insurance_contract_hash = "contract-hash"
+        client.query_contract_dict = AsyncMock(return_value=None)
+        client.get_deploy_error = AsyncMock(return_value="User error: 8")
+        confirmed, reason = await client.confirm_wallet_insurance_claim(
+            "aa" * 32, "e1", deploy_hash="deploy-xyz", attempts=1, delay_seconds=0
+        )
+        assert confirmed is False
+        assert reason == "User error: 8"

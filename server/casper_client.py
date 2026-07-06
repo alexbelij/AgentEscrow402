@@ -376,7 +376,12 @@ class CasperClient:
         if not self._key_path:
             raise RuntimeError("private key not configured")
         if not _POOL_FUNDER_WASM.exists():
-            raise RuntimeError(f"pool-funder wasm not found at {_POOL_FUNDER_WASM}")
+            # Deliberately don't include the absolute sandbox filesystem path
+            # in the exception message -- server/insurance.py surfaces `str(e)`
+            # in its 502 response detail, and that path has no value to an API
+            # caller (only to server-side logs/ops).
+            logger.error("pool-funder wasm not found at %s", _POOL_FUNDER_WASM)
+            raise RuntimeError("pool-funder wasm not found (deployment misconfigured)")
         return await self._run_node_script(
             _FUND_POOL_SCRIPT,
             {
