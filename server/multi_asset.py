@@ -99,6 +99,23 @@ _commit_reveals: dict[str, dict[str, Any]] = {}
 _store_lock = asyncio.Lock()
 
 
+class PermitProof(BaseModel):
+    """CEP-2612-inspired gasless permit proof (see CasperClient.cep18_permit).
+
+    The owner signs `owner_account_hash` was authorized to allow
+    `spender_account_hash` (always the backend operator's own account, the
+    relayer) to move `amount` of the token identified by the surrounding
+    request, off-chain via their own wallet -- see
+    frontend/src/lib/cep18Permit.ts for the exact canonical message the
+    signature must cover. The backend never sees or needs the owner's
+    private key.
+    """
+
+    owner_account_hash: str = Field(..., min_length=64, max_length=64)
+    deadline: int = Field(..., description="Unix ms deadline, must be in the future")
+    signature: str = Field(..., description="Owner's Ed25519 signature, hex, tag-prefixed")
+
+
 class TokenIdentifier(BaseModel):
     """Identifies a token type (CSPR, CEP-18, CEP-78)."""
 
@@ -124,6 +141,14 @@ class MultiAssetEscrowRequest(BaseModel):
     token: TokenIdentifier = Field(..., description="Details of the token being escrowed")
     service_hash: str = Field(..., min_length=64, max_length=64)
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
+    permit: PermitProof | None = Field(
+        None,
+        description=(
+            "CEP-18-only: when set, funds move from the owner's own wallet "
+            "balance via a gasless permit()+transfer_from() instead of the "
+            "backend's custodial demo balance."
+        ),
+    )
 
 
 class StreamEscrowRequest(BaseModel):
@@ -204,8 +229,22 @@ class TokenAdapter(abc.ABC):
         self._config = config
 
     @abc.abstractmethod
-    async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
-        """Transfers tokens to the escrow contract."""
+    async def transfer_to_escrow(
+        self,
+        sender: str,
+        receiver: str,
+        amount: int,
+        token_id: TokenIdentifier,
+        permit: "PermitProof | None" = None,
+    ) -> str:
+        """Transfers tokens to the escrow contract.
+
+        `permit`, when set (CEP-18 only), makes this a real live-wallet
+        transfer: the owner signed a gasless permit() message with their
+        own wallet (never submitting a tx or exposing their key), and this
+        call spends that allowance via transfer_from() instead of moving
+        the backend operator's own custodial balance.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -222,7 +261,9 @@ class TokenAdapter(abc.ABC):
 class CsprAdapter(TokenAdapter):
     """Adapter for Casper native token (CSPR)."""
 
-    async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
+    async def transfer_to_escrow(
+        self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier, permit: "PermitProof | None" = None
+    ) -> str:
         logger.info("Simulating CSPR transfer from %s to escrow for %s motes", sender, amount)
         # In a real scenario, this would involve a Casper deploy to transfer CSPR
         # to the escrow contract, potentially calling an entry point.
@@ -247,11 +288,47 @@ class Cep18Adapter(TokenAdapter):
     on-chain `transfer` call is signed by the client's configured operator
     key (same account that deployed the escrow/insurance-pool/VRF-arbiter
     contracts and the token itself), same as CsprAdapter's escrow funding.
+
+    Unless `permit` is supplied (see PermitProof) -- then real funds move
+    out of the owner's own on-chain balance via a gasless permit() +
+    transfer_from(), not the operator's custodial balance. See
+    server/casper_tx/cep18_permit.mjs / cep18_transfer_from.mjs and
+    CasperClient.cep18_permit/cep18_transfer_from/get_cep18_permit_nonce.
     """
 
-    async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
+    async def transfer_to_escrow(
+        self,
+        sender: str,
+        receiver: str,
+        amount: int,
+        token_id: TokenIdentifier,
+        permit: "PermitProof | None" = None,
+    ) -> str:
         if not token_id.contract_hash:
             raise ValueError("CEP-18 token requires contract_hash")
+        if permit is not None:
+            logger.info(
+                "CEP-18 gasless-permit transfer of %s units from owner %s to %s for contract %s",
+                amount,
+                permit.owner_account_hash[:16],
+                receiver[:16],
+                token_id.contract_hash[:16],
+            )
+            # `sender` (the x402-authenticated caller) must be the wallet
+            # that signed the permit, and doubles as the public key needed
+            # to verify the signature on-chain -- see PermitProof docstring.
+            await self._casper.cep18_permit(
+                token_id.contract_hash,
+                permit.owner_account_hash,
+                sender,
+                self._config.casper_operator_account_hash,
+                amount,
+                permit.deadline,
+                permit.signature,
+            )
+            return await self._casper.cep18_transfer_from(
+                token_id.contract_hash, permit.owner_account_hash, receiver, amount
+            )
         logger.info(
             "CEP-18 transfer of %s units from %s to escrow for contract %s",
             amount,
@@ -288,10 +365,20 @@ class Cep78Adapter(TokenAdapter):
     `token_id` (there is no fungible quantity for an NFT transfer).
     """
 
-    async def transfer_to_escrow(self, sender: str, receiver: str, amount: int, token_id: TokenIdentifier) -> str:
+    async def transfer_to_escrow(
+        self,
+        sender: str,
+        receiver: str,
+        amount: int,
+        token_id: TokenIdentifier,
+        permit: "PermitProof | None" = None,
+    ) -> str:
         if not token_id.contract_hash:
             raise ValueError("CEP-78 token requires contract_hash")
         # For NFTs, `amount` carries the ordinal token_id (e.g., NFT #3).
+        # `permit` is CEP-18-only (NFTs have no allowance/permit standard
+        # equivalent here) -- silently ignored if ever passed by mistake,
+        # same as it would be a no-op for CsprAdapter.
         logger.info(
             "CEP-78 NFT transfer of token_id %s from %s to escrow for contract %s",
             amount,
@@ -345,6 +432,26 @@ def _build_token_adapter(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported token type: {token_id.token_type}")
 
 
+@router.get("/cep18-permit-nonce")
+async def get_cep18_permit_nonce(
+    contract_hash: str,
+    owner_account_hash: str,
+    casper: CasperClient | None = Depends(get_casper),
+) -> dict[str, Any]:
+    """Public read of the next expected permit nonce for `owner_account_hash`
+    on the given CEP-18 contract -- needed by the frontend to build the
+    exact canonical message the wallet will sign (see PermitProof /
+    frontend/src/lib/cep18Permit.ts). No auth needed: this is public
+    on-chain state, not a state-changing call.
+    """
+    if casper is None:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Casper client not configured")
+    if len(contract_hash) != 64:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="contract_hash must be 64-char hex")
+    nonce = await casper.get_cep18_permit_nonce(contract_hash, owner_account_hash)
+    return {"nonce": nonce, "spender_account_hash": get_config().casper_operator_account_hash}
+
+
 @router.post("/multi-asset", response_model=EscrowRecord, status_code=status.HTTP_201_CREATED)
 async def create_multi_asset_escrow(
     request: MultiAssetEscrowRequest,
@@ -374,9 +481,19 @@ async def create_multi_asset_escrow(
         request.token.token_type,
     )
 
-    # Simulate token transfer to the escrow contract
+    if request.permit is not None and request.token.token_type != "cep18":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="permit is only supported for token_type 'cep18'",
+        )
+
+    # Simulate token transfer to the escrow contract (or, if `permit` is
+    # set, a real gasless live-wallet transfer -- see PermitProof/
+    # Cep18Adapter.transfer_to_escrow).
     try:
-        deploy_hash = await token_adapter.transfer_to_escrow(sender, request.receiver, request.amount, request.token)
+        deploy_hash = await token_adapter.transfer_to_escrow(
+            sender, request.receiver, request.amount, request.token, request.permit
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:

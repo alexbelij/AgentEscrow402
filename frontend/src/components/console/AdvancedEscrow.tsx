@@ -10,6 +10,8 @@ import {
 } from '../../lib/api';
 import { randomHex64 } from '../../lib/format';
 import { Coins, Waves, KeyRound, Loader2, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { useSigner } from '../../lib/signer';
+import { useCep18PermitDeposit } from '../../lib/useCep18PermitDeposit';
 
 type Tab = 'token' | 'stream' | 'swap';
 
@@ -97,6 +99,12 @@ const AdvancedEscrow: React.FC = () => {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [tokenResult, setTokenResult] = useState<TransactionHash | null>(null);
+  const { isLive } = useSigner();
+  const { run: runPermitDeposit } = useCep18PermitDeposit();
+  // Live-wallet CEP-18 escrows default to the real gasless-permit path
+  // (funds move from the connected wallet's own balance); users can opt
+  // back into the demo custodial path if they don't have real AETUSD.
+  const [useGaslessPermit, setUseGaslessPermit] = useState(true);
 
   // --- Streaming escrow state ---
   const [streamReceiver, setStreamReceiver] = useState(DEMO_AGENT_RECEIVER);
@@ -140,6 +148,22 @@ const AdvancedEscrow: React.FC = () => {
         service_hash: tokenServiceHash,
         ttl: Number(tokenTtl),
       };
+      if (isLive && tokenIdentifier.token_type === 'cep18' && useGaslessPermit) {
+        // Real live-wallet path: the connected wallet only signs an
+        // off-chain permit message (no tx, no gas) -- the backend relayer
+        // submits permit()+transfer_from() on-chain, moving funds out of
+        // the wallet's own real balance. See useCep18PermitDeposit.
+        const result = await runPermitDeposit(req);
+        if (!result.ok) {
+          if (result.cancelled) {
+            setTokenError('Cancelled in wallet.');
+            return;
+          }
+          throw new Error(result.error);
+        }
+        setTokenResult(result.result);
+        return;
+      }
       const res = await api.createMultiAssetEscrow(req);
       if (res.error) throw new Error(res.error);
       setTokenResult(res.data || null);
@@ -261,6 +285,22 @@ const AdvancedEscrow: React.FC = () => {
               </div>
             </div>
             <TokenSelect value={tokenIdentifier} onChange={setTokenIdentifier} />
+            {isLive && tokenIdentifier.token_type === 'cep18' && (
+              <label className="flex items-start gap-2 mb-4 text-sm text-gray-300 bg-emerald-500/10 border border-emerald-500/30 rounded-md p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useGaslessPermit}
+                  onChange={(e) => setUseGaslessPermit(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <strong className="text-emerald-300">Gasless wallet permit</strong> — sign an off-chain message only
+                  (no transaction, no gas); funds move from your own connected wallet's real CEP-18 balance via a
+                  relayer-submitted <code>permit()</code>+<code>transfer_from()</code>. Uncheck to use the demo
+                  custodial balance instead.
+                </span>
+              </label>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className={labelCls}>Service hash</label>

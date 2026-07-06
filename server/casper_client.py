@@ -26,6 +26,8 @@ _CREATE_SCRIPT = _SCRIPT_DIR / "create_escrow.mjs"
 _LIFECYCLE_SCRIPT = _SCRIPT_DIR / "lifecycle.mjs"
 _RESOLVE_SCRIPT = _SCRIPT_DIR / "resolve.mjs"
 _CEP18_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep18_transfer.mjs"
+_CEP18_PERMIT_SCRIPT = _SCRIPT_DIR / "cep18_permit.mjs"
+_CEP18_TRANSFER_FROM_SCRIPT = _SCRIPT_DIR / "cep18_transfer_from.mjs"
 _CEP78_MINT_SCRIPT = _SCRIPT_DIR / "cep78_mint.mjs"
 _CEP78_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep78_transfer.mjs"
 _SWAP_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "swap_lifecycle.mjs"
@@ -713,6 +715,115 @@ class CasperClient:
             return 0
         parsed = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
         return int(parsed) if parsed is not None else 0
+
+    # ── CEP-2612-inspired gasless permit (AE402 fork extension) ────────────
+    #
+    # Unlike cep18_transfer() above (custodial: moves the *operator's own*
+    # balance), this pair actually moves tokens out of the real token
+    # owner's (the connected wallet's) own balance -- the owner only signs
+    # a canonical off-chain message (see server/casper_tx/cep18_permit.mjs
+    # docstring for the exact message layout, must match the frontend
+    # signer + the Rust contract's `permit()` byte-for-byte), then this
+    # client (as the relayer) submits + pays gas for both permit() (grants
+    # the allowance, signature-gated) and transfer_from() (pulls the funds
+    # using that allowance) -- the owner never has to submit a transaction,
+    # pay gas, or hand over their private key.
+
+    async def get_cep18_permit_nonce(self, contract_hash: str, owner_account_hash_hex: str) -> int:
+        """Reads the next expected permit nonce for `owner` directly from
+        the contract's `permit_nonces` dictionary (no tx needed). 0 if
+        `permit()` has never succeeded for this owner (dictionary entry,
+        or the dictionary itself, may not exist yet)."""
+        owner_account_hash_hex = (
+            owner_account_hash_hex.replace("account-hash-", "")
+            if owner_account_hash_hex.startswith("account-hash-")
+            else owner_account_hash_hex
+        )
+        named_keys = await self._get_cep18_named_keys(contract_hash)
+        nonces_uref = named_keys.get("permit_nonces")
+        if not nonces_uref:
+            return 0
+        owner_bytes = bytes([0]) + bytes.fromhex(owner_account_hash_hex)
+        # Must match Rust's `make_dictionary_item_key(&owner, &owner)`:
+        # blake2b-256(owner_bytes ++ owner_bytes), hex-encoded.
+        import hashlib
+
+        dictionary_item_key = hashlib.blake2b(owner_bytes + owner_bytes, digest_size=32).hexdigest()
+        srh = await self._get_state_root_hash()
+        try:
+            result = await self._rpc(
+                "state_get_dictionary_item",
+                {
+                    "state_root_hash": srh,
+                    "dictionary_identifier": {
+                        "URef": {
+                            "seed_uref": nonces_uref,
+                            "dictionary_item_key": dictionary_item_key,
+                        }
+                    },
+                },
+            )
+        except RuntimeError:
+            return 0
+        parsed = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
+        return int(parsed) if parsed is not None else 0
+
+    async def cep18_permit(
+        self,
+        contract_hash: str,
+        owner_account_hash_hex: str,
+        owner_public_key_hex: str,
+        spender_account_hash_hex: str,
+        amount: int,
+        deadline_ms: int,
+        signature_hex: str,
+    ) -> str:
+        """Submits (and pays gas for) the owner-signed `permit()` call.
+        Reverts on-chain (raises here) if the signature doesn't match, the
+        deadline has passed, or the public key doesn't hash to `owner`."""
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _CEP18_PERMIT_SCRIPT,
+            {
+                "CONTRACT_HASH": contract_hash,
+                "OWNER_ACCOUNT_HASH": owner_account_hash_hex.replace("account-hash-", ""),
+                "OWNER_PUBLIC_KEY": owner_public_key_hex,
+                "SPENDER_ACCOUNT_HASH": spender_account_hash_hex.replace("account-hash-", ""),
+                "AMOUNT": str(amount),
+                "DEADLINE": str(deadline_ms),
+                "SIGNATURE": signature_hex,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def cep18_transfer_from(
+        self,
+        contract_hash: str,
+        owner_account_hash_hex: str,
+        recipient_account_hash_hex: str,
+        amount: int,
+    ) -> str:
+        """Pulls `amount` from `owner`'s balance into `recipient`, using an
+        allowance previously granted (e.g. by cep18_permit() above). Must
+        be submitted by the account that holds that allowance as spender
+        (here: this client's own operator key, the relayer)."""
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _CEP18_TRANSFER_FROM_SCRIPT,
+            {
+                "CONTRACT_HASH": contract_hash,
+                "OWNER_ACCOUNT_HASH": owner_account_hash_hex.replace("account-hash-", ""),
+                "RECIPIENT_ACCOUNT_HASH": recipient_account_hash_hex.replace("account-hash-", ""),
+                "AMOUNT": str(amount),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
 
     async def get_cep18_token_info(self, contract_hash: str) -> dict[str, Any]:
         """Real on-chain CEP-18 token metadata (name/symbol/decimals)."""
