@@ -19,6 +19,16 @@ path enforces; do not wire them up without adding that guard first. Also extende
 CSPR.cloud) — previously the bulk log only had `create`/`release` pairs represented in the
 README's description (the file itself already had releases; the README text just undersold it).
 
+**2026-07-07 bulk log extended again, multi-wallet + JSONL fix:** added 20 more real
+`create`/`release` deploys (10 pairs) using the 10 pre-generated `agent_01`..`agent_10`
+accounts (see `docs/evidence` generation scripts) as receivers, so the bulk-tx evidence now
+shows escrows settling between more than one counterparty pair, not just the original
+sender/receiver. Log is now 349/349 successful deploys (173 create, 166 release, 4 refund,
+3 dispute, 3 resolve). Also fixed a latent bug: the log file previously contained Python
+`True`/`False` literals instead of JSON `true`/`false` in a subset of lines, so it was not
+valid JSONL and would fail to parse in any strict JSON reader — re-serialized every line
+through `json.dumps` (no data changed, only the boolean token spelling).
+
 v9 fixed 3 items that used to be listed here: reentrancy-style checks-effects-interactions
 ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
 `ERR_FEE_EXCEEDS_AMOUNT`), and a new `unfreeze()` entry point (previously freezing was one-way).
