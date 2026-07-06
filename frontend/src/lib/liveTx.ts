@@ -24,6 +24,7 @@
  */
 import {
   Args,
+  CLTypeString,
   CLValue,
   ContractCallBuilder,
   PublicKey,
@@ -68,10 +69,24 @@ export async function sendLifecycleTx(
   },
 ): Promise<LiveTxResult> {
   try {
+    // The contract's `release` (and `reveal_swap`) entry points always read
+    // `arbiter_pubkeys`/`arbiter_signatures` via `get_named_arg` even when
+    // the escrow is under the arbiter-approval cap (they're only *used* when
+    // over-cap, but must still be *present* as empty lists or the call
+    // reverts with `ApiError::MissingArgument [2]`). `refund`/`dispute` take
+    // only `service_hash`. Mirrors `server/casper_tx/lifecycle.mjs`.
+    const argsMap: Record<string, CLValue> = {
+      service_hash: CLValue.newCLString(opts.serviceHash),
+    }
+    if (opts.entryPoint === 'release') {
+      argsMap.arbiter_pubkeys = CLValue.newCLList(CLTypeString, [])
+      argsMap.arbiter_signatures = CLValue.newCLList(CLTypeString, [])
+    }
+
     const tx = new ContractCallBuilder()
       .byHash(opts.contractHash)
       .entryPoint(opts.entryPoint)
-      .runtimeArgs(Args.fromMap({ service_hash: CLValue.newCLString(opts.serviceHash) }))
+      .runtimeArgs(Args.fromMap(argsMap))
       .from(PublicKey.fromHex(opts.senderPublicKeyHex))
       .chainName(CASPER_CHAIN_NAME)
       .payment(LIFECYCLE_PAYMENT_MOTES)

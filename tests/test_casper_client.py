@@ -433,28 +433,74 @@ class TestGetDeployError:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_execution_results_yet(self):
         client = make_client()
-        client._rpc = AsyncMock(return_value={"execution_results": []})
+
+        async def fake_rpc(method, params):
+            if method == "info_get_transaction":
+                raise RuntimeError("No such transaction")
+            return {"execution_results": []}
+
+        client._rpc = AsyncMock(side_effect=fake_rpc)
         assert await client.get_deploy_error("deploy-1") is None
 
     @pytest.mark.asyncio
     async def test_returns_none_on_success(self):
         client = make_client()
-        client._rpc = AsyncMock(
-            return_value={"execution_results": [{"result": {"Success": {}}}]}
-        )
+
+        async def fake_rpc(method, params):
+            if method == "info_get_transaction":
+                raise RuntimeError("No such transaction")
+            return {"execution_results": [{"result": {"Success": {}}}]}
+
+        client._rpc = AsyncMock(side_effect=fake_rpc)
         assert await client.get_deploy_error("deploy-1") is None
 
     @pytest.mark.asyncio
     async def test_returns_error_message_on_failure(self):
         client = make_client()
-        client._rpc = AsyncMock(
-            return_value={
+
+        async def fake_rpc(method, params):
+            if method == "info_get_transaction":
+                raise RuntimeError("No such transaction")
+            return {
                 "execution_results": [
                     {"result": {"Failure": {"error_message": "User error: 5"}}}
                 ]
             }
-        )
+
+        client._rpc = AsyncMock(side_effect=fake_rpc)
         assert await client.get_deploy_error("deploy-1") == "User error: 5"
+
+    @pytest.mark.asyncio
+    async def test_transaction_v1_not_yet_included_returns_none(self):
+        client = make_client()
+        client._rpc = AsyncMock(return_value={"execution_info": None})
+        assert await client.get_deploy_error("tx-1") is None
+
+    @pytest.mark.asyncio
+    async def test_transaction_v1_returns_none_on_success(self):
+        client = make_client()
+        client._rpc = AsyncMock(
+            return_value={
+                "execution_info": {
+                    "execution_result": {"Version2": {"error_message": None}}
+                }
+            }
+        )
+        assert await client.get_deploy_error("tx-1") is None
+
+    @pytest.mark.asyncio
+    async def test_transaction_v1_returns_error_message_on_failure(self):
+        client = make_client()
+        client._rpc = AsyncMock(
+            return_value={
+                "execution_info": {
+                    "execution_result": {
+                        "Version2": {"error_message": "User error: 8"}
+                    }
+                }
+            }
+        )
+        assert await client.get_deploy_error("tx-1") == "User error: 8"
 
 
 class TestConfirmWalletLifecycleTx:
