@@ -1,19 +1,17 @@
 # Known Limitations
 
-Last verified against live testnet + production deploy on 2026-07-05 (contract package
-`d3ca33d1...c8eeb`, version 8, contract_hash `50ca3364...4498664`; production API
+Last verified against live testnet + production deploy on 2026-07-06 (contract package
+`d3ca33d1...c8eeb`, version 9, contract_hash `612cead2...ddd9ec`; production API
 `agentescrow402-api.onrender.com` env `ESCROW_CONTRACT_HASH` updated to match, `SANDBOX=false`).
+Upgrade deploy `3be11314...dabedfe`, confirmed on-chain (`error_message: null`,
+`contract_version: 9`), 800 CSPR payment (100/300 CSPR both hit "Out of gas").
+
+v9 fixed 3 items that used to be listed here: reentrancy-style checks-effects-interactions
+ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
+`ERR_FEE_EXCEEDS_AMOUNT`), and a new `unfreeze()` entry point (previously freezing was one-way).
 
 ## Smart Contract
 
-- **No reentrancy guard** — The contract relies on Casper's execution model (single-threaded per
-  deploy) but does not implement an explicit reentrancy lock. Future upgrades should add one for
-  defense in depth.
-- **Fee underflow edge case** — When `amount * fee_bps / 10_000 > amount`, the subtraction
-  underflows. Fixed in practice because `fee_bps` is admin-controlled and capped, but should use
-  `checked_sub`.
-- **Emergency freeze is one-way** — The `emergency_freeze` entry point sets a frozen flag but
-  there is no `unfreeze` entry point. A contract upgrade is required to resume operations.
 - **Arbiter rotation is manual, not fixed at deploy** — The 5 arbiter addresses are set during
   contract installation but *can* be changed later via the real `set_arbiters` entry point (no
   redeploy needed) — exposed through `POST /set-arbiters` (`server/admin_api.py`), gated by an
