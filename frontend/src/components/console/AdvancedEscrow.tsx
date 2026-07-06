@@ -24,7 +24,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
 
 function TokenSelect({ value, onChange }: { value: TokenIdentifier; onChange: (t: TokenIdentifier) => void }) {
   return (
-    <div className="grid grid-cols-2 gap-3 mb-4">
+    <div className="space-y-3 mb-4">
       <div>
         <label className="block text-sm font-medium text-gray-300 mb-1">Token type</label>
         <select
@@ -39,25 +39,25 @@ function TokenSelect({ value, onChange }: { value: TokenIdentifier; onChange: (t
       </div>
       {value.token_type !== 'cspr' && (
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-1">Contract hash (64 hex)</label>
-          <div className="flex gap-2">
-            <input
-              value={value.contract_hash || ''}
-              onChange={(e) => onChange({ ...value, contract_hash: e.target.value })}
-              placeholder={'c'.repeat(64)}
-              className="flex-1 p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
-            />
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <label className="block text-sm font-medium text-gray-300">Contract hash (64 hex)</label>
             {value.token_type === 'cep18' && (
               <button
                 type="button"
                 onClick={() => onChange({ ...value, contract_hash: TEST_CEP18_CONTRACT_HASH })}
                 title="Fill in this project's own AETUSD test token, deployed on casper-test"
-                className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-sm whitespace-nowrap"
+                className="shrink-0 px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md text-xs whitespace-nowrap"
               >
                 Use test AETUSD
               </button>
             )}
           </div>
+          <input
+            value={value.contract_hash || ''}
+            onChange={(e) => onChange({ ...value, contract_hash: e.target.value })}
+            placeholder={'c'.repeat(64)}
+            className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
+          />
           {value.token_type === 'cep18' && (
             <p className="text-xs text-gray-500 mt-1">
               No CEP-18 token of your own on testnet? Click "Use test AETUSD" to use this project's
@@ -118,11 +118,18 @@ const AdvancedEscrow: React.FC = () => {
   const [tokenLoading, setTokenLoading] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [tokenResult, setTokenResult] = useState<TransactionHash | null>(null);
-  const { isLive } = useSigner();
+  const { isLive, activePublicKey } = useSigner();
   const { run: runPermitDeposit } = useCep18PermitDeposit();
+  // Casper's algorithm tag is the public key's own first hex byte:
+  // 01 = ed25519, 02 = secp256k1. The gasless permit path also signs a
+  // genuine x402 payment header (see cep18Permit.ts), and the backend's
+  // x402 verifier only supports Ed25519 today -- secp256k1 wallets (e.g.
+  // most default Casper Wallet/Ledger accounts) can't use this path yet.
+  const isEd25519Wallet = !!activePublicKey && activePublicKey.slice(0, 2).toLowerCase() === '01';
   // Live-wallet CEP-18 escrows default to the real gasless-permit path
-  // (funds move from the connected wallet's own balance); users can opt
-  // back into the demo custodial path if they don't have real AETUSD.
+  // (funds move from the connected wallet's own balance) when possible;
+  // users can opt back into the demo custodial path if they don't have
+  // real AETUSD, and secp256k1 wallets fall back to it automatically.
   const [useGaslessPermit, setUseGaslessPermit] = useState(true);
 
   // --- Streaming escrow state ---
@@ -167,7 +174,7 @@ const AdvancedEscrow: React.FC = () => {
         service_hash: tokenServiceHash,
         ttl: Number(tokenTtl),
       };
-      if (isLive && tokenIdentifier.token_type === 'cep18' && useGaslessPermit) {
+      if (isLive && tokenIdentifier.token_type === 'cep18' && useGaslessPermit && isEd25519Wallet) {
         // Real live-wallet path: the connected wallet only signs an
         // off-chain permit message (no tx, no gas) -- the backend relayer
         // submits permit()+transfer_from() on-chain, moving funds out of
@@ -305,20 +312,30 @@ const AdvancedEscrow: React.FC = () => {
             </div>
             <TokenSelect value={tokenIdentifier} onChange={setTokenIdentifier} />
             {isLive && tokenIdentifier.token_type === 'cep18' && (
-              <label className="flex items-start gap-2 mb-4 text-sm text-gray-300 bg-emerald-500/10 border border-emerald-500/30 rounded-md p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={useGaslessPermit}
-                  onChange={(e) => setUseGaslessPermit(e.target.checked)}
-                  className="mt-1"
-                />
-                <span>
-                  <strong className="text-emerald-300">Gasless wallet permit</strong> — sign an off-chain message only
-                  (no transaction, no gas); funds move from your own connected wallet's real CEP-18 balance via a
-                  relayer-submitted <code>permit()</code>+<code>transfer_from()</code>. Uncheck to use the demo
-                  custodial balance instead.
-                </span>
-              </label>
+              isEd25519Wallet ? (
+                <label className="flex items-start gap-2 mb-4 text-sm text-gray-300 bg-emerald-500/10 border border-emerald-500/30 rounded-md p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useGaslessPermit}
+                    onChange={(e) => setUseGaslessPermit(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <strong className="text-emerald-300">Gasless wallet permit</strong> — sign an off-chain message only
+                    (no transaction, no gas); funds move from your own connected wallet's real CEP-18 balance via a
+                    relayer-submitted <code>permit()</code>+<code>transfer_from()</code>. Uncheck to use the demo
+                    custodial balance instead.
+                  </span>
+                </label>
+              ) : (
+                <div className="flex items-start gap-2 mb-4 text-sm text-gray-400 bg-gray-800/60 border border-[#1e1e2e] rounded-md p-3">
+                  <span>
+                    <strong className="text-gray-300">Gasless wallet permit unavailable</strong> for this wallet —
+                    it uses a secp256k1 key, and the gasless path currently signs an Ed25519-only payment header.
+                    Falling back to the demo custodial balance for this CEP-18 escrow.
+                  </span>
+                </div>
+              )
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
