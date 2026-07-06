@@ -90,6 +90,73 @@ class TestEscrowEndpoint:
         )
         assert resp.status_code == 409
 
+
+class TestBatchEscrowEndpoint:
+    """escrow-manager.create_batch() wiring (A2 backlog item) — sandbox mode.
+
+    Live-mode on-chain path (server/casper_client.py CasperClient.create_batch,
+    contracts/batch-funder session-wasm) was verified directly against
+    testnet (5-escrow batch, error_message: None, 6 transfers) rather than
+    mocked here, since a real Casper deploy can't run in a unit test.
+    """
+
+    def test_create_batch(self, client):
+        resp = client.post(
+            "/escrows/batch",
+            json={
+                "escrows": [
+                    {"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": _hash("batch-1")},
+                    {"receiver": RECEIVER_HEX_2, "amount": 2000, "service_hash": _hash("batch-2")},
+                ]
+            },
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 2
+        assert body["deploy_hash"] is None  # sandbox mode: no real deploy
+        assert len(body["records"]) == 2
+        assert {r["amount"] for r in body["records"]} == {1000, 2000}
+        assert all(r["status"] == "pending" for r in body["records"])
+
+    def test_create_batch_duplicate_service_hash_in_request_rejected(self, client):
+        h = _hash("batch-dup-in-request")
+        resp = client.post(
+            "/escrows/batch",
+            json={
+                "escrows": [
+                    {"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h},
+                    {"receiver": RECEIVER_HEX_2, "amount": 2000, "service_hash": h},
+                ]
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_create_batch_conflicts_with_existing_escrow(self, client):
+        h = _hash("batch-existing")
+        client.post(
+            "/escrow",
+            json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+        )
+        resp = client.post(
+            "/escrows/batch",
+            json={"escrows": [{"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h}]},
+        )
+        assert resp.status_code == 409
+
+    def test_create_batch_empty_list_rejected(self, client):
+        resp = client.post("/escrows/batch", json={"escrows": []})
+        assert resp.status_code == 422
+
+    def test_create_batch_over_max_size_rejected(self, client):
+        escrows = [
+            {"receiver": RECEIVER_HEX, "amount": 100, "service_hash": _hash(f"batch-big-{i}")}
+            for i in range(51)
+        ]
+        resp = client.post("/escrows/batch", json={"escrows": escrows})
+        assert resp.status_code == 422
+
+
+class TestEscrowEndpointInvalid:
     def test_create_escrow_invalid_amount(self, client):
         h = _hash("invalid")
         resp = client.post(

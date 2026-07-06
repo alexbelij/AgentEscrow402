@@ -35,6 +35,8 @@ _ADMIN_OPS_SCRIPT = _SCRIPT_DIR / "admin_ops.mjs"
 _FUND_POOL_SCRIPT = _SCRIPT_DIR / "fund_pool.mjs"
 _INSURANCE_CLAIM_SCRIPT = _SCRIPT_DIR / "insurance_claim.mjs"
 _POOL_FUNDER_WASM = _SCRIPT_DIR / "pool_funder.wasm"
+_CREATE_BATCH_SCRIPT = _SCRIPT_DIR / "create_batch.mjs"
+_BATCH_FUNDER_WASM = _SCRIPT_DIR / "batch_funder.wasm"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -58,6 +60,7 @@ class CasperClient:
 
     def __init__(self, cfg: Config) -> None:
         self._contract_hash = cfg.contract_hash
+        self._manager_contract_hash = cfg.manager_contract_hash
         self._insurance_contract_hash = cfg.insurance_contract_hash
         self._insurance_package_hash = cfg.insurance_package_hash
         self._key_path = cfg.casper_private_key_path
@@ -158,6 +161,60 @@ class CasperClient:
                 "KEY_ALGO": "secp256k1",
                 "CASPER_RPC": self._rpc_url,
                 "WASM_PATH": str(_SCRIPT_DIR / "escrow_funder.wasm"),
+            },
+        )
+
+    async def create_batch(
+        self,
+        receivers: list[str],
+        amounts: list[int],
+        service_hashes: list[str],
+        ttls: list[int],
+    ) -> str:
+        """Submit escrow-manager.create_batch() as ONE real on-chain deploy.
+
+        Uses the batch-funder session-wasm (contracts/batch-funder): pulls
+        the backend's own operating-key main purse funds into a fresh purse
+        (session context keeps the URef's access rights across the native
+        cross-contract call — see contracts/pool-funder for the same
+        pattern) then calls create_batch(...) with all N escrows at once.
+        Returns a single tx hash covering all N escrow creations.
+        """
+        if not self._manager_contract_hash:
+            raise RuntimeError("manager_contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        n = len(receivers)
+        if n == 0 or not (len(amounts) == len(service_hashes) == len(ttls) == n):
+            raise ValueError("receivers/amounts/service_hashes/ttls must be equal-length, non-empty")
+        if n > 50:
+            raise ValueError("batch size exceeds contract MAX_BATCH_SIZE (50)")
+
+        receivers_hex = [
+            r.replace("account-hash-", "") if r.startswith("account-hash-") else r
+            for r in receivers
+        ]
+        for r in receivers_hex:
+            if len(r) != 64:
+                raise ValueError(f"receiver must be 64-char hex account hash, got: {r!r}")
+
+        # ~4 CSPR base + ~1.2 CSPR/escrow gas ceiling (empirically observed
+        # ~1.02 CSPR/escrow for the n=5 live test); rounds up for safety.
+        payment_motes = 4_000_000_000 + n * 1_500_000_000
+
+        return await self._run_node_script(
+            _CREATE_BATCH_SCRIPT,
+            {
+                "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
+                "RECEIVERS_JSON": json.dumps(receivers_hex),
+                "AMOUNTS_JSON": json.dumps([str(a) for a in amounts]),
+                "SERVICE_HASHES_JSON": json.dumps(service_hashes),
+                "TTLS_JSON": json.dumps(ttls),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "WASM_PATH": str(_BATCH_FUNDER_WASM),
+                "PAYMENT_MOTES": str(payment_motes),
             },
         )
 

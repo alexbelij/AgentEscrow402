@@ -29,6 +29,8 @@ from server.middleware import (
     _verify_signature,
 )
 from server.models import (
+    BatchEscrowRequest,
+    BatchEscrowResponse,
     DisputeRequest,
     EscrowRecord,
     EscrowRequest,
@@ -532,6 +534,87 @@ async def create_escrow(
         except Exception as mlkem_exc:
             logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
     return result_dict
+
+
+@app.post("/escrows/batch", response_model=BatchEscrowResponse)
+async def create_escrow_batch(
+    req: BatchEscrowRequest,
+    request: Request,
+    cfg: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox),
+    casper: CasperClient | None = Depends(get_casper),
+):
+    """Create up to 50 escrows in ONE on-chain deploy via
+    escrow-manager.create_batch() (contracts/escrow-manager/src/main.rs).
+
+    Unlike /escrow (one escrow per deploy, hosted-key path funded from the
+    backend's own purse), this batches N escrow creations behind a single
+    session-wasm transaction (contracts/batch-funder), trading per-escrow
+    dispute/insurance/ML-KEM features for deploy-count efficiency — intended
+    for bulk/demo provisioning, not the interactive per-agent flow.
+    """
+    sender = _extract_sender(request)
+    now = int(time.time())
+
+    service_hashes = [item.service_hash for item in req.escrows]
+    if len(set(service_hashes)) != len(service_hashes):
+        raise HTTPException(status_code=422, detail="Duplicate service_hash in batch request")
+    for sh in service_hashes:
+        if sh in store._escrows:
+            raise HTTPException(status_code=409, detail=f"Escrow {sh} already exists")
+
+    if cfg.sandbox or casper is None:
+        records = [
+            store.create_escrow(
+                sender=sender,
+                receiver=item.receiver,
+                amount=item.amount,
+                service_hash=item.service_hash,
+                ttl=item.ttl,
+            )
+            for item in req.escrows
+        ]
+        for rec in records:
+            pgdb.save_escrow(rec)
+        return BatchEscrowResponse(deploy_hash=None, created=len(records), records=records)
+
+    # Live mode — one real deploy covering the whole batch.
+    deploy_hash = await casper.create_batch(
+        receivers=[item.receiver for item in req.escrows],
+        amounts=[item.amount for item in req.escrows],
+        service_hashes=service_hashes,
+        ttls=[item.ttl for item in req.escrows],
+    )
+
+    records: list[EscrowRecord] = []
+    for item in req.escrows:
+        record = EscrowRecord(
+            sender=sender,
+            receiver=item.receiver,
+            amount=item.amount,
+            service_hash=item.service_hash,
+            status="pending",
+            created_at=now,
+            ttl=item.ttl,
+            deploy_hash=deploy_hash,
+        )
+        store._escrows[item.service_hash] = {
+            "sender": sender,
+            "receiver": item.receiver,
+            "amount": item.amount,
+            "service_hash": item.service_hash,
+            "status": "pending",
+            "created_at": now,
+            "ttl": item.ttl,
+            "deploy_hash": deploy_hash,
+        }
+        pgdb.save_escrow(record)
+        records.append(record)
+
+    _broadcast_event(
+        {"type": "escrow_batch_created", "count": len(records), "deploy_hash": deploy_hash, "ts": now}
+    )
+    return BatchEscrowResponse(deploy_hash=deploy_hash, created=len(records), records=records)
 
 
 @app.post("/release", response_model=EscrowRecord)
