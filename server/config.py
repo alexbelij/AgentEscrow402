@@ -22,6 +22,11 @@ class Config:
     contract_hash: str = ""
     manager_contract_hash: str = ""
     insurance_contract_hash: str = ""
+    # Package hash (not contract hash) of the insurance-pool contract --
+    # required by the pool-funder session-wasm's `deposit()` cross-contract
+    # call (runtime::call_versioned_contract needs the package, not the
+    # contract, hash). See contracts/pool-funder/src/main.rs.
+    insurance_package_hash: str = ""
     vrf_contract_hash: str = ""
     allow_hosted_demo_identity: bool = False
     # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
@@ -85,7 +90,15 @@ class Config:
             ),
             insurance_contract_hash=os.getenv(
                 "INSURANCE_CONTRACT_HASH",
-                "e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61",
+                # e128780f... is the redeployed insurance-pool contract with
+                # the A1 arbiter-quorum fix on claim()/withdraw() (the old
+                # e36b958d... contract had a fully public claim()/withdraw()
+                # -- see contracts/insurance-pool/src/main.rs commit history).
+                "e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929",
+            ),
+            insurance_package_hash=os.getenv(
+                "INSURANCE_PACKAGE_HASH",
+                "4458f5ed31f84314718969d5f6e8112f1589770330930c9ad37feaedb501add7",
             ),
             vrf_contract_hash=os.getenv(
                 "VRF_CONTRACT_HASH",

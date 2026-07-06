@@ -32,6 +32,9 @@ _CEP78_MINT_SCRIPT = _SCRIPT_DIR / "cep78_mint.mjs"
 _CEP78_TRANSFER_SCRIPT = _SCRIPT_DIR / "cep78_transfer.mjs"
 _SWAP_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "swap_lifecycle.mjs"
 _ADMIN_OPS_SCRIPT = _SCRIPT_DIR / "admin_ops.mjs"
+_FUND_POOL_SCRIPT = _SCRIPT_DIR / "fund_pool.mjs"
+_INSURANCE_CLAIM_SCRIPT = _SCRIPT_DIR / "insurance_claim.mjs"
+_POOL_FUNDER_WASM = _SCRIPT_DIR / "pool_funder.wasm"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -56,6 +59,7 @@ class CasperClient:
     def __init__(self, cfg: Config) -> None:
         self._contract_hash = cfg.contract_hash
         self._insurance_contract_hash = cfg.insurance_contract_hash
+        self._insurance_package_hash = cfg.insurance_package_hash
         self._key_path = cfg.casper_private_key_path
         self._rpc_url = RPC_TESTNET  # always use the working testnet node
         self._http = httpx.AsyncClient(timeout=30.0)
@@ -352,6 +356,77 @@ class CasperClient:
             },
         )
 
+    async def deposit_to_insurance_pool(self, amount: int) -> str:
+        """Deposit `amount` motes (from the backend operator's own account)
+        into the insurance-pool contract's purse via the `pool-funder`
+        session-wasm (contracts/pool-funder/src/main.rs).
+
+        A plain deploy arg carrying a purse URef has its access rights
+        stripped by the RPC layer before the contract ever sees it (the
+        `deposit()` entry point would then fail with a Mint permission
+        error), so this session code instead creates a fresh purse, funds
+        it from the caller's own main purse (full rights in session
+        context), and makes a *native* `runtime::call_versioned_contract`
+        into `deposit()` -- native intra-VM calls don't strip URef rights,
+        only RPC-serialized deploy args do. Live-verified end-to-end on
+        testnet (see AE402 skill / commit history for deploy hashes).
+        """
+        if not self._insurance_package_hash:
+            raise RuntimeError("insurance_package_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        if not _POOL_FUNDER_WASM.exists():
+            raise RuntimeError(f"pool-funder wasm not found at {_POOL_FUNDER_WASM}")
+        return await self._run_node_script(
+            _FUND_POOL_SCRIPT,
+            {
+                "WASM_PATH": str(_POOL_FUNDER_WASM),
+                "PACKAGE_HASH": self._insurance_package_hash,
+                "AMOUNT_MOTES": str(amount),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def claim_from_insurance_pool(
+        self,
+        escrow_id: str,
+        amount: int,
+        arbiter_pubkeys: list[str],
+        arbiter_signatures: list[str],
+        evidence: str = "",
+    ) -> str:
+        """Submit `claim()` against the insurance-pool contract (A1 fix:
+        requires a 3-of-5 arbiter quorum, see `require_arbiter_quorum` in
+        contracts/insurance-pool/src/main.rs). The backend operator key
+        signs+submits the deploy and becomes the on-chain claimant/payout
+        recipient -- callers must have already collected real arbiter
+        votes over `"claim:{escrow_id}:{operator_account_hash}:{amount}"`
+        (see `sdk/arbiter_signing.py`-style signing, or
+        `server/arbiter_crypto.build_*_message` for the canonical message).
+        """
+        if not self._insurance_contract_hash:
+            raise RuntimeError("insurance_contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        if not arbiter_pubkeys or len(arbiter_pubkeys) != len(arbiter_signatures):
+            raise ValueError("arbiter_pubkeys and arbiter_signatures must be non-empty and equal length")
+        return await self._run_node_script(
+            _INSURANCE_CLAIM_SCRIPT,
+            {
+                "CONTRACT_HASH": self._insurance_contract_hash,
+                "ESCROW_ID": escrow_id,
+                "AMOUNT_MOTES": str(amount),
+                "EVIDENCE": evidence,
+                "ARBITER_PUBKEYS_JSON": json.dumps(arbiter_pubkeys),
+                "ARBITER_SIGNATURES_JSON": json.dumps(arbiter_signatures),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
     async def get_deploy_error(self, deploy_hash: str) -> str | None:
         """Check a submitted deploy/transaction's execution result for a
         contract-level revert (e.g. `User error: N`). Returns None if it
@@ -497,15 +572,19 @@ class CasperClient:
         claimant's account hash, the wallet's own signed transaction genuinely
         executed and was paid.
 
-        `claimant_account_hash` must be the `account-hash-{hex}` formatted
-        string (matches how the Rust contract's `AccountHash::to_string()`
-        keys the `claims` dictionary) -- NOT a raw public key hex.
+        `claimant_account_hash` may be passed either as raw 64-char hex or
+        `account-hash-{hex}` -- the on-chain dict is keyed by the Rust
+        `AccountHash`'s `Display`/`to_string()` impl, which is plain lowercase
+        hex with **no** `account-hash-` prefix (that prefix only comes from
+        `to_formatted_string()`, which this contract does not use), so any
+        prefix is stripped here before querying.
         """
         if not self._insurance_contract_hash:
             return False, "insurance contract hash not configured"
+        dict_key = claimant_account_hash.replace("account-hash-", "")
         for _ in range(attempts):
             raw = await self.query_contract_dict(
-                "claims", claimant_account_hash, contract_hash=self._insurance_contract_hash
+                "claims", dict_key, contract_hash=self._insurance_contract_hash
             )
             parsed = raw.get("parsed") if raw else None
             if parsed and isinstance(parsed, list) and len(parsed) >= 3:
