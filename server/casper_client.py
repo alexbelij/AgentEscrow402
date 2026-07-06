@@ -350,12 +350,33 @@ class CasperClient:
         )
 
     async def get_deploy_error(self, deploy_hash: str) -> str | None:
-        """Check a submitted deploy's execution result for a contract-level
-        revert (e.g. `User error: N`). Returns None if it executed
-        successfully, the error string if it reverted, or None if the
-        deploy hasn't been included in a finalized block yet (indistinguishable
+        """Check a submitted deploy/transaction's execution result for a
+        contract-level revert (e.g. `User error: N`). Returns None if it
+        executed successfully, the error string if it reverted, or None if
+        it hasn't been included in a finalized block yet (indistinguishable
         from "still pending" from this RPC alone -- callers should retry).
+
+        CSPR.click / casper-js-sdk `ContractCallBuilder`/`SessionBuilder`
+        submissions are Casper 2.0 Transactions (Version1), not legacy
+        Deploys -- `info_get_deploy` returns a "No such deploy" RPC error for
+        these hashes (caught below), so we try `info_get_transaction` first
+        and only fall back to the legacy `info_get_deploy` shape for older
+        hosted-key deploys.
         """
+        try:
+            result = await self._rpc(
+                "info_get_transaction",
+                {"transaction_hash": {"Version1": deploy_hash}},
+            )
+            execution_info = result.get("execution_info") or {}
+            if not execution_info:
+                return None
+            execution_result = execution_info.get("execution_result") or {}
+            outcome = execution_result.get("Version2") or execution_result.get("Version1") or {}
+            return outcome.get("error_message")
+        except Exception:
+            pass
+
         try:
             result = await self._rpc("info_get_deploy", {"deploy_hash": deploy_hash})
         except Exception:
@@ -371,11 +392,11 @@ class CasperClient:
     async def confirm_wallet_lifecycle_tx(
         self,
         service_hash: str,
-        expected_status: str,
+        expected_status: str | tuple[str, ...],
         *,
         deploy_hash: str | None = None,
-        attempts: int = 10,
-        delay_seconds: float = 1.5,
+        attempts: int = 20,
+        delay_seconds: float = 2.5,
     ) -> tuple[bool, str | None]:
         """Poll on-chain contract state until it reflects a wallet-submitted
         release/refund/dispute call, or give up.
@@ -395,12 +416,21 @@ class CasperClient:
         one, and the caller-facing message should say so instead of
         suggesting the user "wait and refresh".
 
+        `expected_status` may be a single status string or a tuple of
+        acceptable statuses -- e.g. `refund()` on-chain can land as either
+        "refunded" (called before TTL) or "expired" (called after TTL) and
+        the caller can't know in advance which branch a given wallet-signed
+        call will take, so both must count as success.
+
         Returns (confirmed, revert_reason). `revert_reason` is only ever set
         when `confirmed` is False and we found a concrete on-chain failure.
         """
+        expected_statuses = (
+            (expected_status,) if isinstance(expected_status, str) else expected_status
+        )
         for _ in range(attempts):
             record = await self.get_escrow(service_hash)
-            if record is not None and record.status.value == expected_status:
+            if record is not None and record.status.value in expected_statuses:
                 return True, None
             await asyncio.sleep(delay_seconds)
 

@@ -639,8 +639,12 @@ async def refund_escrow(
 
     if not cfg.sandbox and casper is not None:
         if req.wallet_tx_hash:
+            # A wallet-submitted refund lands on-chain as "refunded" (before
+            # TTL) or "expired" (after TTL) depending on chain time at the
+            # moment the contract call executes -- either is a genuine
+            # success from the caller's perspective.
             confirmed, revert_reason = await casper.confirm_wallet_lifecycle_tx(
-                req.service_hash, "refunded", deploy_hash=req.wallet_tx_hash
+                req.service_hash, ("refunded", "expired"), deploy_hash=req.wallet_tx_hash
             )
             if not confirmed:
                 detail = (
