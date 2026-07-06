@@ -35,6 +35,7 @@ const ERR_NO_COMMIT: u16 = 16;
 const ERR_INVALID_PREIMAGE: u16 = 17;
 const ERR_ALREADY_REVEALED: u16 = 18;
 const ERR_CAP_EXCEEDED: u16 = 19;
+const ERR_FEE_EXCEEDS_AMOUNT: u16 = 20;
 
 // ── Storage keys ─────────────────────────────────────────────────────
 
@@ -180,6 +181,17 @@ fn require_not_frozen() {
 
 fn compute_fee(amount: U512, bps: u64) -> U512 {
     amount * U512::from(bps) / U512::from(10_000u64)
+}
+
+/// Defense-in-depth: `compute_fee` can never mathematically exceed `amount`
+/// given `bps <= MAX_FEE_BPS` (10%), but a future upgrade raising that cap,
+/// or any other code path computing `insurance_fee` differently, must not
+/// be able to silently underflow this subtraction (wrapping to a huge
+/// U512 value) -- revert explicitly instead.
+fn checked_deduct_fee(amount: U512, insurance_fee: U512) -> U512 {
+    amount
+        .checked_sub(insurance_fee)
+        .unwrap_or_revert_with(ApiError::User(ERR_FEE_EXCEEDS_AMOUNT))
 }
 
 /// Reads the release cap (motes). Defensive by design: `release_cap` is a
@@ -344,19 +356,21 @@ fn do_release_funds(
 ) {
     let amount = parse_u512(&amount_str);
     let insurance_fee = compute_fee(amount, stored_fee_bps);
-    let net_amount = amount - insurance_fee;
+    let net_amount = checked_deduct_fee(amount, insurance_fee);
 
-    let receiver = parse_account(&receiver_str);
-    let contract_purse = get_dict_uref(CONTRACT_PURSE);
-    system::transfer_from_purse_to_account(contract_purse, receiver, net_amount, None)
-        .unwrap_or_revert();
-
+    // Checks-effects-interactions: write the terminal status before the
+    // outbound transfer (see module-level note on do_refund/resolve).
     let updated: EscrowRecord = (
         (sender_str, receiver_str.clone(), amount_str),
         (service_hash.to_string(), STATUS_RELEASED as u64, created_at),
         (ttl, stored_fee_bps),
     );
     write_escrow(dict, service_hash, updated);
+
+    let receiver = parse_account(&receiver_str);
+    let contract_purse = get_dict_uref(CONTRACT_PURSE);
+    system::transfer_from_purse_to_account(contract_purse, receiver, net_amount, None)
+        .unwrap_or_revert();
 
     let rep_dict = get_dict_uref(REPUTATION_DICT);
     let ((completed, disputed, slashed), (_, _)) = read_rep(rep_dict, &receiver_str);
@@ -401,7 +415,7 @@ pub extern "C" fn escrow() {
     // Capture fee at creation time to prevent drift if fee changes later
     let fee_bps = read_fee_bps();
     let insurance_fee = compute_fee(amount, fee_bps);
-    let escrow_amount = amount - insurance_fee;
+    let escrow_amount = checked_deduct_fee(amount, insurance_fee);
 
     let contract_purse = get_dict_uref(CONTRACT_PURSE);
     system::transfer_from_purse_to_purse(source_purse, contract_purse, escrow_amount, None)
@@ -599,12 +613,7 @@ pub extern "C" fn refund() {
     // Use fee_bps captured at escrow creation
     let amount = parse_u512(&amount_str);
     let insurance_fee = compute_fee(amount, stored_fee_bps);
-    let refund_amount = amount - insurance_fee;
-
-    let sender = parse_account(&sender_str);
-    let contract_purse = get_dict_uref(CONTRACT_PURSE);
-    system::transfer_from_purse_to_account(contract_purse, sender, refund_amount, None)
-        .unwrap_or_revert();
+    let refund_amount = checked_deduct_fee(amount, insurance_fee);
 
     let new_status = if is_expired {
         STATUS_EXPIRED as u64
@@ -612,12 +621,24 @@ pub extern "C" fn refund() {
         STATUS_REFUNDED as u64
     };
 
+    // Checks-effects-interactions: record the terminal status *before*
+    // transferring funds out, so the escrow can never be read/acted on
+    // again as still-pending even if the transfer somehow failed to
+    // finish cleanly. Casper's execution model doesn't allow a
+    // synchronous callback into this contract mid-transfer (the system
+    // call below has no user-code reentry path), but this ordering is
+    // the standard hardening pattern regardless and costs nothing.
     let updated: EscrowRecord = (
-        (sender_str, receiver_str, amount_str),
+        (sender_str.clone(), receiver_str, amount_str),
         (service_hash.clone(), new_status, created_at),
         (ttl, stored_fee_bps),
     );
     write_escrow(dict, &service_hash, updated);
+
+    let sender = parse_account(&sender_str);
+    let contract_purse = get_dict_uref(CONTRACT_PURSE);
+    system::transfer_from_purse_to_account(contract_purse, sender, refund_amount, None)
+        .unwrap_or_revert();
 }
 
 /// Open a dispute for a pending escrow.
@@ -739,24 +760,25 @@ pub extern "C" fn resolve() {
     // Use fee_bps captured at escrow creation
     let amount = parse_u512(&amount_str);
     let insurance_fee = compute_fee(amount, stored_fee_bps);
-    let net_amount = amount - insurance_fee;
+    let net_amount = checked_deduct_fee(amount, insurance_fee);
 
-    let contract_purse = get_dict_uref(CONTRACT_PURSE);
     let winner = if in_favor_of == "sender" {
         parse_account(&sender_str)
     } else {
         parse_account(&receiver_str)
     };
 
-    system::transfer_from_purse_to_account(contract_purse, winner, net_amount, None)
-        .unwrap_or_revert();
-
+    // Checks-effects-interactions (see do_release_funds / refund()).
     let updated: EscrowRecord = (
         (sender_str, receiver_str, amount_str),
         (service_hash.clone(), STATUS_RESOLVED as u64, created_at),
         (ttl, stored_fee_bps),
     );
     write_escrow(dict, &service_hash, updated);
+
+    let contract_purse = get_dict_uref(CONTRACT_PURSE);
+    system::transfer_from_purse_to_account(contract_purse, winner, net_amount, None)
+        .unwrap_or_revert();
 }
 
 /// Update the insurance fee (installer only, max 10%).
@@ -844,6 +866,24 @@ pub extern "C" fn emergency_freeze() {
         .into_uref()
         .unwrap_or_revert();
     storage::write(uref, true);
+}
+
+/// Resume operations after `emergency_freeze` (installer only). Previously
+/// freezing was one-way and required a contract upgrade to resume; this
+/// entry point lets the installer clear the flag directly.
+#[no_mangle]
+pub extern "C" fn unfreeze() {
+    let caller = runtime::get_caller();
+    let installer = read_installer();
+    if caller != installer {
+        runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
+    }
+
+    let uref = runtime::get_key(POOL_FROZEN_KEY)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
+    storage::write(uref, false);
 }
 
 /// Read escrow record by service hash.
@@ -1018,6 +1058,14 @@ pub extern "C" fn call() {
     ));
     entry_points.add_entry_point(EntityEntryPoint::new(
         "emergency_freeze",
+        vec![],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "unfreeze",
         vec![],
         CLType::Unit,
         EntryPointAccess::Public,

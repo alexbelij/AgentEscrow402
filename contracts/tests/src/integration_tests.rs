@@ -22,6 +22,7 @@ mod tests {
     const ERR_INVALID_PREIMAGE: u16 = 17;
     const ERR_ALREADY_REVEALED: u16 = 18;
     const ERR_CAP_EXCEEDED: u16 = 19;
+    const ERR_FEE_EXCEEDS_AMOUNT: u16 = 20;
 
     const STATUS_PENDING: u8 = 0;
     const STATUS_RELEASED: u8 = 1;
@@ -194,6 +195,32 @@ mod tests {
         assert_eq!(compute_insurance(1), 0);
     }
 
+    // ── Fee deduction underflow guard (hardening pass) ────────────
+
+    /// Mirrors `checked_deduct_fee` in contracts/escrow/src/main.rs: must
+    /// revert (return None here) instead of silently wrapping when the fee
+    /// would exceed the amount, rather than the raw `amount - fee`
+    /// subtraction this replaced.
+    fn checked_deduct_fee(amount: u64, fee: u64) -> Option<u64> {
+        amount.checked_sub(fee)
+    }
+
+    #[test]
+    fn fee_deduction_normal_case_succeeds() {
+        // Real-world case: bps <= MAX_FEE_BPS always keeps fee <= amount.
+        let fee = compute_fee(10_000, MAX_FEE_BPS);
+        assert_eq!(checked_deduct_fee(10_000, fee), Some(9_000));
+    }
+
+    #[test]
+    fn fee_deduction_underflow_is_rejected_not_wrapped() {
+        // Defense-in-depth: if `fee` ever exceeded `amount` (should be
+        // unreachable given MAX_FEE_BPS, but a future bug/upgrade
+        // shouldn't silently wrap to a huge value), the guard must reject
+        // it instead of computing a corrupted balance.
+        assert_eq!(checked_deduct_fee(100, 150), None);
+    }
+
     // ── Error code distinctness ─────────────────────────────────
 
     #[test]
@@ -215,6 +242,7 @@ mod tests {
             ERR_INVALID_PREIMAGE,
             ERR_ALREADY_REVEALED,
             ERR_CAP_EXCEEDED,
+            ERR_FEE_EXCEEDS_AMOUNT,
         ];
         let mut sorted = codes.to_vec();
         sorted.sort();
