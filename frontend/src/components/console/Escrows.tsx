@@ -978,7 +978,7 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
       setReceiver('');
       setAmount('');
       setServiceHash(randomHex64());
-      setTtl('300');
+      setTtl('3600');
       setEstimate(null);
       setFormError(null);
     } catch (err) {

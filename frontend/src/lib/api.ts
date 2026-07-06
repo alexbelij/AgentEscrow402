@@ -53,6 +53,12 @@ function normalizeError(data: any, statusText: string): string {
 export const DEMO_AGENT_SENDER = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 export const DEMO_AGENT_RECEIVER = 'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
 
+// Contract hash of the CEP-18 test token (AETUSD) this project deploys and controls on
+// casper-test, used to prefill the "Contract hash" field for CEP-18 escrows/permits so users
+// aren't left guessing which hash to paste in. See skills/integrations/casper/SKILL.md for the
+// full deploy history if this token is ever redeployed at a new hash.
+export const TEST_CEP18_CONTRACT_HASH = '177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754';
+
 const HEX_64 = /^[0-9a-f]{64}$/i;
 
 export function buildDemoXPaymentHeader(escrowHash?: string, amount = 0, sender = DEMO_AGENT_SENDER): string {
