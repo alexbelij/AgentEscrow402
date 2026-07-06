@@ -1,3 +1,3 @@
 [workspace]
-members = ["escrow", "escrow-manager", "insurance-pool", "vrf-arbiter", "tests"]
+members = ["escrow", "escrow-manager", "insurance-pool", "vrf-arbiter", "tests", "pool-funder"]
 resolver = "2"
