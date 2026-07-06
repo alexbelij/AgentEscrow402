@@ -15,10 +15,12 @@ from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption,
 from server.arbiter_crypto import (
     _pubkey_from_hex,
     _signature_bytes_from_hex,
+    build_insurance_claim_message,
     build_resolve_message,
+    count_valid_insurance_claim_votes,
     count_valid_votes,
 )
-from sdk.arbiter_signing import sign_arbiter_vote
+from sdk.arbiter_signing import ED25519_TAG_HEX, sign_arbiter_vote
 
 
 def _write_pem(private_key: Ed25519PrivateKey) -> str:
@@ -123,6 +125,57 @@ class TestCanonicalMessageFormat:
     def test_message_binds_service_hash_and_verdict(self):
         assert build_resolve_message("abc", "sender") == b"resolve:abc:sender"
         assert build_resolve_message("abc", "receiver") != build_resolve_message("abc", "sender")
+
+    def test_insurance_claim_message_binds_escrow_claimant_and_amount(self):
+        assert build_insurance_claim_message("e1", "aa" * 32, 1000) == f"claim:e1:{'aa' * 32}:1000".encode()
+        # Changing any bound field must change the message (no cross-field replay).
+        assert build_insurance_claim_message("e1", "aa" * 32, 1000) != build_insurance_claim_message("e2", "aa" * 32, 1000)
+        assert build_insurance_claim_message("e1", "aa" * 32, 1000) != build_insurance_claim_message("e1", "bb" * 32, 1000)
+        assert build_insurance_claim_message("e1", "aa" * 32, 1000) != build_insurance_claim_message("e1", "aa" * 32, 2000)
+
+
+def _sign_insurance_claim(private_key: Ed25519PrivateKey, escrow_id: str, claimant: str, amount: int) -> tuple[str, str]:
+    message = build_insurance_claim_message(escrow_id, claimant, amount)
+    signature = private_key.sign(message)
+    pubkey_hex = ED25519_TAG_HEX + private_key.public_key().public_bytes_raw().hex()
+    return pubkey_hex, ED25519_TAG_HEX + signature.hex()
+
+
+class TestCountValidInsuranceClaimVotes:
+    def test_valid_quorum_counted(self):
+        arbiters = [Ed25519PrivateKey.generate() for _ in range(3)]
+        votes = [_sign_insurance_claim(pk, "e1", "cc" * 32, 500) for pk in arbiters]
+        registered = tuple(v[0] for v in votes)
+        valid = count_valid_insurance_claim_votes(
+            [v[0] for v in votes], [v[1] for v in votes], registered, "e1", "cc" * 32, 500
+        )
+        assert valid == 3
+
+    def test_vote_cannot_be_replayed_for_different_amount(self):
+        pk = Ed25519PrivateKey.generate()
+        pubkey_hex, sig_hex = _sign_insurance_claim(pk, "e1", "cc" * 32, 500)
+        valid = count_valid_insurance_claim_votes(
+            [pubkey_hex], [sig_hex], (pubkey_hex,), "e1", "cc" * 32, 999
+        )
+        assert valid == 0
+
+    def test_vote_cannot_be_replayed_for_different_claimant(self):
+        pk = Ed25519PrivateKey.generate()
+        pubkey_hex, sig_hex = _sign_insurance_claim(pk, "e1", "cc" * 32, 500)
+        valid = count_valid_insurance_claim_votes(
+            [pubkey_hex], [sig_hex], (pubkey_hex,), "e1", "dd" * 32, 500
+        )
+        assert valid == 0
+
+    def test_unregistered_signer_rejected(self):
+        pk = Ed25519PrivateKey.generate()
+        other_pk = Ed25519PrivateKey.generate()
+        pubkey_hex, sig_hex = _sign_insurance_claim(pk, "e1", "cc" * 32, 500)
+        other_pubkey_hex, _ = _sign_insurance_claim(other_pk, "e1", "cc" * 32, 500)
+        valid = count_valid_insurance_claim_votes(
+            [pubkey_hex], [sig_hex], (other_pubkey_hex,), "e1", "cc" * 32, 500
+        )
+        assert valid == 0
 
 
 class TestPubkeyFromHex:

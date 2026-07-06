@@ -160,8 +160,9 @@ async def deposit_to_insurance_pool(
     # working without live credentials.
     if casper is None or not config.insurance_package_hash:
         deploy_hash = f"deploy-hash-insurance-deposit-{int(time.time())}"
-        _insurance_pool["total_assets"] += request.amount
-        _insurance_pool["total_premiums_collected"] += request.amount
+        async with _pool_lock:
+            _insurance_pool["total_assets"] += request.amount
+            _insurance_pool["total_premiums_collected"] += request.amount
         logger.info("Deposit of %s motes by %s recorded (demo/no-chain mode). Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
         return {"message": "Deposit successful (demo mode, no live Casper client configured)", "deploy_hash": deploy_hash}
 
@@ -169,7 +170,7 @@ async def deposit_to_insurance_pool(
         deploy_hash = await casper.deposit_to_insurance_pool(request.amount)
     except Exception as e:
         logger.error("Failed to submit insurance deposit deploy for %s: %s", depositor[:8], e)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to submit deposit transaction on-chain: {e}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit deposit transaction on-chain")
 
     # Poll for a revert before declaring success -- the session-wasm's own
     # cross-contract call can fail (e.g. contract paused) even though the
@@ -187,8 +188,9 @@ async def deposit_to_insurance_pool(
         logger.error("Insurance deposit deploy %s reverted: %s", deploy_hash[:16], revert_reason)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Deposit transaction reverted on-chain: {revert_reason}")
 
-    _insurance_pool["total_assets"] += request.amount
-    _insurance_pool["total_premiums_collected"] += request.amount
+    async with _pool_lock:
+        _insurance_pool["total_assets"] += request.amount
+        _insurance_pool["total_premiums_collected"] += request.amount
 
     logger.info("Deposit of %s motes by %s successful. Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
     return {"message": "Deposit successful", "deploy_hash": deploy_hash}
@@ -268,9 +270,21 @@ async def file_insurance_claim(
     if slashed > 2:  # Example: too many previous slashes
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Claimant has a poor reputation history")
 
-    # 3. Prevent duplicate claims
-    if request.escrow_hash in _claims:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Claim already filed for this escrow")
+    # 3. Prevent duplicate claims -- reserve the slot atomically so two
+    # concurrent requests for the same escrow can't both pass this check
+    # (the plain "in _claims" read + later write below used to race).
+    async with _pool_lock:
+        if request.escrow_hash in _claims:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Claim already filed for this escrow")
+        _claims[request.escrow_hash] = {
+            "claimant": claimant,
+            "escrow_hash": request.escrow_hash,
+            "amount": escrow_amount,
+            "reason": request.reason,
+            "status": "reserved",
+            "filed_at": int(time.time()),
+            "deploy_hash": None,
+        }
 
     logger.info("Agent %s filing claim for escrow %s. Reason: %s", claimant[:8], request.escrow_hash[:16], request.reason[:50])
 
@@ -282,11 +296,15 @@ async def file_insurance_claim(
         # max-coverage-of-pool-balance itself; if this dict entry updated
         # with our escrow_id, the payout genuinely happened.
         if casper is None:
+            async with _pool_lock:
+                _claims.pop(request.escrow_hash, None)
             raise HTTPException(status_code=502, detail="Casper client unavailable to confirm on-chain claim")
         confirmed, revert_reason = await casper.confirm_wallet_insurance_claim(
             request.claimant_account_hash, request.escrow_hash, deploy_hash=request.wallet_tx_hash
         )
         if not confirmed:
+            async with _pool_lock:
+                _claims.pop(request.escrow_hash, None)
             detail = (
                 f"On-chain claim transaction reverted: {revert_reason}"
                 if revert_reason
@@ -294,20 +312,21 @@ async def file_insurance_claim(
             )
             raise HTTPException(status_code=502, detail=detail)
         deploy_hash = request.wallet_tx_hash
-        _insurance_pool["total_claims_filed"] += 1
-        _claims[request.escrow_hash] = {
-            "claimant": claimant,
-            "escrow_hash": request.escrow_hash,
-            "amount": escrow_amount,
-            "reason": request.reason,
-            "status": "paid",
-            "filed_at": int(time.time()),
-            "deploy_hash": deploy_hash,
-        }
         # Real on-chain payout already happened via the contract's own
         # purse -- this is just the local dashboard/accounting mirror.
-        _insurance_pool["total_claims_paid"] += escrow_amount
-        _insurance_pool["total_assets"] -= escrow_amount
+        async with _pool_lock:
+            _insurance_pool["total_claims_filed"] += 1
+            _claims[request.escrow_hash] = {
+                "claimant": claimant,
+                "escrow_hash": request.escrow_hash,
+                "amount": escrow_amount,
+                "reason": request.reason,
+                "status": "paid",
+                "filed_at": int(time.time()),
+                "deploy_hash": deploy_hash,
+            }
+            _insurance_pool["total_claims_paid"] += escrow_amount
+            _insurance_pool["total_assets"] -= escrow_amount
     elif casper is not None and config.insurance_contract_hash and request.arbiter_pubkeys:
         # Backend-submitted path: caller supplied a quorum of real arbiter
         # votes (collected off-chain, e.g. via `sdk/arbiter_signing.py`-
@@ -317,6 +336,8 @@ async def file_insurance_claim(
         # claimant/payout recipient (A1 fix requires this quorum on every
         # claim() -- see contracts/insurance-pool/src/main.rs).
         if len(request.arbiter_pubkeys) != len(request.arbiter_signatures):
+            async with _pool_lock:
+                _claims.pop(request.escrow_hash, None)
             raise HTTPException(status_code=422, detail="arbiter_pubkeys and arbiter_signatures must have the same length")
         if config.arbiter_pubkeys:
             valid_votes = arbiter_crypto.count_valid_insurance_claim_votes(
@@ -328,6 +349,8 @@ async def file_insurance_claim(
                 escrow_amount,
             )
             if valid_votes < config.arbiter_threshold:
+                async with _pool_lock:
+                    _claims.pop(request.escrow_hash, None)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"only {valid_votes} valid arbiter signature(s), need >= {config.arbiter_threshold}",
@@ -342,12 +365,16 @@ async def file_insurance_claim(
             )
         except Exception as e:
             logger.error("Failed to submit insurance claim deploy for %s: %s", claimant[:8], e)
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Failed to submit claim transaction on-chain: {e}")
+            async with _pool_lock:
+                _claims.pop(request.escrow_hash, None)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit claim transaction on-chain")
 
         confirmed, revert_reason = await casper.confirm_wallet_insurance_claim(
             config.casper_operator_account_hash, request.escrow_hash, deploy_hash=deploy_hash
         )
         if not confirmed:
+            async with _pool_lock:
+                _claims.pop(request.escrow_hash, None)
             detail = (
                 f"On-chain claim transaction reverted: {revert_reason}"
                 if revert_reason
@@ -355,18 +382,19 @@ async def file_insurance_claim(
             )
             raise HTTPException(status_code=502, detail=detail)
 
-        _insurance_pool["total_claims_filed"] += 1
-        _claims[request.escrow_hash] = {
-            "claimant": claimant,
-            "escrow_hash": request.escrow_hash,
-            "amount": escrow_amount,
-            "reason": request.reason,
-            "status": "paid",
-            "filed_at": int(time.time()),
-            "deploy_hash": deploy_hash,
-        }
-        _insurance_pool["total_claims_paid"] += escrow_amount
-        _insurance_pool["total_assets"] -= escrow_amount
+        async with _pool_lock:
+            _insurance_pool["total_claims_filed"] += 1
+            _claims[request.escrow_hash] = {
+                "claimant": claimant,
+                "escrow_hash": request.escrow_hash,
+                "amount": escrow_amount,
+                "reason": request.reason,
+                "status": "paid",
+                "filed_at": int(time.time()),
+                "deploy_hash": deploy_hash,
+            }
+            _insurance_pool["total_claims_paid"] += escrow_amount
+            _insurance_pool["total_assets"] -= escrow_amount
     else:
         # Simulated/demo path: no live Casper client/contract configured, or
         # no arbiter votes supplied yet (e.g. hosted-console demo identity
@@ -374,20 +402,21 @@ async def file_insurance_claim(
         # or a full off-chain arbiter-signing round trip.
         try:
             deploy_hash = f"deploy-hash-insurance-claim-{int(time.time())}"
-            _insurance_pool["total_claims_filed"] += 1
-            _claims[request.escrow_hash] = {
-                "claimant": claimant,
-                "escrow_hash": request.escrow_hash,
-                "amount": escrow_amount,
-                "reason": request.reason,
-                "status": "pending",
-                "filed_at": int(time.time()),
-                "deploy_hash": deploy_hash,
-            }
-            # For simplicity, immediately approve and pay out if no complex arbitration
-            _insurance_pool["total_claims_paid"] += escrow_amount
-            _insurance_pool["total_assets"] -= escrow_amount
-            _claims[request.escrow_hash]["status"] = "paid"
+            async with _pool_lock:
+                _insurance_pool["total_claims_filed"] += 1
+                _claims[request.escrow_hash] = {
+                    "claimant": claimant,
+                    "escrow_hash": request.escrow_hash,
+                    "amount": escrow_amount,
+                    "reason": request.reason,
+                    "status": "pending",
+                    "filed_at": int(time.time()),
+                    "deploy_hash": deploy_hash,
+                }
+                # For simplicity, immediately approve and pay out if no complex arbitration
+                _insurance_pool["total_claims_paid"] += escrow_amount
+                _insurance_pool["total_assets"] -= escrow_amount
+                _claims[request.escrow_hash]["status"] = "paid"
         except Exception as e:
             logger.error("Failed to process insurance claim for %s: %s", claimant[:8], e)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain")
