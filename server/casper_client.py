@@ -479,8 +479,19 @@ class CasperClient:
     # ── Read operations (direct JSON-RPC) ─────────────────────────────────
 
     async def query_contract_dict(
-        self, dict_name: str, key: str
+        self, dict_name: str, key: str, contract_hash: str | None = None
     ) -> dict[str, Any] | None:
+        """Read one dictionary entry from a deployed contract.
+
+        `contract_hash` defaults to this client's own escrow contract
+        (`self._contract_hash`) for backwards compatibility, but callers
+        querying a *different* deployed contract (e.g. the vrf-arbiter
+        contract) must pass its hash explicitly -- silently defaulting to
+        the escrow contract here previously caused `vrf_election.py` to
+        query the wrong contract entirely (see
+        skills/projects/ae402_hackathon for the writeup).
+        """
+        target_hash = contract_hash or self._contract_hash
         try:
             srh = await self._get_state_root_hash()
             result = await self._rpc(
@@ -489,7 +500,7 @@ class CasperClient:
                     "state_root_hash": srh,
                     "dictionary_identifier": {
                         "ContractNamedKey": {
-                            "key": f"hash-{self._contract_hash}",
+                            "key": f"hash-{target_hash}",
                             "dictionary_name": dict_name,
                             "dictionary_item_key": key,
                         }
@@ -498,7 +509,7 @@ class CasperClient:
             )
             return result.get("stored_value", {}).get("CLValue", {})
         except Exception:
-            logger.exception("Failed to query dict %s[%s]", dict_name, key)
+            logger.exception("Failed to query dict %s[%s] on contract %s", dict_name, key, target_hash)
             return None
 
     async def get_escrow(self, service_hash: str) -> EscrowRecord | None:
