@@ -412,6 +412,40 @@ class CasperClient:
                 logger.exception("Failed to check deploy execution result for %s", deploy_hash)
         return False, revert_reason
 
+    async def confirm_wallet_created_escrow(
+        self,
+        service_hash: str,
+        *,
+        deploy_hash: str | None = None,
+        attempts: int = 10,
+        delay_seconds: float = 1.5,
+    ) -> tuple[bool, str | None]:
+        """Poll on-chain contract state until a wallet-submitted session-wasm
+        create-escrow transaction (see `sendCreateEscrowTx` in
+        frontend/src/lib/liveTx.ts) has actually landed, or give up.
+
+        Mirrors `confirm_wallet_lifecycle_tx`: on-chain state is the source
+        of truth (the contract itself only ever records an escrow once the
+        real deposit transfer succeeded from the caller's own purse), we
+        just check for existence rather than a specific status transition.
+        On timeout we take one look at the deploy's own execution result to
+        distinguish "still pending" from a genuine revert (e.g. the
+        `InvalidAccessRights`-style purse errors this flow exists to avoid).
+        """
+        for _ in range(attempts):
+            record = await self.get_escrow(service_hash)
+            if record is not None:
+                return True, None
+            await asyncio.sleep(delay_seconds)
+
+        revert_reason: str | None = None
+        if deploy_hash:
+            try:
+                revert_reason = await self.get_deploy_error(deploy_hash)
+            except Exception:
+                logger.exception("Failed to check deploy execution result for %s", deploy_hash)
+        return False, revert_reason
+
     # ── Read operations (direct JSON-RPC) ─────────────────────────────────
 
     async def query_contract_dict(
