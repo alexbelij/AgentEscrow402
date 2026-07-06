@@ -9,6 +9,13 @@ edition = "2021"
 # casper-types = "4"
 sha2 = "0.10"
 
+[dev-dependencies]
+proptest = "1"
+
 [[test]]
 name = "integration_tests"
 path = "src/integration_tests.rs"
+
+[[test]]
+name = "property_tests"
+path = "src/property_tests.rs"

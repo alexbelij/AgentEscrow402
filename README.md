@@ -414,7 +414,8 @@ cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTL
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
-**Current status: 376/376 Python + 29/29 Rust tests passing.** (One test,
+**Current status: 437/437 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
+property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,
 `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
 in-memory identity-registry state sharing between test files — not a production code bug, tracked
 in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).) NVIDIA API-assisted security review
