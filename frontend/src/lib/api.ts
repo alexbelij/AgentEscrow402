@@ -186,7 +186,7 @@ export interface TransactionHash {
 }
 
 // Escrow
-export type EscrowStatus = 'pending' | 'funded' | 'released' | 'refunded' | 'disputed' | 'cancelled' | 'expired';
+export type EscrowStatus = 'pending' | 'funded' | 'released' | 'refunded' | 'disputed' | 'resolved' | 'cancelled' | 'expired';
 
 export interface Escrow {
   hash: string;
@@ -233,6 +233,19 @@ export interface EscrowActionRequest {
   // on-chain transaction directly (live mode). The backend then only
   // confirms on-chain state instead of signing/submitting itself.
   wallet_tx_hash?: string;
+}
+
+// Each entry is one arbiter's real Ed25519 signature (hex) over
+// "resolve:{service_hash}:{in_favor_of}" — collected off-chain (e.g. an
+// arbiter signs with their own connected wallet via clickRef.signMessage,
+// or offline), then pasted in here. At least `arbiter_threshold` (3 of 5
+// by default) valid, registered-arbiter signatures are required or the
+// backend/contract both reject the call.
+export interface ResolveEscrowRequest {
+  service_hash: string;
+  in_favor_of: 'sender' | 'receiver';
+  arbiter_pubkeys: string[];
+  arbiter_signatures: string[];
 }
 
 // Alt-token escrow, streaming escrow & atomic swap (server/multi_asset.py).
@@ -632,6 +645,13 @@ export const api = {
   releaseEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/release', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
   refundEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/refund', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
   disputeEscrow: (data: EscrowActionRequest) => fetcher<TransactionHash>('/dispute', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0)),
+  // Not gated by an x402/demo identity header at all: the contract's
+  // resolve() entry point (and this endpoint's fast local pre-check) only
+  // trust real Ed25519 signatures from registered arbiters over the
+  // canonical "resolve:{service_hash}:{in_favor_of}" message, collected
+  // off-chain — a claimed caller identity is never sufficient here, unlike
+  // release/refund/dispute.
+  resolveEscrow: (data: ResolveEscrowRequest) => fetcher<Escrow>('/resolve', 'POST', data),
 
   getEscrowByHash: async (hash: string): Promise<ApiResponse<Escrow>> => {
     const res = await fetcher<any>(`/escrow/${hash}`, 'GET');

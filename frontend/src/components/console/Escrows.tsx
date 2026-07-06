@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Estimate } from '../../lib/api';
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
-import { useSigner } from '../../lib/signer';
+import { useSigner, useClickRef } from '../../lib/signer';
 import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
@@ -123,6 +123,7 @@ const Select: React.FC<SelectProps> = ({ label, id, options, error, className = 
 const Escrows: React.FC = () => {
   const toast = useToast();
   const { isLive, activePublicKey } = useSigner();
+  const { clickRef } = useClickRef();
   const { run: runLifecycleAction } = useLifecycleAction();
   const { run: runCreateEscrowAction } = useCreateEscrowAction();
   const [contractHash, setContractHash] = useState<string | undefined>(undefined);
@@ -139,6 +140,23 @@ const Escrows: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Resolve (arbiter multisig) — separate from release/refund/dispute:
+  // resolve() is not a wallet-signed on-chain call from this browser at all,
+  // it's a plain POST /resolve carrying already-collected arbiter
+  // signatures (the backend/contract verify those, not the caller's
+  // identity). Rows start at 3 to match the default arbiter_threshold.
+  const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
+  const [resolveInFavorOf, setResolveInFavorOf] = useState<'sender' | 'receiver'>('sender');
+  const [resolveRows, setResolveRows] = useState<{ pubkey: string; signature: string }[]>([
+    { pubkey: '', signature: '' },
+    { pubkey: '', signature: '' },
+    { pubkey: '', signature: '' },
+  ]);
+  const [resolveLoading, setResolveLoading] = useState(false);
+  const [resolveSigningRow, setResolveSigningRow] = useState<number | null>(null);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+  const [resolveSuccess, setResolveSuccess] = useState<string | null>(null);
 
   // Gate lifecycle actions by identity: the contract itself only allows the
   // true sender (release/refund) or sender/receiver (dispute) to call these
@@ -274,6 +292,80 @@ const Escrows: React.FC = () => {
     }
   };
 
+  const openResolveModal = () => {
+    setResolveInFavorOf('sender');
+    setResolveRows([{ pubkey: '', signature: '' }, { pubkey: '', signature: '' }, { pubkey: '', signature: '' }]);
+    setResolveError(null);
+    setResolveSuccess(null);
+    setIsResolveModalOpen(true);
+  };
+
+  const updateResolveRow = (index: number, field: 'pubkey' | 'signature', value: string) => {
+    setResolveRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+  };
+
+  // Lets the *currently connected* live wallet cast its own arbiter vote
+  // directly, if it happens to be one of the registered arbiters — signs
+  // the exact canonical message the contract itself verifies
+  // ("resolve:{service_hash}:{in_favor_of}") via CSPR.click's signMessage,
+  // no on-chain transaction involved. Other arbiters' votes still need to
+  // be collected off-chain and pasted into the remaining rows.
+  const handleSignResolveRow = async (index: number) => {
+    if (!selectedEscrow || !clickRef || !activePublicKey) return;
+    setResolveSigningRow(index);
+    setResolveError(null);
+    try {
+      const message = `resolve:${selectedEscrow.hash}:${resolveInFavorOf}`;
+      const res = await clickRef.signMessage(message, activePublicKey);
+      if (!res || res.cancelled) {
+        setResolveError('Signing cancelled in wallet.');
+        return;
+      }
+      if (!res.signatureHex) {
+        setResolveError(res.error || 'Wallet did not return a signature.');
+        return;
+      }
+      setResolveRows((prev) =>
+        prev.map((row, i) => (i === index ? { pubkey: activePublicKey, signature: res.signatureHex as string } : row)),
+      );
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : 'Failed to sign with connected wallet.');
+    } finally {
+      setResolveSigningRow(null);
+    }
+  };
+
+  const handleResolve = async () => {
+    if (!selectedEscrow) return;
+    const filled = resolveRows.filter((r) => r.pubkey.trim() && r.signature.trim());
+    if (filled.length < 1) {
+      setResolveError('Add at least one arbiter pubkey + signature pair.');
+      return;
+    }
+    setResolveLoading(true);
+    setResolveError(null);
+    setResolveSuccess(null);
+    try {
+      const res = await api.resolveEscrow({
+        service_hash: selectedEscrow.hash,
+        in_favor_of: resolveInFavorOf,
+        arbiter_pubkeys: filled.map((r) => r.pubkey.trim()),
+        arbiter_signatures: filled.map((r) => r.signature.trim()),
+      });
+      if (res.error) throw new Error(res.error);
+      setResolveSuccess(`Escrow resolved in favor of ${resolveInFavorOf}.`);
+      setSelectedEscrow((prev) => (prev ? { ...prev, status: 'resolved' as EscrowStatus } : prev));
+      fetchEscrows();
+      api.getEscrowByHash(selectedEscrow.hash).then((r) => {
+        if (r.data) setSelectedEscrow(r.data);
+      });
+    } catch (err) {
+      setResolveError(err instanceof Error ? err.message : 'Failed to resolve escrow.');
+    } finally {
+      setResolveLoading(false);
+    }
+  };
+
   const getStatusIcon = (status: EscrowStatus) => {
     switch (status) {
       case 'funded':
@@ -286,6 +378,8 @@ const Escrows: React.FC = () => {
         return <Undo2 className="h-5 w-5 text-yellow-500" />;
       case 'disputed':
         return <AlertTriangle className="h-5 w-5 text-red-500" />;
+      case 'resolved':
+        return <CheckCircle className="h-5 w-5 text-purple-500" />;
       case 'cancelled':
         return <XCircle className="h-5 w-5 text-gray-500" />;
       default:
@@ -323,6 +417,7 @@ const Escrows: React.FC = () => {
               { value: 'released', label: 'Released' },
               { value: 'refunded', label: 'Refunded' },
               { value: 'disputed', label: 'Disputed' },
+              { value: 'resolved', label: 'Resolved' },
               { value: 'cancelled', label: 'Cancelled' },
             ]}
             className="w-36 sm:w-48"
@@ -569,7 +664,7 @@ const Escrows: React.FC = () => {
                 }
                 title={
                   selectedEscrow.status === 'disputed'
-                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter resolves it; not yet available in this console'
+                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter quorum resolves it (see the Resolve button below)'
                     : canActOnEscrow(selectedEscrow, 'release')
                     ? undefined
                     : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
@@ -591,7 +686,7 @@ const Escrows: React.FC = () => {
                 }
                 title={
                   selectedEscrow.status === 'disputed'
-                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter resolves it; not yet available in this console'
+                    ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter quorum resolves it (see the Resolve button below)'
                     : canActOnEscrow(selectedEscrow, 'refund')
                     ? undefined
                     : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender — the contract would reject this on-chain`
@@ -619,6 +714,107 @@ const Escrows: React.FC = () => {
                 className="flex items-center px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 <AlertTriangle className="h-5 w-5 mr-2" /> Dispute
+              </button>
+              {selectedEscrow.status === 'disputed' && (
+                <button
+                  onClick={openResolveModal}
+                  className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                >
+                  <CheckCircle className="h-5 w-5 mr-2" /> Resolve
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Resolve (arbiter multisig) Modal */}
+      <Modal isOpen={isResolveModalOpen} onClose={() => setIsResolveModalOpen(false)} title="Resolve Disputed Escrow">
+        {selectedEscrow && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-500">
+              Resolving a dispute requires real Ed25519 signatures from a quorum of registered arbiters over{' '}
+              <span className="font-mono">resolve:{selectedEscrow.hash.substring(0, 12)}...:&lt;verdict&gt;</span> —
+              collected off-chain, then submitted here. This is not a wallet-signed on-chain transaction from this
+              browser; the backend/contract verify the signatures themselves.
+              {isLive && ' If your connected wallet is itself a registered arbiter, use "Sign with wallet" to cast its vote directly.'}
+            </p>
+            <Select
+              label="Resolve in favor of"
+              id="resolveInFavorOf"
+              value={resolveInFavorOf}
+              onChange={(e) => setResolveInFavorOf(e.target.value as 'sender' | 'receiver')}
+              options={[
+                { value: 'sender', label: 'Sender (refund)' },
+                { value: 'receiver', label: 'Receiver (release)' },
+              ]}
+            />
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-gray-400">Arbiter votes</label>
+              {resolveRows.map((row, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <input
+                    type="text"
+                    placeholder="Arbiter public key (hex)"
+                    value={row.pubkey}
+                    onChange={(e) => updateResolveRow(i, 'pubkey', e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 font-mono"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Signature (hex)"
+                    value={row.signature}
+                    onChange={(e) => updateResolveRow(i, 'signature', e.target.value)}
+                    className="flex-1 min-w-0 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-200 font-mono"
+                  />
+                  {isLive && (
+                    <button
+                      type="button"
+                      onClick={() => handleSignResolveRow(i)}
+                      disabled={resolveSigningRow !== null}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs whitespace-nowrap disabled:opacity-50"
+                      title="Sign this row's vote with the connected wallet"
+                    >
+                      {resolveSigningRow === i ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign with wallet'}
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setResolveRows((prev) => [...prev, { pubkey: '', signature: '' }])}
+                className="text-sm text-amber-400 hover:text-amber-300"
+              >
+                + Add another arbiter row
+              </button>
+            </div>
+            {resolveError && (
+              <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-3 flex items-center">
+                <XCircle className="h-5 w-5 mr-2" />
+                <p>{resolveError}</p>
+              </div>
+            )}
+            {resolveSuccess && (
+              <div className="text-green-500 bg-green-900/20 border border-green-700 rounded-lg p-3 flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                <p>{resolveSuccess}</p>
+              </div>
+            )}
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setIsResolveModalOpen(false)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-colors"
+                disabled={resolveLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResolve}
+                disabled={resolveLoading || !!resolveSuccess}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors flex items-center disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {resolveLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+                Submit Resolution
               </button>
             </div>
           </div>
