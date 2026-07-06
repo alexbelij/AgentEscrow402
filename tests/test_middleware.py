@@ -151,6 +151,45 @@ class TestVerifySecp256k1:
         assert _verify_signature(pub_hex, message, sig_hex) is True
 
 
+class TestCasperMessagePrefixFallback:
+    """Browser wallets (Casper Wallet / CSPR.click's `signMessage()`) sign
+    `b"Casper Message:\n" + message`, not the raw message, per the
+    ecosystem-standard `formatMessageWithHeaders` convention. Agent SDKs
+    signing directly with a held private key sign the raw message. Both
+    must verify via `_verify_signature`."""
+
+    def test_ed25519_wallet_prefixed_signature_verifies(self):
+        priv = Ed25519PrivateKey.generate()
+        pub_hex = priv.public_key().public_bytes_raw().hex()
+        message = b"x402-v1;abc;100;sender;123;nonce;POST;/escrow/multi-asset"
+        sig_hex = priv.sign(b"Casper Message:\n" + message).hex()
+        assert _verify_signature(pub_hex, message, sig_hex) is True
+
+    def test_secp256k1_wallet_prefixed_signature_verifies(self):
+        priv = ec.generate_private_key(ec.SECP256K1())
+        pub_hex = priv.public_key().public_bytes(Encoding.X962, PublicFormat.CompressedPoint).hex()
+        message = b"x402-v1;abc;100;sender;123;nonce;POST;/escrow/multi-asset"
+        der_sig = priv.sign(b"Casper Message:\n" + message, ec.ECDSA(SHA256()))
+        r, s = utils.decode_dss_signature(der_sig)
+        sig_hex = (r.to_bytes(32, "big") + s.to_bytes(32, "big")).hex()
+        assert _verify_signature(pub_hex, message, sig_hex) is True
+
+    def test_raw_agent_signature_still_verifies_directly(self):
+        # Direct agent-key signing (no wallet prefix) must keep working.
+        priv = Ed25519PrivateKey.generate()
+        pub_hex = priv.public_key().public_bytes_raw().hex()
+        message = b"x402-v1;abc;100;sender;123;nonce;POST;/escrow/multi-asset"
+        sig_hex = priv.sign(message).hex()
+        assert _verify_signature(pub_hex, message, sig_hex) is True
+
+    def test_tampered_message_rejected_even_with_prefix_fallback(self):
+        priv = Ed25519PrivateKey.generate()
+        pub_hex = priv.public_key().public_bytes_raw().hex()
+        message = b"x402-v1;abc;100;sender;123;nonce;POST;/escrow/multi-asset"
+        sig_hex = priv.sign(b"Casper Message:\n" + message).hex()
+        assert _verify_signature(pub_hex, b"different payload", sig_hex) is False
+
+
 class TestComputeServiceHash:
     def test_deterministic(self):
         h1 = compute_service_hash("s", "r", 100, "nonce")

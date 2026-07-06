@@ -86,16 +86,34 @@ def _verify_secp256k1(public_hex: str, message: bytes, sig_hex: str) -> bool:
         return False
 
 
+# Browser wallets (Casper Wallet / CSPR.click's `signMessage()`) never sign
+# the raw bytes handed to them: per the ecosystem-standard convention (see
+# casper-js-sdk's `formatMessageWithHeaders`), the wallet always prepends
+# this fixed text before signing, specifically so a message-signing request
+# can never be silently reused as a raw-deploy/session signature. Agent
+# SDKs that hold a private key directly and sign the x402 payload
+# themselves (no wallet involved) do NOT add this prefix. We can't tell
+# which path produced a given signature ahead of time, so we try the raw
+# message first (the primary/most common agent-to-agent x402 path) and
+# only fall back to the prefixed form if that fails.
+CASPER_MESSAGE_PREFIX = b"Casper Message:\n"
+
+
 def _verify_signature(public_hex: str, message: bytes, sig_hex: str) -> bool:
     """Dispatches to the right verifier based on the raw public key length:
     32 bytes (64 hex) -> Ed25519, 33 bytes (66 hex) -> secp256k1 compressed.
     Both key types are legitimate CSPR.click wallets; only the crypto
-    primitive differs."""
+    primitive differs. Tries the raw message first, then the
+    wallet-`signMessage`-prefixed form (see CASPER_MESSAGE_PREFIX above)."""
     if len(public_hex) == 64:
-        return _verify_ed25519(public_hex, message, sig_hex)
-    if len(public_hex) == 66:
-        return _verify_secp256k1(public_hex, message, sig_hex)
-    return False
+        verifier = _verify_ed25519
+    elif len(public_hex) == 66:
+        verifier = _verify_secp256k1
+    else:
+        return False
+    if verifier(public_hex, message, sig_hex):
+        return True
+    return verifier(public_hex, CASPER_MESSAGE_PREFIX + message, sig_hex)
 
 
 def _check_replay(nonce: str, ts: int) -> str | None:
