@@ -6,13 +6,18 @@ import hashlib
 import time
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 from starlette.requests import Request
 
 from server.middleware import (
     _build_signing_payload,
     _check_replay,
     _used_nonces,
+    _verify_secp256k1,
+    _verify_signature,
     compute_service_hash,
     parse_x402_header,
     require_payment,
@@ -92,6 +97,58 @@ class TestParseX402Header:
         result = parse_x402_header(header)
         assert result is not None
         assert result.amount == 0
+
+    def test_secp256k1_length_sender_accepted(self):
+        # 33-byte compressed secp256k1 pubkey = 66 hex chars (vs 64 for
+        # Ed25519's raw 32 bytes) -- must not be rejected as malformed.
+        h = "aa" * 32
+        sender = "02" + "bb" * 32  # 66 hex chars, compressed-point-shaped
+        signature = "cc" * 64
+        header = f"x402-v1;{h};0;{sender};0;nonceabcd;{signature}"
+        result = parse_x402_header(header)
+        assert result is not None
+        assert result.sender == sender
+
+    def test_wrong_length_sender_rejected(self):
+        h = "aa" * 32
+        sender = "bb" * 30  # neither 64 nor 66 hex chars
+        signature = "cc" * 64
+        header = f"x402-v1;{h};0;{sender};0;nonceabcd;{signature}"
+        result = parse_x402_header(header)
+        assert result is None
+
+
+class TestVerifySecp256k1:
+    def _keypair_and_sign(self, message: bytes) -> tuple[str, str]:
+        priv = ec.generate_private_key(ec.SECP256K1())
+        pub_hex = priv.public_key().public_bytes(Encoding.X962, PublicFormat.CompressedPoint).hex()
+        der_sig = priv.sign(message, ec.ECDSA(SHA256()))
+        r, s = utils.decode_dss_signature(der_sig)
+        sig_hex = (r.to_bytes(32, "big") + s.to_bytes(32, "big")).hex()
+        return pub_hex, sig_hex
+
+    def test_valid_signature_verifies(self):
+        message = b"ae402 secp256k1 test message"
+        pub_hex, sig_hex = self._keypair_and_sign(message)
+        assert _verify_secp256k1(pub_hex, message, sig_hex) is True
+        assert _verify_signature(pub_hex, message, sig_hex) is True
+
+    def test_tampered_message_rejected(self):
+        message = b"ae402 secp256k1 test message"
+        pub_hex, sig_hex = self._keypair_and_sign(message)
+        assert _verify_secp256k1(pub_hex, b"tampered message", sig_hex) is False
+
+    def test_wrong_key_length_rejected(self):
+        message = b"ae402 secp256k1 test message"
+        _, sig_hex = self._keypair_and_sign(message)
+        assert _verify_secp256k1("bb" * 32, message, sig_hex) is False  # 64 hex, not 66
+
+    def test_dispatch_picks_ed25519_for_32_byte_key(self):
+        priv = Ed25519PrivateKey.generate()
+        pub_hex = priv.public_key().public_bytes_raw().hex()
+        message = b"ae402 ed25519 dispatch test"
+        sig_hex = priv.sign(message).hex()
+        assert _verify_signature(pub_hex, message, sig_hex) is True
 
 
 class TestComputeServiceHash:

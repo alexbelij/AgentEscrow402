@@ -121,15 +121,14 @@ const AdvancedEscrow: React.FC = () => {
   const { isLive, activePublicKey } = useSigner();
   const { run: runPermitDeposit } = useCep18PermitDeposit();
   // Casper's algorithm tag is the public key's own first hex byte:
-  // 01 = ed25519, 02 = secp256k1. The gasless permit path also signs a
-  // genuine x402 payment header (see cep18Permit.ts), and the backend's
-  // x402 verifier only supports Ed25519 today -- secp256k1 wallets (e.g.
-  // most default Casper Wallet/Ledger accounts) can't use this path yet.
-  const isEd25519Wallet = !!activePublicKey && activePublicKey.slice(0, 2).toLowerCase() === '01';
+  // 01 = ed25519, 02 = secp256k1. Both are supported end-to-end for the
+  // gasless permit path (on-chain permit() verify + backend x402 header
+  // verify -- see server/middleware.py::_verify_signature); this is just a
+  // sanity gate against unknown/malformed key tags.
+  const hasSupportedWalletKey = !!activePublicKey && ['01', '02'].includes(activePublicKey.slice(0, 2).toLowerCase());
   // Live-wallet CEP-18 escrows default to the real gasless-permit path
-  // (funds move from the connected wallet's own balance) when possible;
-  // users can opt back into the demo custodial path if they don't have
-  // real AETUSD, and secp256k1 wallets fall back to it automatically.
+  // (funds move from the connected wallet's own balance); users can opt
+  // back into the demo custodial path if they don't have real AETUSD.
   const [useGaslessPermit, setUseGaslessPermit] = useState(true);
 
   // --- Streaming escrow state ---
@@ -174,7 +173,7 @@ const AdvancedEscrow: React.FC = () => {
         service_hash: tokenServiceHash,
         ttl: Number(tokenTtl),
       };
-      if (isLive && tokenIdentifier.token_type === 'cep18' && useGaslessPermit && isEd25519Wallet) {
+      if (isLive && tokenIdentifier.token_type === 'cep18' && useGaslessPermit && hasSupportedWalletKey) {
         // Real live-wallet path: the connected wallet only signs an
         // off-chain permit message (no tx, no gas) -- the backend relayer
         // submits permit()+transfer_from() on-chain, moving funds out of
@@ -312,7 +311,7 @@ const AdvancedEscrow: React.FC = () => {
             </div>
             <TokenSelect value={tokenIdentifier} onChange={setTokenIdentifier} />
             {isLive && tokenIdentifier.token_type === 'cep18' && (
-              isEd25519Wallet ? (
+              hasSupportedWalletKey ? (
                 <label className="flex items-start gap-2 mb-4 text-sm text-gray-300 bg-emerald-500/10 border border-emerald-500/30 rounded-md p-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -330,9 +329,9 @@ const AdvancedEscrow: React.FC = () => {
               ) : (
                 <div className="flex items-start gap-2 mb-4 text-sm text-gray-400 bg-gray-800/60 border border-[#1e1e2e] rounded-md p-3">
                   <span>
-                    <strong className="text-gray-300">Gasless wallet permit unavailable</strong> for this wallet —
-                    it uses a secp256k1 key, and the gasless path currently signs an Ed25519-only payment header.
-                    Falling back to the demo custodial balance for this CEP-18 escrow.
+                    <strong className="text-gray-300">Gasless wallet permit unavailable</strong> — could not
+                    recognize this wallet's key type. Falling back to the demo custodial balance for this
+                    CEP-18 escrow.
                   </span>
                 </div>
               )
