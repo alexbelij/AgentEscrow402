@@ -379,7 +379,8 @@ result = await tool.run(action="create", receiver="ab" * 32, amount=1_000_000)
 python sdk/mcp_server.py
 ```
 
-Full SDK reference → [docs/SDK.md](docs/SDK.md)
+Full SDK reference → [docs/SDK.md](docs/SDK.md) · Standalone JSON-Schema for all 24 tools (no
+server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.json)
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 

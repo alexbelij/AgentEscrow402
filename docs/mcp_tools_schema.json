@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentEscrow402 MCP Tool Registry",
+  "description": "JSON-Schema definitions for all tools exposed by the AE402 MCP server (sdk/mcp_server.py). Generated from the live TOOLS list, not hand-maintained.",
+  "tool_count": 24,
+  "tools": [
+    {
+      "name": "create_escrow",
+      "description": "Lock funds in a new escrow between sender and receiver. Returns the created escrow record with service_hash.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string",
+            "description": "Payer agent ID"
+          },
+          "receiver": {
+            "type": "string",
+            "description": "Service provider ID"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Amount in motes"
+          },
+          "ttl": {
+            "type": "integer",
+            "description": "Time-to-live in seconds (60-86400)",
+            "default": 300
+          }
+        },
+        "required": [
+          "sender",
+          "receiver",
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "release_escrow",
+      "description": "Release escrowed funds to the receiver after service delivery.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "service_hash": {
+            "type": "string",
+            "description": "SHA-256 hash of the escrow"
+          }
+        },
+        "required": [
+          "sender",
+          "service_hash"
+        ]
+      }
+    },
+    {
+      "name": "refund_escrow",
+      "description": "Refund escrowed funds back to the sender.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "service_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sender",
+          "service_hash"
+        ]
+      }
+    },
+    {
+      "name": "dispute_escrow",
+      "description": "Open a dispute on an active escrow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "service_hash": {
+            "type": "string"
+          },
+          "reason_hash": {
+            "type": "string",
+            "description": "SHA-256 of the dispute reason"
+          }
+        },
+        "required": [
+          "sender",
+          "service_hash",
+          "reason_hash"
+        ]
+      }
+    },
+    {
+      "name": "get_escrow",
+      "description": "Fetch the current status and details of an escrow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_hash"
+        ]
+      }
+    },
+    {
+      "name": "get_reputation",
+      "description": "Query the on-chain reputation score of an agent.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent": {
+            "type": "string",
+            "description": "Agent ID to look up"
+          }
+        },
+        "required": [
+          "agent"
+        ]
+      }
+    },
+    {
+      "name": "build_x402_header",
+      "description": "Build an x402 payment header for HTTP requests.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sender",
+          "receiver",
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "list_escrows",
+      "description": "List all escrows with optional status filter.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Filter by status",
+            "enum": [
+              "active",
+              "completed",
+              "disputed",
+              "expired"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Max results (default 50)",
+            "default": 50
+          }
+        }
+      }
+    },
+    {
+      "name": "get_stats",
+      "description": "Get aggregate escrow statistics: total count, volume, success rate.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "estimate_fee",
+      "description": "Estimate fees and insurance cost for a given escrow amount.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "integer",
+            "description": "Escrow amount in motes"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "get_escrow_history",
+      "description": "Get the full state change history of an escrow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_hash": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_hash"
+        ]
+      }
+    },
+    {
+      "name": "list_agents",
+      "description": "List all known agents with their reputation scores.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "get_events",
+      "description": "Get recent escrow events (creates, releases, disputes).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "Max events",
+            "default": 20
+          }
+        }
+      }
+    },
+    {
+      "name": "compute_hash",
+      "description": "Compute the service hash for a sender-receiver-amount tuple.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sender",
+          "receiver",
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "health_check",
+      "description": "Check API and blockchain connection health status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "submit_dispute_arbitration",
+      "description": "Submit a disputed escrow to the AI arbitration engine. Analyzes evidence from both parties and produces a binding resolution.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_hash": {
+            "type": "string",
+            "description": "Escrow identifier"
+          },
+          "evidence_sender": {
+            "type": "string",
+            "description": "Sender evidence text/hash"
+          },
+          "evidence_receiver": {
+            "type": "string",
+            "description": "Receiver evidence text/hash"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "non_delivery",
+              "quality",
+              "late_delivery",
+              "fraud"
+            ],
+            "description": "Dispute category"
+          }
+        },
+        "required": [
+          "service_hash",
+          "evidence_sender",
+          "evidence_receiver"
+        ]
+      }
+    },
+    {
+      "name": "get_arbitration_result",
+      "description": "Get the AI arbitration verdict and reasoning for a dispute.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "arbitration_id": {
+            "type": "string",
+            "description": "Arbitration case ID"
+          }
+        },
+        "required": [
+          "arbitration_id"
+        ]
+      }
+    },
+    {
+      "name": "appeal_arbitration",
+      "description": "Appeal an AI arbitration decision within the allowed window.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "arbitration_id": {
+            "type": "string"
+          },
+          "appellant": {
+            "type": "string",
+            "description": "Agent ID filing appeal"
+          },
+          "new_evidence": {
+            "type": "string",
+            "description": "Additional evidence hash"
+          }
+        },
+        "required": [
+          "arbitration_id",
+          "appellant"
+        ]
+      }
+    },
+    {
+      "name": "calculate_risk_score",
+      "description": "Calculate a composite risk score for a proposed escrow transaction. Considers counterparty history, amount, and chain heuristics.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "receiver": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "description": "Amount in motes"
+          }
+        },
+        "required": [
+          "sender",
+          "receiver",
+          "amount"
+        ]
+      }
+    },
+    {
+      "name": "get_risk_report",
+      "description": "Retrieve a detailed risk breakdown for an agent or escrow.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Agent ID or service_hash"
+          },
+          "report_type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "escrow"
+            ],
+            "default": "agent"
+          }
+        },
+        "required": [
+          "target"
+        ]
+      }
+    },
+    {
+      "name": "set_risk_threshold",
+      "description": "Configure auto-reject threshold for high-risk transactions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threshold": {
+            "type": "number",
+            "description": "Risk score 0.0-1.0 above which transactions are flagged",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "flag",
+              "reject",
+              "require_review"
+            ],
+            "default": "flag"
+          }
+        },
+        "required": [
+          "threshold"
+        ]
+      }
+    },
+    {
+      "name": "register_identity",
+      "description": "Register a new agent identity with KYC-level credentials on-chain.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Unique agent identifier"
+          },
+          "public_key": {
+            "type": "string",
+            "description": "Ed25519 public key hex"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Optional metadata (display_name, org, contact)"
+          }
+        },
+        "required": [
+          "agent_id",
+          "public_key"
+        ]
+      }
+    },
+    {
+      "name": "verify_identity",
+      "description": "Verify an agent's identity and credential status.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_id"
+        ]
+      }
+    },
+    {
+      "name": "revoke_identity",
+      "description": "Revoke an agent's identity credentials (admin only).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Revocation reason"
+          }
+        },
+        "required": [
+          "agent_id",
+          "reason"
+        ]
+      }
+    }
+  ]
+}
