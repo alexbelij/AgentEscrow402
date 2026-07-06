@@ -174,6 +174,7 @@ version 8, updated 2026-07-05):
 | Escrow create / release / refund / dispute / resolve | ✅ **Real on-chain** | Real Casper testnet transactions in live mode (`SANDBOX=false`, what production runs); see [Verified on-chain](#-testing) |
 | HTLC atomic-swap (`commit_swap` / `reveal_swap`) | ✅ **Real on-chain** | SHA-256 commit/reveal entry points, live round-trip with cross-account reveal |
 | CEP-18 (fungible token) transfers | ✅ **Real on-chain** | Deployed test token AETUSD, transfer + balance read against live contract state |
+| CEP-2612-inspired gasless permit (CEP-18) | ✅ **Real on-chain** | Custom `permit()`/`permit_nonce()` entry points added to a forked CEP-18 contract (Ed25519-signature-gated allowance, no session-wasm needed); live-verified: owner signs an off-chain message only, relayer submits `permit()`+`transfer_from()` and pays gas, real balance moves |
 | CEP-78 (NFT) mint/transfer | ✅ **Real on-chain** | Deployed test collection AETNFT, mint + transfer + ownership read against live contract state |
 | x402 signature verification | ✅ **Real crypto** | Ed25519 verify (`cryptography` lib) + nonce replay protection, not a stub |
 | Reputation scoring, staking, slashing | ✅ **Real logic** | Exponential decay + stake-weighted slashing in `identity_registry_api.py` |
@@ -279,7 +280,7 @@ Deployed on Casper Testnet:
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
 | Insurance Pool | `e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61` | [view](https://testnet.cspr.live/contract/e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61) |
 | VRF Arbiter | `5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f` | [view](https://testnet.cspr.live/contract/5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f) |
-| CEP-18 test token (AETUSD) | `c93d7d59e73b213e4351f4e11f2a5217a6aa872bb18d378b3f5f230f29883e7d` | [view](https://testnet.cspr.live/contract/c93d7d59e73b213e4351f4e11f2a5217a6aa872bb18d378b3f5f230f29883e7d) |
+| CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 
 | Entry point | Description |
 |---|---|

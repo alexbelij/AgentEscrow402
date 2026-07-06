@@ -260,12 +260,24 @@ export interface TokenIdentifier {
   contract_hash?: string; // required for cep18/cep78, omitted for cspr
 }
 
+// CEP-2612-inspired gasless permit proof (see server/multi_asset.py
+// PermitProof). The owner signed off-chain (no tx, no gas) authorizing the
+// backend operator/relayer to move `amount` of the escrow's CEP-18 token
+// out of their own real wallet balance -- see lib/cep18Permit.ts for the
+// exact canonical message and lib/useCep18PermitDeposit.ts for the flow.
+export interface PermitProof {
+  owner_account_hash: string;
+  deadline: number;
+  signature: string;
+}
+
 export interface MultiAssetEscrowRequest {
   receiver: string;
   amount: number;
   token: TokenIdentifier;
   service_hash: string;
   ttl?: number;
+  permit?: PermitProof;
 }
 
 export interface StreamEscrowRequest {
@@ -721,6 +733,18 @@ export const api = {
 
   // Multi-asset Escrow Endpoints
   createMultiAssetEscrow: (data: MultiAssetEscrowRequest) => fetcher<TransactionHash>('/escrow/multi-asset', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
+  // Live-wallet variant: `xPaymentHeader` must be a genuine (non-demo)
+  // X-Payment header built + signed by the connected wallet itself (see
+  // lib/cep18Permit.ts buildLiveXPaymentHeader) -- required whenever
+  // `data.permit` is set, since permit()'s on-chain owner check must match
+  // the real x402 `sender` the backend records for this escrow.
+  createMultiAssetEscrowLive: (data: MultiAssetEscrowRequest, xPaymentHeader: string) =>
+    fetcher<TransactionHash>('/escrow/multi-asset', 'POST', data, { 'X-Payment': xPaymentHeader }),
+  getCep18PermitNonce: (contractHash: string, ownerAccountHash: string) =>
+    fetcher<{ nonce: number; spender_account_hash: string }>(
+      `/escrow/cep18-permit-nonce?contract_hash=${contractHash}&owner_account_hash=${ownerAccountHash}`,
+      'GET',
+    ),
   createStreamEscrow: (data: StreamEscrowRequest) => fetcher<TransactionHash>('/escrow/stream', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
   getStreamStatus: (hash: string) => fetcher<StreamStatus>(`/escrow/${hash}/stream-status`, 'GET'),
   // Commit must come from the escrow's sender (DEMO_AGENT_SENDER, the default identity every demo escrow is created with).

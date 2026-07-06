@@ -42,6 +42,12 @@ class Config:
     # set_arbiters/emergency_freeze). Empty by default => those routes are
     # disabled (fail closed), not open, until explicitly configured.
     admin_api_key: str = ""
+    # Account hash of the backend's own operator/deployer key (the account
+    # that pays gas as the "spender"/relayer in the CEP-18 gasless permit
+    # flow -- see CasperClient.cep18_permit/cep18_transfer_from). Derived
+    # once from alexbelij_secret_key.pem via casper-js-sdk; update if the
+    # operator key is ever rotated.
+    casper_operator_account_hash: str = "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8"
 
     @classmethod
     def from_env(cls) -> Config:
@@ -92,6 +98,10 @@ class Config:
             arbiter_threshold=int(os.getenv("ARBITER_THRESHOLD", "3")),
             release_cap_motes=int(os.getenv("RELEASE_CAP_MOTES", "1000000000000")),
             admin_api_key=os.getenv("ADMIN_API_KEY", ""),
+            casper_operator_account_hash=os.getenv(
+                "CASPER_OPERATOR_ACCOUNT_HASH",
+                "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8",
+            ),
         )
 
 
