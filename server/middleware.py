@@ -52,6 +52,52 @@ def _verify_ed25519(public_hex: str, message: bytes, sig_hex: str) -> bool:
         return False
 
 
+def _verify_secp256k1(public_hex: str, message: bytes, sig_hex: str) -> bool:
+    """Verify a secp256k1 ECDSA signature. Returns False on any error.
+
+    Matches Casper's own on-chain `casper_types::crypto::verify` for
+    secp256k1: a 33-byte compressed public key, a 64-byte compact (raw
+    r||s, not DER) signature, and SHA-256 as the digest -- the same
+    encoding CSPR.click's `signMessage()` produces and the same encoding
+    the cep18 fork's `permit()` entry point verifies on-chain (k256's
+    default `ecdsa::Signature`/`Verifier` behavior). We only need to
+    re-encode r||s as DER for the `cryptography` library's ECDSA API.
+    """
+    try:
+        from cryptography.exceptions import InvalidSignature
+        from cryptography.hazmat.primitives.asymmetric import ec, utils
+        from cryptography.hazmat.primitives.hashes import SHA256
+
+        # Compressed secp256k1 pubkey = 33 bytes; compact signature = 64 bytes.
+        if len(public_hex) != 66 or len(sig_hex) != 128:
+            return False
+        pub_bytes = bytes.fromhex(public_hex)
+        sig_bytes = bytes.fromhex(sig_hex)
+        r = int.from_bytes(sig_bytes[:32], "big")
+        s = int.from_bytes(sig_bytes[32:], "big")
+        der_sig = utils.encode_dss_signature(r, s)
+        key = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256K1(), pub_bytes)
+        key.verify(der_sig, message, ec.ECDSA(SHA256()))
+        return True
+    except InvalidSignature:
+        return False
+    except Exception:
+        logger.debug("secp256k1 verification failed for sender=%s", public_hex[:16])
+        return False
+
+
+def _verify_signature(public_hex: str, message: bytes, sig_hex: str) -> bool:
+    """Dispatches to the right verifier based on the raw public key length:
+    32 bytes (64 hex) -> Ed25519, 33 bytes (66 hex) -> secp256k1 compressed.
+    Both key types are legitimate CSPR.click wallets; only the crypto
+    primitive differs."""
+    if len(public_hex) == 64:
+        return _verify_ed25519(public_hex, message, sig_hex)
+    if len(public_hex) == 66:
+        return _verify_secp256k1(public_hex, message, sig_hex)
+    return False
+
+
 def _check_replay(nonce: str, ts: int) -> str | None:
     """Check for replay attacks. Returns error message or None."""
     now = int(time.time())
@@ -93,7 +139,9 @@ def parse_x402_header(raw: str) -> PaymentHeader | None:
     hex_chars = set("0123456789abcdef")
     if len(escrow_hash) != 64 or not all(c in hex_chars for c in escrow_hash.lower()):
         return None
-    if len(sender) != 64 or not all(c in hex_chars for c in sender.lower()):
+    # 64 hex = raw 32-byte Ed25519 pubkey, 66 hex = 33-byte compressed
+    # secp256k1 pubkey -- see _verify_signature in this module.
+    if len(sender) not in (64, 66) or not all(c in hex_chars for c in sender.lower()):
         return None
     if len(signature) != 128 or not all(c in hex_chars for c in signature.lower()):
         return None
@@ -180,7 +228,7 @@ def require_payment(min_amount: int = 0, verify_sig: bool = True):
                     method=request.method,
                     path=request.url.path,
                 )
-                if not _verify_ed25519(payment.sender, msg, payment.signature):
+                if not _verify_signature(payment.sender, msg, payment.signature):
                     return JSONResponse(
                         status_code=401,
                         content={"error": "invalid_signature"},

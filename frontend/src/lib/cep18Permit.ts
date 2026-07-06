@@ -9,11 +9,11 @@
  *    which expects a Casper-tag-prefixed signature (0x01 ed25519 / 0x02
  *    secp256k1 + raw bytes) -- see buildPermitMessage/signPermit below.
  * 2. The **x402 payment header** signature: verified server-side by
- *    `server/middleware.py::_verify_ed25519`, which expects a bare,
- *    untagged 32-byte pubkey + 64-byte signature (`cryptography` lib's
- *    Ed25519PublicKey.verify) -- see buildLiveXPaymentHeader below. Only
- *    Ed25519 wallets can use this path (x402 here has no secp256k1
- *    support); reject secp256k1 signers before calling it.
+ *    `server/middleware.py::_verify_signature`, which expects a bare,
+ *    untagged pubkey (32-byte Ed25519 or 33-byte compressed secp256k1) +
+ *    64-byte signature -- see buildLiveXPaymentHeader below. Both Ed25519
+ *    (`_verify_ed25519`) and secp256k1 (`_verify_secp256k1`, compact r||s
+ *    re-encoded as DER for the `cryptography` lib) are supported.
  */
 import type { ICSPRClickSDK } from '@make-software/csprclick-core-types'
 
@@ -81,10 +81,11 @@ export async function signPermitMessage(
 
 /** Builds + signs a genuine (non-demo) X-Payment header with the connected
  * wallet, matching server/middleware.py's `_build_signing_payload` exactly
- * (`version;escrow_hash;amount;sender;timestamp;nonce;method;path`). Only
- * works for Ed25519 wallets -- `_verify_ed25519` has no secp256k1 support.
- * `ownerPublicKeyHex` must be the bare 32-byte raw hex (no Casper tag
- * prefix) since that's what the backend's x402 `sender` field expects. */
+ * (`version;escrow_hash;amount;sender;timestamp;nonce;method;path`). Works
+ * for both Ed25519 and secp256k1 wallets -- `_verify_signature` dispatches
+ * on the raw pubkey length (32 bytes vs 33-byte compressed). Just strip the
+ * 1-byte Casper algorithm tag; `ownerPublicKeyHexTagged` must be the tagged
+ * hex CSPR.click hands back (`01...` or `02...`). */
 export async function buildLiveXPaymentHeader(
   clickRef: ICSPRClickSDK,
   ownerPublicKeyHexTagged: string,
@@ -93,8 +94,9 @@ export async function buildLiveXPaymentHeader(
   method: string,
   path: string,
 ): Promise<{ ok: true; header: string } | { ok: false; cancelled: boolean; error?: string }> {
-  if (!ownerPublicKeyHexTagged.toLowerCase().startsWith('01')) {
-    return { ok: false, cancelled: false, error: 'Gasless permit deposit currently requires an Ed25519 wallet.' }
+  const tag = ownerPublicKeyHexTagged.slice(0, 2).toLowerCase()
+  if (tag !== '01' && tag !== '02') {
+    return { ok: false, cancelled: false, error: 'Unsupported wallet key type for gasless permit deposit.' }
   }
   const rawSenderHex = ownerPublicKeyHexTagged.slice(2).toLowerCase()
   const timestamp = Math.floor(Date.now() / 1000)
