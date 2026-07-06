@@ -70,7 +70,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-xl backdrop-blur animate-fade-in-up ${cls}`}
             >
               <Icon className="h-[18px] w-[18px] shrink-0 mt-0.5" />
-              <p className="flex-1 leading-snug">{t.message}</p>
+              <p className="flex-1 leading-snug break-all">{t.message}</p>
               <button
                 type="button"
                 onClick={() => dismiss(t.id)}
