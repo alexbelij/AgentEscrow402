@@ -14,7 +14,7 @@ from server.casper_client import CasperClient
 from server.config import Config, get_config
 from server.db import get_db, InMemoryDB, get_reputation_db
 from server.models import EscrowRecord, EscrowStatus, ReputationRecord, PaymentHeader
-from server.middleware import parse_x402_header, _build_signing_payload, _check_replay, _verify_ed25519
+from server.middleware import parse_x402_header, _build_signing_payload, _check_replay, _verify_signature
 
 DEMO_CONSOLE_SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 DEMO_CONSOLE_SIGNATURE = "a" * 128
@@ -33,7 +33,7 @@ def _extract_payment_from_request(http_request: Request):
     if replay_err:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=replay_err)
     msg = _build_signing_payload(x402, method=http_request.method, path=http_request.url.path)
-    if not _verify_ed25519(x402.sender, msg, x402.signature):
+    if not _verify_signature(x402.sender, msg, x402.signature):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid x402 signature")
     return x402
 

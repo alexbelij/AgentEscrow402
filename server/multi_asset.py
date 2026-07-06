@@ -20,7 +20,7 @@ from server.middleware import (
     parse_x402_header,
     _build_signing_payload,
     _check_replay,
-    _verify_ed25519,
+    _verify_signature,
 )
 
 def get_casper() -> CasperClient | None:
@@ -82,7 +82,7 @@ async def get_x402_payment(request: Request, config: Config = Depends(get_config
     if replay_err:
         raise HTTPException(status_code=401, detail=replay_err)
     msg = _build_signing_payload(parsed, method=request.method, path=request.url.path)
-    if not _verify_ed25519(parsed.sender, msg, parsed.signature):
+    if not _verify_signature(parsed.sender, msg, parsed.signature):
         raise HTTPException(status_code=401, detail="invalid x402 signature")
     return parsed
 
