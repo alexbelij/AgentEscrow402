@@ -11,6 +11,7 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  Shield,
 } from 'lucide-react';
 
 // Helper for JSON formatting
@@ -261,6 +262,84 @@ const endpoints: EndpointConfig[] = [
   },
 ];
 
+// ── Admin-only endpoints ──────────────────────────────────────────────
+// These are read-only reference cards — no "Try it" button — so judges
+// see the full API surface without exposing the admin key.
+interface AdminEndpointDoc {
+  name: string;
+  method: 'POST';
+  path: string;
+  description: string;
+  auth: string;
+  bodyFields: Record<string, FieldDoc>;
+}
+
+const ADMIN_ENDPOINTS: AdminEndpointDoc[] = [
+  {
+    name: 'Configure Fee',
+    method: 'POST',
+    path: '/admin/configure-fee',
+    description:
+      'Updates the insurance fee in basis points (max 1000 = 10%). Only succeeds on-chain if the caller is the contract installer.',
+    auth: 'X-Admin-Key header + on-chain installer account',
+    bodyFields: {
+      new_fee_bps: {
+        type: 'integer (0–1000)',
+        description: 'New fee in basis points. 100 = 1%.',
+        required: true,
+      },
+    },
+  },
+  {
+    name: 'Set Release Cap',
+    method: 'POST',
+    path: '/admin/set-release-cap',
+    description:
+      'Sets the maximum amount (in motes) that can be released without arbiter quorum approval. Amounts above this threshold require multi-sig arbitration.',
+    auth: 'X-Admin-Key header + on-chain installer account',
+    bodyFields: {
+      new_cap: {
+        type: 'integer (motes)',
+        description: 'New release cap in motes. Releases above this amount require arbiter quorum.',
+        required: true,
+      },
+    },
+  },
+  {
+    name: 'Set Arbiters',
+    method: 'POST',
+    path: '/admin/set-arbiters',
+    description:
+      'Replaces the current arbiter set on the escrow contract. Arbiters are public keys eligible for VRF election during disputes.',
+    auth: 'X-Admin-Key header + on-chain installer account',
+    bodyFields: {
+      arbiters: {
+        type: 'string[] (hex public keys)',
+        description: 'Array of arbiter public key hashes. Minimum 3 recommended for quorum.',
+        required: true,
+      },
+    },
+  },
+  {
+    name: 'Emergency Freeze',
+    method: 'POST',
+    path: '/admin/emergency-freeze',
+    description:
+      'Freezes all contract operations immediately. No new escrows can be created and no funds can be released until unfrozen. Circuit-breaker for security incidents.',
+    auth: 'X-Admin-Key header + on-chain installer account',
+    bodyFields: {},
+  },
+  {
+    name: 'Unfreeze',
+    method: 'POST',
+    path: '/admin/unfreeze',
+    description:
+      'Resumes normal contract operations after an emergency freeze. Added in contract v9 (previously freeze was irreversible).',
+    auth: 'X-Admin-Key header + on-chain installer account',
+    bodyFields: {},
+  },
+];
+
 const Sandbox: React.FC = () => {
   const [selectedName, setSelectedName] = useState(endpoints[0].name);
   const [responses, setResponses] = useState<Record<string, { data: any; error: string | null; loading: boolean }>>({});
@@ -484,6 +563,51 @@ const Sandbox: React.FC = () => {
             )}
           </div>
         </section>
+      </div>
+
+      {/* ── Admin-only endpoints (read-only documentation) ──────── */}
+      <div className="mt-10">
+        <div className="flex items-center gap-3 mb-4">
+          <Shield className="h-5 w-5 text-red-400" />
+          <h3 className="text-lg font-semibold text-gray-50">Admin-Only Endpoints</h3>
+          <span className="text-xs font-medium bg-red-500/15 text-red-300 border border-red-500/30 rounded-full px-2.5 py-0.5">
+            Installer account required
+          </span>
+        </div>
+        <p className="text-sm text-gray-400 mb-4">
+          These contract-management endpoints are gated by an <code className="text-amber-300">X-Admin-Key</code> header
+          and only succeed on-chain when the caller is the contract's installer account. They are not
+          exposed in the console UI — listed here for API completeness.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {ADMIN_ENDPOINTS.map((ep) => (
+            <div key={ep.path} className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <span className="font-semibold text-gray-50">{ep.name}</span>
+                <span className="text-xs font-mono bg-amber-600/20 text-amber-300 rounded px-2 py-0.5">
+                  {ep.method}
+                </span>
+              </div>
+              <code className="text-sm text-gray-300 block mb-2">{ep.path}</code>
+              <p className="text-sm text-gray-400 mb-3">{ep.description}</p>
+              <div className="text-xs text-gray-500 mb-2">
+                <span className="font-medium text-red-300">Auth:</span> {ep.auth}
+              </div>
+              {Object.keys(ep.bodyFields).length > 0 && (
+                <div className="border-t border-[#1e1e2e] pt-2 mt-2">
+                  <p className="text-xs font-medium text-gray-400 mb-1">Body fields:</p>
+                  {Object.entries(ep.bodyFields).map(([key, doc]) => (
+                    <div key={key} className="flex gap-2 text-xs text-gray-400 mb-1">
+                      <code className="text-amber-300 shrink-0">{key}</code>
+                      <span className="text-gray-500">({doc.type})</span>
+                      <span>{doc.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
