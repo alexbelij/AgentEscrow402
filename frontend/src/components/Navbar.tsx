@@ -25,20 +25,28 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
   const [activeSection, setActiveSection] = useState('home')
 
   useEffect(() => {
-    const sections = NAV_ITEMS.map(n => n.href.replace('/#', '')).filter(Boolean)
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) setActiveSection(entry.target.id)
-        }
-      },
-      { threshold: 0.3, rootMargin: '-80px 0px -50% 0px' }
-    )
-    sections.forEach(id => {
-      const el = document.getElementById(id)
-      if (el) observer.observe(el)
-    })
-    return () => observer.disconnect()
+    const sectionIds = NAV_ITEMS.map(n => n.href.replace('/#', '')).filter(Boolean)
+
+    // Scroll-spy: pick the section whose top is closest to (but above) the
+    // viewport top + a small offset.  For the very bottom of the page we
+    // force the last visible section so FAQ/SDK always highlight.
+    const onScroll = () => {
+      const offset = 120 // navbar height + margin
+      let current = sectionIds[0]
+      for (const id of sectionIds) {
+        const el = document.getElementById(id)
+        if (el && el.getBoundingClientRect().top <= offset) current = id
+      }
+      // If scrolled to page bottom, pick the last section
+      if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 40) {
+        current = sectionIds[sectionIds.length - 1]
+      }
+      setActiveSection(current)
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true })
+    onScroll() // initial
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   return (

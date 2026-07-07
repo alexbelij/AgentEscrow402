@@ -561,6 +561,10 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
       setFormError('All fields are required.');
       return;
     }
+    if (reason.length < 10) {
+      setFormError('Reason must be at least 10 characters.');
+      return;
+    }
 
     setClaimLoading(true);
     try {
@@ -611,11 +615,11 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
           required
         />
         <Textarea
-          label="Reason for Claim"
+          label="Reason for Claim (min. 10 characters)"
           id="claimReason"
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="Describe why you are filing this claim..."
+          placeholder="Describe why you are filing this claim (at least 10 characters)..."
           required
         />
         {!isLive && (
