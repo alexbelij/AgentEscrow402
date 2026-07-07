@@ -19,7 +19,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   (`d3ca33d1...c8eeb`, contract_hash `50ca3364...4498664`), verified live with a fresh
   create → release round trip. Production API's `ESCROW_CONTRACT_HASH` env var was still pointing
   at the stale v3 hash despite running in live mode — updated and force-redeployed.
-- **Docs audit**: full pass over every doc file (README, ROADMAP, KNOWN_LIMITATIONS, SECURITY,
+- **Docs audit**: full pass over every doc file (README, ROADMAP, STATUS_AND_ROADMAP, SECURITY,
   SUBMISSION, BUIDL_SUBMISSION, docs/ARCHITECTURE, docs/SDK, BLOG_POST, SOCIAL_POSTS,
   VIDEO_SCRIPT) for accuracy against current code. Found and fixed: stale contract hashes (some
   files still referenced the very first v1 deployment), stale test counts (85/18 instead of
@@ -27,7 +27,7 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   24 real tools), a wrong production API URL (`ae402-backend.onrender.com`, which 404s — real one
   is `agentescrow402-api.onrender.com`), a wrong frontend framework claim (Next.js — it's actually
   React + Vite), a wrong dispute-resolution diagram (showed 3 arbiters / 2-of-3 majority instead
-  of the real 5 arbiters / 3-of-5 quorum), an inaccurate KNOWN_LIMITATIONS/SECURITY claim that the
+  of the real 5 arbiters / 3-of-5 quorum), an inaccurate STATUS_AND_ROADMAP/SECURITY claim that the
   contract has no upgrade mechanism and arbiters can't be rotated (both are real, working
   entry points), and a non-working curl example in BLOG_POST.md (the live API requires a signed
   x402 header and a `service_hash` field the example didn't include — replaced with the working

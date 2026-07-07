@@ -19,7 +19,7 @@ This project is a hackathon prototype deployed on Casper **testnet only**. The s
   but is triggered manually by an admin API call, not by any on-chain vote.
 - Insurance pool governance is centralized
 
-See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for the full list.
+See [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) for the full list.
 
 ## Secrets
 
