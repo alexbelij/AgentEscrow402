@@ -546,10 +546,10 @@ interface ClaimInsuranceModalProps {
 }
 
 const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClose, onClaim, isLive }) => {
-  const [claimerPublicKey, setClaimerPublicKey] = useState('');
+  const [claimerPublicKey, setClaimerPublicKey] = useState('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
   const [escrowHash, setEscrowHash] = useState('');
-  const [reason, setReason] = useState('');
-  const [signature, setSignature] = useState(''); // Placeholder — demo mode only
+  const [reason, setReason] = useState('Agent failed to deliver compute results within the TTL window');
+  const [signature, setSignature] = useState('demo-x402-header-generated-by-console');
   const [formError, setFormError] = useState<string | null>(null);
   const [claimLoading, setClaimLoading] = useState(false);
 
@@ -607,11 +607,11 @@ const ClaimInsuranceModal: React.FC<ClaimInsuranceModalProps> = ({ isOpen, onClo
           />
         )}
         <Input
-          label="Escrow Hash"
+          label="Escrow Hash (create one in the Escrows tab first)"
           id="claimEscrowHash"
           value={escrowHash}
           onChange={(e) => setEscrowHash(e.target.value)}
-          placeholder="e.g., hash-..."
+          placeholder="64-char hex — create an escrow in the Escrows tab, then paste its hash here"
           required
         />
         <Textarea

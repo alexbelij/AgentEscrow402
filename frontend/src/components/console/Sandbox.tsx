@@ -77,6 +77,15 @@ interface EndpointConfig {
   ) => Promise<any>;
 }
 
+// ── Shared test hashes ────────────────────────────────────────────────
+// All lifecycle endpoints (create → get → dispute → resolve → release)
+// share the SAME hash so you can test the full flow without copy-pasting.
+// Batch and streaming use their own hashes.
+const SHARED_HASH = randomHex64();
+const BATCH_HASH_1 = randomHex64();
+const BATCH_HASH_2 = randomHex64();
+const STREAM_HASH = randomHex64();
+
 const endpoints: EndpointConfig[] = [
   {
     name: 'Get Health',
@@ -105,15 +114,16 @@ const endpoints: EndpointConfig[] = [
     },
     apiCall: (p, q) => api.getEscrows({ limit: Number(q.limit), offset: Number(q.offset), status: q.status as any }),
   },
+  // ── Single-escrow lifecycle: Create → Get → Release / Dispute → Resolve ──
   {
-    name: 'Create Escrow',
+    name: '① Create Escrow',
     method: 'POST',
     path: '/escrow',
-    description: 'Creates a new escrow payment. The service_hash is auto-generated — copy it after creation to use in Release, Get Escrow, and Resolve.',
+    description: 'Creates a new escrow. All lifecycle endpoints below share the same test hash — run this first, then Get / Release / Dispute / Resolve will work on it automatically.',
     initialBody: {
       receiver: DEMO_AGENT_RECEIVER,
       amount: 100000000000,
-      service_hash: randomHex64(),
+      service_hash: SHARED_HASH,
       ttl: 300,
     },
     bodyFieldDocs: {
@@ -125,29 +135,177 @@ const endpoints: EndpointConfig[] = [
     apiCall: (p, q, b) => api.createEscrow(b as any),
   },
   {
-    name: 'Get Escrow by Hash',
+    name: '② Get Escrow by Hash',
     method: 'GET',
     path: '/escrow/{hash}',
-    description: 'Retrieves details for a specific escrow.',
-    initialPathParams: { hash: 'paste-service_hash-from-Create-Escrow-above' },
+    description: 'Retrieves details for the escrow created in step ①.',
+    initialPathParams: { hash: SHARED_HASH },
     pathParamDocs: {
-      hash: { type: 'string (64-char hex)', description: 'The service_hash returned by / used to create the escrow.', required: true },
+      hash: { type: 'string (64-char hex)', description: 'The service_hash from Create Escrow.', required: true },
     },
     apiCall: (p) => api.getEscrowByHash(p.hash),
   },
   {
-    name: 'Release Escrow',
+    name: '③a Release Escrow',
     method: 'POST',
     path: '/release',
-    description: 'Releases funds from a pending escrow to the receiver. First create an escrow above, then paste the service_hash here.',
+    description: 'Releases the pending escrow from step ① to the receiver. Alternative to Dispute flow (③b).',
     initialBody: {
-      service_hash: 'paste-service_hash-from-Create-Escrow',
+      service_hash: SHARED_HASH,
     },
     bodyFieldDocs: {
       service_hash: { type: 'string (64-char hex)', description: 'Identifies which pending escrow to release to its receiver.', required: true },
     },
     apiCall: (p, q, b) => api.releaseEscrow(b as any),
   },
+  {
+    name: '③b Dispute Escrow',
+    method: 'POST',
+    path: '/dispute',
+    description: 'Disputes the pending escrow from step ①. After disputing, use Resolve (④) to settle it. Alternative to Release (③a).',
+    initialBody: {
+      service_hash: SHARED_HASH,
+      reason_hash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    },
+    bodyFieldDocs: {
+      service_hash: { type: 'string (64-char hex)', description: 'Hash of the pending escrow to dispute.', required: true },
+      reason_hash: { type: 'string (64-char hex)', description: 'SHA-256 hash of the dispute reason (off-chain).', required: true },
+    },
+    apiCall: (p, q, b) => api.disputeEscrow(b as any),
+  },
+  {
+    name: '④ Resolve Escrow',
+    method: 'POST',
+    path: '/resolve',
+    description: 'Resolves the disputed escrow from step ③b. Requires arbiter signatures. Run ① → ③b → ④ for the full dispute lifecycle.',
+    initialBody: {
+      service_hash: SHARED_HASH,
+      in_favor_of: 'sender',
+      arbiter_pubkeys: ['01a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'],
+      arbiter_signatures: ['demo-signature-placeholder'],
+    },
+    bodyFieldDocs: {
+      service_hash: { type: 'string (64-char hex)', description: 'Hash of the disputed escrow to resolve.', required: true },
+      in_favor_of: { type: '"sender" | "receiver"', description: 'Who wins the dispute — determines where funds go.', required: true },
+      arbiter_pubkeys: { type: 'string[]', description: 'Public keys of voting arbiters (Ed25519 hex). Must meet quorum threshold.', required: true },
+      arbiter_signatures: { type: 'string[]', description: 'Ed25519 signatures over "resolve:{service_hash}:{in_favor_of}" — one per pubkey.', required: true },
+    },
+    apiCall: (p, q, b) => api.resolveEscrow(b as any),
+  },
+  // ── HTLC Atomic Swap: uses SHARED_HASH from ① ──
+  {
+    name: 'HTLC Commit (Atomic Swap)',
+    method: 'POST',
+    path: '/escrow/atomic-swap/commit',
+    description: 'Phase 1: sender locks escrow with a SHA-256 hash of a secret. Requires a pending escrow from ① Create Escrow (not Streaming). The commit must come from the same demo identity that created the escrow.',
+    initialBody: {
+      service_hash: SHARED_HASH,
+      commit_hash: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
+    },
+    bodyFieldDocs: {
+      service_hash: { type: 'string (64-char hex)', description: 'Hash of a pending escrow (from ① Create Escrow). Must be created by the same identity.', required: true },
+      commit_hash: { type: 'string (64-char hex)', description: 'SHA-256 hash of your secret preimage. Demo: sha256("hello") = 2cf24dba...', required: true },
+    },
+    apiCall: (p, q, b) => api.commitAtomicSwap(b as any),
+  },
+  {
+    name: 'HTLC Reveal (Atomic Swap)',
+    method: 'POST',
+    path: '/escrow/atomic-swap/reveal',
+    description: 'Phase 2: receiver reveals the preimage. If sha256(preimage) matches the commit, funds are released. Flow: ① Create → HTLC Commit → HTLC Reveal.',
+    initialBody: {
+      service_hash: SHARED_HASH,
+      preimage: 'hello',
+    },
+    bodyFieldDocs: {
+      service_hash: { type: 'string (64-char hex)', description: 'Hash of the HTLC-locked escrow.', required: true },
+      preimage: { type: 'string', description: 'The secret preimage. sha256(preimage) must equal the commit_hash. Demo: "hello" → 2cf24dba...', required: true },
+    },
+    apiCall: (p, q, b) => api.revealAtomicSwap(b as any),
+  },
+  // ── Batch lifecycle ──
+  {
+    name: 'Batch Create',
+    method: 'POST',
+    path: '/escrows/batch',
+    description: 'Creates up to 50 escrows in one deploy. Uses its own pre-filled test hashes. Run this first, then Batch Release / Batch Cancel will use the same hashes.',
+    initialBody: {
+      escrows: [
+        { receiver: DEMO_AGENT_RECEIVER, amount: 50000000000, service_hash: BATCH_HASH_1, ttl: 300 },
+        { receiver: DEMO_AGENT_RECEIVER, amount: 25000000000, service_hash: BATCH_HASH_2, ttl: 300 },
+      ],
+    },
+    bodyFieldDocs: {
+      escrows: { type: 'BatchEscrowItem[]', description: 'Array of escrow specs: { receiver, amount, service_hash, ttl }. Max 50.', required: true },
+    },
+    apiCall: (p, q, b: any) => api.batchCreate(b.escrows),
+  },
+  {
+    name: 'Batch Release',
+    method: 'POST',
+    path: '/escrows/batch-release',
+    description: 'Releases multiple batch-created escrows in one deploy. Uses the same hashes from Batch Create above.',
+    initialBody: {
+      service_hashes: [BATCH_HASH_1, BATCH_HASH_2],
+      arbiter_pubkeys: [],
+      arbiter_signatures: [],
+    },
+    bodyFieldDocs: {
+      service_hashes: { type: 'string[]', description: 'Array of service hashes to release (max 50).', required: true },
+      arbiter_pubkeys: { type: 'string[]', description: 'Required only if any escrow exceeds release_cap — same arbiter quorum as single release.' },
+      arbiter_signatures: { type: 'string[]', description: 'Matching signatures over "release:{service_hash}:cap_approval".' },
+    },
+    apiCall: (p, q, b: any) => api.batchRelease(b.service_hashes, b.arbiter_pubkeys, b.arbiter_signatures),
+  },
+  {
+    name: 'Batch Cancel',
+    method: 'POST',
+    path: '/escrows/batch-cancel',
+    description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Uses the same hashes from Batch Create.',
+    initialBody: {
+      service_hashes: [BATCH_HASH_1, BATCH_HASH_2],
+    },
+    bodyFieldDocs: {
+      service_hashes: { type: 'string[]', description: 'Array of service hashes to cancel (max 50).', required: true },
+    },
+    apiCall: (p, q, b: any) => api.batchCancel(b.service_hashes),
+  },
+  // ── Streaming Escrow ──
+  {
+    name: 'Create Streaming Escrow',
+    method: 'POST',
+    path: '/escrow/stream',
+    description: 'Creates a streaming (vesting) escrow. Funds vest linearly from start_time to end_time. Once 100% vested, use "Claim Stream" to settle. end_time is set to now+60s for quick testing.',
+    initialBody: {
+      receiver: DEMO_AGENT_RECEIVER,
+      amount: 5000,
+      token: { type: 'native', contract_hash: null },
+      service_hash: STREAM_HASH,
+      start_time: Math.floor(Date.now() / 1000),
+      end_time: Math.floor(Date.now() / 1000) + 60,
+    },
+    bodyFieldDocs: {
+      receiver: { type: 'string (hex public key)', description: 'Receiver who can claim after full vesting.', required: true },
+      amount: { type: 'integer (motes)', description: 'Total amount to stream.', required: true },
+      token: { type: '{ type, contract_hash }', description: '"native" for CSPR, or { type: "cep18", contract_hash: "..." } for tokens.', required: true },
+      service_hash: { type: 'string (64-char hex)', description: 'Unique hash identifier for this streaming escrow.', required: true },
+      start_time: { type: 'integer (unix)', description: 'Vesting start time (unix seconds). Defaults to now.', required: true },
+      end_time: { type: 'integer (unix)', description: 'Vesting end time. Stream fully vests at this time. Set close to now for testing.', required: true },
+    },
+    apiCall: (p, q, b) => api.createStreamEscrow(b as any),
+  },
+  {
+    name: 'Claim Stream',
+    method: 'POST',
+    path: '/escrow/{service_hash}/stream-claim',
+    description: 'Claims a fully vested streaming escrow. Run "Create Streaming Escrow" first, wait 60s for vesting, then claim here. Uses the same hash.',
+    initialPathParams: { service_hash: STREAM_HASH },
+    pathParamDocs: {
+      service_hash: { type: 'string', description: 'Service hash of the streaming escrow to claim. Must be fully vested.', required: true },
+    },
+    apiCall: (p) => api.claimStreamEscrow(p.service_hash),
+  },
+  // ── Read-only / utility endpoints ──
   {
     name: 'Get Reputation',
     method: 'GET',
@@ -260,119 +418,6 @@ const endpoints: EndpointConfig[] = [
       seed_hash: { type: 'string (64-char hex)', description: 'Randomness seed fed into the VRF (or CSPRNG fallback) for a verifiable, unbiased pick.', required: true },
     },
     apiCall: (p, q, b) => api.electVrfArbiter(b as any),
-  },
-  {
-    name: 'Batch Release',
-    method: 'POST',
-    path: '/escrows/batch-release',
-    description: 'Releases multiple batch-created escrows in one deploy. Server-side cap/quorum guard enforced per escrow before the on-chain call. Use pending escrow hashes from the Escrows tab.',
-    initialBody: {
-      service_hashes: ['paste-service_hash-from-Batch-Create'],
-      arbiter_pubkeys: [],
-      arbiter_signatures: [],
-    },
-    bodyFieldDocs: {
-      service_hashes: { type: 'string[]', description: 'Array of service hashes to release (max 50).', required: true },
-      arbiter_pubkeys: { type: 'string[]', description: 'Required only if any escrow exceeds release_cap — same arbiter quorum as single release.' },
-      arbiter_signatures: { type: 'string[]', description: 'Matching signatures over "release:{service_hash}:cap_approval".' },
-    },
-    apiCall: (p, q, b: any) => api.batchRelease(b.service_hashes, b.arbiter_pubkeys, b.arbiter_signatures),
-  },
-  {
-    name: 'Batch Cancel',
-    method: 'POST',
-    path: '/escrows/batch-cancel',
-    description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Only pending escrows can be cancelled; full refund to sender. Use pending escrow hashes from the Escrows tab.',
-    initialBody: {
-      service_hashes: ['paste-service_hash-from-Batch-Create'],
-    },
-    bodyFieldDocs: {
-      service_hashes: { type: 'string[]', description: 'Array of service hashes to cancel (max 50).', required: true },
-    },
-    apiCall: (p, q, b: any) => api.batchCancel(b.service_hashes),
-  },
-  {
-    name: 'Resolve Escrow',
-    method: 'POST',
-    path: '/resolve',
-    description: 'Resolves a disputed escrow in favor of sender or receiver. Requires arbiter Ed25519 signatures over "resolve:{service_hash}:{verdict}". In demo mode, signatures are verified locally — use the pre-filled demo data to see a successful resolution.',
-    initialBody: {
-      service_hash: 'paste-disputed-escrow-service_hash',
-      in_favor_of: 'sender',
-      arbiter_pubkeys: ['01a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'],
-      arbiter_signatures: ['demo-signature-placeholder'],
-    },
-    bodyFieldDocs: {
-      service_hash: { type: 'string (64-char hex)', description: 'Hash of the disputed escrow to resolve. Must be in "disputed" status.', required: true },
-      in_favor_of: { type: '"sender" | "receiver"', description: 'Who wins the dispute — determines where funds go.', required: true },
-      arbiter_pubkeys: { type: 'string[]', description: 'Public keys of voting arbiters (Ed25519 hex). Must meet quorum threshold.', required: true },
-      arbiter_signatures: { type: 'string[]', description: 'Ed25519 signatures over "resolve:{service_hash}:{in_favor_of}" — one per pubkey.', required: true },
-    },
-    apiCall: (p, q, b) => api.resolveEscrow(b as any),
-  },
-  {
-    name: 'HTLC Commit (Atomic Swap)',
-    method: 'POST',
-    path: '/escrow/atomic-swap/commit',
-    description: 'Phase 1 of the atomic swap flow: the sender commits a SHA-256 hash of a secret preimage, locking the escrow until the receiver reveals the preimage. Create a multi-asset escrow first, then use its hash here.',
-    initialBody: {
-      service_hash: 'paste-multi-asset-escrow-hash-here',
-      commit_hash: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
-    },
-    bodyFieldDocs: {
-      service_hash: { type: 'string (64-char hex)', description: 'Hash of the escrow to lock with HTLC. Must be a pending multi-asset escrow.', required: true },
-      commit_hash: { type: 'string (64-char hex)', description: 'SHA-256 hash of your secret preimage: sha256("hello") = 2cf24dba... The receiver must know the preimage to claim.', required: true },
-    },
-    apiCall: (p, q, b) => api.commitAtomicSwap(b as any),
-  },
-  {
-    name: 'HTLC Reveal (Atomic Swap)',
-    method: 'POST',
-    path: '/escrow/atomic-swap/reveal',
-    description: 'Phase 2: the receiver reveals the secret preimage. If sha256(preimage) matches the commit_hash, funds release to the receiver. If the preimage is wrong or TTL expired, funds refund to sender.',
-    initialBody: {
-      service_hash: 'paste-committed-escrow-hash-here',
-      preimage: 'hello',
-    },
-    bodyFieldDocs: {
-      service_hash: { type: 'string (64-char hex)', description: 'Hash of the HTLC-locked escrow.', required: true },
-      preimage: { type: 'string', description: 'The secret preimage. sha256(preimage) must equal the commit_hash from the commit phase. Demo value: "hello" → 2cf24dba...', required: true },
-    },
-    apiCall: (p, q, b) => api.revealAtomicSwap(b as any),
-  },
-  {
-    name: 'Create Streaming Escrow',
-    method: 'POST',
-    path: '/escrow/stream',
-    description: 'Creates a streaming (vesting) escrow: funds vest linearly from start_time to end_time. Once 100% vested, use "Claim Stream" to settle on-chain. Set end_time close to now for quick testing.',
-    initialBody: {
-      receiver: DEMO_AGENT_RECEIVER,
-      amount: 5000,
-      token: { type: 'native', contract_hash: null },
-      service_hash: `stream-demo-${Date.now().toString(16)}`,
-      start_time: Math.floor(Date.now() / 1000),
-      end_time: Math.floor(Date.now() / 1000) + 60,
-    },
-    bodyFieldDocs: {
-      receiver: { type: 'string (hex public key)', description: 'Receiver who can claim after full vesting.', required: true },
-      amount: { type: 'integer (motes)', description: 'Total amount to stream.', required: true },
-      token: { type: '{ type, contract_hash }', description: '"native" for CSPR, or { type: "cep18", contract_hash: "..." } for tokens.', required: true },
-      service_hash: { type: 'string', description: 'Unique hash identifier for this streaming escrow.', required: true },
-      start_time: { type: 'integer (unix)', description: 'Vesting start time (unix seconds). Defaults to now.', required: true },
-      end_time: { type: 'integer (unix)', description: 'Vesting end time. Stream fully vests at this time. Set close to now for testing.', required: true },
-    },
-    apiCall: (p, q, b) => api.createStreamEscrow(b as any),
-  },
-  {
-    name: 'Claim Stream',
-    method: 'POST',
-    path: '/escrow/{service_hash}/stream-claim',
-    description: 'Claims a fully vested streaming escrow — triggers on-chain release. Rejects if stream is not 100% elapsed. First create a streaming escrow (above), wait for it to vest, then claim here.',
-    initialPathParams: { service_hash: 'create-a-streaming-escrow-first-then-paste-its-hash-here' },
-    pathParamDocs: {
-      service_hash: { type: 'string', description: 'Service hash of the streaming escrow to claim. Must be fully vested.', required: true },
-    },
-    apiCall: (p) => api.claimStreamEscrow(p.service_hash),
   },
 ];
 
@@ -525,8 +570,9 @@ const Sandbox: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed">
-        Write operations use the labelled hosted-console <span className="font-mono">X-Payment</span> identity header. This is a live API playground, not screenshots; errors are returned exactly as the backend returns them.
+      <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 text-sm text-blue-100 leading-relaxed space-y-2">
+        <p>Write operations use the labelled hosted-console <span className="font-mono">X-Payment</span> identity header. This is a live API playground — errors are returned exactly as the backend returns them.</p>
+        <p><strong>Test flow:</strong> Lifecycle endpoints (①②③④) share the same auto-generated hash. Run <strong>① Create Escrow</strong> first, then Get / Release / Dispute / Resolve / HTLC all work on it. Batch and Streaming use their own separate hashes. Reload the page to get fresh hashes.</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
