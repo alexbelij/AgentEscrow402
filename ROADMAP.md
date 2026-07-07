@@ -66,4 +66,15 @@
 - `ThresholdConfig` struct — MPC threshold parameters
 - `EscrowType` enum — extensible escrow categories
 - `FlashGuard` module — anti-manipulation checks
-- `AgentRegistry` contract — DID + capabilities + staking
+
+## ID-1 — Agent Identity Registry (on-chain)
+
+- [x] Brought `contracts/stubs/src/agent_registry.rs` from stub to a real, deployed, tested
+      contract — see [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md).
+      Standalone contract (doesn't touch/upgrade the live escrow contracts), package hash
+      `0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba`, 10 real on-chain txs
+      (deploy + upgrade + full register/stake/slash/deregister/decay lifecycle across 3
+      agents), 7 property-based tests, external-AI-reviewed (2 real bugs found and fixed
+      before/after deploy).
+- [ ] Not yet wired to `escrow`'s own reputation logic or gated behind arbiter-quorum for
+      `slash` — see "Known gaps" in the doc above.

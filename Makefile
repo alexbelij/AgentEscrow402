@@ -15,6 +15,7 @@ format:
 
 contracts:
 	cd contracts/escrow && cargo build --release --target wasm32-unknown-unknown
+	cd contracts/agent-identity-registry && cargo build --release --target wasm32-unknown-unknown
 
 contracts-test:
 	cd contracts && cargo test

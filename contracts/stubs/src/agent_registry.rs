@@ -4,7 +4,10 @@
 //! Agents register with DID (did:casper:{network}:{account_hash}),
 //! declare capabilities, and stake CSPR as anti-Sybil protection.
 //!
-//! Planned: Phase 2 — on-chain DID + capabilities + staking.
+//! SUPERSEDED: this stub's design was implemented as a real, deployed
+//! contract in `contracts/agent-identity-registry/` (see
+//! `docs/AGENT_IDENTITY_REGISTRY.md`). This file is kept only as the
+//! original design note/history; it is not built or referenced anywhere.
 
 use alloc::string::String;
 use alloc::vec::Vec;

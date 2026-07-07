@@ -459,6 +459,8 @@ Full deploy-hash-by-deploy-hash log:
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Detailed component/sequence diagrams |
 | [docs/SDK.md](docs/SDK.md) | Python SDK, LangChain tool, MCP server (24 tools) reference |
 | [docs/openapi.yaml](docs/openapi.yaml) | Full OpenAPI schema for the REST API |
+| [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md) | Real testnet gas costs per escrow entry point |
+| [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md) | On-chain DID/stake/reputation registry contract (ID-1), separate from the escrow contracts |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | What's genuinely a gap vs. what's just intentional demo scope |
 | [ROADMAP.md](ROADMAP.md) | Shipped vs. planned, phase by phase |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
