@@ -15,6 +15,8 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
 
+[![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
+
 **[🚀 Live Demo](https://ae402.xyz)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
 
 </div>
@@ -126,6 +128,35 @@ stateDiagram-v2
 `refund` (TTL expired, nobody delivered), or `dispute` → 3-of-5 arbiter `resolve`, which
 routes funds to either side. `commit_swap`/`reveal_swap` is a variant exit on the same
 `Pending` state — see the [HTLC atomic-swap flow](#-use-cases) below.*
+
+### Full product scope
+
+All escrow types share the same on-chain core but add specialised flows on top:
+
+```mermaid
+flowchart LR
+    subgraph Escrow Types
+        A["🔒 Standard\nCSPR escrow"]
+        B["🪙 Multi-Asset\nCEP-18 / CEP-78"]
+        C["🌊 Streaming\nLinear vesting"]
+        D["🔗 Atomic Swap\nHTLC commit-reveal"]
+        E["📦 Batch\nBulk create/release"]
+    end
+
+    subgraph On-Chain Core
+        F["Smart Contract v9\n(8 entry points)"]
+    end
+
+    subgraph Security Layer
+        G["🛡️ Release Cap\n+ Arbiter Quorum"]
+        H["🎲 VRF Election\nOn-chain randomness"]
+        I["🏦 Insurance Pool\nRisk-scaled premiums"]
+        J["🆔 Identity Registry\nDID + reputation"]
+    end
+
+    A & B & C & D & E --> F
+    F --> G & H & I & J
+```
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
