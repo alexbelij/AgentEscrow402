@@ -255,28 +255,30 @@ version 9, updated 2026-07-07):
 | x402 signature verification | ✅ **Real crypto** | Ed25519 verify (`cryptography` lib) + nonce replay protection, not a stub |
 | Reputation scoring, staking, slashing (off-chain API) | ✅ **Real logic** | Exponential decay + stake-weighted slashing in `identity_registry_api.py` — separate from the on-chain ID-1 registry above |
 | Arbiter multisig resolution (`resolve`) | ✅ **Real crypto** | Real Ed25519 3-of-5 quorum check over the escrow/verdict payload, replay-proof |
-| VRF-assisted arbiter election (`/vrf/elect`) | ⚠️ **Read path wired, write path not yet called** | A deployed `vrf-arbiter` contract exists and its election-result dictionary can be read on-chain, but nothing in the backend currently submits the `select_arbiters` transaction that would populate it — so today `/vrf/elect` almost always falls back to a reputation-weighted local CSPRNG selection; see [VRF-assisted arbiter election](#vrf-assisted-arbiter-election) below |
+| VRF-assisted arbiter election (`/vrf/elect`) | ✅ **Real on-chain election** | Submits `select_arbiters` to the deployed `vrf-arbiter` contract, waits for finalization, and reads the result back; falls back to a reputation-weighted local CSPRNG only when the contract is unavailable/unconfigured or every on-chain candidate for a draw is a dispute party — see [VRF-assisted arbiter election](#vrf-assisted-arbiter-election) below |
 | Payment streaming (`/escrow/stream`) | ⚠️ **API-level simulation** | Streamed/remaining amount computed from wall-clock time in the backend; not an on-chain per-tick release yet |
 | Hosted console demo-signer | ⚠️ **Explicit, labelled bypass** | One fixed public demo identity + signature, gated by `ALLOW_HOSTED_DEMO_IDENTITY`, so browser visitors without a wallet can try the console — never used in the signature-verification code path for real requests |
 | TEE-attested proofs, on-chain ZK-KYC, cross-chain bridge | ❌ **Not implemented** | Roadmap ideas only — would need real TEE hardware or a ZK circuit; out of scope for the hackathon deadline, see [ROADMAP.md](ROADMAP.md) |
 
 ### VRF-assisted arbiter election
 
-`POST /vrf/elect` (`server/vrf_election.py`) is meant to pick a dispute's arbiter via an
-on-chain verifiable-random-function call to the deployed `vrf-arbiter` contract instead of a
-purely off-chain choice. As of this writing, the **read** side is wired correctly (it queries
-the right contract hash and the right `elections_dict` dictionary — a prior bug that read the
-wrong contract/dictionary was fixed in commit `235d8ca`), but the **write** side — actually
-submitting the `select_arbiters` transaction that performs the on-chain election and populates
-that dictionary — is not called anywhere in the backend yet. In practice this means the
-on-chain lookup returns nothing and every election currently falls back to
-`_elect_local_csprng`: a reputation-weighted pseudo-random choice made locally in the API
-process. This is accurately labeled `method: "local_csprng"` in the API response itself (vs.
-`"onchain_vrf"`), so it's not hidden from callers — but it is not yet the on-chain-randomness
-guarantee the name implies. Wiring the write path is tracked as a follow-up, not claimed as
-done.
+`POST /vrf/elect` (`server/vrf_election.py`) picks a dispute's arbiter via a real on-chain call
+to the deployed `vrf-arbiter` contract instead of a purely off-chain choice: it submits
+`select_arbiters(dispute_id, count)`, polls until the transaction finalizes, and reads the
+elected candidates back from `elections_dict`. Because the contract's `select_arbiters` has no
+notion of dispute parties, INVARIANT 5 (arbiter must not be either dispute party) is enforced by
+the backend over the returned candidate list — requesting more than one candidate per election
+leaves room to drop any that are also parties. 4 arbiters are currently registered on-chain via
+`register_arbiter` (staked purses). The API response's `method` field is genuinely
+`"onchain_vrf"` when this succeeds, and only falls back to `"local_csprng"` (a
+reputation-weighted local pseudo-random choice) when the contract is unavailable/unconfigured,
+or — as verified live — when every on-chain candidate returned for a given draw happens to be a
+dispute party. Real testnet deploy hashes and both a normal election and that exclusion stress
+case are in
+[docs/evidence/VRF_ONCHAIN_ELECTION.md](docs/evidence/VRF_ONCHAIN_ELECTION.md).
 
-Full detail (including smart-contract-level caveats like the missing reentrancy guard) is in
+Full detail (including smart-contract-level caveats like the missing reentrancy guard, and the
+small-arbiter-pool exclusion-probability caveat above) is in
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) — kept current, not a one-time snapshot.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
@@ -400,7 +402,7 @@ Deployed on Casper Testnet:
 | Core Escrow | `612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`, v9) | [view](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
 | Insurance Pool | `e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929` (hardened redeploy — the old `e36b958d...` had a fully public `claim()`/`withdraw()`, superseded) | [view](https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929) |
-| VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) — election-result *read* path wired, on-chain election *write* path not yet called (see [VRF section](#vrf-assisted-arbiter-election)) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
+| VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) — real on-chain election write path wired and live-verified, 4 arbiters registered (see [VRF section](#vrf-assisted-arbiter-election)) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
 | Agent Identity Registry (ID-1) | `1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae` (package: `0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba`, v2) — standalone DID/stake/reputation registry, separate from the escrow contracts | [view](https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 
