@@ -1,319 +1,234 @@
 # AE402 Demo Video — Production Script
 
-> **Format:** Screen recording + text overlays + animations + background music
-> **Duration:** 2:30–3:00
-> **No voiceover** — all info via on-screen text, tooltips, and C2A banners
-> **Style:** Dark theme matching ae402.xyz (slate-900 bg, emerald-400/indigo-400 accents)
-> **Music:** Neutral electronic ambient (royalty-free, e.g. "Synthwave Chill" or "Digital Horizons")
+> **Format:** Screen recording (2× speed) + text overlays + animations + bg music
+> **Duration:** 90 seconds (hard cap)
+> **No voiceover** — all info via fast on-screen text & tooltips
+> **Style:** Dark theme matching ae402.xyz (slate-900, emerald-400, indigo-400)
+> **Music:** Upbeat electronic ambient, 110-120 BPM, royalty-free
+> **Rule:** NO static screens >2s. Every second has motion — cursor, scroll, transition, or animation.
 
 ---
 
-## COLOR PALETTE & STYLE
+## COLORS & STYLE
 
-| Element | Color |
+| Element | Value |
 |---------|-------|
 | Background | `#0f172a` (slate-900) |
-| Primary accent | `#818cf8` (indigo-400) |
-| Success/CTA | `#34d399` (emerald-400) |
+| Accent 1 | `#818cf8` (indigo-400) |
+| Accent 2 | `#34d399` (emerald-400) |
 | Text | `#f8fafc` (slate-50) |
-| Subtitle bg | `rgba(15,23,42,0.85)` with blur |
-| Border glow | `#6366f1` (indigo-500) pulse |
-
-**Font:** Inter or system sans-serif, same as site.
-**Transitions:** Smooth fade (300ms) between sections. No hard cuts.
-**Cursor:** Visible with subtle highlight circle on click.
+| Overlay bg | `rgba(15,23,42,0.85)` blur |
+| Font | Inter / system sans |
+| Code font | JetBrains Mono |
+| Resolution | 1920×1080, Chrome dark, no bookmarks bar |
 
 ---
 
-## SCENE-BY-SCENE BREAKDOWN
+## SCENE BREAKDOWN — 90 SECONDS, NON-STOP ACTION
 
-### SCENE 1 — COLD OPEN (0:00–0:08)
+### 0:00–0:03 — LOGO FLASH (3s)
 
-**Screen:** Black → fade in animated particle canvas (same as ae402.xyz hero)
-
-**Text overlay (center, large):**
-```
-AgentEscrow402
-```
-**Subtitle (fade in 0.5s after):**
-```
-Trustless x402 Escrow on Casper Network
-```
-**Bottom banner (emerald, pulse):**
-```
-▶ Live Demo — ae402.xyz
-```
-
-**Animation:** Particles coalesce into the AE402 logo shape, then explode outward as we transition to next scene.
+- Black → particles fly in → form "**AgentEscrow402**"
+- Subtitle fades in: `Trustless x402 Escrow · Casper Network`
+- **Immediate cut** to next scene on beat drop
 
 ---
 
-### SCENE 2 — THE PROBLEM (0:08–0:18)
+### 0:03–0:08 — PROBLEM → SOLUTION (5s, split-screen animation)
 
-**Screen:** Split view — left side shows traditional payment flow diagram, right side shows x402 flow
+- Left panel slides in (red tint): `Traditional: User → Bank → Middleman → Receiver` with ❌❌❌
+- Right panel slides in (green tint): `AE402: Agent → Smart Contract → Agent` with ✅✅✅
+- Center text punches in: **"No middleman. No trust. Just code."**
+- **Hard cut** to landing page
 
-**Left side (red-tinted):**
-```
-Traditional: User → Bank → Middleman → Receiver
-             ❌ Trust required  ❌ Fees  ❌ Slow
-```
+---
 
-**Right side (emerald-tinted):**
-```
-AE402: Agent → Smart Contract → Agent
-       ✅ Trustless  ✅ On-chain  ✅ Instant
-```
+### 0:08–0:18 — LANDING PAGE SPEED RUN (10s, real screen recording 2× speed)
 
-**Tooltip (bottom):**
+**Actions at 2× speed:**
+1. ae402.xyz loads (1s)
+2. Fast scroll → Trust Signals bar zooms in: `8 Contracts · 142+ Txns · 62 API · 26 MCP · 13 Pages`
+3. Click contract link → testnet.cspr.live opens showing real deployed contract (1.5s)
+4. Back → scroll to feature comparison table (1s)
+5. Click **"Launch Console →"** button
+
+**Overlay tooltip (bottom-right, stays 2s):**
 ```
-x402 makes HTTP payments programmable.
-AE402 makes them trustless — no facilitator holds your funds.
+Every contract hash → live Casper testnet deployment
 ```
 
 ---
 
-### SCENE 3 — LANDING PAGE TOUR (0:18–0:35)
+### 0:18–0:28 — CONSOLE SPEED TOUR (10s, 2× speed, rapid cuts)
 
-**Screen:** Navigate to `ae402.xyz` — show landing page loading
+**Rapid-fire sidebar clicks, ~0.8s per page:**
+1. Overview — dashboard stats animate in
+2. Escrows — table with statuses
+3. Agents — reputation scores
+4. Insurance — pool balance
+5. Risk — anomaly chart
+6. Contracts — 8 contracts grid
+7. Advanced — multi-asset tabs
+8. Arbitration — AI analysis
+9. Identity Registry — DID list
+10. Sandbox — endpoint cards
+11. Docs — API reference
+12. Agent Demo — autonomous flow
 
-**Actions (screen recording):**
-1. Scroll down slowly — show Trust Signals bar:
-   - `8 Deployed Contracts` · `142+ On-Chain Txns` · `62 API Endpoints` · `26 MCP Tools` · `13 Console Pages`
-2. Pause on contract evidence links — click one → opens testnet.cspr.live showing real deployed contract
-3. Show feature comparison table (AE402 vs Coinbase x402 vs Manual)
-
-**Tooltip overlay:**
+**Overlay (center, large):**
 ```
-Every contract hash links to a live Casper testnet deployment
-```
-
----
-
-### SCENE 4 — CONSOLE OVERVIEW (0:35–0:55)
-
-**Screen:** Click "Launch Console" → navigate to `/console/overview`
-
-**Actions:**
-1. Show Overview dashboard — live stats, escrow activity chart, recent transactions
-2. Quick-click through sidebar navigation to show all 13 pages exist and load:
-   - Overview → Escrows → Agents → Insurance → Risk → Contracts → Advanced → Arbitration → Identity Registry → Sandbox → Agent Demo → Use Cases → Docs
-
-**Annotation arrow on sidebar:**
-```
-13 fully-wired console pages
+13 live console pages — all wired to the backend
 ```
 
 ---
 
-### SCENE 5 — ESCROW LIFECYCLE DEMO (0:55–1:25)
+### 0:28–0:48 — SANDBOX LIVE DEMO (20s, 1.5× speed)
 
-**Screen:** `/console/sandbox` — Sandbox tab
+**This is the hero section. Show real functionality.**
 
-**Text banner (top):**
-```
-🔴 LIVE DEMO — Creating a Real Escrow
-```
+**Recording at 1.5× speed (responses are instant in sandbox):**
 
-**Actions (screen recording):**
-1. Show the Sandbox info banner explaining shared hashes
-2. Click ① **Create Escrow** → fill form → Submit
-3. Show response: `service_hash`, `deploy_hash`, status `pending`
-4. Click ② **Get Escrow** → paste hash → shows escrow details
-5. Click ③a **Release** → submit → shows `released` status + deploy hash
-6. Scroll to HTLC section — show ⑤ Commit / ⑥ Reveal flow
+1. **① Create Escrow** (5s): Click card → fill amount `5000`, TTL `300` → Submit → green toast "Created!" → show `service_hash` in response
+2. **② Get Escrow** (3s): Paste hash → Submit → shows full escrow detail (sender, receiver, amount, status: pending)
+3. **③a Release** (3s): Click → Submit → toast "Released!" → status changes to `released`
+4. **③b Dispute** (3s): New escrow → click Dispute → reason hash → Submit → status `disputed`
+5. **Batch Create** (3s): Show 2 escrows created atomically
+6. **HTLC Commit** (3s): SHA-256 secret → Commit → Reveal → released
 
-**Tooltip (during create):**
-```
-x402 payment header is auto-generated — Ed25519 signed, bound to this request
-```
+**Tooltip flashes (rotate every 3s):**
+- `x402 header auto-signed · Ed25519 identity`
+- `On-chain deploy hash · Verify on testnet.cspr.live`
+- `Shared hash flows — one hash connects the full lifecycle`
 
-**Tooltip (during release):**
+---
+
+### 0:48–0:58 — AI ARBITRATION + VRF + IDENTITY (10s, 2× speed)
+
+**Fast cuts between 3 features:**
+
+1. **Arbitration** (3.5s): Submit dispute → AI analysis returns verdict + confidence score + evidence breakdown
+2. **VRF Election** (3s): Click "Elect" → random arbiter selected → on-chain proof hash shown
+3. **Identity Registry** (3.5s): Agent detail view → reputation score, capabilities list, "Add Capability" button click
+
+**Overlay text (cycles):**
+- `AI-powered dispute resolution`
+- `VRF-elected arbiters · 3-of-5 quorum`
+- `DID agent identity · Staking · Slashing`
+
+---
+
+### 0:58–1:08 — INSURANCE + MULTI-ASSET + RISK (10s, 2× speed)
+
+1. **Insurance** (3s): Pool stats → click Deposit → modal → submit (fast)
+2. **Multi-Asset** (4s): Advanced tab → create CEP-18 escrow → release → show NFT support
+3. **Risk Dashboard** (3s): Anomaly scores chart, per-agent risk bars
+
+**Overlay:**
 ```
-On-chain deploy submitted to Casper testnet — verifiable at testnet.cspr.live
+Not just CSPR — escrow any token (CEP-18 / CEP-78)
+Insurance pool · IsolationForest risk scoring
 ```
 
 ---
 
-### SCENE 6 — DISPUTE & AI ARBITRATION (1:25–1:45)
+### 1:08–1:20 — SDK / MCP / API DOCS (12s, 2× speed)
 
-**Screen:** `/console/arbitration`
+**Three tabs, fast switches:**
 
-**Actions:**
-1. Show Arbitration tab — submit a dispute for AI analysis
-2. Show AI analysis response: evidence scoring, verdict recommendation
-3. Switch to "VRF Election" tab — show verifiable random arbiter election
-4. Switch to "Register Arbiter" tab — show arbiter registration form
+1. **REST API tab** (4s): Scroll through endpoint groups → expand "Core Escrow" → show request/response JSON → method badges (GET/POST)
 
-**Text overlay:**
-```
-AI-Assisted Dispute Resolution
-VRF-elected arbiters · 3-of-5 quorum · On-chain verified
-```
-
----
-
-### SCENE 7 — MULTI-ASSET & INSURANCE (1:45–2:00)
-
-**Screen:** `/console/advanced` → Multi-Asset tab
-
-**Actions:**
-1. Show Multi-Asset Lifecycle tab — CSPR, CEP-18 tokens, CEP-78 NFTs
-2. Switch to Insurance tab — show pool stats, deposit flow
-3. Show Risk tab — IsolationForest anomaly scores per agent
-
-**Tooltip:**
-```
-Not just CSPR — escrow any Casper token standard
-```
-
----
-
-### SCENE 8 — AGENT IDENTITY (2:00–2:10)
-
-**Screen:** `/console/identity-registry`
-
-**Actions:**
-1. Show registered agents with DID, reputation scores, capabilities
-2. Click agent detail → show capability list, reputation history
-3. Show "Add Capability" button
-
-**Text overlay:**
-```
-DID-Style Agent Identity · Staking · Slashing · Reputation Decay
-```
-
----
-
-### SCENE 9 — SDK / MCP / API DOCS (2:10–2:30)
-
-**Screen:** `/console/docs`
-
-**Actions:**
-1. Show REST API tab — scroll through endpoint groups, expand one to show request/response examples
-2. Switch to SDK tab — show Python code examples, LangChain integration
-3. Switch to MCP tab — show 26 tools, Claude Desktop config, AI agent dialog example
-
-**Text overlay (SDK tab):**
+2. **Python SDK tab** (4s): Show code example (highlight):
 ```python
-async with EscrowClient.generate("https://ae402.xyz/backend") as client:
-    escrow = await client.create_escrow(receiver="ab"*32, amount=5000, ttl=300)
+async with EscrowClient.generate(url) as client:
+    escrow = await client.create_escrow(
+        receiver="ab"*32, amount=5000, ttl=300
+    )
 ```
+→ Scroll to LangChain integration code
 
-**Tooltip (MCP tab):**
+3. **MCP tab** (4s): Show 26 tools table → Claude Desktop config JSON → AI agent dialog example
+
+**Overlay:**
 ```
-26 MCP tools — plug into Claude, GPT, Cursor, or any MCP-compatible LLM
-```
-
----
-
-### SCENE 10 — CONTRACTS ON-CHAIN PROOF (2:30–2:40)
-
-**Screen:** `/console/contracts`
-
-**Actions:**
-1. Show all 8 deployed contracts with hashes
-2. Click "View on Testnet" for Core Escrow → browser opens testnet.cspr.live showing the contract
-3. Quick montage: click 2-3 more contract links to prove they're all real
-
-**Text overlay:**
-```
-8 Smart Contracts · All deployed on Casper Testnet · All verifiable
+62 API endpoints · Python SDK · 26 MCP tools for any LLM
 ```
 
 ---
 
-### SCENE 11 — CLOSING CTA (2:40–3:00)
+### 1:20–1:30 — CLOSING CTA (10s)
 
-**Screen:** Fade to dark background with centered content
+**Screen:** Fade to dark bg, centered content
 
-**Large text (fade in):**
-```
-AgentEscrow402
-```
+**Animation sequence (stagger 0.3s each):**
+1. Logo: `AgentEscrow402` (large, white)
+2. Tagline: `Trustless x402 Escrow for AI-to-AI Payments`
+3. Stats fly in one by one: `8 Contracts` → `62 API` → `26 MCP` → `490 Tests` → `Open Source`
+4. Two CTA buttons pulse in:
 
-**Subtitle:**
 ```
-Trustless x402 Escrow for AI-to-AI Payments on Casper Network
-```
-
-**Stats bar (animate in one by one):**
-```
-8 Contracts · 62 API Endpoints · 26 MCP Tools · 490 Tests · Open Source
+[▶ ae402.xyz]    [⭐ GitHub]
 ```
 
-**CTA buttons (pulse animation):**
-```
-[▶ Try Live Demo — ae402.xyz]    [⭐ GitHub — alexbelij/AgentEscrow402]
-```
+5. Bottom: `Casper Agentic Buildathon 2026 · MIT License`
 
-**Bottom text (small):**
-```
-Built for Casper Agentic Buildathon 2026 · MIT License
-```
-
-**Music:** Fade out over last 3 seconds
+**Music:** Final beat → fade out
 
 ---
 
-## TEXT OVERLAYS & TOOLTIPS LIBRARY
+## PACING RULES
 
-Use these throughout as contextual annotations:
-
-| Trigger | Tooltip Text |
-|---------|-------------|
-| Any deploy hash appears | `✅ Real on-chain transaction — click to verify on testnet.cspr.live` |
-| x402 header shown | `Ed25519-signed payment intent · No middleman · No trust required` |
-| Contract hash shown | `Deployed WASM contract on Casper testnet` |
-| Sandbox submit | `Demo identity auto-signs — real SDK uses Ed25519 private key` |
-| Insurance pool | `2% fee · Automated claim processing · Pool-backed guarantees` |
-| Risk score | `IsolationForest anomaly detection · Per-agent risk profiling` |
-| MCP tools | `Model Context Protocol — any LLM can manage escrows autonomously` |
+| Rule | Why |
+|------|-----|
+| **No screen stays static >2 seconds** | Dead air kills retention |
+| **Screen recording always 1.5–2× speed** | Real-time API waits are boring |
+| **Text overlays appear on action, not before** | Context, not pre-reading |
+| **Every tooltip ≤8 words** | Must be scannable at speed |
+| **Transitions = hard cuts or 150ms fades** | No slow dissolves |
+| **Cursor always moving** | Creates visual momentum |
+| **Beat-synced scene changes** | Music drives the rhythm |
 
 ---
 
-## TECHNICAL NOTES FOR VIDEO GENERATION
+## TOOLTIP LIBRARY (short, punchy)
 
-### Screen Recording Setup
+| Context | Text |
+|---------|------|
+| Deploy hash appears | `✅ Live on Casper testnet` |
+| x402 header | `Ed25519 signed · No middleman` |
+| Contract click | `Real WASM contract on-chain` |
+| Sandbox submit | `Demo identity · Real SDK uses Ed25519` |
+| Insurance | `2% fee · Pool-backed guarantees` |
+| Risk score | `IsolationForest anomaly detection` |
+| MCP | `Any LLM can manage escrows` |
+| Batch | `Up to 50 escrows in one deploy` |
+| HTLC | `SHA-256 atomic swap` |
+
+---
+
+## TECHNICAL SPECS
+
 - **Resolution:** 1920×1080 (16:9)
-- **Browser:** Chrome, dark mode, no bookmarks bar
-- **URL bar:** Visible (shows ae402.xyz — proves it's live)
-- **DevTools:** Hidden (clean view)
-- **Zoom:** 100% browser zoom
-
-### Animation Specs
-- **Section transitions:** 300ms crossfade with slight zoom (1.0→1.02→1.0)
-- **Text overlays:** Slide up from bottom, 200ms ease-out
-- **Tooltips:** Fade in 150ms, stay 3s, fade out 150ms
-- **Stats counters:** Count-up animation (0→142 over 1s)
-- **CTA buttons:** Gentle pulse (scale 1.0↔1.03, 2s cycle)
-- **Cursor highlight:** 20px emerald circle, 30% opacity, follows cursor
-
-### Music
-- Genre: Ambient electronic / lo-fi synth
-- BPM: 80-100
-- No vocals
-- Volume: -12dB (subtle background)
-- Fade in: 0:00–0:03
-- Fade out: last 3 seconds
-
-### Text Style
-- **Headers:** 48px Inter Bold, white, text-shadow `0 2px 8px rgba(0,0,0,0.5)`
-- **Subtitles:** 24px Inter Regular, slate-300
-- **Tooltips:** 16px Inter, emerald-400 text on slate-800/85 bg, rounded-lg, border emerald-500/30
-- **Code blocks:** 16px JetBrains Mono, indigo-300 on slate-900, rounded-md
+- **Recording speed:** 1.5× for demos, 2× for navigation, 1× for CTA
+- **Browser:** Chrome, dark mode, URL bar visible (proves live site)
+- **Cursor:** Visible + 20px emerald highlight circle on click
+- **Text:** Slide up 150ms ease-out, stay 2-3s, fade 100ms
+- **Transitions:** Hard cut or 150ms crossfade
+- **Music:** Electronic ambient, 110-120 BPM, no vocals, -10dB
+- **Counter animations:** Count-up (0→N) over 0.5s
 
 ---
 
-## ALTERNATIVE: 60-SECOND CUT
+## 45-SECOND EMERGENCY CUT
 
-If time is tight, use this compressed version:
+If even 90s is too long:
 
-| Time | Content |
-|------|---------|
-| 0:00–0:05 | Logo + tagline |
-| 0:05–0:10 | Landing page scroll (trust signals) |
-| 0:10–0:25 | Sandbox: Create → Get → Release escrow (fast) |
-| 0:25–0:35 | Arbitration + Insurance + Identity (quick montage) |
-| 0:35–0:45 | Docs page: API → SDK → MCP (3 tabs) |
-| 0:45–0:55 | Contracts page → click testnet link |
-| 0:55–1:00 | CTA: ae402.xyz + GitHub |
+| Time | Content | Speed |
+|------|---------|-------|
+| 0:00–0:02 | Logo + tagline | 1× |
+| 0:02–0:06 | Landing page: trust signals + testnet link click | 2× |
+| 0:06–0:10 | Console: rapid 13-page sidebar tour | 3× |
+| 0:10–0:25 | Sandbox: Create → Get → Release → Dispute (hero) | 1.5× |
+| 0:25–0:32 | Arbitration AI + VRF + Identity (montage) | 2× |
+| 0:32–0:38 | Docs: API → SDK → MCP (3 tab switches) | 2× |
+| 0:38–0:42 | Contracts → testnet link proof | 2× |
+| 0:42–0:45 | CTA: ae402.xyz + GitHub | 1× |
