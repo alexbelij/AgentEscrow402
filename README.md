@@ -29,6 +29,7 @@
 
 - [What makes it unique](#-what-makes-it-unique)
 - [How it works](#-how-it-works)
+- [No-unilateral-withdraw guard](#-no-unilateral-withdraw-guard-release-cap--arbiter-quorum)
 - [Quickstart](#-quickstart)
 - [Architecture](#-architecture)
 - [Screenshots](#-screenshots)
@@ -62,6 +63,7 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 | **AI-assisted dispute triage** | ✅ Evidence scoring feeds the arbiter vote | ❌ None | ❌ None |
 | **Sybil-resistant agent identity** | ✅ DID registry, staking + slashing | ❌ None | — |
 | **Post-quantum metadata confidentiality** | ✅ ML-KEM-768 hybrid encryption | ❌ None | — |
+| **Production maturity / ecosystem adoption** | ⚠️ Hackathon-stage, testnet only | ✅ Live, mainnet, adopted by real facilitators | ✅ Universally understood |
 
 See [what's real vs. simulated](#-what-is-real-vs-simulated) for exactly which of these are live
 on-chain today versus API-level.
@@ -105,6 +107,78 @@ Protected endpoints return `402 Payment Required` with machine-readable terms wh
 This is the base happy-path lifecycle. The dispute-resolution vote, HTLC atomic-swap
 commit/reveal, and multi-asset (CEP-18/CEP-78) flows each have their own diagram in
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) rather than being crammed into this one.
+
+Every escrow moves through the same on-chain states regardless of which exit path it
+takes — created, then released, refunded, or disputed → resolved:
+
+```mermaid
+stateDiagram-v2
+  [*] --> Pending: create_escrow()\nfunds locked, TTL set
+  Pending --> Released: release()\n(sender confirms delivery)
+  Pending --> Refunded: refund()\n(caller, after TTL expiry)
+  Pending --> Disputed: dispute()\n(sender or receiver)
+  Disputed --> Released: resolve()\n3-of-5 arbiter vote → payee
+  Disputed --> Refunded: resolve()\n3-of-5 arbiter vote → sender
+  Released --> [*]
+  Refunded --> [*]
+```
+*Text fallback: an escrow starts `Pending`; it exits via `release` (seller paid),
+`refund` (TTL expired, nobody delivered), or `dispute` → 3-of-5 arbiter `resolve`, which
+routes funds to either side. `commit_swap`/`reveal_swap` is a variant exit on the same
+`Pending` state — see the [HTLC atomic-swap flow](#-use-cases) below.*
+
+<div align="right"><a href="#readme-top">↑ back to top</a></div>
+
+---
+
+## 🛡️ No-unilateral-withdraw guard: release cap + arbiter quorum
+
+The escrow contract's `sender` key is *not*, by itself, sufficient authorization to move
+funds above a configurable cap. This is enforced on-chain in
+[`contracts/escrow/src/main.rs`](contracts/escrow/src/main.rs), not in the API layer:
+
+- A `release_cap` named key (`RELEASE_CAP_KEY`) defaults to `1_000_000_000_000` motes = **1,000
+  CSPR** (`DEFAULT_RELEASE_CAP_MOTES`) and is retunable on-chain via `set_release_cap`
+  (installer-only) with no redeploy needed.
+- Both fund-releasing entry points — `release()` and `reveal_swap()` (the HTLC path below) —
+  call `read_release_cap()` and compare it against the escrow amount. Below the cap, the
+  sender's own signed call is enough, exactly like today's happy path.
+- **Above the cap, the sender's signature alone is rejected.** The caller must additionally
+  supply `arbiter_pubkeys`/`arbiter_signatures` covering a canonical
+  `"release:<service_hash>:cap_approval"` (or `"reveal_swap:..."`) message.
+  `require_arbiter_cap_approval()` → `verify_arbiter_quorum()` checks that at least
+  `threshold` (default 3, same registered-arbiter list `resolve()` uses) **distinct,
+  registered** arbiters produced valid Ed25519 signatures over that exact message — dedup'd,
+  so one arbiter can't sign twice to fake a quorum. Fail the quorum check and the call
+  reverts with `ERR_CAP_EXCEEDED`; no funds move.
+- In other words: **propose → arbiter-quorum approve → release**, not **agent key → release**,
+  for anything above the cap. A compromised or malicious agent key can drain at most the
+  cap amount unilaterally; anything larger requires collusion or compromise of a majority of
+  the independently-held arbiter keys.
+- Confirmed on the deployed v9 contract: the `resolve` (3-of-5 multisig) gas-benchmark entry
+  in [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md) measures the same signature-verification
+  code path this guard reuses (~7.5 CSPR gas for 3 on-chain Ed25519 verifications vs. ~3.2
+  CSPR for a plain `release`).
+
+```mermaid
+flowchart TD
+  A["release() / reveal_swap() called\namount known"] --> B{"amount > release_cap?"}
+  B -- "no (below cap)" --> C["Direct release\nsender signature only"]
+  C --> D["funds → receiver"]
+  B -- "yes (above cap)" --> E["Sender proposes:\nsubmit arbiter_pubkeys +\narbiter_signatures"]
+  E --> F{"verify_arbiter_quorum()\n>= threshold distinct,\nregistered, valid sigs?"}
+  F -- "no" --> G["revert ERR_CAP_EXCEEDED\nno funds move"]
+  F -- "yes" --> D
+```
+*Text fallback: below the configurable cap, the sender's own call releases funds directly;
+above it, the sender's call is rejected unless it also carries a quorum of registered-arbiter
+Ed25519 signatures over the exact release/service-hash message — otherwise the transaction
+reverts and no funds move.*
+
+This is a structural safety property, not a policy promise: it's enforced by the contract
+bytecode itself for `release`/`reveal_swap`. It is **not yet** extended to
+`escrow-manager`'s `batch_release`/`batch_cancel` entry points (currently dead code, unused by
+any caller) — tracked honestly in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -167,21 +241,40 @@ curl -X POST http://localhost:8000/release \
 
 Judging a hackathon project means separating "works in a demo" from "works on-chain." Here's the
 honest breakdown, verified against the current deployment (contract package `d3ca33d1...c8eeb`,
-version 8, updated 2026-07-05):
+version 9, updated 2026-07-07):
 
 | Component | Status | Evidence |
 |---|---|---|
 | Escrow create / release / refund / dispute / resolve | ✅ **Real on-chain** | Real Casper testnet transactions in live mode (`SANDBOX=false`, what production runs); see [Verified on-chain](#-testing) |
+| Release cap + arbiter-quorum guard on `release`/`reveal_swap` | ✅ **Real on-chain** | Enforced in contract bytecode, not the API; see [No-unilateral-withdraw guard](#-no-unilateral-withdraw-guard-release-cap--arbiter-quorum) |
 | HTLC atomic-swap (`commit_swap` / `reveal_swap`) | ✅ **Real on-chain** | SHA-256 commit/reveal entry points, live round-trip with cross-account reveal |
 | CEP-18 (fungible token) transfers | ✅ **Real on-chain** | Deployed test token AETUSD, transfer + balance read against live contract state |
 | CEP-2612-inspired gasless permit (CEP-18) | ✅ **Real on-chain** | Custom `permit()`/`permit_nonce()` entry points added to a forked CEP-18 contract (Ed25519-signature-gated allowance, no session-wasm needed); live-verified: owner signs an off-chain message only, relayer submits `permit()`+`transfer_from()` and pays gas, real balance moves |
 | CEP-78 (NFT) mint/transfer | ✅ **Real on-chain** | Deployed test collection AETNFT, mint + transfer + ownership read against live contract state |
+| ID-1 Agent Identity Registry (DID + stake + reputation) | ✅ **Real on-chain, separate contract** | Standalone deployed contract, not the escrow contracts; see [ID-1 registry](#-smart-contract) and [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md) |
 | x402 signature verification | ✅ **Real crypto** | Ed25519 verify (`cryptography` lib) + nonce replay protection, not a stub |
-| Reputation scoring, staking, slashing | ✅ **Real logic** | Exponential decay + stake-weighted slashing in `identity_registry_api.py` |
-| Arbiter multisig resolution | ✅ **Real crypto** | Real Ed25519 3-of-5 quorum check over the escrow/verdict payload, replay-proof |
+| Reputation scoring, staking, slashing (off-chain API) | ✅ **Real logic** | Exponential decay + stake-weighted slashing in `identity_registry_api.py` — separate from the on-chain ID-1 registry above |
+| Arbiter multisig resolution (`resolve`) | ✅ **Real crypto** | Real Ed25519 3-of-5 quorum check over the escrow/verdict payload, replay-proof |
+| VRF-assisted arbiter election (`/vrf/elect`) | ⚠️ **Read path wired, write path not yet called** | A deployed `vrf-arbiter` contract exists and its election-result dictionary can be read on-chain, but nothing in the backend currently submits the `select_arbiters` transaction that would populate it — so today `/vrf/elect` almost always falls back to a reputation-weighted local CSPRNG selection; see [VRF-assisted arbiter election](#vrf-assisted-arbiter-election) below |
 | Payment streaming (`/escrow/stream`) | ⚠️ **API-level simulation** | Streamed/remaining amount computed from wall-clock time in the backend; not an on-chain per-tick release yet |
 | Hosted console demo-signer | ⚠️ **Explicit, labelled bypass** | One fixed public demo identity + signature, gated by `ALLOW_HOSTED_DEMO_IDENTITY`, so browser visitors without a wallet can try the console — never used in the signature-verification code path for real requests |
 | TEE-attested proofs, on-chain ZK-KYC, cross-chain bridge | ❌ **Not implemented** | Roadmap ideas only — would need real TEE hardware or a ZK circuit; out of scope for the hackathon deadline, see [ROADMAP.md](ROADMAP.md) |
+
+### VRF-assisted arbiter election
+
+`POST /vrf/elect` (`server/vrf_election.py`) is meant to pick a dispute's arbiter via an
+on-chain verifiable-random-function call to the deployed `vrf-arbiter` contract instead of a
+purely off-chain choice. As of this writing, the **read** side is wired correctly (it queries
+the right contract hash and the right `elections_dict` dictionary — a prior bug that read the
+wrong contract/dictionary was fixed in commit `235d8ca`), but the **write** side — actually
+submitting the `select_arbiters` transaction that performs the on-chain election and populates
+that dictionary — is not called anywhere in the backend yet. In practice this means the
+on-chain lookup returns nothing and every election currently falls back to
+`_elect_local_csprng`: a reputation-weighted pseudo-random choice made locally in the API
+process. This is accurately labeled `method: "local_csprng"` in the API response itself (vs.
+`"onchain_vrf"`), so it's not hidden from callers — but it is not yet the on-chain-randomness
+guarantee the name implies. Wiring the write path is tracked as a follow-up, not claimed as
+done.
 
 Full detail (including smart-contract-level caveats like the missing reentrancy guard) is in
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) — kept current, not a one-time snapshot.
@@ -211,6 +304,34 @@ Concrete scenarios this unlocks today, not hypotheticals:
 5. **Atomic secret-for-payment swaps** — the HTLC `commit_swap`/`reveal_swap` flow lets a seller
    release a secret (an API key, a decryption key, a proof) *only* in the same transaction that
    pays them — either both happen or neither does.
+
+### HTLC atomic swap, step by step
+
+Real hash-time-lock contract flow (`commit_swap`/`reveal_swap` in
+[`contracts/escrow/src/main.rs`](contracts/escrow/src/main.rs)), not a simulated swap:
+
+```mermaid
+sequenceDiagram
+  participant Sender
+  participant Contract as escrow contract
+  participant Receiver
+
+  Sender->>Contract: commit_swap(service_hash, sha256(preimage))
+  Note over Contract: hash-lock stored,\nnot revealed yet
+  Note over Sender,Receiver: off-chain: external condition met\n(e.g. secret handed over once paid elsewhere)
+  Receiver->>Contract: reveal_swap(service_hash, preimage,\narbiter_pubkeys, arbiter_signatures)
+  Contract->>Contract: sha256(preimage) == commit_hash?
+  alt hash matches AND (amount <= cap OR quorum verified)
+    Contract->>Receiver: funds released
+  else hash mismatch or above-cap quorum missing
+    Contract-->>Receiver: revert (ERR_INVALID_PREIMAGE / ERR_CAP_EXCEEDED)
+  end
+```
+*Text fallback: the sender locks a SHA-256 hash on-chain with `commit_swap`; funds only move
+once someone calls `reveal_swap` with the exact preimage — verified on-chain, not by a
+trusted party — and, above the release cap, also with a valid arbiter-quorum signature set.
+Live-verified on testnet with a different account revealing than the one that committed (see
+[Verified on-chain](#-testing)).*
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -278,8 +399,9 @@ Deployed on Casper Testnet:
 |---|---|---|
 | Core Escrow | `612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec` (package: `d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb`, v9) | [view](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec) |
 | Escrow Manager | `bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d` | [view](https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d) |
-| Insurance Pool | `e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929` (A1-hardened redeploy — the old `e36b958d...` had a fully public `claim()`/`withdraw()`, superseded) | [view](https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929) |
-| VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
+| Insurance Pool | `e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929` (hardened redeploy — the old `e36b958d...` had a fully public `claim()`/`withdraw()`, superseded) | [view](https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929) |
+| VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) — election-result *read* path wired, on-chain election *write* path not yet called (see [VRF section](#vrf-assisted-arbiter-election)) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
+| Agent Identity Registry (ID-1) | `1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae` (package: `0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba`, v2) — standalone DID/stake/reputation registry, separate from the escrow contracts | [view](https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 
 | Entry point | Description |
