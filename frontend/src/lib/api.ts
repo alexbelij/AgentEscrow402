@@ -756,6 +756,8 @@ export const api = {
   claimStreamEscrow: (hash: string) => fetcher<{ status: string; service_hash: string; deploy_hash?: string }>(`/escrow/${hash}/stream-claim`, 'POST'),
 
   // Batch lifecycle (escrow-manager contract)
+  batchCreate: (escrows: Array<{ receiver: string; amount: number; service_hash: string; ttl?: number }>) =>
+    fetcher<{ deploy_hash?: string; created: number; records: any[] }>('/escrows/batch', 'POST', { escrows }),
   batchRelease: (service_hashes: string[], arbiter_pubkeys: string[] = [], arbiter_signatures: string[] = []) =>
     fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-release', 'POST', { service_hashes, arbiter_pubkeys, arbiter_signatures }),
   batchCancel: (service_hashes: string[]) =>
