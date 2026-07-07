@@ -111,12 +111,9 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
 
 ## Frontend
 
-- **`frontend/src/components/AgentMarketplace.tsx` is dead code with hardcoded mock agents**
-  (`mockAgents` array) — never imported/rendered anywhere in `App.tsx`/console routes (confirmed
-  via repo-wide grep), so it's not an active bug, but it doesn't call the real `/agents` or
-  `/search/agents` endpoints either. Recommend deleting it or wiring it to the real endpoints
-  before submission, so a judge browsing the file tree doesn't find an unused mock-data component
-  (same category of issue flagged and removed on the RWA-Sentinel project this session).
+- **Dead-code components cleaned up** — `AgentMarketplace.tsx` (hardcoded mock agents),
+  `RiskHeatmap.tsx` (mock escrows), and `EscrowTimeline.tsx` (unused) were removed to keep the
+  file tree clean for judges.
 - **`escrow-manager.create_batch()` (bulk escrow creation) has no console UI** — the only caller
   is the `POST /escrows/batch` backend endpoint itself (used by the bulk on-chain evidence
   script), confirmed via grep across `frontend/src`. If bulk creation is meant to be a

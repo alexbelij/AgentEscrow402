@@ -758,6 +758,13 @@ export const api = {
   // Reveal must come from the escrow's receiver (DEMO_AGENT_RECEIVER) per server/multi_asset.py's reveal_atomic_swap check.
   revealAtomicSwap: (data: AtomicSwapRevealRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/reveal', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0, DEMO_AGENT_RECEIVER)),
 
+  // Multi-Asset Escrow Lifecycle
+  releaseMultiAssetEscrow: (hash: string) => fetcher<TransactionHash>(`/escrow/multi-asset/${hash}/release`, 'POST', {}),
+  refundMultiAssetEscrow: (hash: string) => fetcher<TransactionHash>(`/escrow/multi-asset/${hash}/refund`, 'POST', {}),
+  disputeMultiAssetEscrow: (hash: string) => fetcher<TransactionHash>(`/escrow/multi-asset/${hash}/dispute`, 'POST', {}),
+  resolveMultiAssetEscrow: (hash: string, inFavorOf: string) =>
+    fetcher<TransactionHash>(`/escrow/multi-asset/${hash}/resolve`, 'POST', { in_favor_of: inFavorOf }),
+
   // Insurance Endpoints
   depositInsurance: (data: DepositInsuranceRequest) => fetcher<TransactionHash>('/insurance/deposit', 'POST', data, buildDemoPaymentHeaders(undefined, data.amount)),
   claimInsurance: (data: ClaimInsuranceRequest) => fetcher<TransactionHash>('/insurance/claim', 'POST', data, buildDemoPaymentHeaders(data.escrow_hash, 0)),

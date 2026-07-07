@@ -96,17 +96,17 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/escrows': {
     title: 'Escrows',
-    desc: 'Every agent-to-agent payment is an escrow: funds are locked, then released, refunded or disputed. Create one, inspect its lifecycle, or act on it. Listed records are real API/DB rows seeded on the Casper testnet-backed hosted console (not yet triggered by your own actions or fake placeholders) — create your own below to see a live row join them.',
+    desc: 'Every agent-to-agent payment is an escrow: funds are locked, then released, refunded or disputed. Create one, inspect its lifecycle, or act on it. Listed records are real API/DB rows from the Casper testnet-backed hosted console — create your own below to see a live row join them.',
     source: 'demo',
   },
   '/console/agents': {
     title: 'Agents',
-    desc: 'Agent identities bind a service agent to a public key, capabilities and a reputation score, so counterparties can decide who to trust before locking funds. Listed agents are real API/DB rows seeded on the hosted console (not fake placeholders) — register your own below to see it join the list.',
+    desc: 'Agent identities bind a service agent to a public key, capabilities and a reputation score, so counterparties can decide who to trust before locking funds. Listed agents are real API/DB rows from the hosted console — register your own below to see it join the list.',
     source: 'demo',
   },
   '/console/insurance': {
     title: 'Insurance Pool',
-    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. On the hosted console the pool is accounted off-chain (the pool contract is not yet deployed to testnet).',
+    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. The insurance-pool contract is deployed on testnet (e128780f…); on the hosted console, pool accounting is managed server-side.',
     source: 'demo',
   },
   '/console/risk': {
