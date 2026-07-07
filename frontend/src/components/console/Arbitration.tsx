@@ -9,13 +9,15 @@ import {
   Arbiter,
 } from '../../lib/api';
 import { randomHex64 } from '../../lib/format';
-import { Gavel, Dices, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { Gavel, Dices, Loader2, CheckCircle, XCircle, UserPlus, Search } from 'lucide-react';
 
-type Tab = 'analyze' | 'elect';
+type Tab = 'analyze' | 'elect' | 'register' | 'lookup';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'analyze', label: 'AI Dispute Analysis', icon: Gavel },
   { id: 'elect', label: 'VRF Arbiter Election', icon: Dices },
+  { id: 'register', label: 'Register Arbiter', icon: UserPlus },
+  { id: 'lookup', label: 'Election Lookup', icon: Search },
 ];
 
 const RECOMMENDATION_COLOR: Record<string, string> = {
@@ -55,6 +57,18 @@ export default function Arbitration() {
   const [electionResult, setElectionResult] = useState<ElectArbiterResponse | null>(null);
   const [electError, setElectError] = useState<string | null>(null);
   const [arbiters, setArbiters] = useState<Arbiter[]>([]);
+
+  // --- Register arbiter state ---
+  const [regAgent, setRegAgent] = useState('');
+  const [regLoading, setRegLoading] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
+  const [regSuccess, setRegSuccess] = useState(false);
+
+  // --- Election lookup state ---
+  const [lookupId, setLookupId] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+  const [lookupResult, setLookupResult] = useState<ElectArbiterResponse | null>(null);
 
   const loadHistory = async () => {
     const res = await api.getArbitrationHistory(10);
@@ -106,6 +120,26 @@ export default function Arbitration() {
     }
     setElectionResult(res.data);
     await loadArbiters();
+  };
+
+  const handleRegister = async () => {
+    setRegLoading(true); setRegError(null); setRegSuccess(false);
+    try {
+      const res = await api.registerArbiter({ agent: regAgent || DEMO_AGENT_SENDER });
+      if (res.error) setRegError(res.error);
+      else { setRegSuccess(true); await loadArbiters(); }
+    } catch (e: any) { setRegError(e.message ?? String(e)); }
+    finally { setRegLoading(false); }
+  };
+
+  const handleLookup = async () => {
+    setLookupLoading(true); setLookupError(null); setLookupResult(null);
+    try {
+      const res = await api.getElectionResult(lookupId);
+      if (res.error) setLookupError(res.error);
+      else setLookupResult(res.data ?? null);
+    } catch (e: any) { setLookupError(e.message ?? String(e)); }
+    finally { setLookupLoading(false); }
   };
 
   return (
@@ -316,6 +350,54 @@ export default function Arbitration() {
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'register' && (
+        <div className="max-w-xl space-y-4">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 space-y-4">
+            <p className="text-sm text-gray-400">
+              Register an agent as an arbiter in the on-chain VRF pool. Registered arbiters are eligible for random election when disputes arise.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Agent public key (hex, 64 chars)</label>
+              <input className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
+                value={regAgent} onChange={(e) => setRegAgent(e.target.value)} placeholder={DEMO_AGENT_SENDER} />
+            </div>
+            <button onClick={handleRegister} disabled={regLoading}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center disabled:opacity-50 w-full justify-center">
+              {regLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+              Register as arbiter
+            </button>
+            {regError && <div className="flex items-center gap-2 text-red-400 text-sm"><XCircle className="h-4 w-4 shrink-0" />{regError}</div>}
+            {regSuccess && <div className="flex items-center gap-2 text-emerald-400 text-sm"><CheckCircle className="h-4 w-4 shrink-0" />Arbiter registered successfully</div>}
+          </div>
+        </div>
+      )}
+
+      {tab === 'lookup' && (
+        <div className="max-w-xl space-y-4">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6 space-y-4">
+            <p className="text-sm text-gray-400">
+              Look up the result of a past VRF arbiter election by dispute ID.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">Dispute ID</label>
+              <input className="w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none font-mono text-sm"
+                value={lookupId} onChange={(e) => setLookupId(e.target.value)} placeholder={'a'.repeat(64)} />
+            </div>
+            <button onClick={handleLookup} disabled={lookupLoading || !lookupId}
+              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors flex items-center disabled:opacity-50 w-full justify-center">
+              {lookupLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+              Look up election
+            </button>
+            {lookupError && <div className="flex items-center gap-2 text-red-400 text-sm"><XCircle className="h-4 w-4 shrink-0" />{lookupError}</div>}
+            {lookupResult && (
+              <div className="bg-[#12121c] border border-[#1e1e2e] rounded-lg p-4">
+                <pre className="text-xs text-gray-300 overflow-x-auto whitespace-pre-wrap">{JSON.stringify(lookupResult, null, 2)}</pre>
+              </div>
+            )}
           </div>
         </div>
       )}

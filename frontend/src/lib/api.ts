@@ -825,6 +825,8 @@ export const api = {
   applyRegistryDecay: (did: string) => fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/decay`, 'POST', {}),
   slashRegistryIdentity: (did: string, amount: number, reason: string) =>
     fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/slash`, 'POST', { amount, reason }),
+  updateRegistryCapabilities: (did: string, capabilities: RegistryCapability[]) =>
+    fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/capabilities`, 'POST', { capabilities }),
   verifyRegistryIdentity: (did: string, level: VerificationLevel) =>
     fetcher<RegistryIdentity>(`/identity-registry/${encodeURIComponent(did)}/verify`, 'POST', { level }),
   searchRegistryIdentities: (params: { capability?: string; min_reputation?: number; min_verification?: VerificationLevel }) => {
