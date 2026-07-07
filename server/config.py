@@ -38,6 +38,9 @@ class Config:
     # room to apply INVARIANT 5 (arbiter != either dispute party) locally,
     # since the contract's own `select_arbiters` has no knowledge of dispute
     # parties and cannot exclude them itself.
+    multi_asset_escrow_contract_hash: str = ""
+    multi_asset_escrow_package_hash: str = ""
+    test_token_contract_hash: str = ""
     vrf_onchain_select_count: int = 3
     allow_hosted_demo_identity: bool = False
     # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
@@ -124,6 +127,18 @@ class Config:
             vrf_package_hash=os.getenv(
                 "VRF_PACKAGE_HASH",
                 "53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611",
+            ),
+            multi_asset_escrow_contract_hash=os.getenv(
+                "MULTI_ASSET_ESCROW_CONTRACT_HASH",
+                "52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a",
+            ),
+            multi_asset_escrow_package_hash=os.getenv(
+                "MULTI_ASSET_ESCROW_PACKAGE_HASH",
+                "a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044",
+            ),
+            test_token_contract_hash=os.getenv(
+                "TEST_TOKEN_CONTRACT_HASH",
+                "8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",

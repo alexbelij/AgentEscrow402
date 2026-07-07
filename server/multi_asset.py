@@ -464,7 +464,6 @@ async def create_multi_asset_escrow(
     Creates a new multi-asset escrow.
     The sender (from X402 header) transfers the specified token amount to the escrow contract.
     """
-    token_adapter = _build_token_adapter(request.token, casper, config)
     sender = x402.sender
     if x402.amount != request.amount:
         raise HTTPException(
@@ -487,18 +486,64 @@ async def create_multi_asset_escrow(
             detail="permit is only supported for token_type 'cep18'",
         )
 
-    # Simulate token transfer to the escrow contract (or, if `permit` is
-    # set, a real gasless live-wallet transfer -- see PermitProof/
-    # Cep18Adapter.transfer_to_escrow).
-    try:
-        deploy_hash = await token_adapter.transfer_to_escrow(
-            sender, request.receiver, request.amount, request.token, request.permit
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-    except Exception as e:
-        logger.error("Failed to simulate token transfer: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to initiate token transfer")
+    receiver_hex = (
+        request.receiver.replace("account-hash-", "")
+        if request.receiver.startswith("account-hash-")
+        else request.receiver
+    )
+
+    deploy_hash = ""
+
+    # Live mode: use the real on-chain MultiAssetEscrow contract for CEP-18
+    # tokens. The contract holds tokens in its own custody (transfer_from on
+    # create, transfer on release/refund/resolve). Requires an approve() call
+    # first so the contract can pull the tokens in.
+    if (
+        not config.sandbox
+        and casper is not None
+        and request.token.token_type == "cep18"
+        and config.multi_asset_escrow_contract_hash
+    ):
+        token_hash = request.token.contract_hash or config.test_token_contract_hash
+        if not token_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="CEP-18 token contract_hash required in live mode",
+            )
+        try:
+            # Step 1: approve the MultiAssetEscrow contract to pull tokens
+            await casper.multi_asset_approve(token_hash, request.amount)
+            # Step 2: create the escrow on-chain (contract does transfer_from)
+            deploy_hash = await casper.multi_asset_create_escrow(
+                receiver_hex=receiver_hex,
+                amount=request.amount,
+                service_hash=request.service_hash,
+                ttl=request.ttl,
+                token_contract_hash=token_hash,
+                fee_bps=config.insurance_fee_bps,
+            )
+        except Exception as e:
+            logger.error("On-chain multi-asset create_escrow failed: %s", e)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"On-chain multi-asset escrow creation failed: {e}",
+            )
+    else:
+        # Sandbox / non-CEP-18 fallback: use the token adapter (existing
+        # behavior — direct transfer or simulation).
+        token_adapter = _build_token_adapter(request.token, casper, config)
+        try:
+            deploy_hash = await token_adapter.transfer_to_escrow(
+                sender, request.receiver, request.amount, request.token, request.permit
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        except Exception as e:
+            logger.error("Failed to initiate token transfer: %s", e)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to initiate token transfer",
+            )
 
     try:
         escrow_record = store.create_escrow(
@@ -514,7 +559,7 @@ async def create_multi_asset_escrow(
     # Also kept in the local dict so other multi-asset-specific reads (token
     # type, etc.) stay available without extending the shared SandboxStore.
     _multi_asset_escrows[request.service_hash] = escrow_record
-    logger.info("Multi-asset escrow %s created with deploy_hash %s", request.service_hash[:16], deploy_hash[:16])
+    logger.info("Multi-asset escrow %s created with deploy_hash %s", request.service_hash[:16], deploy_hash[:16] if deploy_hash else "sandbox")
     return escrow_record
 
 
@@ -797,3 +842,155 @@ async def reveal_atomic_swap(
         f" (on-chain tx {deploy_hash[:16]})" if deploy_hash else "",
     )
     return {"message": "Preimage revealed successfully. Escrow released.", "deploy_hash": deploy_hash}
+
+
+# ── Multi-asset lifecycle endpoints (release/refund/dispute/resolve) ──
+# These mirror the native CSPR escrow lifecycle routes in app.py but
+# dispatch to the real on-chain MultiAssetEscrow contract instead.
+
+
+class MultiAssetLifecycleRequest(BaseModel):
+    """Request body for multi-asset escrow lifecycle operations."""
+
+    service_hash: str = Field(..., min_length=64, max_length=64)
+    arbiter_pubkeys: list[str] = Field(default_factory=list)
+    arbiter_signatures: list[str] = Field(default_factory=list)
+
+
+class MultiAssetResolveRequest(BaseModel):
+    """Request body for multi-asset escrow dispute resolution."""
+
+    service_hash: str = Field(..., min_length=64, max_length=64)
+    in_favor_of: str = Field(..., pattern="^(sender|receiver)$")
+    arbiter_pubkeys: list[str] = Field(default_factory=list)
+    arbiter_signatures: list[str] = Field(default_factory=list)
+
+
+@router.post("/multi-asset/{service_hash}/release")
+async def release_multi_asset_escrow(
+    service_hash: str,
+    req: MultiAssetLifecycleRequest,
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
+) -> dict[str, Any]:
+    """Release a multi-asset escrow — tokens go to the receiver."""
+    escrow = store.get_escrow(service_hash)
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
+        raise HTTPException(status_code=422, detail="pubkeys/signatures length mismatch")
+
+    deploy_hash = ""
+    if not config.sandbox and casper is not None and config.multi_asset_escrow_contract_hash:
+        try:
+            deploy_hash = await casper.multi_asset_release(
+                service_hash, req.arbiter_pubkeys, req.arbiter_signatures
+            )
+        except Exception as exc:
+            logger.error("On-chain multi-asset release failed: %s", exc)
+            raise HTTPException(status_code=502, detail=f"On-chain release failed: {exc}")
+
+    try:
+        record = store.release_escrow(service_hash, caller=escrow.sender, deploy_hash=deploy_hash)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"status": "released", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+
+
+@router.post("/multi-asset/{service_hash}/refund")
+async def refund_multi_asset_escrow(
+    service_hash: str,
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
+) -> dict[str, Any]:
+    """Refund a multi-asset escrow — tokens go back to the sender."""
+    escrow = store.get_escrow(service_hash)
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    deploy_hash = ""
+    if not config.sandbox and casper is not None and config.multi_asset_escrow_contract_hash:
+        try:
+            deploy_hash = await casper.multi_asset_refund(service_hash)
+        except Exception as exc:
+            logger.error("On-chain multi-asset refund failed: %s", exc)
+            raise HTTPException(status_code=502, detail=f"On-chain refund failed: {exc}")
+
+    try:
+        record = store.refund_escrow(service_hash, caller=escrow.sender, deploy_hash=deploy_hash)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"status": "refunded", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+
+
+@router.post("/multi-asset/{service_hash}/dispute")
+async def dispute_multi_asset_escrow(
+    service_hash: str,
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
+) -> dict[str, Any]:
+    """Dispute a multi-asset escrow."""
+    escrow = store.get_escrow(service_hash)
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    deploy_hash = ""
+    if not config.sandbox and casper is not None and config.multi_asset_escrow_contract_hash:
+        try:
+            deploy_hash = await casper.multi_asset_dispute(service_hash)
+        except Exception as exc:
+            logger.error("On-chain multi-asset dispute failed: %s", exc)
+            raise HTTPException(status_code=502, detail=f"On-chain dispute failed: {exc}")
+
+    try:
+        record = store.dispute_escrow(service_hash, deploy_hash=deploy_hash)
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"status": "disputed", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+
+
+@router.post("/multi-asset/{service_hash}/resolve")
+async def resolve_multi_asset_escrow(
+    service_hash: str,
+    req: MultiAssetResolveRequest,
+    x402: PaymentHeader = Depends(get_x402_payment),
+    casper: CasperClient | None = Depends(get_casper),
+    config: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox_store),
+) -> dict[str, Any]:
+    """Resolve a disputed multi-asset escrow via arbiter quorum."""
+    escrow = store.get_escrow(service_hash)
+    if not escrow:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+
+    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
+        raise HTTPException(status_code=422, detail="pubkeys/signatures length mismatch")
+
+    deploy_hash = ""
+    if not config.sandbox and casper is not None and config.multi_asset_escrow_contract_hash:
+        try:
+            deploy_hash = await casper.multi_asset_resolve(
+                service_hash, req.in_favor_of, req.arbiter_pubkeys, req.arbiter_signatures
+            )
+        except Exception as exc:
+            logger.error("On-chain multi-asset resolve failed: %s", exc)
+            raise HTTPException(status_code=502, detail=f"On-chain resolve failed: {exc}")
+
+    try:
+        record = store.resolve_escrow(
+            service_hash, in_favor_of=req.in_favor_of, deploy_hash=deploy_hash,
+        )
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    return {"status": "resolved", "in_favor_of": req.in_favor_of, "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}

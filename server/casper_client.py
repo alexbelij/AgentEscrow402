@@ -40,6 +40,7 @@ _BATCH_FUNDER_WASM = _SCRIPT_DIR / "batch_funder.wasm"
 _REGISTER_ARBITER_SCRIPT = _SCRIPT_DIR / "register_arbiter.mjs"
 _ARBITER_REGISTRAR_WASM = _SCRIPT_DIR / "arbiter_registrar.wasm"
 _SELECT_ARBITERS_SCRIPT = _SCRIPT_DIR / "select_arbiters.mjs"
+_MULTI_ASSET_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "multi_asset_lifecycle.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -68,6 +69,9 @@ class CasperClient:
         self._insurance_package_hash = cfg.insurance_package_hash
         self._vrf_contract_hash = cfg.vrf_contract_hash
         self._vrf_package_hash = cfg.vrf_package_hash
+        self._multi_asset_escrow_contract_hash = cfg.multi_asset_escrow_contract_hash
+        self._multi_asset_escrow_package_hash = cfg.multi_asset_escrow_package_hash
+        self._test_token_contract_hash = cfg.test_token_contract_hash
         self._key_path = cfg.casper_private_key_path
         self._rpc_url = RPC_TESTNET  # always use the working testnet node
         self._http = httpx.AsyncClient(timeout=30.0)
@@ -1240,6 +1244,148 @@ class CasperClient:
             result = await self._rpc("query_global_state", {"key": uref, "state_identifier": None})
             info[field] = result.get("stored_value", {}).get("CLValue", {}).get("parsed")
         return info
+
+    # ── MultiAssetEscrow on-chain operations ─────────────────────────────
+
+    async def multi_asset_approve(
+        self, token_contract_hash: str, amount: int
+    ) -> str:
+        """Approve the MultiAssetEscrow contract as spender for `amount` tokens."""
+        if not self._multi_asset_escrow_package_hash:
+            raise RuntimeError("multi_asset_escrow_package_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "approve",
+                "TOKEN_HASH": token_contract_hash,
+                "ESCROW_PACKAGE_HASH_HEX": self._multi_asset_escrow_package_hash,
+                "AMOUNT": str(amount),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "5000000000",
+            },
+        )
+
+    async def multi_asset_create_escrow(
+        self,
+        receiver_hex: str,
+        amount: int,
+        service_hash: str,
+        ttl: int,
+        token_contract_hash: str,
+        fee_bps: int = 0,
+    ) -> str:
+        """Create an escrow on the MultiAssetEscrow contract."""
+        if not self._multi_asset_escrow_contract_hash:
+            raise RuntimeError("multi_asset_escrow_contract_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "create_escrow",
+                "ESCROW_HASH": self._multi_asset_escrow_contract_hash,
+                "RECEIVER_HEX": receiver_hex,
+                "AMOUNT": str(amount),
+                "SERVICE_HASH": service_hash,
+                "TTL": str(ttl),
+                "TOKEN_HASH": token_contract_hash,
+                "FEE_BPS": str(fee_bps),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "10000000000",
+            },
+        )
+
+    async def multi_asset_release(
+        self,
+        service_hash: str,
+        arbiter_pubkeys: list[str] | None = None,
+        arbiter_signatures: list[str] | None = None,
+    ) -> str:
+        """Release escrowed tokens to the receiver."""
+        if not self._multi_asset_escrow_contract_hash:
+            raise RuntimeError("multi_asset_escrow_contract_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "release",
+                "ESCROW_HASH": self._multi_asset_escrow_contract_hash,
+                "SERVICE_HASH": service_hash,
+                "ARBITER_PUBKEYS_JSON": json.dumps(arbiter_pubkeys or []),
+                "ARBITER_SIGNATURES_JSON": json.dumps(arbiter_signatures or []),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "10000000000",
+            },
+        )
+
+    async def multi_asset_refund(self, service_hash: str) -> str:
+        """Refund escrowed tokens back to the sender."""
+        if not self._multi_asset_escrow_contract_hash:
+            raise RuntimeError("multi_asset_escrow_contract_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "refund",
+                "ESCROW_HASH": self._multi_asset_escrow_contract_hash,
+                "SERVICE_HASH": service_hash,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "5000000000",
+            },
+        )
+
+    async def multi_asset_dispute(self, service_hash: str) -> str:
+        """Dispute an active multi-asset escrow."""
+        if not self._multi_asset_escrow_contract_hash:
+            raise RuntimeError("multi_asset_escrow_contract_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "dispute",
+                "ESCROW_HASH": self._multi_asset_escrow_contract_hash,
+                "SERVICE_HASH": service_hash,
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "5000000000",
+            },
+        )
+
+    async def multi_asset_resolve(
+        self,
+        service_hash: str,
+        in_favor_of: str,
+        arbiter_pubkeys: list[str],
+        arbiter_signatures: list[str],
+    ) -> str:
+        """Resolve a disputed multi-asset escrow via arbiter quorum."""
+        if not self._multi_asset_escrow_contract_hash:
+            raise RuntimeError("multi_asset_escrow_contract_hash not configured")
+        return await self._run_node_script(
+            _MULTI_ASSET_LIFECYCLE_SCRIPT,
+            {
+                "ACTION": "resolve",
+                "ESCROW_HASH": self._multi_asset_escrow_contract_hash,
+                "SERVICE_HASH": service_hash,
+                "IN_FAVOR_OF": in_favor_of,
+                "ARBITER_PUBKEYS_JSON": json.dumps(arbiter_pubkeys),
+                "ARBITER_SIGNATURES_JSON": json.dumps(arbiter_signatures),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+                "CSPR_CLOUD_API_KEY": os.getenv("CSPR_CLOUD_API_KEY", ""),
+                "PAYMENT_MOTES": "10000000000",
+            },
+        )
 
     async def close(self) -> None:
         await self._http.aclose()
