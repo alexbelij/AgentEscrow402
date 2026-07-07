@@ -226,6 +226,19 @@ export default function IdentityRegistry() {
                 >
                   <BadgeCheck className="w-3.5 h-3.5" /> Advance verification
                 </button>
+                <button
+                  onClick={() => {
+                    const cap = prompt('Enter capability to add (e.g., escrow_agent, data_oracle, compute_provider):');
+                    if (cap) {
+                      const current = identity.capabilities?.map((c: any) => typeof c === 'string' ? c : c.name) ?? [];
+                      withBusy('capabilities', () => api.updateRegistryCapabilities(identity.did, [...current, cap] as any));
+                    }
+                  }}
+                  disabled={!!busyAction}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50"
+                >
+                  + Add capability
+                </button>
               </div>
               {actionError && <p className="text-red-400 text-sm">{actionError}</p>}
             </div>

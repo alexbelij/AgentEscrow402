@@ -10,16 +10,17 @@ import {
   TransactionHash,
 } from '../../lib/api';
 import { randomHex64 } from '../../lib/format';
-import { Coins, Waves, KeyRound, Loader2, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Coins, Waves, KeyRound, Loader2, CheckCircle, XCircle, RefreshCw, ArrowRightLeft } from 'lucide-react';
 import { useSigner } from '../../lib/signer';
 import { useCep18PermitDeposit } from '../../lib/useCep18PermitDeposit';
 
-type Tab = 'token' | 'stream' | 'swap';
+type Tab = 'token' | 'stream' | 'swap' | 'lifecycle';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'token', label: 'Alt-Token Escrow', icon: Coins },
   { id: 'stream', label: 'Streaming Escrow', icon: Waves },
   { id: 'swap', label: 'Atomic Swap (commit-reveal)', icon: KeyRound },
+  { id: 'lifecycle', label: 'Multi-Asset Lifecycle', icon: ArrowRightLeft },
 ];
 
 function TokenSelect({ value, onChange }: { value: TokenIdentifier; onChange: (t: TokenIdentifier) => void }) {
@@ -155,6 +156,14 @@ const AdvancedEscrow: React.FC = () => {
   const [swapRevealError, setSwapRevealError] = useState<string | null>(null);
   const [swapRevealResult, setSwapRevealResult] = useState<TransactionHash | null>(null);
 
+  // --- Multi-asset lifecycle state ---
+  const [maHash, setMaHash] = useState('');
+  const [maAction, setMaAction] = useState<'release' | 'refund' | 'dispute' | 'resolve'>('release');
+  const [maResolveTarget, setMaResolveTarget] = useState('sender');
+  const [maLoading, setMaLoading] = useState(false);
+  const [maError, setMaError] = useState<string | null>(null);
+  const [maResult, setMaResult] = useState<TransactionHash | null>(null);
+
   const sha256Hex = async (text: string) => {
     const data = new TextEncoder().encode(text);
     const digest = await crypto.subtle.digest('SHA-256', data);
@@ -269,6 +278,20 @@ const AdvancedEscrow: React.FC = () => {
     } finally {
       setSwapRevealLoading(false);
     }
+  };
+
+  const handleMultiAssetAction = async () => {
+    setMaLoading(true); setMaError(null); setMaResult(null);
+    try {
+      let res;
+      if (maAction === 'release') res = await api.releaseMultiAssetEscrow(maHash);
+      else if (maAction === 'refund') res = await api.refundMultiAssetEscrow(maHash);
+      else if (maAction === 'dispute') res = await api.disputeMultiAssetEscrow(maHash);
+      else res = await api.resolveMultiAssetEscrow(maHash, maResolveTarget);
+      if (res.error) setMaError(res.error);
+      else setMaResult(res.data ?? null);
+    } catch (e: any) { setMaError(e.message ?? String(e)); }
+    finally { setMaLoading(false); }
   };
 
   const inputCls = 'w-full p-3 rounded-md bg-gray-800 text-gray-50 border border-[#1e1e2e] focus:ring-amber-500 focus:border-amber-500 outline-none';
@@ -443,6 +466,48 @@ const AdvancedEscrow: React.FC = () => {
                 <p className="text-sm text-gray-500 italic">No status fetched yet.</p>
               )}
             </div>
+          </ResultRail>
+        </div>
+      )}
+
+      {tab === 'lifecycle' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+          <div className="bg-[#151521] border border-[#1e1e2e] rounded-xl p-6">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 text-sm text-blue-100 mb-4">
+              Manage an existing <strong>multi-asset (CEP-18)</strong> escrow created via the Alt-Token Escrow tab.
+              The on-chain contract holds the tokens in custody until released, refunded, disputed, or resolved.
+            </div>
+            <div className="mb-4">
+              <label className={labelCls}>Service hash of multi-asset escrow</label>
+              <input className={`${inputCls} font-mono text-sm`} value={maHash} onChange={(e) => setMaHash(e.target.value)} placeholder={'a'.repeat(64)} />
+            </div>
+            <div className="mb-4">
+              <label className={labelCls}>Action</label>
+              <div className="grid grid-cols-2 gap-2">
+                {(['release', 'refund', 'dispute', 'resolve'] as const).map((a) => (
+                  <button key={a} onClick={() => setMaAction(a)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${maAction === a ? 'bg-amber-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}>
+                    {a.charAt(0).toUpperCase() + a.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {maAction === 'resolve' && (
+              <div className="mb-4">
+                <label className={labelCls}>Resolve in favor of</label>
+                <select className={inputCls} value={maResolveTarget} onChange={(e) => setMaResolveTarget(e.target.value)}>
+                  <option value="sender">Sender</option>
+                  <option value="receiver">Receiver</option>
+                </select>
+              </div>
+            )}
+            <button onClick={handleMultiAssetAction} disabled={maLoading || !maHash} className={`${btnCls} w-full justify-center`}>
+              {maLoading && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
+              {maAction.charAt(0).toUpperCase() + maAction.slice(1)} escrow
+            </button>
+          </div>
+          <ResultRail title="Result">
+            <ResultPanel error={maError} result={maResult} placeholder="Select an action and submit to see the on-chain result." />
           </ResultRail>
         </div>
       )}
