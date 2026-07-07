@@ -12,9 +12,9 @@ This project is a hackathon prototype deployed on Casper **testnet only**. The s
 
 ## Known limitations
 
-- The contract *is* upgradeable (deployed as a versioned Casper contract package — v3 through v8
-  in this hackathon so far), but only the deployer account that owns the package URef can push a
-  new version; there's no timelock or multi-party governance over upgrades.
+- The contract *is* upgradeable (deployed as a versioned Casper contract package — currently v9),
+  but only the deployer account that owns the package URef can push a new version; there's no
+  timelock or multi-party governance over upgrades.
 - Arbiter rotation goes through a real on-chain `set_arbiters` entry point (no redeploy needed),
   but is triggered manually by an admin API call, not by any on-chain vote.
 - Insurance pool governance is centralized
