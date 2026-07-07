@@ -372,3 +372,120 @@ class TestArbiterElection:
         client = _client()
         res = client.get("/vrf/election/nonexistent-dispute")
         assert res.status_code == 404
+
+
+class _FakeVrfCasper:
+    """Fake CasperClient exercising the on-chain VRF write path without a
+    real network call -- simulates `select_arbiters` + `elections_dict`."""
+
+    def __init__(self, selected_csv: str, deploy_hash: str = "deadbeef" * 8):
+        self._selected_csv = selected_csv
+        self._deploy_hash = deploy_hash
+        self.select_arbiters_calls: list[tuple[str, int]] = []
+
+    async def close(self) -> None:
+        return None
+
+    async def select_arbiters(self, dispute_id: str, count: int) -> str:
+        self.select_arbiters_calls.append((dispute_id, count))
+        return self._deploy_hash
+
+    async def confirm_election(self, dispute_id, *, deploy_hash=None, attempts=15, delay_seconds=2.0):
+        # First call (idempotency check before submitting) has no deploy yet
+        # in the "nothing selected" case; subsequent calls simulate the
+        # write having landed immediately (no real polling delay in tests).
+        if not self.select_arbiters_calls and deploy_hash is None:
+            return None, None
+        return self._selected_csv, None
+
+
+class TestOnchainVrfWritePath:
+    """Focused tests for the real select_arbiters-submission write path
+    (server.vrf_election._elect_via_onchain_vrf), using a fake CasperClient
+    instead of a live testnet call."""
+
+    def _reset(self):
+        vrf_mod._registered_arbiters.clear()
+        vrf_mod._election_results.clear()
+
+    def test_onchain_vrf_elects_non_party_candidate(self):
+        self._reset()
+        client = _client()
+        client.post(
+            "/vrf/arbiters/register",
+            json={"agent": "local-fallback-arbiter", "score": 70, "completed": 3, "disputed": 0},
+        )
+        appmod._casper = _FakeVrfCasper(
+            selected_csv="aaaa111111111111111111111111111111111111111111111111111111111111,"
+            "bbbb222222222222222222222222222222222222222222222222222222222222"
+        )
+        res = client.post(
+            "/vrf/elect",
+            json={
+                "dispute_id": "onchain-dispute-1",
+                "sender": "sender-account-hash",
+                "receiver": "receiver-account-hash",
+                "seed_hash": "ab" * 32,
+            },
+        )
+        assert res.status_code == 201
+        body = res.json()
+        assert body["method"] == "onchain_vrf"
+        assert body["elected_arbiter"]["arbiter_id"] == (
+            "aaaa111111111111111111111111111111111111111111111111111111111111"
+        )
+
+    def test_onchain_vrf_invariant5_excludes_dispute_party(self):
+        """If the only on-chain candidate returned happens to be a dispute
+        party, the endpoint must NOT elect them -- it should fall back to
+        the local CSPRNG pool instead (INVARIANT 5 enforced client-side,
+        since the contract's own select_arbiters has no notion of dispute
+        parties)."""
+        self._reset()
+        client = _client()
+        appmod._casper = _FakeVrfCasper(selected_csv="sender-account-hash")
+        client.post(
+            "/vrf/arbiters/register",
+            json={"agent": "neutral-arbiter", "score": 70, "completed": 3, "disputed": 0},
+        )
+        res = client.post(
+            "/vrf/elect",
+            json={
+                "dispute_id": "onchain-dispute-invariant5",
+                "sender": "sender-account-hash",
+                "receiver": "receiver-account-hash",
+                "seed_hash": "cd" * 32,
+            },
+        )
+        assert res.status_code == 201
+        body = res.json()
+        assert body["method"] == "local_csprng"
+        assert body["elected_arbiter"]["arbiter_id"] != "sender-account-hash"
+        assert body["elected_arbiter"]["arbiter_id"] != "receiver-account-hash"
+
+    def test_onchain_vrf_is_idempotent_on_retry(self):
+        """A second /vrf/elect for a dispute_id that already has an
+        on-chain election recorded should read it back rather than
+        submitting select_arbiters twice (avoids ERR_ELECTION_EXISTS)."""
+        self._reset()
+        client = _client()
+        client.post(
+            "/vrf/arbiters/register",
+            json={"agent": "local-fallback-arbiter", "score": 70, "completed": 3, "disputed": 0},
+        )
+        fake = _FakeVrfCasper(
+            selected_csv="cccc333333333333333333333333333333333333333333333333333333333333"
+        )
+        appmod._casper = fake
+        res = client.post(
+            "/vrf/elect",
+            json={
+                "dispute_id": "onchain-dispute-idempotent",
+                "sender": "sender-account-hash",
+                "receiver": "receiver-account-hash",
+                "seed_hash": "ef" * 32,
+            },
+        )
+        assert res.status_code == 201
+        assert res.json()["method"] == "onchain_vrf"
+        assert len(fake.select_arbiters_calls) == 1
