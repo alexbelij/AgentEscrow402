@@ -19,10 +19,14 @@
 - [x] Insurance pool (configurable fee on release)
 - [x] EscrowManager Factory + Agent Identity Registry (DID-style, capabilities, staking) — real,
       wired endpoints, not stubs
-- [x] VRF arbiter election endpoint (`/vrf/elect`) — deployed `vrf-arbiter` contract with a
-      correctly-wired on-chain *read* path (fixed in `235d8ca`); the on-chain *write* path
-      (submitting `select_arbiters`) is not called anywhere yet, so elections currently resolve
-      via the labeled `local_csprng` fallback — see [README](README.md#vrf-assisted-arbiter-election)
+- [x] VRF arbiter election — `/vrf/elect` genuinely submits `select_arbiters` to the deployed
+      vrf-arbiter contract (the on-chain *write* path noted as missing as of `235d8ca` is now
+      wired) and reads the result back, with 4 arbiters registered on-chain and INVARIANT 5
+      (arbiter != either dispute party) verified live on testnet for both a normal election and
+      a stress case where every raw on-chain candidate was a dispute party; local-CSPRNG
+      fallback still used when the contract is unavailable, unconfigured, or every on-chain
+      candidate for a given draw is excluded — see
+      [docs/evidence/VRF_ONCHAIN_ELECTION.md](docs/evidence/VRF_ONCHAIN_ELECTION.md)
 - [x] Multi-token escrow: real on-chain CEP-18 (fungible) and CEP-78 (NFT) transfers, verified
       live (mint/transfer/balance round-tripped against deployed test tokens)
 - [x] On-chain HTLC atomic-swap (`commit_swap`/`reveal_swap`) — SHA-256 commit/reveal, verified
