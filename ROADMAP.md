@@ -2,7 +2,7 @@
 
 > x402-compatible payment middleware for AI agents on Casper Network
 
-*Last verified against commit `4b125f1` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
+*Last verified against commit `bcd7fc3` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 ---
 
@@ -28,12 +28,14 @@
       candidate for a given draw is excluded — see
       [docs/evidence/VRF_ONCHAIN_ELECTION.md](docs/evidence/VRF_ONCHAIN_ELECTION.md)
 - [x] Multi-token escrow: real on-chain CEP-18 (fungible) and CEP-78 (NFT) transfers, verified
-      live (mint/transfer/balance round-tripped against deployed test tokens)
+      live (mint/transfer/balance round-tripped against deployed test tokens). The backend API
+      (`server/multi_asset.py`) now dispatches to the deployed `MultiAssetEscrow` contract in
+      live mode — approve + create_escrow + release/refund/dispute/resolve, all on-chain
 - [x] On-chain HTLC atomic-swap (`commit_swap`/`reveal_swap`) — SHA-256 commit/reveal, verified
       live end-to-end with a different account revealing than the one that committed
 - [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
 - [x] Post-quantum ML-KEM metadata encryption
-- [x] 437 Python + 40 Rust automated tests (477 total, incl. Hypothesis/proptest property-based
+- [x] 440 Python + 40 Rust automated tests (480 total, incl. Hypothesis/proptest property-based
       invariant tests); see [Testing](README.md#-testing) for current pass rate
 - [x] CI/CD via GitHub Actions
 

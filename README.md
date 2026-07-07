@@ -404,7 +404,9 @@ Deployed on Casper Testnet:
 | Insurance Pool | `e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929` (hardened redeploy — the old `e36b958d...` had a fully public `claim()`/`withdraw()`, superseded) | [view](https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929) |
 | VRF Arbiter | `78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93` (package: `53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611`) — real on-chain election write path wired and live-verified, 4 arbiters registered (see [VRF section](#vrf-assisted-arbiter-election)) | [view](https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93) |
 | Agent Identity Registry (ID-1) | `1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae` (package: `0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba`, v2) — standalone DID/stake/reputation registry, separate from the escrow contracts | [view](https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae) |
+| MultiAssetEscrow (CEP-18) | `52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a` (package: `a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044`) — real contract-custody escrow for CEP-18 tokens, full lifecycle verified on-chain | [view](https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
+| CEP-18 test token (AEMAT) | `8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5` (package: `5caa324c3073a8b9fc05076a01e9d4d658cb08a1b4839fa0aa93dac39213e3fd`) — custody-compatible token (uses `get_immediate_caller`) | [view](https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5) |
 
 | Entry point | Description |
 |---|---|
@@ -538,7 +540,7 @@ cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTL
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
-**Current status: 437/437 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
+**Current status: 440/440 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
 property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,
 `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
 in-memory identity-registry state sharing between test files — not a production code bug, tracked
