@@ -24,6 +24,7 @@ import Risk from './components/console/Risk'
 import Contracts from './components/console/Contracts'
 import AgentDemo from './components/console/AgentDemo'
 import Sandbox from './components/console/Sandbox'
+import Docs from './components/console/Docs'
 import AdvancedEscrow from './components/console/AdvancedEscrow'
 import Arbitration from './components/console/Arbitration'
 import IdentityRegistry from './components/console/IdentityRegistry'
@@ -91,6 +92,7 @@ export default function App() {
             <Route path="contracts" element={<Contracts />} />
             <Route path="agent-demo" element={<AgentDemo />} />
             <Route path="sandbox" element={<Sandbox />} />
+            <Route path="docs" element={<Docs />} />
             <Route path="advanced" element={<AdvancedEscrow />} />
             <Route path="arbitration" element={<Arbitration />} />
             <Route path="identity-registry" element={<IdentityRegistry />} />

@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   Github,
+  BookOpen,
 } from 'lucide-react';
 
 interface NavItem {
@@ -69,6 +70,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Contracts', path: '/console/contracts', icon: FileText },
       { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
       { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
+      { name: 'API / SDK / MCP Docs', path: '/console/docs', icon: BookOpen },
     ],
   },
 ];
@@ -142,6 +144,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   '/console/sandbox': {
     title: 'API Sandbox',
     desc: 'An interactive explorer for every REST endpoint: pick a call on the left, set parameters, and see the live response. Use it to learn the API before wiring the SDK.',
+    source: 'tool',
+  },
+  '/console/docs': {
+    title: 'API / SDK / MCP Documentation',
+    desc: 'Complete reference for all 62 REST API endpoints, the Python SDK with code examples, LangChain integration, and the 26-tool MCP server for AI agent interoperability.',
     source: 'tool',
   },
 };

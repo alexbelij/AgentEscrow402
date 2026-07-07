@@ -757,11 +757,11 @@ export const api = {
 
   // Batch lifecycle (escrow-manager contract)
   batchCreate: (escrows: Array<{ receiver: string; amount: number; service_hash: string; ttl?: number }>) =>
-    fetcher<{ deploy_hash?: string; created: number; records: any[] }>('/escrows/batch', 'POST', { escrows }),
+    fetcher<{ deploy_hash?: string; created: number; records: any[] }>('/escrows/batch', 'POST', { escrows }, buildDemoPaymentHeaders(escrows[0]?.service_hash, 0)),
   batchRelease: (service_hashes: string[], arbiter_pubkeys: string[] = [], arbiter_signatures: string[] = []) =>
-    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-release', 'POST', { service_hashes, arbiter_pubkeys, arbiter_signatures }),
+    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-release', 'POST', { service_hashes, arbiter_pubkeys, arbiter_signatures }, buildDemoPaymentHeaders(service_hashes[0], 0)),
   batchCancel: (service_hashes: string[]) =>
-    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-cancel', 'POST', { service_hashes }),
+    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-cancel', 'POST', { service_hashes }, buildDemoPaymentHeaders(service_hashes[0], 0)),
   // Commit must come from the escrow's sender (DEMO_AGENT_SENDER, the default identity every demo escrow is created with).
   commitAtomicSwap: (data: AtomicSwapCommitRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/commit', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0, DEMO_AGENT_SENDER)),
   // Reveal must come from the escrow's receiver (DEMO_AGENT_RECEIVER) per server/multi_asset.py's reveal_atomic_swap check.

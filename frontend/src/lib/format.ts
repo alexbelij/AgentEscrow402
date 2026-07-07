@@ -14,10 +14,10 @@ export function motesToCspr(amount: number | string | null | undefined): number 
   return n;
 }
 
-/** Format motes as a friendly CSPR string, e.g. "100 CSPR". */
+/** Format motes as a friendly CSPR string, e.g. "100 CSPR" or "0.02 CSPR". */
 export function formatCspr(motes: number | string | null | undefined, digits = 2): string {
   const v = motesToCspr(motes);
-  const s = v.toLocaleString(undefined, { maximumFractionDigits: digits });
+  const s = v.toLocaleString(undefined, { minimumFractionDigits: v % 1 !== 0 ? 2 : 0, maximumFractionDigits: digits });
   return `${s} CSPR`;
 }
 
