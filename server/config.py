@@ -28,6 +28,17 @@ class Config:
     # contract, hash). See contracts/pool-funder/src/main.rs.
     insurance_package_hash: str = ""
     vrf_contract_hash: str = ""
+    # Package hash (not contract hash) of the vrf-arbiter contract --
+    # required by the arbiter-registrar session-wasm's `call_versioned_contract`
+    # cross-contract call into `register_arbiter()`. See
+    # contracts/arbiter-registrar/src/main.rs.
+    vrf_package_hash: str = ""
+    # Number of candidates requested from the on-chain `select_arbiters`
+    # entry point per election. Requesting more than 1 gives the backend
+    # room to apply INVARIANT 5 (arbiter != either dispute party) locally,
+    # since the contract's own `select_arbiters` has no knowledge of dispute
+    # parties and cannot exclude them itself.
+    vrf_onchain_select_count: int = 3
     allow_hosted_demo_identity: bool = False
     # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
     # arbiters, mirroring the on-chain `arbiter_list`. Used to verify
@@ -110,6 +121,11 @@ class Config:
                 # always failed with Mint error 21 (UnapprovedSpendingAmount).
                 "78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93",
             ),
+            vrf_package_hash=os.getenv(
+                "VRF_PACKAGE_HASH",
+                "53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611",
+            ),
+            vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
             arbiter_pubkeys=tuple(
                 p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()

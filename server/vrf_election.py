@@ -1,9 +1,15 @@
 """VRF-based arbiter election for AgentEscrow402.
 
 On-chain VRF via the deployed vrf-arbiter contract:
-- Calls `elect_arbiter` entry point on deployed vrf-arbiter contract
-- Parses `selected_arbiters_csv` from on-chain contract state
-- Falls back to local cryptographic selection if contract unavailable
+- Submits `select_arbiters(dispute_id, count)` on the deployed vrf-arbiter
+  contract (the real on-chain write; arbiters must already be registered
+  on-chain via `register_arbiter`, see `CasperClient.register_arbiter`)
+- Waits for the transaction to finalize, then reads back
+  `selected_arbiters_csv` from `elections_dict`
+- Applies INVARIANT 5 (arbiter must not be either dispute party) locally,
+  since the contract itself has no notion of dispute parties
+- Falls back to local cryptographic selection if the contract is
+  unavailable, unconfigured, or every on-chain candidate is excluded
 """
 
 from __future__ import annotations
@@ -71,8 +77,20 @@ class ArbiterRecord(BaseModel):
 
 class ElectArbiterRequest(BaseModel):
     dispute_id: str = Field(..., description="Unique dispute identifier")
-    sender: str = Field(..., description="Dispute sender account (excluded from election)")
-    receiver: str = Field(..., description="Dispute receiver account (excluded from election)")
+    sender: str = Field(
+        ...,
+        description=(
+            "Dispute sender account (excluded from election). For the "
+            "on-chain VRF path this must match the on-chain arbiter "
+            "identity format -- a plain lowercase-hex Casper account hash, "
+            "no 'account-hash-' prefix -- since that is what elected "
+            "candidates are compared against (INVARIANT 5)."
+        ),
+    )
+    receiver: str = Field(
+        ...,
+        description="Dispute receiver account (excluded from election); same format as `sender`.",
+    )
     seed_hash: str = Field(
         ...,
         description="A recent block hash or other verifiable random seed for election",
@@ -97,65 +115,74 @@ class ArbiterListResponse(BaseModel):
 async def _elect_via_onchain_vrf(
     casper: CasperClient,
     dispute_id: str,
-    eligible_ids: list[str],
+    excluded_accounts: set[str],
     seed_hash: str,
     vrf_contract_hash: str = "",
+    select_count: int = 3,
 ) -> str | None:
-    """Read an already-recorded election result from the deployed
-    vrf-arbiter contract's `elections_dict` dictionary.
+    """Perform a real on-chain VRF election: submit `select_arbiters` on the
+    deployed vrf-arbiter contract, wait for it to finalize, then read back
+    the result from `elections_dict` and apply INVARIANT 5 locally.
 
-    IMPORTANT — this is a *read-only* helper, not a full on-chain flow:
-    the vrf-arbiter contract's `select_arbiters` entry point (the one that
-    actually performs the on-chain election and writes this dictionary
-    entry) is never called by this backend anywhere. Nothing currently
-    triggers a real on-chain election, so in practice this will almost
-    always return None and the caller falls back to
-    `_elect_local_csprng`. Wiring the write path (submitting a
-    `select_arbiters` transaction here, plus registering arbiters via
-    `register_arbiter` with a staked purse) is tracked as a separate,
-    larger follow-up -- see skills/projects/ae402_hackathon.
+    The contract's `select_arbiters(dispute_id, count)` entry point has no
+    concept of dispute parties -- it only knows about its own
+    `active_arbiters_list` -- so it cannot exclude a party itself. This
+    function asks for `select_count` (> 1) candidates precisely so there is
+    room to drop any candidate that is also a dispute party (`sender`/
+    `receiver`, passed in as `excluded_accounts`) without necessarily having
+    to fall back to the local CSPRNG path.
 
-    Previously this both read the wrong contract entirely (defaulted to
-    the escrow contract's hash) and the wrong dictionary name
-    ("vrf_elections" vs. the contract's actual "elections_dict"); fixed
-    2026-07-06 so at least the read path is structurally correct for when
-    the write path lands.
+    `dispute_id` must not already have an election recorded on-chain (the
+    contract reverts `ERR_ELECTION_EXISTS` on a second `select_arbiters`
+    call for the same id) -- if one already exists, this reads it back
+    instead of submitting a fresh transaction (idempotent).
 
-    Returns the elected arbiter account hash string, or None if no
-    on-chain election result is available.
+    Returns the elected arbiter account hash string (plain lowercase hex,
+    no `account-hash-` prefix -- matches the contract's own
+    `AccountHash::to_string()` format), or None if no eligible on-chain
+    candidate is available and the caller should fall back to
+    `_elect_local_csprng`.
     """
     if not vrf_contract_hash:
-        logger.warning("vrf_contract_hash not configured, skipping on-chain VRF read")
+        logger.warning("vrf_contract_hash not configured, skipping on-chain VRF")
         return None
 
     try:
-        # Contract's ElectionRecord layout:
-        #   ((dispute_id, seed, selection_count), (selected_arbiters_csv, status, resolved_block_time))
-        # CLValue "parsed" for a nested tuple typically comes back as a
-        # nested list mirroring that shape; handle both that and a flat
-        # CSV string defensively since we've never observed a real one yet.
-        result = await casper.query_contract_dict("elections_dict", dispute_id, contract_hash=vrf_contract_hash)
-        if not result or not result.get("parsed"):
-            return None
-        parsed = result["parsed"]
-        selected_csv: str | None = None
-        if isinstance(parsed, str):
-            selected_csv = parsed
-        elif isinstance(parsed, (list, tuple)) and len(parsed) == 2:
-            inner = parsed[1]
-            if isinstance(inner, (list, tuple)) and inner and isinstance(inner[0], str):
-                selected_csv = inner[0]
+        # Idempotent: check for an already-recorded election first so a
+        # retried request (e.g. after a transient RPC timeout) doesn't try
+        # to submit `select_arbiters` twice for the same dispute_id.
+        existing, _ = await casper.confirm_election(dispute_id, attempts=1, delay_seconds=0)
+        selected_csv = existing
+        deploy_hash: str | None = None
+
         if not selected_csv:
-            return None
+            deploy_hash = await casper.select_arbiters(dispute_id, select_count)
+            selected_csv, revert_reason = await casper.confirm_election(
+                dispute_id, deploy_hash=deploy_hash
+            )
+            if revert_reason:
+                logger.warning("On-chain select_arbiters reverted for %s: %s", dispute_id, revert_reason)
+                return None
+            if not selected_csv:
+                logger.warning("On-chain election for %s did not finalize in time", dispute_id)
+                return None
+
         candidates = [a.strip() for a in selected_csv.split(",") if a.strip()]
         for candidate in candidates:
-            if candidate in eligible_ids:
-                logger.info("On-chain VRF elected arbiter: %s", candidate)
+            if candidate not in excluded_accounts:
+                logger.info("On-chain VRF elected arbiter: %s (deploy=%s)", candidate, deploy_hash)
                 return candidate
-        if candidates:
-            return candidates[0]
+
+        logger.warning(
+            "All %d on-chain VRF candidates for dispute %s are excluded dispute parties "
+            "(INVARIANT 5) -- falling back to local CSPRNG (deploy=%s, candidates=%s)",
+            len(candidates),
+            dispute_id[:16],
+            deploy_hash,
+            candidates,
+        )
     except Exception as exc:
-        logger.warning("On-chain VRF query failed: %s", exc)
+        logger.warning("On-chain VRF election failed, using local fallback: %s", exc)
 
     return None
 
@@ -234,7 +261,12 @@ async def elect_arbiter(
     if casper and cfg.vrf_contract_hash:
         try:
             elected_id = await _elect_via_onchain_vrf(
-                casper, request.dispute_id, eligible_ids, request.seed_hash, cfg.vrf_contract_hash
+                casper,
+                request.dispute_id,
+                excluded,
+                request.seed_hash,
+                cfg.vrf_contract_hash,
+                cfg.vrf_onchain_select_count,
             )
             if elected_id:
                 method = "onchain_vrf"

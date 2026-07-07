@@ -37,6 +37,9 @@ _INSURANCE_CLAIM_SCRIPT = _SCRIPT_DIR / "insurance_claim.mjs"
 _POOL_FUNDER_WASM = _SCRIPT_DIR / "pool_funder.wasm"
 _CREATE_BATCH_SCRIPT = _SCRIPT_DIR / "create_batch.mjs"
 _BATCH_FUNDER_WASM = _SCRIPT_DIR / "batch_funder.wasm"
+_REGISTER_ARBITER_SCRIPT = _SCRIPT_DIR / "register_arbiter.mjs"
+_ARBITER_REGISTRAR_WASM = _SCRIPT_DIR / "arbiter_registrar.wasm"
+_SELECT_ARBITERS_SCRIPT = _SCRIPT_DIR / "select_arbiters.mjs"
 
 # Status int → EscrowStatus string (matches contract STATUS_* constants)
 _STATUS_MAP = {
@@ -63,6 +66,8 @@ class CasperClient:
         self._manager_contract_hash = cfg.manager_contract_hash
         self._insurance_contract_hash = cfg.insurance_contract_hash
         self._insurance_package_hash = cfg.insurance_package_hash
+        self._vrf_contract_hash = cfg.vrf_contract_hash
+        self._vrf_package_hash = cfg.vrf_package_hash
         self._key_path = cfg.casper_private_key_path
         self._rpc_url = RPC_TESTNET  # always use the working testnet node
         self._http = httpx.AsyncClient(timeout=30.0)
@@ -421,6 +426,104 @@ class CasperClient:
                 **extra_env,
             },
         )
+
+    async def register_arbiter(self, account_hash_hex: str, stake_motes: int) -> str:
+        """Register `account_hash_hex` as an on-chain VRF arbiter, staking
+        `stake_motes` pulled from *this client's own key's* main purse
+        (custodial operator model, same as `deposit_to_insurance_pool`).
+
+        Uses the `arbiter-registrar` session-wasm (contracts/arbiter-registrar/
+        src/main.rs) rather than a plain contract call, because a purse URef
+        passed as a top-level deploy runtime arg has its access rights
+        stripped by the RPC layer -- the session code instead creates a
+        fresh purse from the caller's own main purse (full rights in session
+        context) and makes a native `call_versioned_contract` into
+        `register_arbiter()`.
+        """
+        if not self._vrf_package_hash:
+            raise RuntimeError("vrf_package_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        if not _ARBITER_REGISTRAR_WASM.exists():
+            logger.error("arbiter-registrar wasm not found at %s", _ARBITER_REGISTRAR_WASM)
+            raise RuntimeError("arbiter-registrar wasm not found (deployment misconfigured)")
+        return await self._run_node_script(
+            _REGISTER_ARBITER_SCRIPT,
+            {
+                "WASM_PATH": str(_ARBITER_REGISTRAR_WASM),
+                "PACKAGE_HASH": self._vrf_package_hash,
+                "ACCOUNT_HEX": account_hash_hex,
+                "STAKE_MOTES": str(stake_motes),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def select_arbiters(self, dispute_id: str, count: int) -> str:
+        """Submit `select_arbiters(dispute_id, count)` against the deployed
+        vrf-arbiter contract -- the actual on-chain election write. The
+        contract writes the result into its `elections_dict`; read it back
+        via `query_contract_dict("elections_dict", dispute_id, ...)` (or
+        `confirm_election` below, which polls until it's finalized).
+
+        Reverts on-chain (`ERR_ELECTION_EXISTS`) if `dispute_id` already has
+        a recorded election -- callers should check for that (or catch the
+        resulting `RuntimeError`) before retrying.
+        """
+        if not self._vrf_contract_hash:
+            raise RuntimeError("vrf_contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        return await self._run_node_script(
+            _SELECT_ARBITERS_SCRIPT,
+            {
+                "CONTRACT_HASH": self._vrf_contract_hash,
+                "DISPUTE_ID": dispute_id,
+                "COUNT": str(count),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
+
+    async def confirm_election(
+        self,
+        dispute_id: str,
+        *,
+        deploy_hash: str | None = None,
+        attempts: int = 15,
+        delay_seconds: float = 2.0,
+    ) -> tuple[str | None, str | None]:
+        """Poll the vrf-arbiter contract's `elections_dict` until the
+        `select_arbiters` deploy above has landed, or give up.
+
+        Returns `(selected_arbiters_csv, revert_reason)`. `selected_arbiters_csv`
+        is None until the election is recorded on-chain; `revert_reason` is
+        only ever set once we give up and find a concrete on-chain failure
+        (e.g. `ERR_INSUFFICIENT_ARBITERS` when fewer than `count` arbiters
+        are currently active).
+        """
+        if not self._vrf_contract_hash:
+            return None, "vrf_contract_hash not configured"
+        for _ in range(attempts):
+            raw = await self.query_contract_dict(
+                "elections_dict", dispute_id, contract_hash=self._vrf_contract_hash
+            )
+            parsed = raw.get("parsed") if raw else None
+            if parsed and isinstance(parsed, (list, tuple)) and len(parsed) == 2:
+                inner = parsed[1]
+                if isinstance(inner, (list, tuple)) and inner and isinstance(inner[0], str):
+                    return inner[0], None
+            await asyncio.sleep(delay_seconds)
+
+        revert_reason: str | None = None
+        if deploy_hash:
+            try:
+                revert_reason = await self.get_deploy_error(deploy_hash)
+            except Exception:
+                logger.exception("Failed to check deploy execution result for %s", deploy_hash)
+        return None, revert_reason
 
     async def deposit_to_insurance_pool(self, amount: int) -> str:
         """Deposit `amount` motes (from the backend operator's own account)
