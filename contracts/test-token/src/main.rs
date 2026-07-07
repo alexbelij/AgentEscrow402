@@ -59,10 +59,16 @@ fn revert(code: u16) -> ! {
     runtime::revert(ApiError::User(code))
 }
 
+/// Plain 64-hex-char address, no variant prefix. Casper dictionary item
+/// keys are capped at 64 bytes -- a `"contract-"` prefix (9 bytes) would
+/// push a contract identity's key to 73 bytes, over that cap (this
+/// broke `balances`/`allowances` writes for a contract-held balance
+/// before this fix). Account vs. contract collision is not a practical
+/// concern (both are independent 32-byte hash spaces).
 fn key_to_hex(key: &Key) -> String {
     match key {
         Key::Account(a) => a.to_string(),
-        Key::Hash(h) => alloc::format!("contract-{}", hex_encode(h)),
+        Key::Hash(h) => hex_encode(h),
         _ => runtime::revert(ApiError::InvalidArgument),
     }
 }
@@ -156,8 +162,17 @@ fn write_balance(dict: casper_types::URef, owner_hex: &str, amount: U256) {
     storage::dictionary_put(dict, owner_hex, amount);
 }
 
+/// Casper dictionary item keys are capped at 64 bytes. A plain
+/// `"{owner}:{spender}"` string overflows that once either side is a
+/// contract identity (`contract-<64 hex>` = 73 chars), so hash both parts
+/// down to a fixed 64-hex-char blake2b digest instead -- same fixed-length
+/// trick Casper's own dictionary-key schemes use for multi-part keys.
 fn allowance_key(owner_hex: &str, spender_hex: &str) -> String {
-    alloc::format!("{}:{}", owner_hex, spender_hex)
+    let mut buf = alloc::vec::Vec::with_capacity(owner_hex.len() + spender_hex.len() + 1);
+    buf.extend_from_slice(owner_hex.as_bytes());
+    buf.push(b':');
+    buf.extend_from_slice(spender_hex.as_bytes());
+    hex_encode(&runtime::blake2b(&buf))
 }
 
 fn read_allowance(dict: casper_types::URef, owner_hex: &str, spender_hex: &str) -> U256 {
