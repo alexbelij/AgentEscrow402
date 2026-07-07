@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, HealthStatus, Stats, Event } from '../../lib/api';
+import { useEscrowEvents } from '../../lib/useEscrowEvents';
 import { formatCspr } from '../../lib/format';
 import {
   Activity,
@@ -74,7 +75,7 @@ const Overview: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastFetchedAt, setLastFetchedAt] = useState<Date | null>(null);
 
-  const fetchData = async (showSpinner: boolean) => {
+  const fetchData = useCallback(async (showSpinner: boolean) => {
     if (showSpinner) setLoading(true);
     setError(null);
     try {
@@ -98,15 +99,19 @@ const Overview: React.FC = () => {
     } finally {
       if (showSpinner) setLoading(false);
     }
-  };
+  }, []);
+
+  // SSE: real-time updates — refetch stats when on-chain events arrive
+  const { connected: sseConnected } = useEscrowEvents(
+    useCallback(() => { fetchData(false); }, [fetchData]),
+  );
 
   useEffect(() => {
     fetchData(true);
-    // Poll quietly in the background so "Recent Activity" behaves like a
-    // realtime feed instead of a static snapshot taken once on page load.
+    // Fallback poll (SSE handles real-time; this is a safety net)
     const id = window.setInterval(() => fetchData(false), 20000);
     return () => window.clearInterval(id);
-  }, []);
+  }, [fetchData]);
 
   // Real (not fabricated) 7-day activity trend derived from the same events
   // the list below shows — a day with zero events renders as an empty bar,
@@ -273,10 +278,10 @@ const Overview: React.FC = () => {
           </h3>
           <span className="inline-flex items-center gap-1.5 text-xs text-gray-500">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${sseConnected ? 'bg-green-400' : 'bg-yellow-400'} opacity-75`} />
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${sseConnected ? 'bg-green-500' : 'bg-yellow-500'}`} />
             </span>
-            Live · refreshed {lastFetchedAt ? format(lastFetchedAt, 'HH:mm:ss') : '—'}
+            {sseConnected ? 'Live (SSE)' : 'Polling'} · {lastFetchedAt ? format(lastFetchedAt, 'HH:mm:ss') : '—'}
           </span>
         </div>
         {events.length > 0 ? (
