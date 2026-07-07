@@ -247,13 +247,14 @@ app.include_router(admin_router)
 # ---------------------------------------------------------------------------
 
 
-def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
+def _apply_insurance_fee(amount: int | float, fee_bps: int) -> tuple[float, float]:
     """Split amount into net + insurance fee.
 
-    Returns (net_amount, fee_amount).
+    Returns (net_amount, fee_amount) as floats so fractional CSPR is preserved
+    (e.g. 2% of 1 CSPR = 0.02 CSPR, not 0).
     """
-    fee = (amount * fee_bps) // 10_000
-    return amount - fee, fee
+    fee = round(amount * fee_bps / 10_000, 2)
+    return round(amount - fee, 2), fee
 
 
 # ---------------------------------------------------------------------------

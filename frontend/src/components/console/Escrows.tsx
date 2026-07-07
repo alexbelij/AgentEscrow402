@@ -1038,7 +1038,6 @@ const CreateEscrowModal: React.FC<CreateEscrowModalProps> = ({ isOpen, onClose, 
             <p className="flex items-center">
               <Info className="h-4 w-4 mr-2 text-gray-500" />
               Insurance Fee (2%): <span className="ml-1 text-amber-400">{formatCspr(estimate.insurance_fee ?? estimate.fee)}</span>
-              {(estimate.insurance_fee ?? estimate.fee) === 0 && <span className="ml-2 text-gray-500 text-xs">(rounds to 0 for amounts &lt; 50 CSPR)</span>}
             </p>
             <p className="flex items-center">
               <DollarSign className="h-4 w-4 mr-2 text-gray-500" />

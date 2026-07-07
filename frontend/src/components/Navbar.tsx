@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, Bot, Grid3x3, CheckCircle, TrendingUp } from 'lucide-react'
 
 // This Navbar only renders on the marketing site (App.tsx skips it on
@@ -17,8 +18,8 @@ const NAV_ITEMS = [
 ]
 
 const EXTERNAL_LINKS = [
-  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
-  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md' },
+  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', external: true },
+  { label: 'SDK Docs', href: '/console/docs', external: false },
 ]
 
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
@@ -133,7 +134,7 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
             <div className="w-16 h-px bg-ae-border my-4" />
           </div>
           <div className="flex flex-wrap justify-center gap-4 pb-10 px-6">
-            {EXTERNAL_LINKS.map(link => (
+            {EXTERNAL_LINKS.map(link => link.external ? (
               <a
                 key={link.label}
                 href={link.href}
@@ -143,6 +144,14 @@ export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: bool
               >
                 {link.label} <ExternalLink size={10} />
               </a>
+            ) : (
+              <Link
+                key={link.label}
+                to={link.href}
+                className="text-xs text-gray-500 hover:text-gray-300"
+              >
+                {link.label}
+              </Link>
             ))}
           </div>
         </div>

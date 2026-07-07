@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { Code2, Bot, Plug } from 'lucide-react'
 
 function Reveal({ children, className }: { children: ReactNode; className?: string }) {
@@ -61,7 +62,7 @@ escrow = client.create_escrow(
 )
 
 client.release(escrow.service_hash)`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md',
+    link: '/console/docs',
     linkLabel: 'View SDK Docs',
   },
   {
@@ -87,7 +88,7 @@ if score.recommendation != "deny":
         task="summarize due diligence pack",
         amount_motes=10_000_000_000,
     )`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/langchain_tool.py',
+    link: '/console/docs',
     linkLabel: 'View LangChain Tool',
   },
   {
@@ -115,7 +116,7 @@ if score.recommendation != "deny":
 // 26 tools: create/release/refund/dispute,
 // batch_release, batch_cancel, claim_stream,
 // elect_arbiter, risk_score, get_identity...`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/mcp_server.py',
+    link: '/console/docs',
     linkLabel: 'View MCP Server',
   },
 ]
@@ -155,14 +156,12 @@ export default function SDKSection() {
                         </li>
                       ))}
                     </ul>
-                    <a
-                      href={tool.link}
-                      target="_blank"
-                      rel="noreferrer"
+                    <Link
+                      to={tool.link}
                       className="text-xs text-ae-accent hover:text-ae-accent-bright font-semibold"
                     >
                       {tool.linkLabel} →
-                    </a>
+                    </Link>
                   </div>
                   <div className={reverse ? 'lg:[direction:ltr]' : ''}>
                     <div className="bg-ae-card/60 border border-ae-border rounded-2xl p-6 hover:border-ae-accent/30 transition-colors">

@@ -1,10 +1,12 @@
 import { ExternalLink } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 const LINKS = [
-  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
-  { label: 'SDK', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md' },
-  { label: 'MCP', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/mcp_server.py' },
-  { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec' },
+  { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', external: true },
+  { label: 'API Docs', href: '/console/docs', external: false },
+  { label: 'SDK', href: '/console/docs', external: false },
+  { label: 'MCP', href: '/console/docs', external: false },
+  { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec', external: true },
 ]
 
 export default function Footer() {
@@ -18,7 +20,7 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center gap-5">
-            {LINKS.map(l => (
+            {LINKS.map(l => l.external ? (
               <a
                 key={l.label}
                 href={l.href}
@@ -28,6 +30,14 @@ export default function Footer() {
               >
                 {l.label} <ExternalLink size={10} />
               </a>
+            ) : (
+              <Link
+                key={l.label}
+                to={l.href}
+                className="text-xs text-gray-500 hover:text-ae-accent transition-colors"
+              >
+                {l.label}
+              </Link>
             ))}
           </div>
 
