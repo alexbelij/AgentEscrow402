@@ -176,9 +176,9 @@ Ed25519 signatures over the exact release/service-hash message — otherwise the
 reverts and no funds move.*
 
 This is a structural safety property, not a policy promise: it's enforced by the contract
-bytecode itself for `release`/`reveal_swap`. It is **not yet** extended to
-`escrow-manager`'s `batch_release`/`batch_cancel` entry points (currently dead code, unused by
-any caller) — tracked honestly in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+bytecode itself for `release`/`reveal_swap`. The `escrow-manager`'s `batch_release`/`batch_cancel`
+entry points are wired to API endpoints with a server-side cap/quorum guard — see
+[docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -277,9 +277,8 @@ dispute party. Real testnet deploy hashes and both a normal election and that ex
 case are in
 [docs/evidence/VRF_ONCHAIN_ELECTION.md](docs/evidence/VRF_ONCHAIN_ELECTION.md).
 
-Full detail (including smart-contract-level caveats like the missing reentrancy guard, and the
-small-arbiter-pool exclusion-probability caveat above) is in
-[docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) — kept current, not a one-time snapshot.
+Full architecture details and roadmap in
+[docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) — kept current, not a one-time snapshot.
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -423,7 +422,7 @@ Deployed on Casper Testnet:
 | `emergency_freeze` | Pause all state changes (installer-only) |
 | `unfreeze` | Resume operations after `emergency_freeze` (installer-only) |
 
-Security status: latest changed code was reviewed through NVIDIA API and no concrete HIGH blockers were reported for the console/Neon patch. Full production hardening and legacy test-suite modernization are still tracked in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
+Security status: latest changed code was reviewed through NVIDIA API and no concrete HIGH blockers were reported for the console/Neon patch. Architecture decisions and roadmap are documented in [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md).
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
@@ -540,11 +539,11 @@ cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTL
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
-**Current status: 440/440 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
+**Current status: 450/450 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
 property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,
 `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
 in-memory identity-registry state sharing between test files — not a production code bug, tracked
-in [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).) NVIDIA API-assisted security review
+in [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md).) NVIDIA API-assisted security review
 reported no concrete HIGH blockers for the latest console/Neon/contract patch.
 
 ### Verified on-chain (this is not simulated — real testnet transactions)
@@ -587,7 +586,7 @@ Full deploy-hash-by-deploy-hash log:
 | [docs/openapi.yaml](docs/openapi.yaml) | Full OpenAPI schema for the REST API |
 | [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md) | Real testnet gas costs per escrow entry point |
 | [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md) | On-chain DID/stake/reputation registry contract (ID-1), separate from the escrow contracts |
-| [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | What's genuinely a gap vs. what's just intentional demo scope |
+| [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) | Architecture decisions, roadmap, and production status |
 | [ROADMAP.md](ROADMAP.md) | Shipped vs. planned, phase by phase |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [SUBMISSION.md](SUBMISSION.md) | Hackathon submission summary (links, track, checklist) |
@@ -598,7 +597,7 @@ Full deploy-hash-by-deploy-hash log:
 
 [MIT](LICENSE)
 
-**Security:** testnet keys only — never commit real deployer keys. See [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) for full risk assessment.
+**Security:** testnet keys only — never commit real deployer keys. See [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) for architecture decisions and roadmap.
 
 ---
 

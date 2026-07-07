@@ -1,31 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
 import { csprToMotes, randomHex64 } from '../../lib/format';
-import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards } from 'lucide-react';
+import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards, BadgeCheck, Coins, Layers, Dices } from 'lucide-react';
 
 // Fallback only — used if the backend /contracts call fails (e.g. offline
 // dev build). The source of truth is the backend Config (env-overridable),
 // so a contract redeploy no longer requires a frontend code change.
+const CATEGORY_ICONS: Record<string, React.ElementType> = {
+  core: Shield,
+  identity: BadgeCheck,
+  'multi-asset': Layers,
+  token: Coins,
+};
+
 const FALLBACK_CONTRACTS = [
   {
     name: 'Core Escrow',
-    hash: '3a477e01eca177173a30e13b7b029cfc575488cd73b471b65505c576e1abb60e',
-    role: 'Create/release/refund/dispute/resolve escrow lifecycle exposed by the API.',
+    hash: '612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec',
+    role: 'Full escrow lifecycle: create → release / refund / dispute → 3-of-5 arbiter resolve, with release-cap guard and emergency freeze.',
+    category: 'core',
   },
   {
     name: 'Escrow Manager',
     hash: 'bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d',
-    role: 'Manager/orchestration contract used for deployed demo flows.',
+    role: 'Batch escrow orchestration: create, release and cancel multiple escrows in a single deploy.',
+    category: 'core',
   },
   {
     name: 'Insurance Pool',
-    hash: 'e36b958dc3ec27f8af6ad7e81f56c5ff5d06ad1a102e155259b60b6ab9f51f61',
-    role: 'Insurance premium/deposit/claim accounting for risky agent work.',
+    hash: 'e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929',
+    role: 'Collects insurance premiums on escrow creation, manages claim payouts for disputed escrows.',
+    category: 'core',
   },
   {
     name: 'VRF Arbiter',
-    hash: '5d65bedf67aeb8dc41426787da6a59735206728ce04c668f2a493b7b53392f7f',
-    role: 'On-chain random arbiter election target; API falls back to verifiable local CSPRNG when chain query is unavailable.',
+    hash: '78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93',
+    role: 'On-chain verifiable random arbiter election with staked purses; API falls back to local CSPRNG when unavailable.',
+    category: 'core',
+  },
+  {
+    name: 'Agent Identity Registry',
+    hash: '1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae',
+    role: 'DID-style agent registration with on-chain staking, reputation tracking and capability delegation.',
+    category: 'identity',
+  },
+  {
+    name: 'MultiAssetEscrow',
+    hash: '52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a',
+    role: 'Contract-custody escrow for CEP-18 fungible tokens: approve → create → release/refund/dispute/resolve, all on-chain.',
+    category: 'multi-asset',
+  },
+  {
+    name: 'AEMAT (test token)',
+    hash: '8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5',
+    role: 'CEP-18 fungible test token for multi-asset escrow demos (custody-compatible, uses get_immediate_caller).',
+    category: 'token',
   },
 ];
 
@@ -38,7 +67,7 @@ const Contracts: React.FC = () => {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [escrowStatus, setEscrowStatus] = useState<string | null>(null);
-  const [contractsList, setContractsList] = useState(FALLBACK_CONTRACTS);
+  const [contractsList, setContractsList] = useState<{ name: string; hash: string; role: string; category?: string }[]>(FALLBACK_CONTRACTS);
 
   useEffect(() => {
     api.getContracts().then((res) => {
@@ -89,7 +118,7 @@ const Contracts: React.FC = () => {
                 <p className="text-lg font-semibold text-gray-50">{contract.name}</p>
                 <p className="text-sm text-gray-400 mt-1">{contract.role}</p>
               </div>
-              <Cpu className="h-6 w-6 text-amber-500 shrink-0" />
+              {(() => { const Icon = CATEGORY_ICONS[contract.category || ''] || Cpu; return <Icon className="h-6 w-6 text-amber-500 shrink-0" />; })()}
             </div>
             <p className="font-mono text-sm text-gray-300 mt-4 break-all">{contract.hash}</p>
             <a

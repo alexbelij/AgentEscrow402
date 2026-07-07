@@ -289,22 +289,44 @@ async def contracts(cfg: Config = Depends(get_config)):
             {
                 "name": "Core Escrow",
                 "hash": cfg.contract_hash,
-                "role": "Create/release/refund/dispute/resolve escrow lifecycle exposed by the API.",
+                "role": "Full escrow lifecycle: create → release / refund / dispute → 3-of-5 arbiter resolve, with release-cap guard and emergency freeze.",
+                "category": "core",
             },
             {
                 "name": "Escrow Manager",
                 "hash": cfg.manager_contract_hash,
-                "role": "Manager/orchestration contract used for deployed demo flows.",
+                "role": "Batch escrow orchestration: create, release and cancel multiple escrows in a single deploy.",
+                "category": "core",
             },
             {
                 "name": "Insurance Pool",
                 "hash": cfg.insurance_contract_hash,
-                "role": "Insurance premium/deposit/claim accounting for risky agent work.",
+                "role": "Collects insurance premiums on escrow creation, manages claim payouts for disputed escrows.",
+                "category": "core",
             },
             {
                 "name": "VRF Arbiter",
                 "hash": cfg.vrf_contract_hash,
-                "role": "On-chain random arbiter election target; API falls back to verifiable local CSPRNG when chain query is unavailable.",
+                "role": "On-chain verifiable random arbiter election with staked purses; API falls back to local CSPRNG when unavailable.",
+                "category": "core",
+            },
+            {
+                "name": "Agent Identity Registry",
+                "hash": "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+                "role": "DID-style agent registration with on-chain staking, reputation tracking and capability delegation.",
+                "category": "identity",
+            },
+            {
+                "name": "MultiAssetEscrow",
+                "hash": cfg.multi_asset_escrow_contract_hash,
+                "role": "Contract-custody escrow for CEP-18 fungible tokens: approve → create → release/refund/dispute/resolve, all on-chain.",
+                "category": "multi-asset",
+            },
+            {
+                "name": "AEMAT (test token)",
+                "hash": cfg.test_token_contract_hash,
+                "role": "CEP-18 fungible test token for multi-asset escrow demos (custody-compatible, uses get_immediate_caller).",
+                "category": "token",
             },
         ]
     }

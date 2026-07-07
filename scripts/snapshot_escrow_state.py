@@ -5,7 +5,7 @@ before/after diff. Uses the same CasperClient.get_escrow() the backend API
 uses, not a reimplementation.
 
 Run from the repo root:
-  ESCROW_CONTRACT_HASH=<live escrow contract_hash, see docs/KNOWN_LIMITATIONS.md> \
+  ESCROW_CONTRACT_HASH=<live escrow contract_hash, see docs/STATUS_AND_ROADMAP.md> \
     uv run python scripts/snapshot_escrow_state.py
 
 Output: docs/evidence/escrow_state_snapshot_<label>.json (label from
