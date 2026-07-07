@@ -25,6 +25,7 @@ use alloc::string::{String, ToString};
 
 use casper_contract::contract_api::{runtime, storage};
 use casper_contract::unwrap_or_revert::UnwrapOrRevert;
+use casper_types::account::AccountHash;
 use casper_types::contracts::NamedKeys;
 use casper_types::{
     ApiError, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointPayment,
@@ -58,10 +59,16 @@ fn revert(code: u16) -> ! {
     runtime::revert(ApiError::User(code))
 }
 
+/// Plain 64-hex-char address, no variant prefix. Casper dictionary item
+/// keys are capped at 64 bytes -- a `"contract-"` prefix (9 bytes) would
+/// push a contract identity's key to 73 bytes, over that cap (this
+/// broke `balances`/`allowances` writes for a contract-held balance
+/// before this fix). Account vs. contract collision is not a practical
+/// concern (both are independent 32-byte hash spaces).
 fn key_to_hex(key: &Key) -> String {
     match key {
         Key::Account(a) => a.to_string(),
-        Key::Hash(h) => alloc::format!("contract-{}", hex_encode(h)),
+        Key::Hash(h) => hex_encode(h),
         _ => runtime::revert(ApiError::InvalidArgument),
     }
 }
@@ -76,7 +83,62 @@ fn hex_encode(bytes: &[u8]) -> String {
     s
 }
 
+/// Identity used as the acting party for `transfer`/`transfer_from`/
+/// `approve`. `runtime::get_caller()` always returns an `AccountHash` --
+/// by construction it can never represent a contract, so across a
+/// contract-to-contract call it still resolves to the transaction's
+/// originating account rather than the immediate calling contract. That
+/// makes it impossible for a contract (e.g. a token-custody escrow) to
+/// ever be recognized as a token holder or an approved spender in its own
+/// right if this function only ever used `get_caller()`.
+///
+/// `runtime::get_immediate_caller()` is Casper's actual answer to that:
+/// it returns a `CallerInfo`/`Caller` that *can* represent a calling
+/// smart contract (`Caller::SmartContract { contract_package_hash, .. }`)
+/// distinctly from a directly-signing account (`Caller::Initiator`).
+/// Using it here lets a contract genuinely hold and spend its own token
+/// balance -- required for real (non-bookkeeping-only) contract custody
+/// in an escrow. Falls back to `get_caller()` only if the immediate-caller
+/// API is unavailable for some reason, which still correctly handles a
+/// direct account-signed call.
 fn caller_key() -> Key {
+    if let Ok(info) = runtime::get_immediate_caller() {
+        match info.kind() {
+            // Caller::Initiator -- a directly-signing account.
+            0 => {
+                if let Some(cl) = info.get_field_by_index(0) {
+                    if let Ok(Some(acct)) = cl.clone().into_t::<Option<AccountHash>>() {
+                        return Key::Account(acct);
+                    }
+                }
+            }
+            // Caller::SmartContract -- another contract called us directly
+            // via a stored-contract call (the case that matters for
+            // contract-mediated custody).
+            4 => {
+                if let Some(cl) = info.get_field_by_index(2) {
+                    if let Ok(Some(pkg)) =
+                        cl.clone().into_t::<Option<casper_types::contracts::ContractPackageHash>>()
+                    {
+                        return Key::from(pkg);
+                    }
+                }
+            }
+            // Caller::Entity -- addressable-entity representation of a
+            // calling contract under the newer entity model. Normalize to
+            // the same Key::Hash shape as the SmartContract branch so a
+            // contract's identity is stable regardless of which variant
+            // this node reports for it.
+            3 => {
+                if let Some(cl) = info.get_field_by_index(1) {
+                    if let Ok(Some(pkg)) = cl.clone().into_t::<Option<casper_types::PackageHash>>() {
+                        return Key::Hash(pkg.value());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
     Key::Account(runtime::get_caller())
 }
 
@@ -100,8 +162,17 @@ fn write_balance(dict: casper_types::URef, owner_hex: &str, amount: U256) {
     storage::dictionary_put(dict, owner_hex, amount);
 }
 
+/// Casper dictionary item keys are capped at 64 bytes. A plain
+/// `"{owner}:{spender}"` string overflows that once either side is a
+/// contract identity (`contract-<64 hex>` = 73 chars), so hash both parts
+/// down to a fixed 64-hex-char blake2b digest instead -- same fixed-length
+/// trick Casper's own dictionary-key schemes use for multi-part keys.
 fn allowance_key(owner_hex: &str, spender_hex: &str) -> String {
-    alloc::format!("{}:{}", owner_hex, spender_hex)
+    let mut buf = alloc::vec::Vec::with_capacity(owner_hex.len() + spender_hex.len() + 1);
+    buf.extend_from_slice(owner_hex.as_bytes());
+    buf.push(b':');
+    buf.extend_from_slice(spender_hex.as_bytes());
+    hex_encode(&runtime::blake2b(&buf))
 }
 
 fn read_allowance(dict: casper_types::URef, owner_hex: &str, spender_hex: &str) -> U256 {
