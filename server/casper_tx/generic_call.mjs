@@ -14,6 +14,7 @@ import fs from 'fs';
 import sdk from 'casper-js-sdk';
 
 const { PrivateKey, KeyAlgorithm, ContractCallBuilder, RpcClient, HttpHandler, CLValue, Key, Args } = sdk;
+const CLTypeString = sdk.default ? sdk.default.CLTypeString : sdk.CLTypeString;
 
 const RPC = process.env.CASPER_RPC || 'https://node.testnet.casper.network/rpc';
 const CONTRACT_HASH = process.env.CONTRACT_HASH;
@@ -34,6 +35,12 @@ function buildCLValue(spec) {
   if (spec.type === 'u256') return CLValue.newCLUInt256(spec.value);
   if (spec.type === 'key_account') {
     return CLValue.newCLKey(Key.newKey('account-hash-' + spec.value));
+  }
+  if (spec.type === 'key_hash') {
+    return CLValue.newCLKey(Key.newKey('hash-' + spec.value));
+  }
+  if (spec.type === 'list_string') {
+    return CLValue.newCLList(CLTypeString, (spec.value || []).map((s) => CLValue.newCLString(s)));
   }
   throw new Error(`Unsupported arg type: ${spec.type}`);
 }

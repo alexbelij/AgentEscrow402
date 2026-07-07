@@ -48,11 +48,33 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
 ## Backend
 
 - **On-chain integration is real, not partial** — `create_escrow`, `release`, `refund`,
-  `dispute`/`resolve`, `commit_swap`/`reveal_swap` (HTLC atomic swap), and CEP-18/CEP-78
-  multi-asset transfers all submit real Casper testnet transactions in live mode (`SANDBOX=false`,
+  `dispute`/`resolve`, and `commit_swap`/`reveal_swap` (HTLC atomic swap) on the native CSPR
+  escrow contract all submit real Casper testnet transactions in live mode (`SANDBOX=false`,
   which production runs). Sandbox mode (local dev default) still uses in-memory simulation for
   fast iteration — this is intentional and clearly separated by the `cfg.sandbox` flag, not a
   gap.
+- **CEP-18 multi-asset escrow: real contract custody now exists as a separate deployed contract**
+  — `contracts/multi-asset-escrow` is a real, independent smart contract deployed on testnet
+  (`52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a`, package
+  `a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044`) that mirrors the native
+  escrow's create/release/refund/dispute/resolve state machine and arbiter-quorum-above-cap
+  release gate, but pulls a CEP-18 token into *its own* on-chain custody balance via
+  `transfer_from()` on create and pushes it back out via `transfer()` on release/refund/resolve —
+  verified with real transactions and independent on-chain balance reads for all three terminal
+  paths (release, TTL-expiry refund, dispute+arbiter-resolve); see
+  [docs/evidence/MULTI_ASSET_ESCROW_ONCHAIN.md](evidence/MULTI_ASSET_ESCROW_ONCHAIN.md). This
+  superseded the previous state of `server/multi_asset.py`, which did direct account-to-account
+  CEP-18 `transfer`/`transfer_from` (permit/allowance) calls with in-memory Python bookkeeping and
+  no contract-level custody at all.
+- **`server/multi_asset.py` is not yet wired to the new MultiAssetEscrow contract** — the backend
+  API layer still calls direct CEP-18 `transfer`/`transfer_from` and tracks escrow state in
+  Python, unchanged from before. The new contract exists and is proven correct on-chain (see
+  evidence doc above), but integrating it as `server/multi_asset.py`'s backing store (replacing
+  the in-memory bookkeeping with real `get_escrow` reads from the new contract) is follow-up work,
+  not done in this change. Do not read this section as "the multi-asset API is now
+  contract-backed" — only the contract itself, exercised directly, is.
+- **CEP-78 (NFT) multi-asset transfers**: unaffected by this change, still whatever the pre-existing
+  claims describe below — this section is specifically about the CEP-18 fungible-token escrow path.
 - **x402 signature verification is real** — `server/middleware.py` performs actual Ed25519
   signature verification (`cryptography` lib) plus nonce-based replay protection with a 5-minute
   window. The hosted console additionally exposes one explicit, labelled demo bypass
