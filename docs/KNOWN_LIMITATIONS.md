@@ -66,6 +66,15 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   payment-streaming primitive yet.
 - **Single-process only** — The global `casper_client` instance is not thread-safe for
   multi-worker deployments.
+- **VRF arbiter election write path is not wired** — `server/vrf_election.py`'s on-chain read
+  helper (`_elect_via_onchain_vrf`) correctly queries the deployed `vrf-arbiter` contract's
+  `elections_dict` (fixed in commit `235d8ca`, previously read the wrong contract/dictionary),
+  but nothing in the backend ever submits the `select_arbiters` transaction that would populate
+  that dictionary in the first place. In practice every `/vrf/elect` call today falls through to
+  `_elect_local_csprng`, a reputation-weighted local pseudo-random choice — correctly labeled
+  `method: "local_csprng"` in the API response, not hidden, but not the on-chain-randomness
+  guarantee the feature name implies. Wiring the write path (submit `select_arbiters`, plus
+  registering arbiters via `register_arbiter` with a staked purse) is open follow-up work.
 - **`escrow-manager.batch_release`/`batch_cancel` lack a cap/quorum guard** — Unlike
   `create_batch()` (wired and live-verified, see [README](../README.md#-verified-on-chain-this-is-not-simulated--real-testnet-transactions)),
   the manager contract's `batch_release`/`batch_cancel` entry points don't enforce the same

@@ -17,8 +17,12 @@
 - [x] Reputation scoring with exponential decay + staking-aware slashing
       (`server/identity_registry_api.py`)
 - [x] Insurance pool (configurable fee on release)
-- [x] EscrowManager Factory + VRF arbiter election + Agent Identity Registry (DID-style,
-      capabilities, staking) — all real, wired endpoints, not stubs
+- [x] EscrowManager Factory + Agent Identity Registry (DID-style, capabilities, staking) — real,
+      wired endpoints, not stubs
+- [x] VRF arbiter election endpoint (`/vrf/elect`) — deployed `vrf-arbiter` contract with a
+      correctly-wired on-chain *read* path (fixed in `235d8ca`); the on-chain *write* path
+      (submitting `select_arbiters`) is not called anywhere yet, so elections currently resolve
+      via the labeled `local_csprng` fallback — see [README](README.md#vrf-assisted-arbiter-election)
 - [x] Multi-token escrow: real on-chain CEP-18 (fungible) and CEP-78 (NFT) transfers, verified
       live (mint/transfer/balance round-tripped against deployed test tokens)
 - [x] On-chain HTLC atomic-swap (`commit_swap`/`reveal_swap`) — SHA-256 commit/reveal, verified
