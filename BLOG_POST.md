@@ -104,17 +104,27 @@ An AI agent SDK can parse this, create an escrow, retry the request, and handle 
 
 ### Stack
 
-- **Smart contract:** Rust → WASM, Casper 2.x, CEP-88 event standard
-- **Server:** Python 3.11, FastAPI, 376 passing tests
-- **Contract tests:** 29 Rust integration tests
-- **SDK:** Python async client, LangChain tool, MCP server (24 tools)
-- **Console:** React 18 + TypeScript + Vite, on Vercel
+- **Smart contracts:** 8 Rust → WASM contracts on Casper 2.x with CEP-88 events
+- **Server:** Python 3.11, FastAPI, 62 API endpoints, 450 passing tests
+- **Contract tests:** 40 Rust integration tests (incl. property-based)
+- **SDK:** Python async client, LangChain tool, MCP server (26 tools)
+- **Console:** React 18 + TypeScript + Vite on Vercel, 12 live tabs
+- **On-chain evidence:** 349 real testnet transactions
 
 ---
 
 ## What's Next
 
-The escrow primitive is live and tested. The next layer is agent discovery — a registry where agents publish their capabilities, pricing, and reputation scores, and other agents can query and transact autonomously. That turns AgentEscrow402 from a payment tool into a coordination layer for the agentic economy.
+The escrow primitive is live and tested. The platform already goes beyond basic escrow: multi-asset support (CSPR, CEP-18, CEP-78), HTLC atomic swaps, streaming payments, VRF arbiter election, ML risk scoring, and an identity registry with staking-aware reputation.
+
+The next layers are:
+
+- **Agent discovery marketplace** — a registry where agents publish their capabilities, pricing, and reputation scores, and other agents can query and transact autonomously. This turns AgentEscrow402 from a payment tool into a coordination layer for the agentic economy.
+- **Multi-chain bridge** — Casper ↔ EVM atomic bridge, allowing agents across different chains to transact through the same escrow lifecycle.
+- **Threshold escrow via MPC** — Shamir Secret Sharing for n-of-m release, so no single party holds the unlock key.
+- **Compliance framework** — regulated jurisdiction support for enterprise agent deployments.
+
+The foundation is designed for both vertical depth (more escrow types, more sophisticated risk models, formal verification) and horizontal expansion (more chains, more agent frameworks, more token standards).
 
 ---
 

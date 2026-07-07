@@ -43,14 +43,16 @@ Contract: [`612cead2...`](https://testnet.cspr.live/contract/612cead2226329fafec
 
 | Layer | Technology |
 |---|---|
-| Smart contract | Rust → WASM, Casper 2.x, CEP-88 events |
-| Payment server | Python 3.11, FastAPI, Uvicorn |
-| x402 middleware | Custom HTTP 402 header parser + validator |
-| SDK | Python async SDK, LangChain tool, MCP server (24 tools) |
-| Console | React 18 + TypeScript + Vite, hosted on Vercel |
+| Smart contracts | Rust → WASM, Casper 2.x, CEP-88 events — **8 contracts deployed** |
+| Payment server | Python 3.11, FastAPI, Uvicorn — **62 API endpoints** |
+| x402 middleware | Custom HTTP 402 header parser + Ed25519 signature validator |
+| SDK | Python async SDK, LangChain tool, MCP server (**26 tools**) |
+| Console | React 18 + TypeScript + Vite, hosted on Vercel — **12 tabs** |
+| Persistence | Neon PostgreSQL (serverless) for hosted API records |
 | Backend hosting | Render |
 | CI | GitHub Actions — lint, pytest, WASM build, cargo test |
-| Tests | 376 Python + 29 Rust = 405 total, all passing |
+| Tests | **450 Python + 40 Rust = 490 total**, all passing (incl. property-based) |
+| On-chain evidence | **349 real testnet transactions** (create/release/refund/dispute/resolve) |
 
 ---
 
@@ -62,9 +64,13 @@ Contract: [`612cead2...`](https://testnet.cspr.live/contract/612cead2226329fafec
 
 **3-of-5 arbiter dispute resolution.** Contested payments don't go to a single administrator — they go to a configurable arbiter pool with a multi-sig vote. The contract handles payout atomically on quorum. No human coordinator required.
 
-**Casper-native.** Built for Casper 2.x with native WASM, CEP-88 event monitoring, and testnet deployment. Not a port or wrapper — a ground-up implementation designed for Casper's execution model.
+**Casper-native.** Built for Casper 2.x with native WASM, CEP-88 event monitoring, and testnet deployment. Not a port or wrapper — a ground-up implementation designed for Casper's execution model. 8 smart contracts deployed, all verified on testnet.
 
 **x402 for AI agents, not browsers.** The x402 middleware returns machine-readable 402 responses (structured JSON with price, receiver, and accepted format) that AI agent SDKs can parse and act on programmatically — no wallet pop-up, no human approval.
+
+**Multi-asset escrow.** Not just native CSPR — the `MultiAssetEscrow` contract handles CEP-18 fungible tokens and CEP-78 NFTs with real contract-custody transfers. Plus HTLC atomic swaps (SHA-256 commit/reveal) for trustless secret-for-payment exchanges, and streaming escrow with linear vesting for long-running agent work.
+
+**Production-grade safety.** Release cap + arbiter quorum guard prevents unilateral large withdrawals on-chain. Insurance pool funded by configurable fees on each escrow. IsolationForest ML risk scoring flags anomalous counterparties before funds lock. ML-KEM post-quantum encryption for escrow metadata privacy.
 
 ---
 

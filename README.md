@@ -565,8 +565,8 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-uv run --active python -m pytest -q          # 376 tests (server logic, x402, identity, risk, multi-asset)
-cargo test --manifest-path contracts/escrow/Cargo.toml   # 29 tests (escrow, HTLC, arbitration)
+uv run --active python -m pytest -q          # 450 tests (server logic, x402, identity, risk, multi-asset)
+cargo test --manifest-path contracts/escrow/Cargo.toml   # 40 tests (escrow, HTLC, arbitration)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
@@ -638,7 +638,7 @@ Built for **[Casper Agentic Buildathon 2026](https://dorahacks.io/)** · Deploye
 
 *[ae402.xyz](https://ae402.xyz) · [API Docs](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md)*
 
-*Last verified against commit `4b125f1` / contract package `d3ca33d1...c8eeb` v9 (`612cead2...ddd9ec`), 2026-07-07.*
+*Last verified against commit `e19f865` / contract package `d3ca33d1...c8eeb` v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 </div>
 

@@ -54,7 +54,7 @@
 > 2️⃣ Reputation tracking — exponential decay scoring per agent, stored in the contract
 > 3️⃣ 3-of-5 arbiter dispute resolution — multi-sig vote, auto-payout on quorum
 >
-> 405 tests passing (376 Python + 29 Rust). Contract audited.
+> 490 tests passing (450 Python + 40 Rust). Contract audited.
 
 ---
 
@@ -80,7 +80,7 @@ The premise: AI agents increasingly transact with each other — paying for comp
 
 AgentEscrow402 solves this with a Rust/WASM smart contract on Casper Network implementing time-locked escrow, per-agent on-chain reputation scoring, and 3-of-5 multi-sig dispute resolution — no facilitator required.
 
-The full stack is deployed and live: console at ae402.xyz, API at agentescrow402-api.onrender.com, contract verified on Casper Testnet. Python SDK, LangChain integration, and MCP server included. 405 tests passing (376 Python + 29 Rust).
+The full stack is deployed and live: console at ae402.xyz, API at agentescrow402-api.onrender.com, contract verified on Casper Testnet. Python SDK, LangChain integration, and MCP server included. 490 tests passing (450 Python + 40 Rust).
 
 For developers building agentic systems that require trustless, programmable payments — the infrastructure is here.
 
