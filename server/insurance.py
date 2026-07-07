@@ -158,30 +158,16 @@ async def deposit_to_insurance_pool(
     # console requests (no configured Casper client/contract) still fall
     # back to the in-memory-only simulation so the hosted demo keeps
     # working without live credentials.
-    # Fall back to demo/in-memory mode when:
-    # - no Casper client configured, OR
-    # - no insurance package hash, OR
-    # - pool-funder WASM not deployed (common on hosted Render — the Rust
-    #   contract isn't compiled in CI, only the JS helpers are shipped)
-    _pool_funder_available = casper is not None and hasattr(casper, '_key_path') and casper._key_path
-    if casper is None or not config.insurance_package_hash or not _pool_funder_available:
+    if casper is None or not config.insurance_package_hash:
         deploy_hash = f"deploy-hash-insurance-deposit-{int(time.time())}"
         async with _pool_lock:
             _insurance_pool["total_assets"] += request.amount
             _insurance_pool["total_premiums_collected"] += request.amount
         logger.info("Deposit of %s motes by %s recorded (demo/no-chain mode). Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
-        return {"message": "Deposit successful (demo mode)", "deploy_hash": deploy_hash}
+        return {"message": "Deposit successful (demo mode, no live Casper client configured)", "deploy_hash": deploy_hash}
 
     try:
         deploy_hash = await casper.deposit_to_insurance_pool(request.amount)
-    except RuntimeError as re:
-        # WASM not found or key not configured — graceful fallback to demo
-        logger.warning("Insurance deposit falling back to demo mode: %s", re)
-        deploy_hash = f"deploy-hash-insurance-deposit-{int(time.time())}"
-        async with _pool_lock:
-            _insurance_pool["total_assets"] += request.amount
-            _insurance_pool["total_premiums_collected"] += request.amount
-        return {"message": "Deposit successful (demo mode)", "deploy_hash": deploy_hash}
     except Exception as e:
         logger.error("Failed to submit insurance deposit deploy for %s: %s", depositor[:8], e)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit deposit transaction on-chain")
