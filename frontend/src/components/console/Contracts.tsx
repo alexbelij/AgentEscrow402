@@ -56,6 +56,12 @@ const FALLBACK_CONTRACTS = [
     role: 'CEP-18 fungible test token for multi-asset escrow demos (custody-compatible, uses get_immediate_caller).',
     category: 'token',
   },
+  {
+    name: 'AETNFT (test NFT)',
+    hash: 'c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a',
+    role: 'CEP-78 enhanced NFT collection for multi-asset escrow NFT demos (Transferable, Public minting, Ordinal IDs).',
+    category: 'token',
+  },
 ];
 
 const short = (value: string) => `${value.slice(0, 12)}…${value.slice(-10)}`;

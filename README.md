@@ -466,7 +466,7 @@ Base URL (production): `https://agentescrow402-api.onrender.com`
 Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml)
 
 <details>
-<summary><kbd>All 63 endpoints — click to expand</kbd></summary>
+<summary><kbd>All 62 endpoints — click to expand</kbd></summary>
 
 | Method | Path | Description |
 |---|---|---|
