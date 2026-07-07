@@ -2,7 +2,7 @@
 
 > x402-compatible payment middleware for AI agents on Casper Network
 
-*Last verified against commit `f3a501d` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
+*Last verified against commit `e19f865` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 ---
 

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react'
-import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, Activity, Grid3x3 } from 'lucide-react'
+import { X, ExternalLink, Home, Repeat, Shield, Code, HelpCircle, LayoutDashboard, Bot, Grid3x3 } from 'lucide-react'
 
 // This Navbar only renders on the marketing site (App.tsx skips it on
 // /console/* routes — the console owns its own fixed sidebar + top bar).
 const NAV_ITEMS = [
   { label: 'HOME', href: '/#home', icon: Home },
+  { label: 'WHY', href: '/#why', icon: Shield },
   { label: 'FLOW', href: '/#flow', icon: Repeat },
-  { label: 'X402', href: '/#x402', icon: Shield },
-  { label: 'REPUTATION', href: '/#reputation', icon: Activity },
   { label: 'CAPABILITIES', href: '/#capabilities', icon: Grid3x3 },
+  { label: 'USE CASES', href: '/#scenarios', icon: Bot },
   { label: 'SDK', href: '/#developers', icon: Code },
   { label: 'FAQ', href: '/#faq', icon: HelpCircle },
 ]

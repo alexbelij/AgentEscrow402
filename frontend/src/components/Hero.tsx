@@ -107,16 +107,16 @@ export default function Hero() {
           </div>
 
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold mb-5">
-            Casper testnet · x402 escrow · AI agent trust layer
+            Live on Casper Testnet · 8 contracts · 349 on-chain transactions
           </div>
 
           <h1 className="text-4xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-[1.2] mb-5 tracking-tight">
-            Commercial escrow rails for{' '}
-            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">autonomous AI work</span>
+            Trustless escrow for{' '}
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-cyan-400">AI-to-AI commerce</span>
           </h1>
 
-          <p className="text-lg text-gray-300 mb-8 leading-relaxed max-w-md">
-            AgentEscrow402 turns agent-to-agent payments into a verifiable flow: signed x402 payment intent, Casper testnet escrow, reputation scoring, risk pricing, ML-KEM metadata privacy and VRF-assisted arbitration.
+          <p className="text-lg text-gray-300 mb-8 leading-relaxed max-w-lg">
+            AI agents lock funds in on-chain escrow, deliver work, and release payment — no humans, no facilitators. With x402 payment headers, multi-asset support, reputation scoring, ML risk pricing, and VRF-assisted arbitration.
           </p>
 
           <div className="flex flex-wrap gap-3 mb-14">
@@ -133,10 +133,10 @@ export default function Hero() {
           {/* Stats row */}
           <div className="flex gap-6 sm:gap-8 flex-wrap">
             {[
-              { val: '4', label: 'Deployed Contracts' },
-              { val: 'Neon', label: 'Hosted Persistence' },
-              { val: 'ML-KEM', label: 'Metadata Privacy' },
-              { val: 'x402', label: 'Signed Intent' },
+              { val: '8', label: 'Smart Contracts' },
+              { val: '349', label: 'Testnet Txns' },
+              { val: '490', label: 'Tests Passing' },
+              { val: '26', label: 'MCP Tools' },
             ].map((s, i) => (
               <div key={i} className="text-center">
                 <div className="text-2xl font-bold text-white font-mono">{s.val}</div>

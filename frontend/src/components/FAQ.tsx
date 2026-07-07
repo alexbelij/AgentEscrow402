@@ -58,7 +58,7 @@ const FAQS: FaqItem[] = [
   },
   {
     q: 'Can I integrate it with existing agent frameworks?',
-    a: 'Yes. The repo includes a Python SDK, LangChain-style helpers and an MCP server with 24 tools, so an orchestrator can create escrow, check reputation, elect arbiters and release funds without custom blockchain code.',
+    a: 'Yes. The repo includes a Python SDK, LangChain-style helpers and an MCP server with 26 tools, so an orchestrator can create escrow, check reputation, elect arbiters and release funds without custom blockchain code.',
     categories: ['developer'],
   },
   {

@@ -93,7 +93,7 @@ if score.recommendation != "deny":
   {
     icon: Plug,
     tag: 'MCP SERVER',
-    title: '24 tools your LLM can call directly, zero custom glue code',
+    title: '26 tools your LLM can call directly, zero custom glue code',
     description:
       'Point any MCP-compatible client (Claude, Cursor, your own agent host) at this server and the model gets native tool-calling access to the entire escrow/identity/risk/arbitration surface — creating escrows, checking reputation, electing arbiters and releasing funds — without you writing a single HTTP wrapper.',
     bullets: [
@@ -105,17 +105,16 @@ if score.recommendation != "deny":
   "mcpServers": {
     "agentescrow402": {
       "command": "python",
-      "args": ["-m", "agentescrow402.mcp_server"],
-      "env": { "AE402_URL": "https://ae402.xyz/backend" }
+      "args": ["sdk/mcp_server.py"],
+      "env": { "AE402_BASE_URL":
+        "https://agentescrow402-api.onrender.com" }
     }
   }
 }
 
-// 24 tools include:
-// create_escrow, release_escrow,
-// refund_escrow, dispute_escrow,
-// risk_score, vrf_elect,
-// mlkem_encrypt_metadata`,
+// 26 tools: create/release/refund/dispute,
+// batch_release, batch_cancel, claim_stream,
+// elect_arbiter, risk_score, get_identity...`,
     link: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk',
     linkLabel: 'View MCP',
   },
@@ -128,8 +127,9 @@ export default function SDKSection() {
         <div className="text-center mb-16">
           <h2 className="text-3xl font-extrabold text-white mb-3">Developer Tools</h2>
           <p className="text-gray-500 text-sm max-w-2xl mx-auto">
-            The same primitives used by the live console: signed x402 intent headers, Casper testnet escrow calls,
-            24 MCP tools, SDK helpers, risk scoring and arbitration hooks for agent teams.
+            Three integration paths — Python SDK, LangChain tool, and MCP server with 26 tools.
+            The same primitives the live console uses: signed x402 headers, Casper escrow calls,
+            risk scoring, identity lookup, and arbitration hooks.
           </p>
         </div>
 

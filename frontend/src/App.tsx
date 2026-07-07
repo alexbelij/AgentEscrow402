@@ -2,12 +2,15 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useCallback } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
+import WhyAE402 from './components/WhyAE402'
+import TrustSignals from './components/TrustSignals'
 import PaymentFlow from './components/PaymentFlow'
 import X402Protocol from './components/X402Protocol'
 import ReputationSystem from './components/ReputationSystem'
 import Capabilities from './components/Capabilities'
-import SDKSection from './components/SDKSection'
 import Scenarios from './components/Scenarios'
+import GrowthPotential from './components/GrowthPotential'
+import SDKSection from './components/SDKSection'
 import FAQ from './components/FAQ'
 import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
@@ -41,11 +44,14 @@ function Landing() {
   return (
     <>
       <Hero />
+      <WhyAE402 />
+      <TrustSignals />
       <PaymentFlow />
       <X402Protocol />
       <ReputationSystem />
       <Capabilities />
       <Scenarios />
+      <GrowthPotential />
       <SDKSection />
       <FAQ />
     </>

@@ -33,13 +33,13 @@
 
 ### Testing & CI
 
-- 450 tests (440 Python + 40 Rust, incl. Hypothesis + proptest property-based invariants).
+- 450 tests (450 Python + 40 Rust, incl. Hypothesis + proptest property-based invariants).
 - GitHub Actions CI: lint, type-check, build, coverage ≥70%.
 - 349 real testnet transactions as on-chain evidence.
 
 ### SDK & Integrations
 
-- Python SDK (`EscrowClient`), LangChain `EscrowPaymentTool`, MCP server (24 tools).
+- Python SDK (`EscrowClient`), LangChain `EscrowPaymentTool`, MCP server (26 tools).
 
 ## 🏗 Architecture Decisions
 
