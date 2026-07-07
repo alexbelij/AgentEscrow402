@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 
 const LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', external: true },
-  { label: 'API Docs', href: '/console/docs', external: false },
-  { label: 'SDK', href: '/console/docs', external: false },
-  { label: 'MCP', href: '/console/docs', external: false },
+  { label: 'API Docs', href: '/console/docs?tab=api', external: false },
+  { label: 'SDK', href: '/console/docs?tab=sdk', external: false },
+  { label: 'MCP', href: '/console/docs?tab=mcp', external: false },
   { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec', external: true },
 ]
 

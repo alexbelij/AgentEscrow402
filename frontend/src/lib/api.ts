@@ -14,7 +14,8 @@ export interface ApiResponse<T> {
 // The demo backend sleeps after ~15 min idle and takes ~50s to cold-start.
 // Instead of a hard timeout that crashes the UI, we retry with backoff and let a
 // global preloader (see BackendWakeOverlay) inform the user the server is waking.
-const PER_ATTEMPT_TIMEOUT_MS = 20000;
+const PER_ATTEMPT_TIMEOUT_GET_MS = 20000;
+const PER_ATTEMPT_TIMEOUT_WRITE_MS = 45000; // on-chain deploys can take 25-30s
 const RETRY_DELAYS_MS = [1500, 3000, 5000, 8000, 12000]; // ~30s of retries after 1st try
 const RETRYABLE_STATUS = new Set([502, 503, 504]);
 
@@ -100,10 +101,12 @@ async function fetcher<T>(
   let lastError = 'An unknown error occurred';
   let lastStatus: number | null = 500;
 
+  const timeoutMs = method === 'GET' ? PER_ATTEMPT_TIMEOUT_GET_MS : PER_ATTEMPT_TIMEOUT_WRITE_MS;
+
   try {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), PER_ATTEMPT_TIMEOUT_MS);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(`${BASE_URL}${url}`, { ...config, signal: controller.signal });
         clearTimeout(timeoutId);
@@ -128,9 +131,10 @@ async function fetcher<T>(
         lastError = isTimeout ? 'Server is waking up, please wait…' : (err instanceof Error ? err.message : 'Network error');
         lastStatus = isTimeout ? 504 : 503;
         // A mid-flight abort on a non-GET could double-submit if the server already
-        // received it, so only retry non-GET on connection-level failures.
+        // received it, so bail out immediately for write-method timeouts.
         const safeToRetry = method === 'GET' || !isTimeout;
-        if (safeToRetry && attempt < maxAttempts - 1) {
+        if (!safeToRetry) break;
+        if (attempt < maxAttempts - 1) {
           if (!waking) { waking = true; emitBackendState('waking'); }
           await sleep(RETRY_DELAYS_MS[attempt]);
           continue;
