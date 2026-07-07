@@ -121,6 +121,14 @@ export default function FAQ() {
 
   return (
     <section id="faq" className="py-24 relative">
+      {/* Mascot — right side */}
+      <img
+        src="/images/mascot/maskot_sad__right.png"
+        alt=""
+        className="absolute right-0 bottom-12 w-28 lg:w-36 opacity-40 hover:opacity-70 transition-opacity pointer-events-none hidden lg:block"
+        loading="lazy"
+      />
+
       <div className="ae-section max-w-3xl">
         <h2 className="text-3xl font-extrabold text-white mb-3 text-center">Frequently Asked Questions</h2>
         <p className="text-sm text-gray-400 text-center mb-8">

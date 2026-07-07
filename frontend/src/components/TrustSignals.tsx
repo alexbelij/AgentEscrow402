@@ -34,7 +34,15 @@ const EVIDENCE = [
 
 export default function TrustSignals() {
   return (
-    <section className="py-20 relative">
+    <section id="evidence" className="py-20 relative">
+      {/* Mascot — right side, thumbs up */}
+      <img
+        src="/images/mascot/maskot_ok__right.png"
+        alt=""
+        className="absolute right-0 top-16 w-28 lg:w-36 opacity-40 hover:opacity-70 transition-opacity pointer-events-none hidden lg:block"
+        loading="lazy"
+      />
+
       <div className="ae-section">
         <div className="text-center mb-12">
           <div className="text-xs text-ae-accent font-mono tracking-wider mb-3">VERIFIED ON-CHAIN</div>

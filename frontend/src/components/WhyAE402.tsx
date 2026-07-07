@@ -45,6 +45,14 @@ export default function WhyAE402() {
       {/* Subtle background accent */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-purple-900/5 to-transparent pointer-events-none" />
 
+      {/* Mascot — left side, peeking from edge */}
+      <img
+        src="/images/mascot/maskot_mind__left.png"
+        alt=""
+        className="absolute left-0 bottom-8 w-28 lg:w-36 opacity-40 hover:opacity-70 transition-opacity pointer-events-none hidden lg:block"
+        loading="lazy"
+      />
+
       <div className="ae-section relative">
         <div className="text-center mb-14">
           <div className="text-xs text-ae-accent font-mono tracking-wider mb-3">WHY AGENTESCROW402</div>

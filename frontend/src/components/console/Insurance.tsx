@@ -181,31 +181,26 @@ const Insurance: React.FC = () => {
   };
 
   const handleDeposit = async (formData: DepositInsuranceRequest) => {
-    setLoading(true); // Use a separate loading for forms if needed
-    setError(null);
+    setLoading(true);
     try {
       const res = await api.depositInsurance(formData);
       if (res.error) throw new Error(res.error);
       toast.success(`Deposit successful — deploy hash ${res.data?.deploy_hash}`);
       setIsDepositModalOpen(false);
-      fetchPoolStats(); // Refresh stats
+      fetchPoolStats();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to deposit insurance.');
+      const msg = err instanceof Error ? err.message : 'Failed to deposit insurance.';
+      toast.error(msg);
+      setIsDepositModalOpen(false);
     } finally {
       setLoading(false);
     }
   };
 
   const handleClaim = async (formData: ClaimInsuranceRequest) => {
-    setLoading(true); // Use a separate loading for forms if needed
-    setError(null);
+    setLoading(true);
     try {
       if (isLive) {
-        // Live-wallet path: the connected wallet itself signs+submits a
-        // real claim() call (see useInsuranceClaimAction) — the on-chain
-        // contract pays out to the wallet's own get_caller() directly, so
-        // this only works with whatever that wallet's claims-cooldown /
-        // pool-coverage limits actually allow, exactly as requested.
         const escrowRes = await api.getEscrowByHash(formData.escrow_hash);
         if (escrowRes.error || !escrowRes.data) {
           throw new Error(escrowRes.error || 'Escrow not found — cannot determine claim amount');
@@ -218,7 +213,8 @@ const Insurance: React.FC = () => {
         );
         if (!result.ok) {
           if (result.cancelled) {
-            setError('Cancelled in wallet.');
+            toast.info('Cancelled in wallet.');
+            setIsClaimModalOpen(false);
             return;
           }
           throw new Error(result.error);
@@ -230,9 +226,11 @@ const Insurance: React.FC = () => {
         toast.success(`Claim submitted — deploy hash ${res.data?.deploy_hash}`);
       }
       setIsClaimModalOpen(false);
-      fetchPoolStats(); // Refresh stats
+      fetchPoolStats();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to submit claim.');
+      const msg = err instanceof Error ? err.message : 'Failed to submit claim.';
+      toast.error(msg);
+      setIsClaimModalOpen(false);
     } finally {
       setLoading(false);
     }
