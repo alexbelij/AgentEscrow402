@@ -25,6 +25,7 @@ use alloc::string::{String, ToString};
 
 use casper_contract::contract_api::{runtime, storage};
 use casper_contract::unwrap_or_revert::UnwrapOrRevert;
+use casper_types::account::AccountHash;
 use casper_types::contracts::NamedKeys;
 use casper_types::{
     ApiError, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointPayment,
@@ -76,7 +77,62 @@ fn hex_encode(bytes: &[u8]) -> String {
     s
 }
 
+/// Identity used as the acting party for `transfer`/`transfer_from`/
+/// `approve`. `runtime::get_caller()` always returns an `AccountHash` --
+/// by construction it can never represent a contract, so across a
+/// contract-to-contract call it still resolves to the transaction's
+/// originating account rather than the immediate calling contract. That
+/// makes it impossible for a contract (e.g. a token-custody escrow) to
+/// ever be recognized as a token holder or an approved spender in its own
+/// right if this function only ever used `get_caller()`.
+///
+/// `runtime::get_immediate_caller()` is Casper's actual answer to that:
+/// it returns a `CallerInfo`/`Caller` that *can* represent a calling
+/// smart contract (`Caller::SmartContract { contract_package_hash, .. }`)
+/// distinctly from a directly-signing account (`Caller::Initiator`).
+/// Using it here lets a contract genuinely hold and spend its own token
+/// balance -- required for real (non-bookkeeping-only) contract custody
+/// in an escrow. Falls back to `get_caller()` only if the immediate-caller
+/// API is unavailable for some reason, which still correctly handles a
+/// direct account-signed call.
 fn caller_key() -> Key {
+    if let Ok(info) = runtime::get_immediate_caller() {
+        match info.kind() {
+            // Caller::Initiator -- a directly-signing account.
+            0 => {
+                if let Some(cl) = info.get_field_by_index(0) {
+                    if let Ok(Some(acct)) = cl.clone().into_t::<Option<AccountHash>>() {
+                        return Key::Account(acct);
+                    }
+                }
+            }
+            // Caller::SmartContract -- another contract called us directly
+            // via a stored-contract call (the case that matters for
+            // contract-mediated custody).
+            4 => {
+                if let Some(cl) = info.get_field_by_index(2) {
+                    if let Ok(Some(pkg)) =
+                        cl.clone().into_t::<Option<casper_types::contracts::ContractPackageHash>>()
+                    {
+                        return Key::from(pkg);
+                    }
+                }
+            }
+            // Caller::Entity -- addressable-entity representation of a
+            // calling contract under the newer entity model. Normalize to
+            // the same Key::Hash shape as the SmartContract branch so a
+            // contract's identity is stable regardless of which variant
+            // this node reports for it.
+            3 => {
+                if let Some(cl) = info.get_field_by_index(1) {
+                    if let Ok(Some(pkg)) = cl.clone().into_t::<Option<casper_types::PackageHash>>() {
+                        return Key::Hash(pkg.value());
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
     Key::Account(runtime::get_caller())
 }
 
