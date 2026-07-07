@@ -260,6 +260,47 @@ const endpoints: EndpointConfig[] = [
     },
     apiCall: (p, q, b) => api.electVrfArbiter(b as any),
   },
+  {
+    name: 'Batch Release',
+    method: 'POST',
+    path: '/escrows/batch-release',
+    description: 'Releases multiple batch-created escrows in one deploy. Server-side cap/quorum guard enforced per escrow before the on-chain call.',
+    initialBody: {
+      service_hashes: ['<service_hash_1>', '<service_hash_2>'],
+      arbiter_pubkeys: [],
+      arbiter_signatures: [],
+    },
+    bodyFieldDocs: {
+      service_hashes: { type: 'string[]', description: 'Array of service hashes to release (max 50).', required: true },
+      arbiter_pubkeys: { type: 'string[]', description: 'Required only if any escrow exceeds release_cap — same arbiter quorum as single release.' },
+      arbiter_signatures: { type: 'string[]', description: 'Matching signatures over "release:{service_hash}:cap_approval".' },
+    },
+    apiCall: (p, q, b: any) => api.batchRelease(b.service_hashes, b.arbiter_pubkeys, b.arbiter_signatures),
+  },
+  {
+    name: 'Batch Cancel',
+    method: 'POST',
+    path: '/escrows/batch-cancel',
+    description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Only pending escrows can be cancelled; full refund to sender.',
+    initialBody: {
+      service_hashes: ['<service_hash_1>', '<service_hash_2>'],
+    },
+    bodyFieldDocs: {
+      service_hashes: { type: 'string[]', description: 'Array of service hashes to cancel (max 50).', required: true },
+    },
+    apiCall: (p, q, b: any) => api.batchCancel(b.service_hashes),
+  },
+  {
+    name: 'Claim Stream',
+    method: 'POST',
+    path: '/escrow/{service_hash}/stream-claim',
+    description: 'Claims a fully vested streaming escrow — triggers real on-chain release. Rejects if stream is not 100% elapsed.',
+    initialPathParams: { service_hash: '<streaming_escrow_hash>' },
+    pathParamDocs: {
+      service_hash: { type: 'string', description: 'Service hash of the streaming escrow to claim.', required: true },
+    },
+    apiCall: (p) => api.claimStreamEscrow(p.service_hash),
+  },
 ];
 
 // ── Admin-only endpoints ──────────────────────────────────────────────

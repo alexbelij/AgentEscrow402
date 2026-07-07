@@ -37,6 +37,7 @@ _INSURANCE_CLAIM_SCRIPT = _SCRIPT_DIR / "insurance_claim.mjs"
 _POOL_FUNDER_WASM = _SCRIPT_DIR / "pool_funder.wasm"
 _CREATE_BATCH_SCRIPT = _SCRIPT_DIR / "create_batch.mjs"
 _BATCH_FUNDER_WASM = _SCRIPT_DIR / "batch_funder.wasm"
+_BATCH_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "batch_lifecycle.mjs"
 _REGISTER_ARBITER_SCRIPT = _SCRIPT_DIR / "register_arbiter.mjs"
 _ARBITER_REGISTRAR_WASM = _SCRIPT_DIR / "arbiter_registrar.wasm"
 _SELECT_ARBITERS_SCRIPT = _SCRIPT_DIR / "select_arbiters.mjs"
@@ -224,6 +225,46 @@ class CasperClient:
                 "CASPER_RPC": self._rpc_url,
                 "WASM_PATH": str(_BATCH_FUNDER_WASM),
                 "PAYMENT_MOTES": str(payment_motes),
+            },
+        )
+
+    async def batch_release(self, service_hashes: list[str]) -> str:
+        """Submit escrow-manager.batch_release() for multiple escrows.
+
+        Cap/quorum guards are NOT enforced on-chain by the manager contract
+        — the caller (server/app.py) MUST pre-validate every escrow against
+        the release cap and collect arbiter signatures before calling this.
+        """
+        return await self._batch_lifecycle("batch_release", service_hashes)
+
+    async def batch_cancel(self, service_hashes: list[str]) -> str:
+        """Submit escrow-manager.batch_cancel() for multiple escrows.
+
+        On-chain: only the sender can cancel, and only pending escrows.
+        Full refund to sender (no fee deduction on cancel).
+        """
+        return await self._batch_lifecycle("batch_cancel", service_hashes)
+
+    async def _batch_lifecycle(self, entry_point: str, service_hashes: list[str]) -> str:
+        """Common helper for escrow-manager batch operations."""
+        if not self._manager_contract_hash:
+            raise RuntimeError("manager_contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        n = len(service_hashes)
+        if n == 0:
+            raise ValueError("service_hashes must be non-empty")
+        if n > 50:
+            raise ValueError("batch size exceeds contract MAX_BATCH_SIZE (50)")
+        return await self._run_node_script(
+            _BATCH_LIFECYCLE_SCRIPT,
+            {
+                "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
+                "ENTRY_POINT": entry_point,
+                "SERVICE_HASHES_JSON": json.dumps(service_hashes),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
             },
         )
 

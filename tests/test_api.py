@@ -156,6 +156,141 @@ class TestBatchEscrowEndpoint:
         assert resp.status_code == 422
 
 
+class TestBatchLifecycle:
+    """batch_release / batch_cancel with server-side cap/quorum guard."""
+
+    def _create_batch(self, client, prefix: str, count: int = 2):
+        """Helper: create a batch of pending escrows and return their hashes."""
+        hashes = [_hash(f"{prefix}-{i}") for i in range(count)]
+        resp = client.post(
+            "/escrows/batch",
+            json={
+                "escrows": [
+                    {"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h}
+                    for h in hashes
+                ]
+            },
+        )
+        assert resp.status_code == 200
+        return hashes
+
+    def test_batch_release_success(self, client):
+        hashes = self._create_batch(client, "brel")
+        resp = client.post("/escrows/batch-release", json={"service_hashes": hashes})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["processed"] == 2
+        # Verify escrows are now released
+        for h in hashes:
+            r = client.get(f"/escrow/{h}")
+            assert r.status_code == 200
+            assert r.json()["status"] == "released"
+
+    def test_batch_cancel_success(self, client):
+        hashes = self._create_batch(client, "bcan")
+        resp = client.post("/escrows/batch-cancel", json={"service_hashes": hashes})
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["processed"] == 2
+        for h in hashes:
+            r = client.get(f"/escrow/{h}")
+            assert r.status_code == 200
+            assert r.json()["status"] == "refunded"
+
+    def test_batch_release_not_found(self, client):
+        resp = client.post(
+            "/escrows/batch-release",
+            json={"service_hashes": [_hash("no-exist")]},
+        )
+        assert resp.status_code == 404
+
+    def test_batch_cancel_already_released(self, client):
+        hashes = self._create_batch(client, "bcan-rel")
+        client.post("/escrows/batch-release", json={"service_hashes": hashes})
+        resp = client.post("/escrows/batch-cancel", json={"service_hashes": hashes})
+        assert resp.status_code == 422
+
+    def test_batch_release_empty_rejected(self, client):
+        resp = client.post("/escrows/batch-release", json={"service_hashes": []})
+        assert resp.status_code == 422
+
+    def test_batch_release_over_max_rejected(self, client):
+        resp = client.post(
+            "/escrows/batch-release",
+            json={"service_hashes": [_hash(f"big-{i}") for i in range(51)]},
+        )
+        assert resp.status_code == 422
+
+
+class TestStreamClaim:
+    """POST /escrow/{hash}/stream-claim — API-timed vesting + on-chain settlement.
+
+    The stream-claim endpoint itself has no x402 dependency (the vesting
+    schedule proves entitlement), so we test it by seeding the in-memory
+    _streaming_escrows dict + SandboxStore directly — bypassing the x402-
+    gated /escrow/stream creation path that would need real signatures.
+    """
+
+    @staticmethod
+    def _seed_stream(sandbox_store, service_hash, start_time, end_time, amount=5000):
+        """Seed a streaming escrow directly into the in-memory store."""
+        from server.multi_asset import _streaming_escrows
+        from server.models import EscrowRecord
+
+        record = sandbox_store.create_escrow(
+            sender="aa" * 32,
+            receiver=RECEIVER_HEX,
+            amount=amount,
+            service_hash=service_hash,
+            ttl=86400,
+        )
+        _streaming_escrows[service_hash] = {
+            "escrow_record": record,
+            "token": {"token_type": "CSPR"},
+            "start_time": start_time,
+            "end_time": end_time,
+            "streamed_amount": 0,
+            "last_payout_time": None,
+        }
+
+    def test_stream_claim_not_found(self, client):
+        resp = client.post(f"/escrow/{_hash('no-stream')}/stream-claim")
+        assert resp.status_code == 404
+
+    def test_stream_claim_before_vested(self, client, sandbox_store):
+        """Stream not yet fully elapsed → 422."""
+        import time
+        now = int(time.time())
+        h = _hash("stream-early")
+        self._seed_stream(sandbox_store, h, now - 10, now + 3600)
+        resp = client.post(f"/escrow/{h}/stream-claim")
+        assert resp.status_code == 422
+        assert "not fully vested" in resp.json()["detail"]
+
+    def test_stream_claim_after_vested(self, client, sandbox_store):
+        """Stream fully elapsed → on-chain release triggered."""
+        import time
+        now = int(time.time())
+        h = _hash("stream-done")
+        self._seed_stream(sandbox_store, h, now - 3600, now - 1)
+        resp = client.post(f"/escrow/{h}/stream-claim")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] == "claimed"
+        assert body["service_hash"] == h
+
+    def test_stream_double_claim(self, client, sandbox_store):
+        """Second claim returns already_claimed."""
+        import time
+        now = int(time.time())
+        h = _hash("stream-dbl")
+        self._seed_stream(sandbox_store, h, now - 3600, now - 1)
+        client.post(f"/escrow/{h}/stream-claim")
+        resp = client.post(f"/escrow/{h}/stream-claim")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "already_claimed"
+
+
 class TestEscrowEndpointInvalid:
     def test_create_escrow_invalid_amount(self, client):
         h = _hash("invalid")
