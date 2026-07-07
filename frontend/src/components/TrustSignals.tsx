@@ -30,6 +30,26 @@ const EVIDENCE = [
     hash: '52db09a1…d12a',
     url: 'https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a',
   },
+  {
+    label: 'Escrow Manager (batch)',
+    hash: 'bfa8c02c…675d',
+    url: 'https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d',
+  },
+  {
+    label: 'Insurance Pool',
+    hash: 'e128780f…8929',
+    url: 'https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929',
+  },
+  {
+    label: 'AEMAT (CEP-18 test token)',
+    hash: '8ba7df6f…00a5',
+    url: 'https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5',
+  },
+  {
+    label: 'AETNFT (CEP-78 test NFT)',
+    hash: 'c2dee0f1…f70a',
+    url: 'https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a',
+  },
 ]
 
 export default function TrustSignals() {
