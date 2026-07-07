@@ -13,7 +13,7 @@
       AETUSD + AEMAT test tokens
 - [x] FastAPI backend with PostgreSQL (Neon) persistence
 - [x] Python SDK (`EscrowClient`) + LangChain `EscrowPaymentTool`
-- [x] MCP server exposing **24** escrow/identity/risk/arbitration tools (`sdk/mcp_server.py`)
+- [x] MCP server exposing **26** escrow/identity/risk/arbitration tools (`sdk/mcp_server.py`)
 - [x] React console at ae402.xyz/console — 12 tabs, all live-wired
 - [x] Reputation scoring with exponential decay + staking-aware slashing, integrated with escrow lifecycle
 - [x] Insurance pool (configurable fee on release)

@@ -19,6 +19,10 @@ class EscrowPaymentTool:
         dispute  — open dispute (requires ``service_hash``, ``reason_hash``)
         status   — check escrow (requires ``service_hash``)
         reputation — query agent score (requires ``agent``)
+        batch_release — release multiple escrows (requires ``service_hashes``)
+        batch_cancel  — cancel multiple pending escrows (requires ``service_hashes``)
+        claim_stream  — claim fully-vested streaming escrow (requires ``service_hash``)
+        risk     — get risk score (requires ``agent``)
 
     Example::
 
@@ -47,6 +51,10 @@ class EscrowPaymentTool:
             "dispute": lambda: self._client.dispute(kwargs["service_hash"], kwargs["reason_hash"]),
             "status": lambda: self._client.get_escrow(kwargs["service_hash"]),
             "reputation": lambda: self._client.get_reputation(kwargs["agent"]),
+            "batch_release": lambda: self._client.batch_release(kwargs["service_hashes"]),
+            "batch_cancel": lambda: self._client.batch_cancel(kwargs["service_hashes"]),
+            "claim_stream": lambda: self._client.claim_stream(kwargs["service_hash"]),
+            "risk": lambda: self._client.risk_score(kwargs["agent"]),
         }
         handler = handlers.get(action)
         if handler is None:

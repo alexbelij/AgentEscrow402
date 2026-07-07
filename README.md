@@ -530,12 +530,12 @@ tool = EscrowPaymentTool(base_url="http://localhost:8000", sender="my-agent")  #
 result = await tool.run(action="create", receiver="ab" * 32, amount=1_000_000)
 ```
 
-### MCP server (24 tools via stdio/SSE)
+### MCP server (26 tools via stdio/SSE)
 ```bash
 python sdk/mcp_server.py
 ```
 
-Full SDK reference → [docs/SDK.md](docs/SDK.md) · Standalone JSON-Schema for all 24 tools (no
+Full SDK reference → [docs/SDK.md](docs/SDK.md) · Standalone JSON-Schema for all 26 tools (no
 server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.json)
 
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
@@ -613,7 +613,7 @@ Full deploy-hash-by-deploy-hash log:
 | Doc | What's in it |
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Detailed component/sequence diagrams |
-| [docs/SDK.md](docs/SDK.md) | Python SDK, LangChain tool, MCP server (24 tools) reference |
+| [docs/SDK.md](docs/SDK.md) | Python SDK, LangChain tool, MCP server (26 tools) reference |
 | [docs/openapi.yaml](docs/openapi.yaml) | Full OpenAPI schema for the REST API |
 | [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md) | Real testnet gas costs per escrow entry point |
 | [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md) | On-chain DID/stake/reputation registry contract (ID-1), separate from the escrow contracts |
