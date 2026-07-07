@@ -61,8 +61,8 @@ escrow = client.create_escrow(
 )
 
 client.release(escrow.service_hash)`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk',
-    linkLabel: 'View SDK',
+    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md',
+    linkLabel: 'View SDK Docs',
   },
   {
     icon: Bot,
@@ -87,8 +87,8 @@ if score.recommendation != "deny":
         task="summarize due diligence pack",
         amount_motes=10_000_000_000,
     )`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk',
-    linkLabel: 'View adapter',
+    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/langchain_tool.py',
+    linkLabel: 'View LangChain Tool',
   },
   {
     icon: Plug,
@@ -115,8 +115,8 @@ if score.recommendation != "deny":
 // 26 tools: create/release/refund/dispute,
 // batch_release, batch_cancel, claim_stream,
 // elect_arbiter, risk_score, get_identity...`,
-    link: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk',
-    linkLabel: 'View MCP',
+    link: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/mcp_server.py',
+    linkLabel: 'View MCP Server',
   },
 ]
 

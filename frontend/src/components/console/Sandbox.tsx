@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
+import { randomHex64 } from '../../lib/format';
 import {
   FlaskConical,
   Play,
@@ -108,11 +109,11 @@ const endpoints: EndpointConfig[] = [
     name: 'Create Escrow',
     method: 'POST',
     path: '/escrow',
-    description: 'Creates a new escrow payment.',
+    description: 'Creates a new escrow payment. The service_hash is auto-generated — copy it after creation to use in Release, Get Escrow, and Resolve.',
     initialBody: {
       receiver: DEMO_AGENT_RECEIVER,
       amount: 100000000000,
-      service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
+      service_hash: randomHex64(),
       ttl: 300,
     },
     bodyFieldDocs: {
@@ -128,7 +129,7 @@ const endpoints: EndpointConfig[] = [
     method: 'GET',
     path: '/escrow/{hash}',
     description: 'Retrieves details for a specific escrow.',
-    initialPathParams: { hash: '1111111111111111111111111111111111111111111111111111111111111111' },
+    initialPathParams: { hash: 'paste-service_hash-from-Create-Escrow-above' },
     pathParamDocs: {
       hash: { type: 'string (64-char hex)', description: 'The service_hash returned by / used to create the escrow.', required: true },
     },
@@ -138,9 +139,9 @@ const endpoints: EndpointConfig[] = [
     name: 'Release Escrow',
     method: 'POST',
     path: '/release',
-    description: 'Releases funds from an escrow.',
+    description: 'Releases funds from a pending escrow to the receiver. First create an escrow above, then paste the service_hash here.',
     initialBody: {
-      service_hash: '1111111111111111111111111111111111111111111111111111111111111111',
+      service_hash: 'paste-service_hash-from-Create-Escrow',
     },
     bodyFieldDocs: {
       service_hash: { type: 'string (64-char hex)', description: 'Identifies which pending escrow to release to its receiver.', required: true },
@@ -266,7 +267,7 @@ const endpoints: EndpointConfig[] = [
     path: '/escrows/batch-release',
     description: 'Releases multiple batch-created escrows in one deploy. Server-side cap/quorum guard enforced per escrow before the on-chain call. Use pending escrow hashes from the Escrows tab.',
     initialBody: {
-      service_hashes: ['136b25f6fa3531383d3ffb0b5e4e8f13fb9e1210f5e0d7449bf033e1d20f9d12'],
+      service_hashes: ['paste-service_hash-from-Batch-Create'],
       arbiter_pubkeys: [],
       arbiter_signatures: [],
     },
@@ -283,7 +284,7 @@ const endpoints: EndpointConfig[] = [
     path: '/escrows/batch-cancel',
     description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Only pending escrows can be cancelled; full refund to sender. Use pending escrow hashes from the Escrows tab.',
     initialBody: {
-      service_hashes: ['c1334f7c9a4d0cdeaf8e56eb72b9a18362e13945d079d3180e0dfab2e31014aa'],
+      service_hashes: ['paste-service_hash-from-Batch-Create'],
     },
     bodyFieldDocs: {
       service_hashes: { type: 'string[]', description: 'Array of service hashes to cancel (max 50).', required: true },
@@ -296,7 +297,7 @@ const endpoints: EndpointConfig[] = [
     path: '/resolve',
     description: 'Resolves a disputed escrow in favor of sender or receiver. Requires arbiter Ed25519 signatures over "resolve:{service_hash}:{verdict}". In demo mode, signatures are verified locally — use the pre-filled demo data to see a successful resolution.',
     initialBody: {
-      service_hash: '032f83f2bef61b6a49d7131b20e5c2d97c7cd704f1641cdc7ec20c4c22f75f29',
+      service_hash: 'paste-disputed-escrow-service_hash',
       in_favor_of: 'sender',
       arbiter_pubkeys: ['01a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'],
       arbiter_signatures: ['demo-signature-placeholder'],
@@ -315,7 +316,7 @@ const endpoints: EndpointConfig[] = [
     path: '/escrow/atomic-swap/commit',
     description: 'Phase 1 of the atomic swap flow: the sender commits a SHA-256 hash of a secret preimage, locking the escrow until the receiver reveals the preimage. Create a multi-asset escrow first, then use its hash here.',
     initialBody: {
-      service_hash: '71cb33f25635d213562363b376f913c33b18934ee4eada136cee219c663bae50',
+      service_hash: 'paste-multi-asset-escrow-hash-here',
       commit_hash: '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824',
     },
     bodyFieldDocs: {
@@ -330,7 +331,7 @@ const endpoints: EndpointConfig[] = [
     path: '/escrow/atomic-swap/reveal',
     description: 'Phase 2: the receiver reveals the secret preimage. If sha256(preimage) matches the commit_hash, funds release to the receiver. If the preimage is wrong or TTL expired, funds refund to sender.',
     initialBody: {
-      service_hash: '71cb33f25635d213562363b376f913c33b18934ee4eada136cee219c663bae50',
+      service_hash: 'paste-committed-escrow-hash-here',
       preimage: 'hello',
     },
     bodyFieldDocs: {

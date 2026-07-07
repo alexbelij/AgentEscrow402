@@ -18,7 +18,7 @@ const NAV_ITEMS = [
 
 const EXTERNAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
-  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
+  { label: 'SDK Docs', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md' },
 ]
 
 export default function Navbar({ mobileOpen, setMobileOpen }: { mobileOpen: boolean; setMobileOpen: (v: boolean) => void }) {
