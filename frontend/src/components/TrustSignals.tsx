@@ -2,11 +2,11 @@ import { ExternalLink } from 'lucide-react'
 
 const STATS = [
   { value: '8', label: 'Deployed Contracts', sub: 'on Casper Testnet' },
-  { value: '349', label: 'On-Chain Transactions', sub: 'create / release / refund / resolve' },
+  { value: '142+', label: 'On-Chain Transactions', sub: 'create / release / refund / resolve' },
   { value: '490', label: 'Automated Tests', sub: '450 Python + 40 Rust' },
   { value: '62', label: 'API Endpoints', sub: 'OpenAPI-documented' },
   { value: '26', label: 'MCP Tools', sub: 'for LLM tool-calling' },
-  { value: '12', label: 'Console Tabs', sub: 'all live-wired' },
+  { value: '13', label: 'Console Pages', sub: 'all live-wired' },
 ]
 
 const EVIDENCE = [
