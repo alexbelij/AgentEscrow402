@@ -47,7 +47,7 @@ from server.vrf_election import router as vrf_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
 from server.risk_api import router as risk_router
-from server.identity_registry_api import router as identity_registry_router
+from server.identity_registry_api import router as identity_registry_router, _registry as _id_registry
 from server.admin_api import router as admin_router
 try:
     from server.mlkem_crypto import generate_keypair, encrypt_metadata, EncryptedMetadata
@@ -175,6 +175,21 @@ async def lifespan(application: FastAPI):
         _monitor_task.cancel()
     if _casper:
         await _casper.close()
+
+
+async def _sync_identity_registry(account_hash: str, completed: int = 0, disputed: int = 0) -> None:
+    """Bridge escrow reputation events into the DID Identity Registry.
+
+    If the agent has a registered identity (did:casper:…), update its
+    reputation score there too.  Silently no-ops when the account has no
+    registered DID — this is expected for most demo escrows.
+    """
+    try:
+        identity = await _id_registry.get_by_account(account_hash)
+        if identity:
+            await _id_registry.update_reputation(identity.did, completed=completed, disputed=disputed)
+    except Exception:
+        pass  # non-critical — DB reputation is the canonical store
 
 
 app = FastAPI(
@@ -460,7 +475,9 @@ async def create_escrow(
                     encap_key, decap_key = generate_keypair()
                     plaintext = f"service_hash={req.service_hash}&sender={sender}&receiver={req.receiver}"
                     enc_meta = encrypt_metadata(plaintext, encap_key)
-                    result_dict["mlkem_decap_key"] = decap_key
+                    # NOTE: decap_key is the private decryption key — never
+                    # return it in the API response.  In production the sender
+                    # would derive it via their own KEM decapsulation.
                     result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
                     result_dict["mlkem_algorithm"] = "ML-KEM-768"
                     logger.info("ML-KEM encryption applied to escrow %s", req.service_hash[:16])
@@ -527,7 +544,6 @@ async def create_escrow(
             encap_key, decap_key = generate_keypair()
             plaintext = f"service_hash={req.service_hash}&sender={sender}&receiver={req.receiver}"
             enc_meta = encrypt_metadata(plaintext, encap_key)
-            result_dict["mlkem_decap_key"] = decap_key
             result_dict["mlkem_ciphertext"] = enc_meta.kem_ciphertext_b64
             result_dict["mlkem_algorithm"] = "ML-KEM-768"
             logger.info("ML-KEM encryption applied to live escrow %s", req.service_hash[:16])
@@ -695,6 +711,7 @@ async def release_escrow(
         record = store.release_escrow(req.service_hash, caller, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, "released", deploy_hash)
         pgdb.bump_reputation(record.receiver, completed=1)
+        await _sync_identity_registry(record.receiver, completed=1)
         _broadcast_event(
             {
                 "type": "escrow_released",
@@ -823,6 +840,7 @@ async def dispute_escrow(
         record = store.dispute_escrow(req.service_hash, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, "disputed", deploy_hash)
         pgdb.bump_reputation(record.sender, disputed=1)
+        await _sync_identity_registry(record.sender, disputed=1)
         _broadcast_event({"type": "escrow_disputed", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
     except KeyError:
@@ -953,6 +971,7 @@ async def resolve_escrow(
         pgdb.update_escrow_status(req.service_hash, "resolved", deploy_hash)
         winner = record.sender if req.in_favor_of == "sender" else record.receiver
         pgdb.bump_reputation(winner, completed=1)
+        await _sync_identity_registry(winner, completed=1)
         _broadcast_event({"type": "escrow_resolved", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
     except KeyError:
