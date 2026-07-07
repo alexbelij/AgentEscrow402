@@ -264,9 +264,9 @@ const endpoints: EndpointConfig[] = [
     name: 'Batch Release',
     method: 'POST',
     path: '/escrows/batch-release',
-    description: 'Releases multiple batch-created escrows in one deploy. Server-side cap/quorum guard enforced per escrow before the on-chain call.',
+    description: 'Releases multiple batch-created escrows in one deploy. Server-side cap/quorum guard enforced per escrow before the on-chain call. Use pending escrow hashes from the Escrows tab.',
     initialBody: {
-      service_hashes: ['<service_hash_1>', '<service_hash_2>'],
+      service_hashes: ['136b25f6fa3531383d3ffb0b5e4e8f13fb9e1210f5e0d7449bf033e1d20f9d12'],
       arbiter_pubkeys: [],
       arbiter_signatures: [],
     },
@@ -281,9 +281,9 @@ const endpoints: EndpointConfig[] = [
     name: 'Batch Cancel',
     method: 'POST',
     path: '/escrows/batch-cancel',
-    description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Only pending escrows can be cancelled; full refund to sender.',
+    description: 'Cancels (refunds) multiple batch-created escrows in one deploy. Only pending escrows can be cancelled; full refund to sender. Use pending escrow hashes from the Escrows tab.',
     initialBody: {
-      service_hashes: ['<service_hash_1>', '<service_hash_2>'],
+      service_hashes: ['c1334f7c9a4d0cdeaf8e56eb72b9a18362e13945d079d3180e0dfab2e31014aa'],
     },
     bodyFieldDocs: {
       service_hashes: { type: 'string[]', description: 'Array of service hashes to cancel (max 50).', required: true },
@@ -294,8 +294,8 @@ const endpoints: EndpointConfig[] = [
     name: 'Claim Stream',
     method: 'POST',
     path: '/escrow/{service_hash}/stream-claim',
-    description: 'Claims a fully vested streaming escrow — triggers real on-chain release. Rejects if stream is not 100% elapsed.',
-    initialPathParams: { service_hash: '<streaming_escrow_hash>' },
+    description: 'Claims a fully vested streaming escrow — triggers real on-chain release. Rejects if stream is not 100% elapsed. Requires a streaming-type escrow hash.',
+    initialPathParams: { service_hash: '71cb33f25635d213562363b376f913c33b18934ee4eada136cee219c663bae50' },
     pathParamDocs: {
       service_hash: { type: 'string', description: 'Service hash of the streaming escrow to claim.', required: true },
     },
@@ -490,7 +490,7 @@ const Sandbox: React.FC = () => {
             </div>
             <button
               onClick={() => handleRun(endpoint)}
-              className="h-12 inline-flex items-center justify-center px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-50"
+              className="h-12 inline-flex items-center justify-center px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md disabled:opacity-50 whitespace-nowrap shrink-0"
               disabled={response?.loading}
             >
               {response?.loading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : <Play className="h-5 w-5 mr-2" />}

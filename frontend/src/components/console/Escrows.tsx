@@ -246,7 +246,8 @@ const Escrows: React.FC = () => {
       setIsCreateModalOpen(false);
       fetchEscrows(); // Refresh list
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create escrow.');
+      const msg = err instanceof Error ? err.message : 'Failed to create escrow.';
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -286,7 +287,9 @@ const Escrows: React.FC = () => {
         if (res.data) setSelectedEscrow(res.data);
       });
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : `Failed to ${actionType} escrow.`);
+      const msg = err instanceof Error ? err.message : `Failed to ${actionType} escrow.`;
+      setActionError(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -771,11 +774,21 @@ const Escrows: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleSignResolveRow(i)}
-                      disabled={resolveSigningRow !== null}
-                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs whitespace-nowrap disabled:opacity-50"
-                      title="Sign this row's vote with the connected wallet"
+                      disabled={resolveSigningRow !== null || !row.pubkey.trim()}
+                      className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg text-xs whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!row.pubkey.trim() ? 'Enter an arbiter public key first' : 'Sign this row\'s vote with the connected wallet'}
                     >
                       {resolveSigningRow === i ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sign with wallet'}
+                    </button>
+                  )}
+                  {resolveRows.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setResolveRows((prev) => prev.filter((_, j) => j !== i))}
+                      className="px-2 py-2 text-red-400 hover:text-red-300 transition-colors shrink-0"
+                      title="Remove this arbiter row"
+                    >
+                      <XCircle className="h-4 w-4" />
                     </button>
                   )}
                 </div>

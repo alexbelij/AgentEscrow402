@@ -52,6 +52,14 @@ const VERTICALS = [
 export default function GrowthPotential() {
   return (
     <section id="growth" className="py-24 relative">
+      {/* Mascot — left side, excited */}
+      <img
+        src="/images/mascot/maskot_casper_up__left.png"
+        alt=""
+        className="absolute left-0 top-20 w-28 lg:w-36 opacity-40 hover:opacity-70 transition-opacity pointer-events-none hidden lg:block"
+        loading="lazy"
+      />
+
       <div className="ae-section">
         <div className="text-center mb-14">
           <div className="text-xs text-ae-accent font-mono tracking-wider mb-3">GROWTH POTENTIAL</div>

@@ -20,8 +20,31 @@ import {
   DollarSign,
   Scale,
   KeyRound,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { format } from 'date-fns';
+
+/** Tiny inline copy-to-clipboard button with a brief ✓ confirmation. */
+const CopyButton: React.FC<{ text: string }> = ({ text }) => {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="inline-flex items-center justify-center ml-1.5 p-1 rounded hover:bg-gray-700 text-gray-500 hover:text-gray-300 transition-colors shrink-0"
+      title="Copy to clipboard"
+    >
+      {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+    </button>
+  );
+};
 
 // Reusable Modal Component (from Escrows.tsx)
 interface ModalProps {
@@ -39,7 +62,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   // "fixed inset-0" overlay ~32px down from the real viewport top.
   return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center p-4 border-b border-[#1e1e2e]">
           <h3 className="text-xl font-semibold text-gray-50">{title}</h3>
           <button onClick={onClose} aria-label="Close dialog" className="text-gray-400 hover:text-gray-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright rounded">
@@ -259,11 +282,19 @@ const Agents: React.FC = () => {
               <tbody className="divide-y divide-[#1e1e2e]">
                 {filteredAgents.map((agent) => (
                   <tr key={agent.public_key} className="hover:bg-gray-800 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{agent.name || 'N/A'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 max-w-[160px] truncate" title={agent.name || 'N/A'}>
+                      <span className="inline-flex items-center gap-1">
+                        <span className="truncate">{agent.name || 'N/A'}</span>
+                        {agent.name && agent.name.length > 20 && <CopyButton text={agent.name} />}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      <ExplorerLink value={agent.public_key}>
-                        {agent.public_key.length > 20 ? `${agent.public_key.substring(0, 12)}...${agent.public_key.substring(agent.public_key.length - 8)}` : agent.public_key}
-                      </ExplorerLink>
+                      <span className="inline-flex items-center gap-0.5">
+                        <ExplorerLink value={agent.public_key}>
+                          {agent.public_key.length > 20 ? `${agent.public_key.substring(0, 12)}…${agent.public_key.substring(agent.public_key.length - 8)}` : agent.public_key}
+                        </ExplorerLink>
+                        <CopyButton text={agent.public_key} />
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300 flex items-center">
                       <Star className="h-4 w-4 text-yellow-400 mr-1" /> {(agent.reputation_score ?? 0).toFixed(2)}
@@ -302,10 +333,17 @@ const Agents: React.FC = () => {
                 <UserPlus className="h-5 w-5 mr-2 text-amber-500" />
                 <strong>Name:</strong> <span className="ml-2">{selectedAgent.name || 'N/A'}</span>
               </p>
-              <p className="flex items-center col-span-full">
-                <Hash className="h-5 w-5 mr-2 text-amber-500" />
-                <strong>Public Key:</strong> <span className="ml-2 break-all"><ExplorerLink value={selectedAgent.public_key}>{selectedAgent.public_key}</ExplorerLink></span>
-              </p>
+              <div className="col-span-full">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
+                  <Hash className="h-4 w-4 text-amber-500" /> Public Key
+                </div>
+                <div className="flex items-center gap-1 font-mono text-sm text-gray-300">
+                  <ExplorerLink value={selectedAgent.public_key}>
+                    <span className="break-all">{selectedAgent.public_key}</span>
+                  </ExplorerLink>
+                  <CopyButton text={selectedAgent.public_key} />
+                </div>
+              </div>
               <p className="flex items-center">
                 <Star className="h-5 w-5 mr-2 text-amber-500" />
                 <strong>Reputation Score:</strong> <span className="ml-2">{selectedAgent.reputation_score.toFixed(2)}</span>
