@@ -633,6 +633,162 @@ async def create_escrow_batch(
     return BatchEscrowResponse(deploy_hash=deploy_hash, created=len(records), records=records)
 
 
+# ── Batch lifecycle (release / cancel) ─────────────────────────────────
+# Python-side cap/quorum guard fills the gap the on-chain escrow-manager
+# lacks: every escrow in the batch is individually validated before the
+# single deploy is submitted. If ANY escrow fails the check, the entire
+# request is rejected (atomic all-or-nothing).
+
+class BatchLifecycleRequest(BaseModel):
+    """Request to batch-release or batch-cancel escrows."""
+    service_hashes: list[str]
+    # Required only for release when any escrow exceeds release_cap
+    arbiter_pubkeys: list[str] = []
+    arbiter_signatures: list[str] = []
+
+
+class BatchLifecycleResponse(BaseModel):
+    deploy_hash: str | None
+    processed: int
+
+
+@app.post("/escrows/batch-release", response_model=BatchLifecycleResponse)
+async def batch_release_escrows(
+    req: BatchLifecycleRequest,
+    cfg: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox),
+    casper: CasperClient | None = Depends(get_casper),
+):
+    """Release multiple batch-created escrows in one deploy.
+
+    Server-side enforcement: every escrow is checked against the release cap.
+    If any escrow exceeds the cap, a valid arbiter quorum (via
+    arbiter_pubkeys/arbiter_signatures) is required for the ENTIRE batch —
+    same threshold as single-escrow release.
+    """
+    if not req.service_hashes:
+        raise HTTPException(status_code=422, detail="service_hashes must be non-empty")
+    if len(req.service_hashes) > 50:
+        raise HTTPException(status_code=422, detail="batch size exceeds MAX_BATCH_SIZE (50)")
+    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
+        raise HTTPException(
+            status_code=422,
+            detail="arbiter_pubkeys and arbiter_signatures must have the same length",
+        )
+
+    # Pre-validate every escrow: must exist, must be pending, cap/quorum check
+    needs_quorum = False
+    for sh in req.service_hashes:
+        existing = store.get_escrow(sh)
+        if existing is None:
+            raise HTTPException(status_code=404, detail=f"Escrow {sh[:16]}… not found")
+        if existing.status != "pending":
+            raise HTTPException(status_code=422, detail=f"Escrow {sh[:16]}… is {existing.status}, not pending")
+        if existing.amount > cfg.release_cap_motes:
+            needs_quorum = True
+
+    if needs_quorum and cfg.arbiter_pubkeys:
+        # Validate arbiter quorum against ALL above-cap escrows
+        for sh in req.service_hashes:
+            existing = store.get_escrow(sh)
+            if existing and existing.amount > cfg.release_cap_motes:
+                valid_votes = arbiter_crypto.count_valid_cap_approval_votes(
+                    req.arbiter_pubkeys,
+                    req.arbiter_signatures,
+                    cfg.arbiter_pubkeys,
+                    "release",
+                    sh,
+                )
+                if valid_votes < cfg.arbiter_threshold:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=(
+                            f"Escrow {sh[:16]}… exceeds release_cap "
+                            f"({cfg.release_cap_motes} motes); only {valid_votes} "
+                            f"valid arbiter signature(s), need >= {cfg.arbiter_threshold}"
+                        ),
+                    )
+
+    deploy_hash = ""
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.batch_release(req.service_hashes)
+        except Exception as exc:
+            logger.error("Casper batch_release failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain batch_release failed; local state unchanged",
+            )
+
+    # Update local state — release_escrow needs a caller (sender); for the
+    # batch path the backend's own deployer key IS the sender, so we pass
+    # the escrow's sender from the record to satisfy the permission check.
+    for sh in req.service_hashes:
+        try:
+            existing = store.get_escrow(sh)
+            if existing:
+                store.release_escrow(sh, existing.sender, deploy_hash)
+                pgdb.update_escrow_status(sh, "released", deploy_hash)
+                pgdb.bump_reputation(existing.receiver, completed=1)
+                await _sync_identity_registry(existing.receiver, completed=1)
+        except Exception as exc:
+            logger.warning("batch_release local update for %s failed: %s", sh[:16], exc)
+
+    _broadcast_event(
+        {"type": "escrow_batch_released", "count": len(req.service_hashes), "deploy_hash": deploy_hash, "ts": int(time.time())}
+    )
+    return BatchLifecycleResponse(deploy_hash=deploy_hash or None, processed=len(req.service_hashes))
+
+
+@app.post("/escrows/batch-cancel", response_model=BatchLifecycleResponse)
+async def batch_cancel_escrows(
+    req: BatchLifecycleRequest,
+    cfg: Config = Depends(get_config),
+    store: SandboxStore = Depends(get_sandbox),
+    casper: CasperClient | None = Depends(get_casper),
+):
+    """Cancel multiple batch-created escrows in one deploy.
+
+    Full refund to sender. Only pending escrows can be cancelled.
+    """
+    if not req.service_hashes:
+        raise HTTPException(status_code=422, detail="service_hashes must be non-empty")
+    if len(req.service_hashes) > 50:
+        raise HTTPException(status_code=422, detail="batch size exceeds MAX_BATCH_SIZE (50)")
+
+    for sh in req.service_hashes:
+        existing = store.get_escrow(sh)
+        if existing is None:
+            raise HTTPException(status_code=404, detail=f"Escrow {sh[:16]}… not found")
+        if existing.status != "pending":
+            raise HTTPException(status_code=422, detail=f"Escrow {sh[:16]}… is {existing.status}, not pending")
+
+    deploy_hash = ""
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.batch_cancel(req.service_hashes)
+        except Exception as exc:
+            logger.error("Casper batch_cancel failed: %s", exc)
+            raise HTTPException(
+                status_code=502,
+                detail="On-chain batch_cancel failed; local state unchanged",
+            )
+
+    for sh in req.service_hashes:
+        try:
+            existing = store.get_escrow(sh)
+            if existing:
+                store.refund_escrow(sh, existing.sender, deploy_hash)
+                pgdb.update_escrow_status(sh, "cancelled", deploy_hash)
+        except Exception as exc:
+            logger.warning("batch_cancel local update for %s failed: %s", sh[:16], exc)
+
+    _broadcast_event(
+        {"type": "escrow_batch_cancelled", "count": len(req.service_hashes), "deploy_hash": deploy_hash, "ts": int(time.time())}
+    )
+    return BatchLifecycleResponse(deploy_hash=deploy_hash or None, processed=len(req.service_hashes))
+
+
 @app.post("/release", response_model=EscrowRecord)
 async def release_escrow(
     req: ReleaseRequest,

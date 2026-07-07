@@ -753,6 +753,13 @@ export const api = {
     ),
   createStreamEscrow: (data: StreamEscrowRequest) => fetcher<TransactionHash>('/escrow/stream', 'POST', data, buildDemoPaymentHeaders(data.service_hash, data.amount)),
   getStreamStatus: (hash: string) => fetcher<StreamStatus>(`/escrow/${hash}/stream-status`, 'GET'),
+  claimStreamEscrow: (hash: string) => fetcher<{ status: string; service_hash: string; deploy_hash?: string }>(`/escrow/${hash}/stream-claim`, 'POST'),
+
+  // Batch lifecycle (escrow-manager contract)
+  batchRelease: (service_hashes: string[], arbiter_pubkeys: string[] = [], arbiter_signatures: string[] = []) =>
+    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-release', 'POST', { service_hashes, arbiter_pubkeys, arbiter_signatures }),
+  batchCancel: (service_hashes: string[]) =>
+    fetcher<{ deploy_hash?: string; processed: number }>('/escrows/batch-cancel', 'POST', { service_hashes }),
   // Commit must come from the escrow's sender (DEMO_AGENT_SENDER, the default identity every demo escrow is created with).
   commitAtomicSwap: (data: AtomicSwapCommitRequest) => fetcher<TransactionHash>('/escrow/atomic-swap/commit', 'POST', data, buildDemoPaymentHeaders(data.service_hash, 0, DEMO_AGENT_SENDER)),
   // Reveal must come from the escrow's receiver (DEMO_AGENT_RECEIVER) per server/multi_asset.py's reveal_atomic_swap check.

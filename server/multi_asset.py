@@ -686,6 +686,67 @@ async def get_stream_status(service_hash: str) -> StreamStatusResponse:
     )
 
 
+@router.post("/{service_hash}/stream-claim", status_code=status.HTTP_200_OK)
+async def claim_streamed_escrow(
+    service_hash: str,
+    store: SandboxStore = Depends(get_sandbox_store),
+    cfg: Config = Depends(get_config),
+    casper: CasperClient | None = Depends(get_casper),
+) -> dict[str, Any]:
+    """Claim a fully vested streaming escrow — triggers a real on-chain release.
+
+    A streaming escrow's vesting schedule is computed API-side (linear from
+    start_time to end_time).  Once 100% of the stream duration has elapsed,
+    this endpoint settles the escrow on-chain by calling the same release()
+    path as a standard escrow.  Before the stream is fully vested, the
+    request is rejected with 422.
+
+    This turns streaming from pure API simulation into "API-timed vesting
+    with on-chain settlement at maturity".
+    """
+    stream_data = _streaming_escrows.get(service_hash)
+    if not stream_data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Streaming escrow not found")
+
+    current_time = int(time.time())
+    if current_time < stream_data["end_time"]:
+        elapsed = max(0, current_time - stream_data["start_time"])
+        total = stream_data["end_time"] - stream_data["start_time"]
+        pct = int((elapsed / total) * 100) if total > 0 else 0
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Stream not fully vested yet ({pct}% elapsed). Claim available after end_time={stream_data['end_time']}",
+        )
+
+    escrow_record = stream_data["escrow_record"]
+    if escrow_record.status == "released":
+        return {"status": "already_claimed", "service_hash": service_hash, "deploy_hash": escrow_record.deploy_hash}
+
+    deploy_hash = ""
+    if not cfg.sandbox and casper is not None:
+        try:
+            deploy_hash = await casper.release(service_hash)
+        except Exception as exc:
+            logger.error("On-chain stream claim release failed for %s: %s", service_hash[:16], exc)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="On-chain release for stream claim failed; local state unchanged",
+            )
+
+    # Update both in-memory stream state and the main store
+    escrow_record.status = EscrowStatus.RELEASED
+    escrow_record.deploy_hash = deploy_hash
+    stream_data["streamed_amount"] = escrow_record.amount
+    stream_data["last_payout_time"] = current_time
+    try:
+        store.release_escrow(service_hash, escrow_record.sender, deploy_hash)
+    except Exception:
+        pass  # may already be released in store
+
+    logger.info("Streaming escrow %s claimed and released on-chain: %s", service_hash[:16], deploy_hash[:16] if deploy_hash else "sandbox")
+    return {"status": "claimed", "service_hash": service_hash, "deploy_hash": deploy_hash or None}
+
+
 @router.post("/atomic-swap/commit", status_code=status.HTTP_202_ACCEPTED)
 async def commit_atomic_swap(
     request: CommitRequest,

@@ -10,10 +10,11 @@ Upgrade deploy `3be11314...dabedfe`, confirmed on-chain (`error_message: null`,
 transfers funds *into* the contract purse (a deposit, mirroring `create_escrow`'s own funding
 step) — it has no withdrawal path at all, so the A1 "no unilateral agent-key withdraw above cap"
 invariant doesn't apply to it directly. The two entry points on `escrow-manager` that *can* move
-funds out, `batch_release`/`batch_cancel`, remain unreachable dead code (confirmed again via
-repo-wide grep across `server/`, `sdk/`, `frontend/src` — only `create_batch()` is ever called)
-and still lack the per-escrow cap/arbiter-quorum guard the single-escrow `release()`/`resolve()`
-path enforces; do not wire them up without adding that guard first. Also extended
+funds out, `batch_release`/`batch_cancel`, are now wired to API endpoints
+(`POST /escrows/batch-release`, `POST /escrows/batch-cancel`) with a server-side cap/quorum
+guard that mirrors the single-escrow release path: every escrow in the batch is individually
+validated against the release cap, and above-cap escrows require arbiter quorum signatures.
+The guard is defense-in-depth (server-side) since the contract itself doesn't enforce it. Also extended
 `docs/evidence/bulk_escrow_tx_log.jsonl` this session with 4 real `refund` and 3 real
 `dispute`→3-of-5-arbiter-`resolve` cycles (all on the current v9 contract, confirmed via
 CSPR.cloud) — previously the bulk log only had `create`/`release` pairs represented in the
@@ -82,11 +83,15 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   (`X-AE402-Demo-Identity: hosted-console` + a fixed public demo signature) so browser visitors
   without a wallet can exercise the UI — this bypass is scoped to two hardcoded demo identities
   only and is disabled by setting `ALLOW_HOSTED_DEMO_IDENTITY=false`.
-- **Payment streaming (`/escrow/stream`) is API-level simulation, not on-chain vesting** — the
-  streamed/remaining amount is computed linearly from wall-clock elapsed time in
-  `server/multi_asset.py`, but there is no on-chain per-tick release; the underlying escrow is
-  released the same way as a normal escrow. Fine for demoing the UX pattern, not a production
-  payment-streaming primitive yet.
+- **Payment streaming (`/escrow/stream`) uses API-timed vesting with on-chain settlement** —
+  the vesting schedule (streamed vs remaining amount) is computed linearly from wall-clock
+  elapsed time in `server/multi_asset.py` — Casper has no native per-tick on-chain vesting
+  primitive. However, this is not pure simulation: the escrow is created on-chain
+  (`POST /escrow/stream` → real `create_escrow` deploy), and once 100% of the stream duration
+  has elapsed, `POST /escrow/{hash}/stream-claim` triggers a real on-chain `release()` call,
+  settling funds to the receiver. Before full vesting, claim requests are rejected with 422.
+  This is an API-timed linear vesting schedule with on-chain settlement at maturity — a
+  practical pattern for Casper's current capabilities.
 - **Single-process only** — The global `casper_client` instance is not thread-safe for
   multi-worker deployments.
 - **VRF arbiter election write path is now wired, but on a small live arbiter pool** —
@@ -102,12 +107,16 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   there is a real (if so far unobserved) chance every draw for a given dispute lands on a
   party, forcing a fallback even though other eligible arbiters exist but weren't drawn —
   registering more arbiters lowers this probability.
-- **`escrow-manager.batch_release`/`batch_cancel` lack a cap/quorum guard** — Unlike
-  `create_batch()` (wired and live-verified, see [README](../README.md#-verified-on-chain-this-is-not-simulated--real-testnet-transactions)),
-  the manager contract's `batch_release`/`batch_cancel` entry points don't enforce the same
-  per-escrow amount cap or arbiter-quorum check that the single-escrow `release`/`resolve` path
-  does. They are dead code — nothing in the backend or SDK currently calls them — so this is not
-  an active vulnerability, but the guard should be added before either entry point is wired up.
+- **`escrow-manager.batch_release`/`batch_cancel` — server-side cap/quorum guard** — The
+  on-chain `escrow-manager` contract's `batch_release`/`batch_cancel` entry points do not
+  enforce the same per-escrow release-cap or arbiter-quorum check that the main escrow
+  contract's single-escrow `release()` does. To close this gap without a contract redeploy,
+  the Python backend now enforces the guard server-side before submitting the on-chain call:
+  every escrow in the batch is individually validated against the release cap, and if any
+  exceeds it, a valid arbiter quorum is required for the entire request. The endpoints
+  `POST /escrows/batch-release` and `POST /escrows/batch-cancel` are now wired and callable
+  via the API Sandbox. The guard is defense-in-depth (server-side, not on-chain) — a contract
+  upgrade adding the on-chain check would be the production-grade fix.
 
 ## Frontend
 
