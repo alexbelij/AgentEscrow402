@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Book, Code2, Terminal, Server, Shield, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 
 const API_BASE = 'https://ae402.xyz/backend';
@@ -271,8 +272,26 @@ const MCP_TOOLS = [
   ]},
 ];
 
+type TabId = 'api' | 'sdk' | 'mcp';
+const VALID_TABS: TabId[] = ['api', 'sdk', 'mcp'];
+
 export default function Docs() {
-  const [activeTab, setActiveTab] = useState<'api' | 'sdk' | 'mcp'>('api');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab') as TabId | null;
+  const [activeTab, setActiveTab] = useState<TabId>(
+    tabParam && VALID_TABS.includes(tabParam) ? tabParam : 'api'
+  );
+
+  useEffect(() => {
+    if (tabParam && VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const switchTab = (tab: TabId) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   const tabs = [
     { id: 'api' as const, label: 'REST API', icon: Server, count: '62 endpoints' },
@@ -287,7 +306,7 @@ export default function Docs() {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => switchTab(tab.id)}
             className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-amber-500 text-amber-400'
