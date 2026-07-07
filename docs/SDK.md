@@ -74,7 +74,7 @@ pip install mcp[sse] uvicorn starlette
 python -m sdk.mcp_server --transport sse --port 8402
 ```
 
-**Available tools (24, grouped by domain):**
+**Available tools (26, grouped by domain):**
 
 | Tool | Description |
 |------|-------------|
@@ -100,13 +100,16 @@ python -m sdk.mcp_server --transport sse --port 8402
 | `get_arbitration_result` | Get the AI arbitration verdict and reasoning for a dispute |
 | `appeal_arbitration` | Appeal an AI arbitration decision within the allowed window |
 | **Risk scoring** | |
-| `calculate_risk_score` | Compute a composite risk score for an agent/transaction |
-| `get_risk_report` | Retrieve a detailed risk breakdown for an agent or escrow |
-| `set_risk_threshold` | Configure the auto-reject threshold for high-risk transactions |
+| `calculate_risk_score` | Get IsolationForest anomaly-detection risk score for an agent |
+| `get_risk_dashboard` | Get aggregated risk scores for all known agents |
 | **Identity registry** | |
-| `register_identity` | Register a new agent identity with KYC-level credentials on-chain |
-| `verify_identity` | Verify an agent's identity and credential status |
-| `revoke_identity` | Revoke an agent's identity credentials (admin only) |
+| `register_identity` | Register a new agent identity with public key and capabilities |
+| `get_identity` | Look up an agent's registered identity, reputation and capabilities |
+| **VRF & batch & streaming** | |
+| `elect_arbiter` | Run a VRF-based on-chain random arbiter election for a dispute |
+| `batch_release` | Release multiple escrows atomically with cap/quorum guard |
+| `batch_cancel` | Cancel (refund) multiple pending escrows atomically |
+| `claim_stream` | Claim a fully-vested streaming escrow (triggers on-chain release) |
 
 ## x402 Header Format
 

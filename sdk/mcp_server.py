@@ -247,7 +247,10 @@ TOOLS = [
     ),
     Tool(
         name="get_events",
-        description="Get recent escrow events (creates, releases, disputes).",
+        description=(
+            "Get recent escrow activity. Note: the backend also exposes a "
+            "real-time SSE stream at GET /events for live subscriptions."
+        ),
         inputSchema={
             "type": "object",
             "properties": {"limit": {"type": "integer", "description": "Max events", "default": 20}},
@@ -327,55 +330,21 @@ TOOLS = [
     Tool(
         name="calculate_risk_score",
         description=(
-            "Calculate a composite risk score for a proposed escrow transaction. "
-            "Considers counterparty history, amount, and chain heuristics."
+            "Get the IsolationForest anomaly-detection risk score for an agent. "
+            "Trained on real escrow data; returns score, anomaly flag, and explanation."
         ),
         inputSchema={
             "type": "object",
             "properties": {
-                "sender": {"type": "string"},
-                "receiver": {"type": "string"},
-                "amount": {"type": "integer", "description": "Amount in motes"},
+                "agent": {"type": "string", "description": "Agent ID or account hash"},
             },
-            "required": ["sender", "receiver", "amount"],
+            "required": ["agent"],
         },
     ),
     Tool(
-        name="get_risk_report",
-        description="Retrieve a detailed risk breakdown for an agent or escrow.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "target": {"type": "string", "description": "Agent ID or service_hash"},
-                "report_type": {
-                    "type": "string",
-                    "enum": ["agent", "escrow"],
-                    "default": "agent",
-                },
-            },
-            "required": ["target"],
-        },
-    ),
-    Tool(
-        name="set_risk_threshold",
-        description="Configure auto-reject threshold for high-risk transactions.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "threshold": {
-                    "type": "number",
-                    "description": "Risk score 0.0-1.0 above which transactions are flagged",
-                    "minimum": 0.0,
-                    "maximum": 1.0,
-                },
-                "action": {
-                    "type": "string",
-                    "enum": ["flag", "reject", "require_review"],
-                    "default": "flag",
-                },
-            },
-            "required": ["threshold"],
-        },
+        name="get_risk_dashboard",
+        description="Get aggregated risk scores for all known agents.",
+        inputSchema={"type": "object", "properties": {}},
     ),
 
     # ------------------------------------------------------------------
@@ -383,41 +352,99 @@ TOOLS = [
     # ------------------------------------------------------------------
     Tool(
         name="register_identity",
-        description="Register a new agent identity with KYC-level credentials on-chain.",
+        description="Register a new agent identity with public key and capabilities.",
         inputSchema={
             "type": "object",
             "properties": {
                 "agent_id": {"type": "string", "description": "Unique agent identifier"},
                 "public_key": {"type": "string", "description": "Ed25519 public key hex"},
-                "metadata": {
-                    "type": "object",
-                    "description": "Optional metadata (display_name, org, contact)",
+                "capabilities": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of capability strings (e.g. 'compute', 'storage')",
                 },
             },
             "required": ["agent_id", "public_key"],
         },
     ),
     Tool(
-        name="verify_identity",
-        description="Verify an agent's identity and credential status.",
+        name="get_identity",
+        description="Look up an agent's registered identity, reputation and capabilities.",
         inputSchema={
             "type": "object",
             "properties": {
-                "agent_id": {"type": "string"},
+                "agent_id": {"type": "string", "description": "Agent ID to look up"},
             },
             "required": ["agent_id"],
         },
     ),
+
+    # ------------------------------------------------------------------
+    # VRF Arbiter Election (1)
+    # ------------------------------------------------------------------
     Tool(
-        name="revoke_identity",
-        description="Revoke an agent's identity credentials (admin only).",
+        name="elect_arbiter",
+        description="Run a VRF-based on-chain random arbiter election for a dispute.",
         inputSchema={
             "type": "object",
             "properties": {
-                "agent_id": {"type": "string"},
-                "reason": {"type": "string", "description": "Revocation reason"},
+                "dispute_id": {"type": "string", "description": "Dispute identifier"},
+                "sender": {"type": "string", "description": "Dispute sender agent ID"},
+                "receiver": {"type": "string", "description": "Dispute receiver agent ID"},
+                "seed_hash": {"type": "string", "description": "64-hex randomness seed"},
             },
-            "required": ["agent_id", "reason"],
+            "required": ["dispute_id", "sender", "receiver", "seed_hash"],
+        },
+    ),
+
+    # ------------------------------------------------------------------
+    # Batch Escrow (2)
+    # ------------------------------------------------------------------
+    Tool(
+        name="batch_release",
+        description="Release multiple escrows atomically with cap/quorum guard.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "sender": {"type": "string"},
+                "service_hashes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of escrow service hashes to release",
+                },
+            },
+            "required": ["sender", "service_hashes"],
+        },
+    ),
+    Tool(
+        name="batch_cancel",
+        description="Cancel (refund) multiple pending escrows atomically.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "sender": {"type": "string"},
+                "service_hashes": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of pending escrow service hashes to cancel",
+                },
+            },
+            "required": ["sender", "service_hashes"],
+        },
+    ),
+
+    # ------------------------------------------------------------------
+    # Streaming Escrow (1)
+    # ------------------------------------------------------------------
+    Tool(
+        name="claim_stream",
+        description="Claim a fully-vested streaming escrow (triggers on-chain release).",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "service_hash": {"type": "string", "description": "Streaming escrow hash"},
+            },
+            "required": ["service_hash"],
         },
     ),
 ]
@@ -497,7 +524,7 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
 
         elif name == "get_events":
             limit = _validate_limit(args.get("limit"), 20)
-            result = await _get(f"{base}/events", params={"limit": str(limit)})
+            result = await _get(f"{base}/escrows", params={"limit": str(limit)})
 
         elif name == "compute_hash":
             result = await _post(f"{base}/compute-hash", {"sender": _validate_id(args["sender"], "sender"), "receiver": _validate_id(args["receiver"], "receiver"), "amount": _validate_amount(args["amount"])})
@@ -507,7 +534,7 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
 
         # --- AI Arbitration ---
         elif name == "submit_dispute_arbitration":
-            result = await _post(f"{base}/arbitration/submit", {
+            result = await _post(f"{base}/arbitration/analyze", {
                 "service_hash": _validate_hash(args["service_hash"], "service_hash"),
                 "evidence_sender": str(args["evidence_sender"])[:10000],
                 "evidence_receiver": str(args["evidence_receiver"])[:10000],
@@ -525,44 +552,53 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
 
         # --- Risk Scoring ---
         elif name == "calculate_risk_score":
-            result = await _post(f"{base}/risk/score", {
-                "sender": _validate_id(args["sender"], "sender"),
-                "receiver": _validate_id(args["receiver"], "receiver"),
-                "amount": _validate_amount(args["amount"]),
-            })
+            agent = _validate_id(args["agent"], "agent")
+            result = await _get(f"{base}/risk/score/{_safe_path(agent)}")
 
-        elif name == "get_risk_report":
-            target = _validate_id(args["target"], "target")
-            report_type = args.get("report_type", "agent")
-            if report_type not in ("agent", "escrow"):
-                report_type = "agent"
-            result = await _get(f"{base}/risk/report/{_safe_path(target)}", params={"type": report_type})
-
-        elif name == "set_risk_threshold":
-            threshold = float(args["threshold"])
-            if not 0.0 <= threshold <= 1.0:
-                raise ValueError("threshold must be 0.0-1.0")
-            action = args.get("action", "flag")
-            if action not in ("flag", "reject", "require_review"):
-                action = "flag"
-            result = await _post(f"{base}/risk/threshold", {
-                "threshold": threshold,
-                "action": action,
-            })
+        elif name == "get_risk_dashboard":
+            result = await _get(f"{base}/risk/dashboard")
 
         # --- Identity Registry ---
         elif name == "register_identity":
             result = await _post(f"{base}/identity/register", {
                 "agent_id": _validate_id(args["agent_id"], "agent_id"),
                 "public_key": str(args["public_key"])[:256],
-                "metadata": args.get("metadata", {}),
+                "capabilities": args.get("capabilities", []),
             })
 
-        elif name == "verify_identity":
-            result = await _get(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}/verify")
+        elif name == "get_identity":
+            result = await _get(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}")
 
-        elif name == "revoke_identity":
-            result = await _post(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}/revoke", {"reason": str(args["reason"])[:1000]})
+        # --- VRF Election ---
+        elif name == "elect_arbiter":
+            result = await _post(f"{base}/vrf/elect", {
+                "dispute_id": _validate_id(args["dispute_id"], "dispute_id"),
+                "sender": _validate_id(args["sender"], "sender"),
+                "receiver": _validate_id(args["receiver"], "receiver"),
+                "seed_hash": _validate_hash(args["seed_hash"], "seed_hash"),
+            })
+
+        # --- Batch Lifecycle ---
+        elif name == "batch_release":
+            hashes = [_validate_hash(h, "service_hash") for h in args["service_hashes"]]
+            result = await _post(
+                f"{base}/escrows/batch-release",
+                {"service_hashes": hashes},
+                params={"sender": _validate_id(args["sender"], "sender")},
+            )
+
+        elif name == "batch_cancel":
+            hashes = [_validate_hash(h, "service_hash") for h in args["service_hashes"]]
+            result = await _post(
+                f"{base}/escrows/batch-cancel",
+                {"service_hashes": hashes},
+                params={"sender": _validate_id(args["sender"], "sender")},
+            )
+
+        # --- Streaming ---
+        elif name == "claim_stream":
+            sh = _validate_hash(args["service_hash"], "service_hash")
+            result = await _post(f"{base}/escrow/{_safe_path(sh)}/stream-claim", {})
 
         else:
             result = {"error": f"Unknown tool: {name}"}

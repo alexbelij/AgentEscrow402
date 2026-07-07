@@ -1,8 +1,7 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "AgentEscrow402 MCP Tool Registry",
-  "description": "JSON-Schema definitions for all tools exposed by the AE402 MCP server (sdk/mcp_server.py). Generated from the live TOOLS list, not hand-maintained.",
-  "tool_count": 24,
+  "name": "agentescrow402",
+  "version": "1.0.0",
+  "description": "MCP tools for x402-compatible escrow on Casper Network",
   "tools": [
     {
       "name": "create_escrow",
@@ -225,7 +224,7 @@
     },
     {
       "name": "get_events",
-      "description": "Get recent escrow events (creates, releases, disputes).",
+      "description": "Get recent escrow activity. Note: the backend also exposes a real-time SSE stream at GET /events for live subscriptions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -346,82 +345,31 @@
     },
     {
       "name": "calculate_risk_score",
-      "description": "Calculate a composite risk score for a proposed escrow transaction. Considers counterparty history, amount, and chain heuristics.",
+      "description": "Get the IsolationForest anomaly-detection risk score for an agent. Trained on real escrow data; returns score, anomaly flag, and explanation.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "sender": {
-            "type": "string"
-          },
-          "receiver": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "integer",
-            "description": "Amount in motes"
+          "agent": {
+            "type": "string",
+            "description": "Agent ID or account hash"
           }
         },
         "required": [
-          "sender",
-          "receiver",
-          "amount"
+          "agent"
         ]
       }
     },
     {
-      "name": "get_risk_report",
-      "description": "Retrieve a detailed risk breakdown for an agent or escrow.",
+      "name": "get_risk_dashboard",
+      "description": "Get aggregated risk scores for all known agents.",
       "inputSchema": {
         "type": "object",
-        "properties": {
-          "target": {
-            "type": "string",
-            "description": "Agent ID or service_hash"
-          },
-          "report_type": {
-            "type": "string",
-            "enum": [
-              "agent",
-              "escrow"
-            ],
-            "default": "agent"
-          }
-        },
-        "required": [
-          "target"
-        ]
-      }
-    },
-    {
-      "name": "set_risk_threshold",
-      "description": "Configure auto-reject threshold for high-risk transactions.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "threshold": {
-            "type": "number",
-            "description": "Risk score 0.0-1.0 above which transactions are flagged",
-            "minimum": 0.0,
-            "maximum": 1.0
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "flag",
-              "reject",
-              "require_review"
-            ],
-            "default": "flag"
-          }
-        },
-        "required": [
-          "threshold"
-        ]
+        "properties": {}
       }
     },
     {
       "name": "register_identity",
-      "description": "Register a new agent identity with KYC-level credentials on-chain.",
+      "description": "Register a new agent identity with public key and capabilities.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -433,9 +381,12 @@
             "type": "string",
             "description": "Ed25519 public key hex"
           },
-          "metadata": {
-            "type": "object",
-            "description": "Optional metadata (display_name, org, contact)"
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of capability strings (e.g. 'compute', 'storage')"
           }
         },
         "required": [
@@ -445,13 +396,14 @@
       }
     },
     {
-      "name": "verify_identity",
-      "description": "Verify an agent's identity and credential status.",
+      "name": "get_identity",
+      "description": "Look up an agent's registered identity, reputation and capabilities.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "agent_id": {
-            "type": "string"
+            "type": "string",
+            "description": "Agent ID to look up"
           }
         },
         "required": [
@@ -460,22 +412,95 @@
       }
     },
     {
-      "name": "revoke_identity",
-      "description": "Revoke an agent's identity credentials (admin only).",
+      "name": "elect_arbiter",
+      "description": "Run a VRF-based on-chain random arbiter election for a dispute.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "agent_id": {
-            "type": "string"
-          },
-          "reason": {
+          "dispute_id": {
             "type": "string",
-            "description": "Revocation reason"
+            "description": "Dispute identifier"
+          },
+          "sender": {
+            "type": "string",
+            "description": "Dispute sender agent ID"
+          },
+          "receiver": {
+            "type": "string",
+            "description": "Dispute receiver agent ID"
+          },
+          "seed_hash": {
+            "type": "string",
+            "description": "64-hex randomness seed"
           }
         },
         "required": [
-          "agent_id",
-          "reason"
+          "dispute_id",
+          "sender",
+          "receiver",
+          "seed_hash"
+        ]
+      }
+    },
+    {
+      "name": "batch_release",
+      "description": "Release multiple escrows atomically with cap/quorum guard.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "service_hashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of escrow service hashes to release"
+          }
+        },
+        "required": [
+          "sender",
+          "service_hashes"
+        ]
+      }
+    },
+    {
+      "name": "batch_cancel",
+      "description": "Cancel (refund) multiple pending escrows atomically.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sender": {
+            "type": "string"
+          },
+          "service_hashes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of pending escrow service hashes to cancel"
+          }
+        },
+        "required": [
+          "sender",
+          "service_hashes"
+        ]
+      }
+    },
+    {
+      "name": "claim_stream",
+      "description": "Claim a fully-vested streaming escrow (triggers on-chain release).",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_hash": {
+            "type": "string",
+            "description": "Streaming escrow hash"
+          }
+        },
+        "required": [
+          "service_hash"
         ]
       }
     }

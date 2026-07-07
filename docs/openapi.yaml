@@ -1,549 +1,3298 @@
 openapi: 3.1.0
 info:
-  title: AgentEscrow402 API
-  version: 1.0.0
-  description: x402 Escrow Protocol for AI-to-AI transactions on Casper blockchain
-  contact:
-    name: AgentEscrow402
-    email: aliaksandr.khrol@gmail.com
-servers:
-  - url: https://agentescrow402-api.onrender.com
-    description: Production
+  title: AgentEscrow402
+  description: x402-compatible payment middleware for AI agents on Casper
+  version: 0.2.0
 paths:
-  /health:
+  /escrow/cep18-permit-nonce:
     get:
-      summary: Health check
-      operationId: healthCheck
+      tags:
+      - multi-asset
+      - streaming
+      summary: Get Cep18 Permit Nonce
+      description: 'Public read of the next expected permit nonce for `owner_account_hash`
+
+        on the given CEP-18 contract -- needed by the frontend to build the
+
+        exact canonical message the wallet will sign (see PermitProof /
+
+        frontend/src/lib/cep18Permit.ts). No auth needed: this is public
+
+        on-chain state, not a state-changing call.'
+      operationId: get_cep18_permit_nonce_escrow_cep18_permit_nonce_get
+      parameters:
+      - name: contract_hash
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Contract Hash
+      - name: owner_account_hash
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Owner Account Hash
       responses:
         '200':
-          description: Service healthy
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
-  /api/v1/escrow/create:
+                type: object
+                title: Response Get Cep18 Permit Nonce Escrow Cep18 Permit Nonce Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/multi-asset:
     post:
-      summary: Create new escrow
-      operationId: createEscrow
+      tags:
+      - multi-asset
+      - streaming
+      summary: Create Multi Asset Escrow
+      description: 'Creates a new multi-asset escrow.
+
+        The sender (from X402 header) transfers the specified token amount to the
+        escrow contract.'
+      operationId: create_multi_asset_escrow_escrow_multi_asset_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MultiAssetEscrowRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/stream:
+    post:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Create Streaming Escrow
+      description: 'Creates a new streaming escrow.
+
+        The sender (from X402 header) deposits the total amount into a streaming contract,
+
+        which then releases funds to the receiver over a specified time period.'
+      operationId: create_streaming_escrow_escrow_stream_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StreamEscrowRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/{service_hash}/stream-status:
+    get:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Get Stream Status
+      description: Retrieves the current status of a streaming escrow, including streamed
+        and remaining amounts.
+      operationId: get_stream_status_escrow__service_hash__stream_status_get
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/{service_hash}/stream-claim:
+    post:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Claim Streamed Escrow
+      description: 'Claim a fully vested streaming escrow — triggers a real on-chain
+        release.
+
+
+        A streaming escrow''s vesting schedule is computed API-side (linear from
+
+        start_time to end_time).  Once 100% of the stream duration has elapsed,
+
+        this endpoint settles the escrow on-chain by calling the same release()
+
+        path as a standard escrow.  Before the stream is fully vested, the
+
+        request is rejected with 422.
+
+
+        This turns streaming from pure API simulation into "API-timed vesting
+
+        with on-chain settlement at maturity".'
+      operationId: claim_streamed_escrow_escrow__service_hash__stream_claim_post
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Claim Streamed Escrow Escrow  Service Hash  Stream
+                  Claim Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/atomic-swap/commit:
+    post:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Commit Atomic Swap
+      description: 'Commits a SHA256 hash of a secret preimage for an atomic swap.
+
+        This is the first step in a commit-reveal scheme.
+
+
+        Live mode calls the deployed escrow contract''s real `commit_swap` entry
+
+        point (contracts/escrow/src/main.rs), which enforces on-chain that the
+
+        caller is the escrow''s sender and that no commit already exists for this
+
+        service_hash -- see CasperClient.commit_swap. Sandbox mode (or no casper
+
+        client configured) keeps the previous purely in-memory simulation.'
+      operationId: commit_atomic_swap_escrow_atomic_swap_commit_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommitRequest'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Commit Atomic Swap Escrow Atomic Swap Commit Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/atomic-swap/reveal:
+    post:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Reveal Atomic Swap
+      description: 'Reveals the secret preimage for an atomic swap.
+
+        The contract verifies the preimage against the previously committed hash.
+
+        If valid, the escrow is released.
+
+
+        Live mode calls the deployed escrow contract''s real `reveal_swap` entry
+
+        point, which verifies sha256(preimage) == commit_hash *on-chain* and
+
+        releases escrowed funds directly to the receiver as part of the same
+
+        transaction (the HTLC model: the contract has no caller-identity check
+
+        here, knowing the preimage IS the authorization) -- see
+
+        CasperClient.reveal_swap. We still verify the hash locally first so we
+
+        can return a clean 400 instead of paying gas for a doomed on-chain call.'
+      operationId: reveal_atomic_swap_escrow_atomic_swap_reveal_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RevealRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Reveal Atomic Swap Escrow Atomic Swap Reveal Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/multi-asset/{service_hash}/release:
+    post:
+      tags:
+      - multi-asset
+      - streaming
+      summary: Release Multi Asset Escrow
+      description: Release a multi-asset escrow — tokens go to the receiver.
+      operationId: release_multi_asset_escrow_escrow_multi_asset__service_hash__release_post
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateEscrowInput'
-      responses:
-        '201':
-          description: Escrow created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/EscrowResponse'
-        '400':
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-  /api/v1/escrow/{escrowId}:
-    get:
-      summary: Get escrow details
-      operationId: getEscrow
-      parameters:
-        - name: escrowId
-          in: path
-          required: true
-          schema:
-            type: string
+              $ref: '#/components/schemas/MultiAssetLifecycleRequest'
       responses:
         '200':
-          description: Escrow details
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/EscrowResponse'
-        '404':
-          description: Escrow not found
-  /api/v1/escrow/{escrowId}/release:
+                type: object
+                title: Response Release Multi Asset Escrow Escrow Multi Asset  Service
+                  Hash  Release Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/multi-asset/{service_hash}/refund:
     post:
-      summary: Release funds from escrow
-      operationId: releaseEscrow
+      tags:
+      - multi-asset
+      - streaming
+      summary: Refund Multi Asset Escrow
+      description: Refund a multi-asset escrow — tokens go back to the sender.
+      operationId: refund_multi_asset_escrow_escrow_multi_asset__service_hash__refund_post
       parameters:
-        - name: escrowId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReleaseInput'
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
       responses:
         '200':
-          description: Funds released
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TransactionResult'
-  /api/v1/escrow/{escrowId}/dispute:
+                type: object
+                title: Response Refund Multi Asset Escrow Escrow Multi Asset  Service
+                  Hash  Refund Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/multi-asset/{service_hash}/dispute:
     post:
-      summary: Open dispute on escrow
-      operationId: disputeEscrow
+      tags:
+      - multi-asset
+      - streaming
+      summary: Dispute Multi Asset Escrow
+      description: Dispute a multi-asset escrow.
+      operationId: dispute_multi_asset_escrow_escrow_multi_asset__service_hash__dispute_post
       parameters:
-        - name: escrowId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/DisputeInput'
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
       responses:
         '200':
-          description: Dispute opened
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DisputeResponse'
-  /api/v1/escrow/list:
-    get:
-      summary: List escrows
-      operationId: listEscrows
-      parameters:
-        - name: page
-          in: query
-          schema:
-            type: integer
-            default: 1
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 20
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [pending, active, completed, disputed, expired]
-      responses:
-        '200':
-          description: Paginated escrow list
+                type: object
+                title: Response Dispute Multi Asset Escrow Escrow Multi Asset  Service
+                  Hash  Dispute Post
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedEscrows'
-  /api/v1/agents/register:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/multi-asset/{service_hash}/resolve:
     post:
-      summary: Register AI agent identity
-      operationId: registerAgent
+      tags:
+      - multi-asset
+      - streaming
+      summary: Resolve Multi Asset Escrow
+      description: Resolve a disputed multi-asset escrow via arbiter quorum.
+      operationId: resolve_multi_asset_escrow_escrow_multi_asset__service_hash__resolve_post
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AgentRegistration'
+              $ref: '#/components/schemas/MultiAssetResolveRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Resolve Multi Asset Escrow Escrow Multi Asset  Service
+                  Hash  Resolve Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /insurance/deposit:
+    post:
+      tags:
+      - insurance
+      summary: Deposit To Insurance Pool
+      description: 'Allows an agent to deposit funds into the shared insurance pool.
+
+        These funds contribute to the pool''s solvency and can be used to cover claims.'
+      operationId: deposit_to_insurance_pool_insurance_deposit_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsuranceDepositRequest'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Deposit To Insurance Pool Insurance Deposit Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /insurance/claim:
+    post:
+      tags:
+      - insurance
+      summary: File Insurance Claim
+      description: 'Allows an agent to file a claim against the insurance pool for
+        a disputed or failed escrow.
+
+        Includes basic fraud detection.'
+      operationId: file_insurance_claim_insurance_claim_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InsuranceClaimRequest'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response File Insurance Claim Insurance Claim Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /insurance/pool-stats:
+    get:
+      tags:
+      - insurance
+      summary: Get Insurance Pool Stats
+      description: Retrieves current statistics for the insurance pool.
+      operationId: get_insurance_pool_stats_insurance_pool_stats_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PoolStatsResponse'
+  /insurance/premium-quote:
+    get:
+      tags:
+      - insurance
+      summary: Get Premium Quote
+      description: Calculates a dynamic insurance premium quote based on agent reputation
+        and escrow details.
+      operationId: get_premium_quote_insurance_premium_quote_get
+      parameters:
+      - name: agent_id
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      - name: escrow_amount
+        in: query
+        required: true
+        schema:
+          type: integer
+          exclusiveMinimum: 0
+          title: Escrow Amount
+      - name: service_type
+        in: query
+        required: false
+        schema:
+          type: string
+          default: general
+          title: Service Type
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PremiumQuoteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /vrf/elect:
+    post:
+      tags:
+      - vrf
+      summary: Elect Arbiter
+      description: Elect an arbiter using on-chain VRF (vrf-arbiter contract) with
+        local CSPRNG fallback.
+      operationId: elect_arbiter_vrf_elect_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ElectArbiterRequest'
+        required: true
       responses:
         '201':
-          description: Agent registered
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentProfile'
-  /api/v1/agents/{agentId}:
+                $ref: '#/components/schemas/ElectArbiterResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /vrf/election/{dispute_id}:
     get:
-      summary: Get agent profile
-      operationId: getAgent
+      tags:
+      - vrf
+      summary: Get Election Result
+      description: Retrieve the result of a previous arbiter election.
+      operationId: get_election_result_vrf_election__dispute_id__get
       parameters:
-        - name: agentId
-          in: path
-          required: true
-          schema:
-            type: string
+      - name: dispute_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Dispute Id
       responses:
         '200':
-          description: Agent profile
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentProfile'
-  /api/v1/agents/{agentId}/capabilities:
+                $ref: '#/components/schemas/ElectArbiterResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /vrf/arbiters:
     get:
-      summary: Get agent capabilities
-      operationId: getAgentCapabilities
-      parameters:
-        - name: agentId
-          in: path
-          required: true
-          schema:
-            type: string
+      tags:
+      - vrf
+      summary: Get Registered Arbiters
+      description: List all registered arbiters.
+      operationId: get_registered_arbiters_vrf_arbiters_get
       responses:
         '200':
-          description: Agent capabilities
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AgentCapabilities'
-  /api/v1/insurance/pool:
-    get:
-      summary: Get insurance pool status
-      operationId: getInsurancePool
-      responses:
-        '200':
-          description: Pool status
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/InsurancePool'
-  /api/v1/insurance/claim:
+                $ref: '#/components/schemas/ArbiterListResponse'
+  /vrf/arbiters/register:
     post:
-      summary: File insurance claim
-      operationId: fileInsuranceClaim
+      tags:
+      - vrf
+      summary: Register Arbiter
+      description: Register an arbiter in the election pool.
+      operationId: register_arbiter_vrf_arbiters_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReputationScore'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  type: string
+                type: object
+                title: Response Register Arbiter Vrf Arbiters Register Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity/register:
+    post:
+      tags:
+      - identity
+      summary: Register Agent Identity
+      description: 'Registers a new agent identity on the platform, linking a Casper
+        account hash
+
+        to a public key and a DID document hash.'
+      operationId: register_agent_identity_identity_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAgentRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__agent_identity__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity/{agent_id}:
+    get:
+      tags:
+      - identity
+      summary: Get Agent Identity
+      description: Retrieves the registered identity details for a given agent ID.
+      operationId: get_agent_identity_identity__agent_id__get
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__agent_identity__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity/delegate:
+    post:
+      tags:
+      - identity
+      summary: Delegate Capability
+      description: 'Delegates a specific capability from one agent (delegator) to
+        another (delegatee).
+
+        Requires a cryptographic signature from the delegator.'
+      operationId: delegate_capability_identity_delegate_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DelegateCapabilityRequest'
+        required: true
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                additionalProperties:
+                  anyOf:
+                  - type: string
+                  - type: integer
+                type: object
+                title: Response Delegate Capability Identity Delegate Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity/capabilities/{agent_id}:
+    get:
+      tags:
+      - identity
+      summary: Get Capabilities
+      description: Get all capabilities for an agent (own + delegated).
+      operationId: get_capabilities_identity_capabilities__agent_id__get
+      parameters:
+      - name: agent_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /risk/score/{agent}:
+    get:
+      tags:
+      - risk
+      summary: Get Agent Risk Score
+      description: Get the IsolationForest risk score for a specific agent address.
+      operationId: get_agent_risk_score_risk_score__agent__get
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRiskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /risk/dashboard:
+    get:
+      tags:
+      - risk
+      summary: Get Risk Dashboard
+      description: Return aggregated risk scores for all known agents.
+      operationId: get_risk_dashboard_risk_dashboard_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiskDashboard'
+  /identity-registry/register:
+    post:
+      tags:
+      - identity-registry
+      summary: Register Identity
+      operationId: register_identity_identity_registry_register_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterIdentityRequest'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}:
+    get:
+      tags:
+      - identity-registry
+      summary: Get Identity
+      operationId: get_identity_identity_registry__did__get
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/by-account/{account_hash}:
+    get:
+      tags:
+      - identity-registry
+      summary: Get Identity By Account
+      operationId: get_identity_by_account_identity_registry_by_account__account_hash__get
+      parameters:
+      - name: account_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Account Hash
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}/reputation:
+    post:
+      tags:
+      - identity-registry
+      summary: Update Reputation
+      operationId: update_reputation_identity_registry__did__reputation_post
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ClaimInput'
-      responses:
-        '201':
-          description: Claim filed
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ClaimResult'
-  /api/v1/risk/heatmap:
-    get:
-      summary: Get risk heatmap data
-      operationId: getRiskHeatmap
+              $ref: '#/components/schemas/UpdateReputationRequest'
       responses:
         '200':
-          description: Risk matrix data
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RiskHeatmapData'
-  /api/v1/marketplace/agents:
-    get:
-      summary: Browse agent marketplace
-      operationId: browseMarketplace
-      parameters:
-        - name: category
-          in: query
-          schema:
-            type: string
-        - name: minRating
-          in: query
-          schema:
-            type: number
-      responses:
-        '200':
-          description: Agent listings
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/MarketplaceListing'
-  /api/v1/vrf/election:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}/decay:
     post:
-      summary: Trigger VRF arbiter election
-      operationId: vrfElection
+      tags:
+      - identity-registry
+      summary: Apply Decay
+      operationId: apply_decay_identity_registry__did__decay_post
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}/slash:
+    post:
+      tags:
+      - identity-registry
+      summary: Slash Identity
+      operationId: slash_identity_identity_registry__did__slash_post
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/VRFElectionInput'
+              $ref: '#/components/schemas/SlashRequest'
       responses:
         '200':
-          description: Election result
+          description: Successful Response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/VRFElectionResult'
-  /api/v1/assets/supported:
-    get:
-      summary: List supported assets for multi-asset escrow
-      operationId: getSupportedAssets
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}/verify:
+    post:
+      tags:
+      - identity-registry
+      summary: Verify Identity
+      operationId: verify_identity_identity_registry__did__verify_post
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyRequest'
       responses:
         '200':
-          description: Supported assets
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/{did}/capabilities:
+    post:
+      tags:
+      - identity-registry
+      summary: Add Capability
+      operationId: add_capability_identity_registry__did__capabilities_post
+      parameters:
+      - name: did
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Did
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCapabilityRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/search/agents:
+    get:
+      tags:
+      - identity-registry
+      summary: Search Identities
+      operationId: search_identities_identity_registry_search_agents_get
+      parameters:
+      - name: capability
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Capability
+      - name: min_reputation
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 0
+          default: 0
+          title: Min Reputation
+      - name: min_verification
+        in: query
+        required: false
+        schema:
+          allOf:
+          - $ref: '#/components/schemas/VerificationLevel'
+          default: UNVERIFIED
+          title: Min Verification
+      responses:
+        '200':
+          description: Successful Response
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/SupportedAsset'
-  /api/v1/stats:
-    get:
-      summary: Get protocol statistics
-      operationId: getStats
-      responses:
-        '200':
-          description: Protocol stats
+                  $ref: '#/components/schemas/server__identity_registry__AgentIdentity'
+                title: Response Search Identities Identity Registry Search Agents
+                  Get
+        '422':
+          description: Validation Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ProtocolStats'
+                $ref: '#/components/schemas/HTTPValidationError'
+  /identity-registry/stats/summary:
+    get:
+      tags:
+      - identity-registry
+      summary: Registry Statistics
+      operationId: registry_statistics_identity_registry_stats_summary_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                title: Response Registry Statistics Identity Registry Stats Summary
+                  Get
+  /admin/configure-fee:
+    post:
+      tags:
+      - admin
+      summary: Configure Fee
+      description: Update the insurance fee (basis points, contract max 1000 = 10%).
+      operationId: configure_fee_admin_configure_fee_post
+      parameters:
+      - name: x-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfigureFeeRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Configure Fee Admin Configure Fee Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/set-release-cap:
+    post:
+      tags:
+      - admin
+      summary: Set Release Cap
+      description: 'Update the A1 release cap (motes). Remember to also update the
+
+        RELEASE_CAP_MOTES env var (server/config.py''s local fast-fail mirror) to
+
+        match, or /release and /escrow/atomic-swap/reveal will fast-fail against
+
+        a stale cap even though the on-chain value already changed.'
+      operationId: set_release_cap_admin_set_release_cap_post
+      parameters:
+      - name: x-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetReleaseCapRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Set Release Cap Admin Set Release Cap Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/set-arbiters:
+    post:
+      tags:
+      - admin
+      summary: Set Arbiters
+      description: 'Replace the whole on-chain arbiter_list used by resolve() and
+        the A1
+
+        cap-approval quorum. Remember to also update ARBITER_PUBKEYS env var to
+
+        match, or the backend''s local fast-fail checks will use a stale list.'
+      operationId: set_arbiters_admin_set_arbiters_post
+      parameters:
+      - name: x-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Admin-Key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetArbitersRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Set Arbiters Admin Set Arbiters Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/emergency-freeze:
+    post:
+      tags:
+      - admin
+      summary: Emergency Freeze
+      description: 'Freeze escrow-contract state changes (release/refund/dispute/resolve/
+
+        commit_swap/reveal_swap). Reversible -- see `POST /admin/unfreeze`.
+
+        Use as a last resort (e.g. a discovered exploit) while investigating.'
+      operationId: emergency_freeze_admin_emergency_freeze_post
+      parameters:
+      - name: x-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Emergency Freeze Admin Emergency Freeze Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /admin/unfreeze:
+    post:
+      tags:
+      - admin
+      summary: Unfreeze
+      description: 'Resume operations after `emergency_freeze` (installer-only on-chain
+
+        check, plus the same X-Admin-Key gate as every other route in this
+
+        file).'
+      operationId: unfreeze_admin_unfreeze_post
+      parameters:
+      - name: x-admin-key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: X-Admin-Key
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+                title: Response Unfreeze Admin Unfreeze Post
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      summary: Health
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /contracts:
+    get:
+      summary: Contracts
+      description: 'Backend-configured deployed contract addresses.
+
+
+        Previously the 3 non-escrow contract hashes were hardcoded directly in
+
+        the frontend (frontend/src/components/console/Contracts.tsx) with no
+
+        env/config wiring — a redeploy of any of them required a frontend code
+
+        change. All 4 are now sourced from Config (env-overridable) and served
+
+        here so the frontend can fetch them at runtime instead.'
+      operationId: contracts_contracts_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /stats:
+    get:
+      summary: Stats
+      description: 'Aggregate statistics for the console.
+
+
+        Neon is optional on the hosted demo. When it is disconnected or empty,
+
+        the console must still reflect the in-memory testnet/demo escrows loaded at
+
+        startup and created during the current process.'
+      operationId: stats_stats_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /escrows:
+    get:
+      summary: List Escrows
+      description: List escrows with optional filters and pagination.
+      operationId: list_escrows_escrows_get
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Status
+      - name: sender
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 1
+          title: Page
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Offset
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /wasm/escrow_funder:
+    get:
+      summary: Wasm Escrow Funder
+      description: 'Serve the session-wasm module used to fund an escrow''s on-chain
+
+        deposit directly from a caller''s own main purse (see
+
+        `sendCreateEscrowTx` in frontend/src/lib/liveTx.ts). Session code
+
+        executed under the signer''s own account context is the only way the
+
+        Casper execution engine grants legitimate elevated purse access — a
+
+        plain stored-contract call cannot (see wallet_frontend_gotchas skill
+
+        notes on `Mint error: 4` / InvalidAccessRights). This is the exact same
+
+        compiled artifact the backend''s own hosted-key flow already runs
+
+        (`server/casper_tx/escrow_funder.wasm`); serving it lets the connected
+
+        wallet sign+submit it itself instead.'
+      operationId: wasm_escrow_funder_wasm_escrow_funder_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /escrow:
+    post:
+      summary: Create Escrow
+      operationId: create_escrow_escrow_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EscrowRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrows/batch:
+    post:
+      summary: Create Escrow Batch
+      description: 'Create up to 50 escrows in ONE on-chain deploy via
+
+        escrow-manager.create_batch() (contracts/escrow-manager/src/main.rs).
+
+
+        Unlike /escrow (one escrow per deploy, hosted-key path funded from the
+
+        backend''s own purse), this batches N escrow creations behind a single
+
+        session-wasm transaction (contracts/batch-funder), trading per-escrow
+
+        dispute/insurance/ML-KEM features for deploy-count efficiency — intended
+
+        for bulk/demo provisioning, not the interactive per-agent flow.'
+      operationId: create_escrow_batch_escrows_batch_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchEscrowRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchEscrowResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrows/batch-release:
+    post:
+      summary: Batch Release Escrows
+      description: 'Release multiple batch-created escrows in one deploy.
+
+
+        Server-side enforcement: every escrow is checked against the release cap.
+
+        If any escrow exceeds the cap, a valid arbiter quorum (via
+
+        arbiter_pubkeys/arbiter_signatures) is required for the ENTIRE batch —
+
+        same threshold as single-escrow release.'
+      operationId: batch_release_escrows_escrows_batch_release_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchLifecycleResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrows/batch-cancel:
+    post:
+      summary: Batch Cancel Escrows
+      description: 'Cancel multiple batch-created escrows in one deploy.
+
+
+        Full refund to sender. Only pending escrows can be cancelled.'
+      operationId: batch_cancel_escrows_escrows_batch_cancel_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchLifecycleRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchLifecycleResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /release:
+    post:
+      summary: Release Escrow
+      description: 'Release escrowed funds to the receiver.
+
+
+        A1 hardening: if this escrow''s amount exceeds the contract''s
+
+        `release_cap`, `arbiter_pubkeys`/`arbiter_signatures` must carry a
+
+        quorum of registered-arbiter signatures over
+
+        "release:{service_hash}:cap_approval" (see arbiter_crypto.
+
+        build_cap_approval_message) — same fast-fail-then-on-chain-enforced
+
+        pattern as /resolve. Below cap, empty lists are fine.'
+      operationId: release_escrow_release_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReleaseRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /refund:
+    post:
+      summary: Refund Escrow
+      operationId: refund_escrow_refund_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefundRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /dispute:
+    post:
+      summary: Dispute Escrow
+      operationId: dispute_escrow_dispute_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DisputeRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /resolve:
+    post:
+      summary: Resolve Escrow
+      description: 'Resolve a disputed escrow via 3-of-5 arbiter multisig.
+
+
+        Unlike release/refund/dispute, this is *not* gated on the escrow
+
+        sender/receiver identity: authorization comes from the contract''s own
+
+        check that each submitted (pubkey, signature) pair is (a) a member of
+
+        the on-chain registered `arbiter_list` and (b) a real Ed25519 signature
+
+        over the canonical vote message `"resolve:{service_hash}:{in_favor_of}"`,
+
+        verified on-chain via `casper_types::crypto::verify`. Any caller may
+
+        submit this once they have collected enough signed arbiter votes
+
+        off-chain -- a claimed account-hash alone is never sufficient.'
+      operationId: resolve_escrow_resolve_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /arbitration/analyze:
+    post:
+      tags:
+      - arbitration
+      summary: Arbitrate Dispute
+      description: 'Run LLM arbitration on dispute evidence.
+
+
+        Tries Groq → NVIDIA NIM → heuristic fallback.
+
+        Returns recommendation: favor_sender | favor_receiver | split | escalate.'
+      operationId: arbitrate_dispute_arbitration_analyze_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ArbitrateRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArbitrationRecommendation'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /arbitration/history:
+    get:
+      tags:
+      - arbitration
+      summary: Arbitration History
+      description: 'Most recent LLM arbitration analyses (process-lifetime in-memory
+        history),
+
+        newest first. Powers the console''s Arbitration verdict-history view.'
+      operationId: arbitration_history_arbitration_history_get
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          default: 20
+          title: Limit
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ArbitrationRecommendation'
+                title: Response Arbitration History Arbitration History Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /escrow/{service_hash}:
+    get:
+      summary: Get Escrow
+      operationId: get_escrow_escrow__service_hash__get
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /reputation/{agent}:
+    get:
+      summary: Get Reputation
+      operationId: get_reputation_reputation__agent__get
+      parameters:
+      - name: agent
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Agent
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReputationRecord'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /agents:
+    get:
+      summary: List Agents
+      description: List known agents with their reputation scores.
+      operationId: list_agents_agents_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /escrow/{service_hash}/history:
+    get:
+      summary: Escrow History
+      description: Transaction timeline for a specific escrow.
+      operationId: escrow_history_escrow__service_hash__history_get
+      parameters:
+      - name: service_hash
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Service Hash
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /estimate:
+    get:
+      summary: Fee Estimate
+      description: Calculate insurance fee for a given amount.
+      operationId: fee_estimate_estimate_get
+      parameters:
+      - name: amount
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Amount
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /events:
+    get:
+      summary: Event Stream
+      description: Server-Sent Events stream for real-time escrow updates.
+      operationId: event_stream_events_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /compute-hash:
+    post:
+      summary: Compute Hash
+      description: Utility endpoint to compute a service hash.
+      operationId: compute_hash_compute_hash_post
+      parameters:
+      - name: sender
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Sender
+      - name: receiver
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Receiver
+      - name: amount
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Amount
+      - name: nonce
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Nonce
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
 components:
   schemas:
-    HealthResponse:
-      type: object
+    AddCapabilityRequest:
       properties:
-        status:
+        capability:
+          $ref: '#/components/schemas/AgentCapability'
+      type: object
+      required:
+      - capability
+      title: AddCapabilityRequest
+    AgentCapability:
+      properties:
+        name:
           type: string
+          title: Name
         version:
           type: string
-        uptime:
-          type: number
-    CreateEscrowInput:
+          title: Version
+        description:
+          type: string
+          title: Description
+        verified:
+          type: boolean
+          title: Verified
+          default: false
       type: object
-      required: [buyer, seller, amount, asset, terms]
+      required:
+      - name
+      - version
+      - description
+      title: AgentCapability
+    AgentRiskResponse:
       properties:
-        buyer:
+        agent:
           type: string
-          description: Buyer agent public key
-        seller:
+          title: Agent
+        risk_score:
+          type: integer
+          title: Risk Score
+        anomaly_flag:
+          type: boolean
+          title: Anomaly Flag
+        explanation:
           type: string
-          description: Seller agent public key
+          title: Explanation
+        model_version:
+          type: string
+          title: Model Version
+        scored_at:
+          type: integer
+          title: Scored At
+        escrow_count:
+          type: integer
+          title: Escrow Count
+        total_volume_motes:
+          type: integer
+          title: Total Volume Motes
+        dispute_rate:
+          type: number
+          title: Dispute Rate
+      type: object
+      required:
+      - agent
+      - risk_score
+      - anomaly_flag
+      - explanation
+      - model_version
+      - scored_at
+      - escrow_count
+      - total_volume_motes
+      - dispute_rate
+      title: AgentRiskResponse
+    ArbiterListResponse:
+      properties:
+        arbiters:
+          items:
+            $ref: '#/components/schemas/ReputationScore'
+          type: array
+          title: Arbiters
+        count:
+          type: integer
+          title: Count
+      type: object
+      required:
+      - arbiters
+      - count
+      title: ArbiterListResponse
+    ArbiterRecord:
+      properties:
+        arbiter_id:
+          type: string
+          title: Arbiter Id
+        reputation_score:
+          type: number
+          title: Reputation Score
+        completed_arbitrations:
+          type: integer
+          title: Completed Arbitrations
+        availability:
+          type: boolean
+          title: Availability
+          default: true
+      type: object
+      required:
+      - arbiter_id
+      - reputation_score
+      - completed_arbitrations
+      title: ArbiterRecord
+    ArbitrateRequest:
+      properties:
+        dispute_id:
+          type: string
+          title: Dispute Id
+        sender_evidence:
+          items:
+            $ref: '#/components/schemas/DisputeEvidence'
+          type: array
+          title: Sender Evidence
+        receiver_evidence:
+          items:
+            $ref: '#/components/schemas/DisputeEvidence'
+          type: array
+          title: Receiver Evidence
+        escrow_amount:
+          type: integer
+          title: Escrow Amount
+      type: object
+      required:
+      - dispute_id
+      - sender_evidence
+      - receiver_evidence
+      - escrow_amount
+      title: ArbitrateRequest
+    ArbitrationRecommendation:
+      properties:
+        dispute_id:
+          type: string
+          title: Dispute Id
+        recommendation:
+          type: string
+          pattern: ^(favor_sender|favor_receiver|split|escalate)$
+          title: Recommendation
+        confidence:
+          type: number
+          maximum: 1.0
+          minimum: 0.0
+          title: Confidence
+        reasoning:
+          type: string
+          title: Reasoning
+        risk_factors:
+          items:
+            type: string
+          type: array
+          title: Risk Factors
+        suggested_split_pct:
+          type: number
+          maximum: 100.0
+          minimum: 0.0
+          title: Suggested Split Pct
+        analysis_hash:
+          type: string
+          title: Analysis Hash
+        provider:
+          type: string
+          title: Provider
+          default: heuristic
+      type: object
+      required:
+      - dispute_id
+      - recommendation
+      - confidence
+      - reasoning
+      - risk_factors
+      - suggested_split_pct
+      - analysis_hash
+      title: ArbitrationRecommendation
+    BatchEscrowItem:
+      properties:
+        receiver:
+          type: string
+          pattern: ^(account-hash-)?[0-9a-fA-F]{64}$
+          title: Receiver
+          description: Casper account hash of the receiver (raw 64-hex or account-hash-
+            prefixed)
         amount:
-          type: string
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Amount
           description: Amount in motes
-        asset:
+        service_hash:
           type: string
-          description: Asset type (CSPR, CEP-18 token address)
-        terms:
-          type: object
-          properties:
-            deadline:
-              type: integer
-              description: Unix timestamp
-            autoRelease:
-              type: boolean
-            insuranceRequired:
-              type: boolean
-    EscrowResponse:
-      type: object
-      properties:
-        id:
-          type: string
-        buyer:
-          type: string
-        seller:
-          type: string
-        amount:
-          type: string
-        asset:
-          type: string
-        status:
-          type: string
-          enum: [pending, active, completed, disputed, expired]
-        contractHash:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        deployHash:
-          type: string
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-        code:
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-fA-F]{64}$
+          title: Service Hash
+        ttl:
           type: integer
-        details:
-          type: string
-    ReleaseInput:
+          maximum: 86400.0
+          minimum: 60.0
+          title: Ttl
+          description: Time-to-live in seconds
+          default: 300
       type: object
+      required:
+      - receiver
+      - amount
+      - service_hash
+      title: BatchEscrowItem
+      description: A single escrow spec within a batch-create request.
+    BatchEscrowRequest:
       properties:
-        senderKey:
-          type: string
-        proof:
-          type: string
-    TransactionResult:
+        escrows:
+          items:
+            $ref: '#/components/schemas/BatchEscrowItem'
+          type: array
+          maxItems: 50
+          minItems: 1
+          title: Escrows
       type: object
+      required:
+      - escrows
+      title: BatchEscrowRequest
+      description: 'Request to create up to 50 escrows in a single on-chain deploy
+        via
+
+        escrow-manager.create_batch().'
+    BatchEscrowResponse:
       properties:
-        txHash:
+        deploy_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deploy Hash
+        created:
+          type: integer
+          title: Created
+        records:
+          items:
+            $ref: '#/components/schemas/EscrowRecord'
+          type: array
+          title: Records
+      type: object
+      required:
+      - created
+      - records
+      title: BatchEscrowResponse
+      description: Result of a batch escrow creation.
+    BatchLifecycleRequest:
+      properties:
+        service_hashes:
+          items:
+            type: string
+          type: array
+          title: Service Hashes
+        arbiter_pubkeys:
+          items:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+          default: []
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
+          default: []
+      type: object
+      required:
+      - service_hashes
+      title: BatchLifecycleRequest
+      description: Request to batch-release or batch-cancel escrows.
+    BatchLifecycleResponse:
+      properties:
+        deploy_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deploy Hash
+        processed:
+          type: integer
+          title: Processed
+      type: object
+      required:
+      - deploy_hash
+      - processed
+      title: BatchLifecycleResponse
+    CommitRequest:
+      properties:
+        service_hash:
           type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        commit_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Commit Hash
+          description: SHA256 hash of the secret preimage
+      type: object
+      required:
+      - service_hash
+      - commit_hash
+      title: CommitRequest
+      description: Request to commit a hash for an atomic swap.
+    ConfigureFeeRequest:
+      properties:
+        new_fee_bps:
+          type: integer
+          maximum: 1000.0
+          minimum: 0.0
+          title: New Fee Bps
+          description: Basis points, contract max 1000 = 10%
+      type: object
+      required:
+      - new_fee_bps
+      title: ConfigureFeeRequest
+    DelegateCapabilityRequest:
+      properties:
+        delegator_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+          pattern: ^[a-zA-Z0-9_:.-]+$
+          title: Delegator Id
+          description: Public ID of the delegating agent
+        delegatee_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+          pattern: ^[a-zA-Z0-9_:.-]+$
+          title: Delegatee Id
+          description: Public ID of the agent receiving the capability
+        capability_uri:
+          type: string
+          maxLength: 256
+          minLength: 1
+          pattern: ^[a-zA-Z0-9_:/?.#=-]+$
+          title: Capability Uri
+          description: URI identifying the capability (e.g., 'urn:escrow:release')
+        expiry_timestamp:
+          type: integer
+          exclusiveMinimum: 1783423454.0
+          title: Expiry Timestamp
+          description: Unix timestamp when the delegation expires
+        signature:
+          type: string
+          maxLength: 128
+          minLength: 128
+          pattern: ^[0-9a-fA-F]{128}$
+          title: Signature
+          description: Ed25519 signature of the canonical delegation message
+      type: object
+      required:
+      - delegator_id
+      - delegatee_id
+      - capability_uri
+      - expiry_timestamp
+      - signature
+      title: DelegateCapabilityRequest
+      description: Request to delegate a capability from one agent to another.
+    DisputeEvidence:
+      properties:
+        escrow_id:
+          type: string
+          title: Escrow Id
+        claimant:
+          type: string
+          title: Claimant
+        evidence_type:
+          type: string
+          pattern: ^(text|screenshot|hash|transaction)$
+          title: Evidence Type
+        content_hash:
+          type: string
+          title: Content Hash
+        description:
+          type: string
+          title: Description
+        timestamp:
+          type: integer
+          title: Timestamp
+      type: object
+      required:
+      - escrow_id
+      - claimant
+      - evidence_type
+      - content_hash
+      - description
+      - timestamp
+      title: DisputeEvidence
+    DisputeRequest:
+      properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        reason_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Reason Hash
+        wallet_tx_hash:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Wallet Tx Hash
+      type: object
+      required:
+      - service_hash
+      - reason_hash
+      title: DisputeRequest
+    ElectArbiterRequest:
+      properties:
+        dispute_id:
+          type: string
+          title: Dispute Id
+          description: Unique dispute identifier
+        sender:
+          type: string
+          title: Sender
+          description: Dispute sender account (excluded from election). For the on-chain
+            VRF path this must match the on-chain arbiter identity format -- a plain
+            lowercase-hex Casper account hash, no 'account-hash-' prefix -- since
+            that is what elected candidates are compared against (INVARIANT 5).
+        receiver:
+          type: string
+          title: Receiver
+          description: Dispute receiver account (excluded from election); same format
+            as `sender`.
+        seed_hash:
+          type: string
+          title: Seed Hash
+          description: A recent block hash or other verifiable random seed for election
+      type: object
+      required:
+      - dispute_id
+      - sender
+      - receiver
+      - seed_hash
+      title: ElectArbiterRequest
+    ElectArbiterResponse:
+      properties:
+        dispute_id:
+          type: string
+          title: Dispute Id
+        elected_arbiter:
+          $ref: '#/components/schemas/ArbiterRecord'
+        election_proof:
+          type: string
+          title: Election Proof
+        elected_at:
+          type: integer
+          title: Elected At
+        method:
+          type: string
+          title: Method
+          default: onchain_vrf
+      type: object
+      required:
+      - dispute_id
+      - elected_arbiter
+      - election_proof
+      - elected_at
+      title: ElectArbiterResponse
+    EscrowRecord:
+      properties:
+        sender:
+          type: string
+          title: Sender
+        receiver:
+          type: string
+          title: Receiver
+        amount:
+          type: integer
+          title: Amount
+        service_hash:
+          type: string
+          title: Service Hash
+        status:
+          $ref: '#/components/schemas/EscrowStatus'
+        created_at:
+          type: integer
+          title: Created At
+        ttl:
+          type: integer
+          title: Ttl
+        deploy_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deploy Hash
+        mlkem_ciphertext:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mlkem Ciphertext
+        mlkem_decap_key:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mlkem Decap Key
+        mlkem_algorithm:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Mlkem Algorithm
+      type: object
+      required:
+      - sender
+      - receiver
+      - amount
+      - service_hash
+      - status
+      - created_at
+      - ttl
+      title: EscrowRecord
+      description: 'On-chain escrow record.
+
+
+        Optional ML-KEM fields are returned by create_escrow so the console can
+
+        prove that post-quantum metadata encryption actually ran for the demo.'
+    EscrowRequest:
+      properties:
+        receiver:
+          type: string
+          pattern: ^(account-hash-)?[0-9a-fA-F]{64}$
+          title: Receiver
+          description: Casper account hash of the receiver (raw 64-hex or account-hash-
+            prefixed)
+        amount:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Amount
+          description: Amount in motes
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-fA-F]{64}$
+          title: Service Hash
+        ttl:
+          type: integer
+          maximum: 86400.0
+          minimum: 60.0
+          title: Ttl
+          description: Time-to-live in seconds
+          default: 300
+        wallet_tx_hash:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Wallet Tx Hash
+        sender_public_key_hex:
+          anyOf:
+          - type: string
+            maxLength: 140
+            minLength: 1
+          - type: 'null'
+          title: Sender Public Key Hex
+      type: object
+      required:
+      - receiver
+      - amount
+      - service_hash
+      title: EscrowRequest
+      description: Request to create a new escrow.
+    EscrowStatus:
+      type: string
+      enum:
+      - pending
+      - released
+      - refunded
+      - expired
+      - disputed
+      - resolved
+      - released
+      - refunded
+      title: EscrowStatus
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
         status:
           type: string
-        gasUsed:
+          title: Status
+          default: ok
+        version:
           type: string
-    DisputeInput:
+          title: Version
+          default: 0.2.0
+        sandbox:
+          type: boolean
+          title: Sandbox
+          default: true
+        chain:
+          type: string
+          title: Chain
+          default: ''
+        contract_hash:
+          type: string
+          title: Contract Hash
+          default: ''
+        db:
+          type: string
+          title: Db
+          default: disconnected
+        uptime:
+          type: integer
+          title: Uptime
+          default: 0
       type: object
-      required: [reason]
+      title: HealthResponse
+    InsuranceClaimRequest:
       properties:
+        escrow_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Escrow Hash
+          description: Service hash of the disputed escrow
         reason:
           type: string
-        evidence:
-          type: string
-    DisputeResponse:
-      type: object
-      properties:
-        disputeId:
-          type: string
-        status:
-          type: string
-        arbiter:
-          type: string
-    PaginatedEscrows:
-      type: object
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/EscrowResponse'
-        total:
-          type: integer
-        page:
-          type: integer
-        limit:
-          type: integer
-    AgentRegistration:
-      type: object
-      required: [publicKey, name]
-      properties:
-        publicKey:
-          type: string
-        name:
-          type: string
-        capabilities:
-          type: array
+          minLength: 10
+          title: Reason
+          description: Reason for the claim
+        wallet_tx_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Wallet Tx Hash
+          description: Transaction hash of a wallet-submitted on-chain claim() call
+        sender_public_key_hex:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Sender Public Key Hex
+          description: Connected wallet's public key hex, matched against the escrow's
+            recorded sender/receiver (required when wallet_tx_hash is set)
+        claimant_account_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Claimant Account Hash
+          description: account-hash-{hex} of the connected wallet, used to poll the
+            on-chain claims dict (required when wallet_tx_hash is set)
+        arbiter_pubkeys:
           items:
             type: string
-        metadata:
-          type: object
-    AgentProfile:
-      type: object
-      properties:
-        id:
-          type: string
-        publicKey:
-          type: string
-        name:
-          type: string
-        rating:
-          type: number
-        totalEscrows:
-          type: integer
-        successRate:
-          type: number
-        registeredAt:
-          type: string
-          format: date-time
-    AgentCapabilities:
-      type: object
-      properties:
-        agentId:
-          type: string
-        capabilities:
           type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
           items:
             type: string
-        protocols:
           type: array
-          items:
-            type: string
-        maxEscrowAmount:
-          type: string
-    InsurancePool:
+          title: Arbiter Signatures
       type: object
+      required:
+      - escrow_hash
+      - reason
+      title: InsuranceClaimRequest
+      description: Request to file a claim against the insurance pool.
+    InsuranceDepositRequest:
       properties:
-        totalStaked:
-          type: string
-        availableFunds:
-          type: string
-        activeClaims:
-          type: integer
-        premiumRate:
-          type: number
-    ClaimInput:
-      type: object
-      required: [escrowId, reason, amount]
-      properties:
-        escrowId:
-          type: string
-        reason:
-          type: string
         amount:
-          type: string
-    ClaimResult:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Amount
+          description: Amount in motes to deposit
       type: object
+      required:
+      - amount
+      title: InsuranceDepositRequest
+      description: Request to deposit funds into the insurance pool.
+    MultiAssetEscrowRequest:
       properties:
-        claimId:
+        receiver:
           type: string
-        status:
+          title: Receiver
+          description: Casper account hash of the receiver
+        amount:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: Amount
+          description: Amount in motes or token units
+        token:
+          allOf:
+          - $ref: '#/components/schemas/TokenIdentifier'
+          description: Details of the token being escrowed
+        service_hash:
           type: string
-        estimatedPayout:
-          type: string
-    RiskHeatmapData:
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        ttl:
+          type: integer
+          maximum: 86400.0
+          minimum: 60.0
+          title: Ttl
+          description: Time-to-live in seconds
+          default: 300
+        permit:
+          anyOf:
+          - $ref: '#/components/schemas/PermitProof'
+          - type: 'null'
+          description: 'CEP-18-only: when set, funds move from the owner''s own wallet
+            balance via a gasless permit()+transfer_from() instead of the backend''s
+            custodial demo balance.'
       type: object
+      required:
+      - receiver
+      - amount
+      - token
+      - service_hash
+      title: MultiAssetEscrowRequest
+      description: Request to create a new multi-asset escrow.
+    MultiAssetLifecycleRequest:
       properties:
-        matrix:
-          type: array
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        arbiter_pubkeys:
           items:
-            type: object
-            properties:
-              category:
-                type: string
-              level:
-                type: string
-              count:
-                type: integer
-              value:
-                type: number
-        totalRiskScore:
-          type: number
-    MarketplaceListing:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
       type: object
+      required:
+      - service_hash
+      title: MultiAssetLifecycleRequest
+      description: Request body for multi-asset escrow lifecycle operations.
+    MultiAssetResolveRequest:
       properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        in_favor_of:
+          type: string
+          pattern: ^(sender|receiver)$
+          title: In Favor Of
+        arbiter_pubkeys:
+          items:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
+      type: object
+      required:
+      - service_hash
+      - in_favor_of
+      title: MultiAssetResolveRequest
+      description: Request body for multi-asset escrow dispute resolution.
+    PermitProof:
+      properties:
+        owner_account_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Owner Account Hash
+        deadline:
+          type: integer
+          title: Deadline
+          description: Unix ms deadline, must be in the future
+        signature:
+          type: string
+          title: Signature
+          description: Owner's Ed25519 signature, hex, tag-prefixed
+      type: object
+      required:
+      - owner_account_hash
+      - deadline
+      - signature
+      title: PermitProof
+      description: 'CEP-2612-inspired gasless permit proof (see CasperClient.cep18_permit).
+
+
+        The owner signs `owner_account_hash` was authorized to allow
+
+        `spender_account_hash` (always the backend operator''s own account, the
+
+        relayer) to move `amount` of the token identified by the surrounding
+
+        request, off-chain via their own wallet -- see
+
+        frontend/src/lib/cep18Permit.ts for the exact canonical message the
+
+        signature must cover. The backend never sees or needs the owner''s
+
+        private key.'
+    PoolStatsResponse:
+      properties:
+        total_assets:
+          type: integer
+          title: Total Assets
+        total_premiums_collected:
+          type: integer
+          title: Total Premiums Collected
+        total_claims_paid:
+          type: integer
+          title: Total Claims Paid
+        total_claims_filed:
+          type: integer
+          title: Total Claims Filed
+        coverage_ratio:
+          type: number
+          title: Coverage Ratio
+          description: Ratio of total assets to total potential liabilities (simplified)
+        last_rebalance_time:
+          type: integer
+          title: Last Rebalance Time
+      type: object
+      required:
+      - total_assets
+      - total_premiums_collected
+      - total_claims_paid
+      - total_claims_filed
+      - coverage_ratio
+      - last_rebalance_time
+      title: PoolStatsResponse
+      description: Response containing current insurance pool statistics.
+    PremiumQuoteResponse:
+      properties:
+        premium_amount:
+          type: integer
+          title: Premium Amount
+          description: Calculated premium in motes
+        risk_multiplier:
+          type: number
+          title: Risk Multiplier
+          description: Risk multiplier applied to the base rate
+        base_rate_bps:
+          type: integer
+          title: Base Rate Bps
+          description: Base premium rate in basis points
+      type: object
+      required:
+      - premium_amount
+      - risk_multiplier
+      - base_rate_bps
+      title: PremiumQuoteResponse
+      description: Response containing the calculated insurance premium.
+    RefundRequest:
+      properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        wallet_tx_hash:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Wallet Tx Hash
+      type: object
+      required:
+      - service_hash
+      title: RefundRequest
+    RegisterAgentRequest:
+      properties:
+        agent_id:
+          type: string
+          maxLength: 128
+          minLength: 1
+          pattern: ^[a-zA-Z0-9_:.-]+$
+          title: Agent Id
+          description: Public agent identifier
+        public_key:
+          type: string
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-fA-F]{64}$
+          title: Public Key
+          description: Public key associated with the agent's identity
+        did_document_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-fA-F]{64}$
+          title: Did Document Hash
+          description: SHA256 hash of the agent's Decentralized Identity (DID) document
+      type: object
+      required:
+      - agent_id
+      - public_key
+      - did_document_hash
+      title: RegisterAgentRequest
+      description: Request to register a new agent identity.
+    RegisterIdentityRequest:
+      properties:
+        account_hash:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Account Hash
+        display_name:
+          type: string
+          maxLength: 256
+          title: Display Name
+        capabilities:
+          items:
+            $ref: '#/components/schemas/AgentCapability'
+          type: array
+          title: Capabilities
+      type: object
+      required:
+      - account_hash
+      - display_name
+      title: RegisterIdentityRequest
+    ReleaseRequest:
+      properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        wallet_tx_hash:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Wallet Tx Hash
+        arbiter_pubkeys:
+          items:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
+      type: object
+      required:
+      - service_hash
+      title: ReleaseRequest
+    ReputationRecord:
+      properties:
+        agent:
+          type: string
+          title: Agent
+        completed:
+          type: integer
+          title: Completed
+          default: 0
+        disputed:
+          type: integer
+          title: Disputed
+          default: 0
+        slashed:
+          type: integer
+          title: Slashed
+          default: 0
+        last_active:
+          type: integer
+          title: Last Active
+          default: 0
+        score:
+          type: integer
+          title: Score
+          default: 50
+      type: object
+      required:
+      - agent
+      title: ReputationRecord
+    ReputationScore:
+      properties:
+        agent:
+          type: string
+          title: Agent
+        score:
+          type: number
+          title: Score
+          default: 0.0
+        completed:
+          type: integer
+          title: Completed
+          default: 0
+        disputed:
+          type: integer
+          title: Disputed
+          default: 0
+      type: object
+      required:
+      - agent
+      title: ReputationScore
+    ResolveRequest:
+      properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        in_favor_of:
+          type: string
+          pattern: ^(sender|receiver)$
+          title: In Favor Of
+        arbiter_pubkeys:
+          items:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
+      type: object
+      required:
+      - service_hash
+      - in_favor_of
+      - arbiter_pubkeys
+      - arbiter_signatures
+      title: ResolveRequest
+    RevealRequest:
+      properties:
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        preimage:
+          type: string
+          minLength: 1
+          title: Preimage
+          description: The secret preimage to reveal
+        arbiter_pubkeys:
+          items:
+            type: string
+          type: array
+          title: Arbiter Pubkeys
+        arbiter_signatures:
+          items:
+            type: string
+          type: array
+          title: Arbiter Signatures
+      type: object
+      required:
+      - service_hash
+      - preimage
+      title: RevealRequest
+      description: Request to reveal the preimage for an atomic swap.
+    RiskDashboard:
+      properties:
+        total_agents:
+          type: integer
+          title: Total Agents
+        high_risk_count:
+          type: integer
+          title: High Risk Count
+        avg_risk_score:
+          type: number
+          title: Avg Risk Score
         agents:
-          type: array
           items:
-            $ref: '#/components/schemas/AgentProfile'
-        total:
-          type: integer
-    VRFElectionInput:
-      type: object
-      properties:
-        escrowId:
-          type: string
-        candidates:
+            $ref: '#/components/schemas/AgentRiskResponse'
           type: array
+          title: Agents
+        model_trained_at:
+          type: number
+          title: Model Trained At
+        training_samples:
+          type: integer
+          title: Training Samples
+      type: object
+      required:
+      - total_agents
+      - high_risk_count
+      - avg_risk_score
+      - agents
+      - model_trained_at
+      - training_samples
+      title: RiskDashboard
+    SetArbitersRequest:
+      properties:
+        arbiters:
           items:
             type: string
-    VRFElectionResult:
+          type: array
+          minItems: 1
+          title: Arbiters
+          description: Full replacement arbiter_list — hex-encoded Ed25519 pubkeys
       type: object
+      required:
+      - arbiters
+      title: SetArbitersRequest
+    SetReleaseCapRequest:
       properties:
-        selectedArbiter:
-          type: string
-        vrfProof:
-          type: string
-        randomness:
-          type: string
-    SupportedAsset:
+        new_cap_motes:
+          type: integer
+          exclusiveMinimum: 0.0
+          title: New Cap Motes
+          description: New A1 release cap, in motes
       type: object
+      required:
+      - new_cap_motes
+      title: SetReleaseCapRequest
+    SlashRequest:
       properties:
-        symbol:
-          type: string
-        name:
-          type: string
-        contractHash:
-          type: string
-        decimals:
+        amount:
           type: integer
-    ProtocolStats:
+          exclusiveMinimum: 0.0
+          title: Amount
+        reason:
+          type: string
+          maxLength: 256
+          minLength: 1
+          title: Reason
       type: object
+      required:
+      - amount
+      - reason
+      title: SlashRequest
+    StreamEscrowRequest:
       properties:
-        totalEscrows:
-          type: integer
-        activeEscrows:
-          type: integer
-        totalVolume:
+        receiver:
           type: string
-        registeredAgents:
+          title: Receiver
+          description: Casper account hash of the receiver
+        amount:
           type: integer
-        disputeRate:
+          exclusiveMinimum: 0.0
+          title: Amount
+          description: Total amount in motes or token units
+        token:
+          allOf:
+          - $ref: '#/components/schemas/TokenIdentifier'
+          description: Details of the token being streamed
+        service_hash:
+          type: string
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+        start_time:
+          type: integer
+          title: Start Time
+          description: Unix timestamp when streaming starts
+        end_time:
+          type: integer
+          title: End Time
+          description: Unix timestamp when streaming ends
+      additionalProperties: false
+      type: object
+      required:
+      - receiver
+      - amount
+      - token
+      - service_hash
+      - start_time
+      - end_time
+      title: StreamEscrowRequest
+      description: Request to create a new streaming escrow.
+      example:
+        amount: 1000000000
+        end_time: 1783427054
+        receiver: account-hash-...
+        service_hash: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        start_time: 1783423454
+        token:
+          token_type: cspr
+    StreamStatusResponse:
+      properties:
+        service_hash:
+          type: string
+          title: Service Hash
+        total_amount:
+          type: integer
+          title: Total Amount
+        token:
+          $ref: '#/components/schemas/TokenIdentifier'
+        receiver:
+          type: string
+          title: Receiver
+        sender:
+          type: string
+          title: Sender
+        start_time:
+          type: integer
+          title: Start Time
+        end_time:
+          type: integer
+          title: End Time
+        streamed_amount:
+          type: integer
+          title: Streamed Amount
+        remaining_amount:
+          type: integer
+          title: Remaining Amount
+        status:
+          $ref: '#/components/schemas/EscrowStatus'
+        last_payout_time:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Last Payout Time
+      type: object
+      required:
+      - service_hash
+      - total_amount
+      - token
+      - receiver
+      - sender
+      - start_time
+      - end_time
+      - streamed_amount
+      - remaining_amount
+      - status
+      title: StreamStatusResponse
+      description: Current status of a streaming escrow.
+    TokenIdentifier:
+      properties:
+        token_type:
+          type: string
+          pattern: ^(cspr|cep18|cep78)$
+          title: Token Type
+          description: 'Type of token: ''cspr'', ''cep18'', or ''cep78'''
+        contract_hash:
+          anyOf:
+          - type: string
+            maxLength: 64
+            minLength: 64
+          - type: 'null'
+          title: Contract Hash
+          description: Contract hash for CEP-18/CEP-78 tokens
+      type: object
+      required:
+      - token_type
+      title: TokenIdentifier
+      description: Identifies a token type (CSPR, CEP-18, CEP-78).
+    UpdateReputationRequest:
+      properties:
+        completed:
+          type: integer
+          minimum: 0.0
+          title: Completed
+          default: 0
+        disputed:
+          type: integer
+          minimum: 0.0
+          title: Disputed
+          default: 0
+      type: object
+      title: UpdateReputationRequest
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    VerificationLevel:
+      type: string
+      enum:
+      - UNVERIFIED
+      - BASIC
+      - ENHANCED
+      - FULL
+      title: VerificationLevel
+    VerifyRequest:
+      properties:
+        level:
+          $ref: '#/components/schemas/VerificationLevel'
+      type: object
+      required:
+      - level
+      title: VerifyRequest
+    server__agent_identity__AgentIdentity:
+      properties:
+        agent_id:
+          type: string
+          title: Agent Id
+        public_key:
+          type: string
+          title: Public Key
+        did_document_hash:
+          type: string
+          title: Did Document Hash
+        registered_at:
+          type: integer
+          title: Registered At
+        updated_at:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Updated At
+        capabilities:
+          items:
+            type: string
+          type: array
+          title: Capabilities
+          description: List of capabilities delegated to this agent
+        deploy_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Deploy Hash
+        mode:
+          type: string
+          title: Mode
+          default: local_registry
+      type: object
+      required:
+      - agent_id
+      - public_key
+      - did_document_hash
+      - registered_at
+      title: AgentIdentity
+      description: Details of an agent's registered identity.
+    server__identity_registry__AgentIdentity:
+      properties:
+        did:
+          type: string
+          title: Did
+        account_hash:
+          type: string
+          title: Account Hash
+        display_name:
+          type: string
+          title: Display Name
+        capabilities:
+          items:
+            $ref: '#/components/schemas/AgentCapability'
+          type: array
+          title: Capabilities
+        verification_level:
+          $ref: '#/components/schemas/VerificationLevel'
+        reputation_score:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Reputation Score
+        total_deals:
+          type: integer
+          title: Total Deals
+        dispute_rate:
           type: number
-        averageSettlementTime:
-          type: number
+          title: Dispute Rate
+        registered_at:
+          type: integer
+          title: Registered At
+        last_active:
+          type: integer
+          title: Last Active
+        metadata_hash:
+          type: string
+          title: Metadata Hash
+        risk_score:
+          type: integer
+          maximum: 100.0
+          minimum: 0.0
+          title: Risk Score
+        slashed_count:
+          type: integer
+          title: Slashed Count
+        stake:
+          type: integer
+          minimum: 0.0
+          title: Stake
+          default: 0
+      type: object
+      required:
+      - did
+      - account_hash
+      - display_name
+      - capabilities
+      - verification_level
+      - reputation_score
+      - total_deals
+      - dispute_rate
+      - registered_at
+      - last_active
+      - metadata_hash
+      - risk_score
+      - slashed_count
+      title: AgentIdentity

@@ -291,3 +291,59 @@ class EscrowClient:
 
     async def __aexit__(self, *exc: Any) -> None:
         await self.close()
+
+    # -- Batch lifecycle --------------------------------------------------
+
+    async def batch_release(self, service_hashes: list[str]) -> dict[str, Any]:
+        """Release multiple escrows atomically with cap/quorum guard."""
+        resp = await self._http.post(
+            f"{self._base}/escrows/batch-release",
+            json={"service_hashes": service_hashes},
+            params={"sender": self._sender} if self._sandbox else None,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def batch_cancel(self, service_hashes: list[str]) -> dict[str, Any]:
+        """Cancel (refund) multiple pending escrows."""
+        resp = await self._http.post(
+            f"{self._base}/escrows/batch-cancel",
+            json={"service_hashes": service_hashes},
+            params={"sender": self._sender} if self._sandbox else None,
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    # -- Streaming escrow -------------------------------------------------
+
+    async def claim_stream(self, service_hash: str) -> dict[str, Any]:
+        """Claim a fully-vested streaming escrow (on-chain release)."""
+        resp = await self._http.post(f"{self._base}/escrow/{service_hash}/stream-claim")
+        resp.raise_for_status()
+        return resp.json()
+
+    # -- VRF election -----------------------------------------------------
+
+    async def elect_arbiter(
+        self, dispute_id: str, sender: str, receiver: str, seed_hash: str,
+    ) -> dict[str, Any]:
+        """Run VRF-based on-chain arbiter election for a dispute."""
+        resp = await self._http.post(
+            f"{self._base}/vrf/elect",
+            json={
+                "dispute_id": dispute_id,
+                "sender": sender,
+                "receiver": receiver,
+                "seed_hash": seed_hash,
+            },
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    # -- Risk scoring -----------------------------------------------------
+
+    async def risk_score(self, agent: str) -> dict[str, Any]:
+        """Get IsolationForest anomaly-detection risk score for an agent."""
+        resp = await self._http.get(f"{self._base}/risk/score/{agent}")
+        resp.raise_for_status()
+        return resp.json()
