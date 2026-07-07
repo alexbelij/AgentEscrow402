@@ -66,15 +66,19 @@ ordering in release/refund/resolve, `checked_sub` on the fee deduction (new
   payment-streaming primitive yet.
 - **Single-process only** — The global `casper_client` instance is not thread-safe for
   multi-worker deployments.
-- **VRF arbiter election write path is not wired** — `server/vrf_election.py`'s on-chain read
-  helper (`_elect_via_onchain_vrf`) correctly queries the deployed `vrf-arbiter` contract's
-  `elections_dict` (fixed in commit `235d8ca`, previously read the wrong contract/dictionary),
-  but nothing in the backend ever submits the `select_arbiters` transaction that would populate
-  that dictionary in the first place. In practice every `/vrf/elect` call today falls through to
-  `_elect_local_csprng`, a reputation-weighted local pseudo-random choice — correctly labeled
-  `method: "local_csprng"` in the API response, not hidden, but not the on-chain-randomness
-  guarantee the feature name implies. Wiring the write path (submit `select_arbiters`, plus
-  registering arbiters via `register_arbiter` with a staked purse) is open follow-up work.
+- **VRF arbiter election write path is now wired, but on a small live arbiter pool** —
+  `server/vrf_election.py`'s `_elect_via_onchain_vrf` submits the deployed `vrf-arbiter`
+  contract's `select_arbiters` transaction, waits for finalization, and reads the result back
+  from `elections_dict`; 4 arbiters are registered on-chain today via `register_arbiter`
+  (staked purses). INVARIANT 5 (arbiter != either dispute party) is enforced by the backend
+  after the on-chain draw, since `select_arbiters` itself has no notion of dispute parties —
+  see [docs/evidence/VRF_ONCHAIN_ELECTION.md](evidence/VRF_ONCHAIN_ELECTION.md) for real deploy
+  hashes and API responses proving both a normal on-chain election and a stress case where the
+  on-chain draw returned only dispute parties (correctly triggering the `local_csprng`
+  fallback instead of electing one). With only 4 active arbiters and `count=3` per election,
+  there is a real (if so far unobserved) chance every draw for a given dispute lands on a
+  party, forcing a fallback even though other eligible arbiters exist but weren't drawn —
+  registering more arbiters lowers this probability.
 - **`escrow-manager.batch_release`/`batch_cancel` lack a cap/quorum guard** — Unlike
   `create_batch()` (wired and live-verified, see [README](../README.md#-verified-on-chain-this-is-not-simulated--real-testnet-transactions)),
   the manager contract's `batch_release`/`batch_cancel` entry points don't enforce the same
