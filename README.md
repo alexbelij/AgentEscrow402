@@ -463,22 +463,88 @@ Security status: latest changed code was reviewed through NVIDIA API and no conc
 
 Base URL (production): `https://agentescrow402-api.onrender.com`
 
+Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml)
+
+<details>
+<summary><kbd>All 63 endpoints — click to expand</kbd></summary>
+
 | Method | Path | Description |
 |---|---|---|
+| **Core escrow** | | |
 | `GET` | `/health` | Server health + mode |
+| `GET` | `/stats` | Console statistics and data-source label |
+| `GET` | `/contracts` | Deployed contract hashes and roles |
+| `GET` | `/escrows` | List escrows (filter by status, paged) |
+| `GET` | `/escrow/{hash}` | Look up escrow by service hash |
+| `GET` | `/escrow/{hash}/history` | Full state-change history of an escrow |
 | `POST` | `/escrow` | Create escrow — lock funds |
 | `POST` | `/release` | Release funds to receiver |
 | `POST` | `/refund` | Refund sender after TTL |
 | `POST` | `/dispute` | Open dispute (sender or receiver) |
 | `POST` | `/resolve` | Arbiter vote (3-of-5) |
-| `GET` | `/escrow/{hash}` | Look up escrow by service hash |
-| `GET` | `/stats` | Console statistics and data-source label |
-| `GET` | `/risk/dashboard` | IsolationForest risk dashboard |
-| `GET` | `/risk/score/{agent}` | Agent risk score |
-| `GET` | `/insurance/pool-stats` | Hosted insurance pool accounting |
-| `POST` | `/vrf/elect` | VRF-assisted arbiter election |
-| `GET` | `/reputation/{agent}` | Agent trust score |
 | `POST` | `/compute-hash` | Derive service hash from params |
+| `GET` | `/reputation/{agent}` | Agent trust score |
+| `GET` | `/agents` | List all known agents with reputation |
+| `GET` | `/estimate` | Fee + insurance estimate for an amount |
+| `GET` | `/events` | SSE stream of escrow events |
+| `GET` | `/wasm/escrow_funder` | Download `escrow_funder.wasm` binary |
+| **Batch operations** | | |
+| `POST` | `/escrows/batch` | Create multiple escrows in one call |
+| `POST` | `/escrows/batch-release` | Release multiple escrows atomically |
+| `POST` | `/escrows/batch-cancel` | Cancel (refund) multiple escrows |
+| **Multi-asset & streaming** | | |
+| `GET` | `/escrow/cep18-permit-nonce` | CEP-18 gasless permit nonce lookup |
+| `POST` | `/escrow/multi-asset` | Create CEP-18/CEP-78 token escrow |
+| `POST` | `/escrow/multi-asset/{hash}/release` | Release multi-asset escrow |
+| `POST` | `/escrow/multi-asset/{hash}/refund` | Refund multi-asset escrow |
+| `POST` | `/escrow/multi-asset/{hash}/dispute` | Dispute multi-asset escrow |
+| `POST` | `/escrow/multi-asset/{hash}/resolve` | Resolve multi-asset escrow |
+| `POST` | `/escrow/stream` | Create linear-vesting streaming escrow |
+| `GET` | `/escrow/{hash}/stream-status` | Streaming escrow vesting status |
+| `POST` | `/escrow/{hash}/stream-claim` | Claim fully-vested streaming escrow |
+| **Atomic swap (HTLC)** | | |
+| `POST` | `/escrow/atomic-swap/commit` | Commit SHA-256 hash-lock |
+| `POST` | `/escrow/atomic-swap/reveal` | Reveal preimage to release funds |
+| **AI arbitration** | | |
+| `POST` | `/arbitration/analyze` | AI-assisted dispute evidence analysis |
+| `GET` | `/arbitration/history` | Recent arbitration recommendations |
+| **VRF arbiter election** | | |
+| `POST` | `/vrf/elect` | VRF-assisted on-chain arbiter election |
+| `GET` | `/vrf/election/{dispute_id}` | Look up election result |
+| `GET` | `/vrf/arbiters` | List registered arbiters |
+| `POST` | `/vrf/arbiters/register` | Register an agent as arbiter |
+| **Insurance pool** | | |
+| `POST` | `/insurance/deposit` | Deposit into insurance pool |
+| `POST` | `/insurance/claim` | Claim from insurance pool |
+| `GET` | `/insurance/pool-stats` | Pool balance and accounting |
+| `GET` | `/insurance/premium-quote` | Risk-scaled premium quote |
+| **Agent identity (on-chain)** | | |
+| `POST` | `/identity/register` | Register identity with on-chain deploy |
+| `GET` | `/identity/{agent_id}` | Look up on-chain agent identity |
+| `POST` | `/identity/delegate` | Delegate capability to sub-agent |
+| `GET` | `/identity/capabilities/{agent_id}` | Own + delegated capabilities |
+| **Identity registry (hosted)** | | |
+| `POST` | `/identity-registry/register` | Register DID + stake + capabilities |
+| `GET` | `/identity-registry/{did}` | Look up by DID |
+| `GET` | `/identity-registry/by-account/{hash}` | Look up by account hash |
+| `POST` | `/identity-registry/{did}/reputation` | Update reputation counters |
+| `POST` | `/identity-registry/{did}/decay` | Apply time-based reputation decay |
+| `POST` | `/identity-registry/{did}/slash` | Slash stake for misbehaviour |
+| `POST` | `/identity-registry/{did}/verify` | Advance verification level |
+| `POST` | `/identity-registry/{did}/capabilities` | Update agent capabilities |
+| `GET` | `/identity-registry/search/agents` | Search agents by capability/score |
+| `GET` | `/identity-registry/stats/summary` | Registry-wide summary stats |
+| **Risk scoring** | | |
+| `GET` | `/risk/score/{agent}` | IsolationForest agent risk score |
+| `GET` | `/risk/dashboard` | Aggregated risk dashboard |
+| **Admin (API-key gated)** | | |
+| `POST` | `/admin/configure-fee` | Set insurance fee (basis points) |
+| `POST` | `/admin/set-release-cap` | Update arbiter-quorum release cap |
+| `POST` | `/admin/set-arbiters` | Rotate 5-account arbiter pool |
+| `POST` | `/admin/emergency-freeze` | Pause all state changes |
+| `POST` | `/admin/unfreeze` | Resume after freeze |
+
+</details>
 
 **402 response format:**
 ```json
@@ -638,7 +704,7 @@ Built for **[Casper Agentic Buildathon 2026](https://dorahacks.io/)** · Deploye
 
 *[ae402.xyz](https://ae402.xyz) · [API Docs](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md)*
 
-*Last verified against commit `e19f865` / contract package `d3ca33d1...c8eeb` v9 (`612cead2...ddd9ec`), 2026-07-07.*
+*Last verified against commit `5cdd4a8` / contract package `d3ca33d1...c8eeb` v9 (`612cead2...ddd9ec`), 2026-07-07.*
 
 </div>
 
