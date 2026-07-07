@@ -2,8 +2,8 @@ import { ExternalLink } from 'lucide-react'
 
 const LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402' },
-  { label: 'SDK', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
-  { label: 'MCP', href: 'https://github.com/alexbelij/AgentEscrow402/tree/main/sdk' },
+  { label: 'SDK', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/docs/SDK.md' },
+  { label: 'MCP', href: 'https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/mcp_server.py' },
   { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec' },
 ]
 
