@@ -7,6 +7,12 @@ edition = "2021"
 casper-contract = "5.1"
 casper-types = "6.0"
 
+[lib]
+name = "multi_asset_escrow"
+path = "src/lib.rs"
+bench = false
+doctest = false
+
 [[bin]]
 name = "multi-asset-escrow"
 path = "src/main.rs"
