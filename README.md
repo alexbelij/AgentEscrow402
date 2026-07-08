@@ -686,7 +686,7 @@ Full deploy-hash-by-deploy-hash log:
 | [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) | Architecture decisions, roadmap, and production status |
 | [ROADMAP.md](ROADMAP.md) | Shipped vs. planned, phase by phase |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [SUBMISSION.md](SUBMISSION.md) | Hackathon submission summary (links, track, checklist) |
+
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, PR conventions |
 | [SECURITY.md](SECURITY.md) | Vulnerability disclosure, key-handling policy |
 
