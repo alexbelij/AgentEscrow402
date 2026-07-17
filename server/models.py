@@ -175,9 +175,10 @@ class PaymentHeader(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "0.2.0"
+    version: str = "0.3.0"
     sandbox: bool = True
     chain: str = ""
     contract_hash: str = ""
     db: str = "disconnected"
     uptime: int = 0
+    mode: str = "sandbox"  # "sandbox" | "live" — explicit mode indicator

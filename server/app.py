@@ -292,6 +292,7 @@ async def health(cfg: Config = Depends(get_config)):
         contract_hash=contract_hash,
         db="connected" if connected else "disconnected",
         uptime=int(time.time() - _started_at),
+        mode="sandbox" if cfg.sandbox else "live",
     )
 
 
