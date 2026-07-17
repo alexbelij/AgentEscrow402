@@ -648,6 +648,15 @@ cargo test --manifest-path contracts/escrow/Cargo.toml   # 40 tests (escrow, HTL
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
+### Test coverage
+
+| Suite | Framework | Count | Coverage |
+|---|---|---|---|
+| Server (Python) | pytest + Hypothesis | 450 | 70%+ |
+| Contracts (Rust) | cargo test + proptest | 40 | property-based |
+| Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
+| Frontend build | Vite + tsc --noEmit | — | type-checked |
+
 **Current status: 450/450 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
 property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,
 `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
