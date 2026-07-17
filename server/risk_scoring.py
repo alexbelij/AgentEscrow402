@@ -13,7 +13,7 @@ import random
 import struct
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 class TransactionFeatures(BaseModel):
     amount: int
@@ -28,6 +28,8 @@ class TransactionFeatures(BaseModel):
     hour_of_day: int
 
 class RiskScore(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     escrow_id: str
     score: int = Field(ge=0, le=100)
     anomaly_flag: bool
