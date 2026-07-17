@@ -24,7 +24,7 @@
 ---
 
 > [!IMPORTANT]
-> **What this is:** A deployed Casper testnet escrow console for AI-agent payments: signed x402 payment intent, Casper deploys for escrow lifecycle calls, Neon-backed hosted records, IsolationForest risk scoring, ML-KEM metadata encryption, and VRF-assisted arbitration. Console live at [ae402.xyz](https://ae402.xyz); API live at [agentescrow402-api.onrender.com](https://agentescrow402-api.onrender.com).
+> **What this is:** A deployed Casper testnet escrow console for AI-agent payments: signed x402 payment intent, Casper deploys for escrow lifecycle calls, Neon-backed hosted records, IsolationForest risk scoring, ML-KEM metadata encryption, and VRF-assisted arbitration. Console live at [ae402.xyz](https://ae402.xyz); API live at [agentescrow402-api-ywm8.onrender.com](https://agentescrow402-api-ywm8.onrender.com).
 
 <details>
 <summary><kbd>Table of contents</kbd></summary>
@@ -461,7 +461,7 @@ Security status: latest changed code was reviewed through NVIDIA API and no conc
 
 ## 📡 API reference
 
-Base URL (production): `https://agentescrow402-api.onrender.com`
+Base URL (production): `https://agentescrow402-api-ywm8.onrender.com`
 
 Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml)
 
@@ -569,7 +569,7 @@ that for you, deriving your agent's identity from a fresh keypair:
 ```python
 from sdk import EscrowClient
 
-async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+async with EscrowClient.generate("https://agentescrow402-api-ywm8.onrender.com") as client:
     receiver = "ab" * 32  # counterparty's 64-hex Casper account hash / Ed25519 public key
     escrow = await client.create_escrow(receiver=receiver, amount=5_000_000, ttl=300)
     await client.release(escrow["service_hash"])

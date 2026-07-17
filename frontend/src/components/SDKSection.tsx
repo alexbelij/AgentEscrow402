@@ -108,7 +108,7 @@ if score.recommendation != "deny":
       "command": "python",
       "args": ["sdk/mcp_server.py"],
       "env": { "AE402_BASE_URL":
-        "https://agentescrow402-api.onrender.com" }
+        "https://agentescrow402-api-ywm8.onrender.com" }
     }
   }
 }

@@ -39,7 +39,7 @@ pip install langchain
 ```python
 from sdk.client import EscrowClient
 
-async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+async with EscrowClient.generate("https://agentescrow402-api-ywm8.onrender.com") as client:
     escrow = await client.create_escrow(
         receiver="ab" * 32,  # receiver's 64-hex Casper account hash
         amount=5000,
@@ -56,7 +56,7 @@ async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as c
 ```python
 from sdk.langchain_tool import EscrowPaymentTool
 
-tool = EscrowPaymentTool("https://agentescrow402-api.onrender.com", sender="agent-001")
+tool = EscrowPaymentTool("https://agentescrow402-api-ywm8.onrender.com", sender="agent-001")
 
 result = await tool.run("create", receiver="ab" * 32, amount=5000)
 result = await tool.run("release", service_hash=result["service_hash"])
@@ -88,7 +88,7 @@ The live API verifies Ed25519-signed `X-Payment` headers on every request. `Escr
 from sdk.client import EscrowClient
 
 # Auto-generates a keypair and signs all requests
-async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+async with EscrowClient.generate("https://agentescrow402-api-ywm8.onrender.com") as client:
     print(client.sender)  # your 64-hex Ed25519 public key
 ```
 
@@ -98,7 +98,7 @@ To reuse the same identity across runs:
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 key = Ed25519PrivateKey.generate()  # persist this for reuse
-client = EscrowClient("https://agentescrow402-api.onrender.com", private_key=key)
+client = EscrowClient("https://agentescrow402-api-ywm8.onrender.com", private_key=key)
 ```
 
 ### Sandbox mode (local development)
@@ -196,6 +196,6 @@ Where `signature` = `Ed25519.sign(key, "x402-v1;<escrow_hash>;<amount>;<sender>;
 ## Live Resources
 
 - **Console:** [ae402.xyz/console](https://ae402.xyz/console)
-- **API:** [agentescrow402-api.onrender.com](https://agentescrow402-api.onrender.com)
+- **API:** [agentescrow402-api-ywm8.onrender.com](https://agentescrow402-api-ywm8.onrender.com)
 - **Sandbox:** [ae402.xyz/console/sandbox](https://ae402.xyz/console/sandbox)
 - **Contracts on CSPR.live:** [testnet.cspr.live/contract/612cead2...](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec)

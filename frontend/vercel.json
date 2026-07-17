@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/backend/:path*", "destination": "https://agentescrow402-api.onrender.com/:path*" },
+    { "source": "/backend/:path*", "destination": "https://agentescrow402-api-ywm8.onrender.com/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
