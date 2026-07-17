@@ -7,6 +7,7 @@ import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
 import ExplorerLink from './ExplorerLink';
+import CopyButton from './CopyButton';
 import {
   PlusCircle,
   Eye,
@@ -576,7 +577,10 @@ const Escrows: React.FC = () => {
                 <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                   <Hash className="h-4 w-4 mr-1.5 text-amber-500" /> Hash
                 </div>
-                <p className="font-mono text-sm break-all">{selectedEscrow.hash}</p>
+                <div className="flex items-start gap-2">
+                  <p className="font-mono text-sm break-all">{selectedEscrow.hash}</p>
+                  <CopyButton text={selectedEscrow.hash} className="shrink-0 mt-0.5" />
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

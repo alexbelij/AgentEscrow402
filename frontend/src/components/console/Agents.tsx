@@ -662,7 +662,10 @@ const DelegateCapabilityModal: React.FC<DelegateCapabilityModalProps> = ({ isOpe
             <p className="flex items-center"><CheckCircle className="h-5 w-5 mr-2" /> Delegation recorded and signature verified.</p>
             <p className="font-mono break-all">{result.delegator_id} → {result.delegatee_id}</p>
             <p>Capability: <span className="font-mono">{result.capability_uri}</span></p>
-            <p>Mode: <span className="font-mono">{result.mode}</span> · Deploy hash: <span className="font-mono">{result.deploy_hash}</span></p>
+            <p className="flex items-center flex-wrap gap-x-2">
+              <span>Mode: <span className="font-mono">{result.mode}</span> · Deploy hash: <span className="font-mono">{result.deploy_hash}</span></span>
+              {result.deploy_hash && <CopyButton text={result.deploy_hash} />}
+            </p>
           </div>
         )}
 

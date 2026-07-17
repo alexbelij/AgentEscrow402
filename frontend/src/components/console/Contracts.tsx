@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
 import { csprToMotes, randomHex64 } from '../../lib/format';
 import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards, BadgeCheck, Coins, Layers, Dices } from 'lucide-react';
+import CopyButton from './CopyButton';
 
 // Fallback only — used if the backend /contracts call fails (e.g. offline
 // dev build). The source of truth is the backend Config (env-overridable),
@@ -126,7 +127,10 @@ const Contracts: React.FC = () => {
               </div>
               {(() => { const Icon = CATEGORY_ICONS[contract.category || ''] || Cpu; return <Icon className="h-6 w-6 text-amber-500 shrink-0" />; })()}
             </div>
-            <p className="font-mono text-sm text-gray-300 mt-4 break-all">{contract.hash}</p>
+            <div className="flex items-start gap-2 mt-4">
+              <p className="font-mono text-sm text-gray-300 break-all">{contract.hash}</p>
+              <CopyButton text={contract.hash} className="shrink-0 mt-0.5" />
+            </div>
             <a
               href={`https://testnet.cspr.live/search/${contract.hash}`}
               target="_blank"
