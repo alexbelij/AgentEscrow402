@@ -77,7 +77,7 @@ export const ClickProvider = ({ children }: { children: ReactNode }) => {
         const account = await ref.getActiveAccountAsync({ withBalance: false })
         setConnectedAccount(account?.public_key ? account : undefined)
       } catch (error) {
-        console.error('CSPR.click: failed to get active account', error)
+        if (import.meta.env.DEV) console.error('CSPR.click: failed to get active account', error)
         setConnectedAccount(undefined)
       }
     }

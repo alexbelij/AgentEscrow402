@@ -201,7 +201,7 @@ const Escrows: React.FC = () => {
       setTotalEscrows(onlyMine ? rows.length : ((res.data as any)?.total ?? rows.length));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch escrows.');
-      console.error('Escrow fetch error:', err);
+      if (import.meta.env.DEV) console.error('Escrow fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -225,7 +225,7 @@ const Escrows: React.FC = () => {
       if (historyRes.error) throw new Error(historyRes.error);
       setHistory(historyRes.data || []);
     } catch (err) {
-      console.error('Failed to fetch escrow history:', err);
+      if (import.meta.env.DEV) console.error('Failed to fetch escrow history:', err);
       setHistory([]);
     }
   };
