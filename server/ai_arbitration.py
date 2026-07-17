@@ -46,7 +46,7 @@ class DisputeEvidence(BaseModel):
 
 class ArbitrationRecommendation(BaseModel):
     dispute_id: str
-    recommendation: str = Field(..., pattern="^(favor_sender|favor_receiver|split|escalate)$")
+    recommendation: str = Field(..., pattern="^(favor_sender|favor_receiver|split|escalate|abstain)$")
     confidence: float = Field(..., ge=0.0, le=1.0)
     reasoning: str
     risk_factors: list[str]
@@ -69,10 +69,11 @@ Valid recommendations:
 - "favor_receiver" — release funds to receiver (service delivered)
 - "split"          — split funds proportionally
 - "escalate"       — insufficient evidence, needs human review
+- "abstain"        — arbiter has a conflict of interest or cannot judge fairly
 
 Required JSON format (EXACTLY, no extra keys):
 {
-  "recommendation": "<favor_sender|favor_receiver|split|escalate>",
+  "recommendation": "<favor_sender|favor_receiver|split|escalate|abstain>",
   "confidence": <0.0-1.0>,
   "reasoning": "<concise explanation, max 200 chars>",
   "risk_factors": ["<factor1>", "<factor2>"],
@@ -127,7 +128,7 @@ def _parse_llm_json(raw: str) -> dict[str, Any] | None:
     required = {"recommendation", "confidence", "reasoning", "risk_factors", "suggested_split_pct"}
     if not required.issubset(d.keys()):
         return None
-    if d["recommendation"] not in ("favor_sender", "favor_receiver", "split", "escalate"):
+    if d["recommendation"] not in ("favor_sender", "favor_receiver", "split", "escalate", "abstain"):
         return None
     try:
         d["confidence"] = float(d["confidence"])
