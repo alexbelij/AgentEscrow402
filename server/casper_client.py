@@ -53,13 +53,39 @@ _STATUS_MAP = {
     5: "resolved",
 }
 
-RPC_TESTNET = "https://node.testnet.casper.network/rpc"
+# Ordered fallback list.  First entry that responds wins.
+# NowNodes free tier: 20 req/sec, 50k req/day — good fallback.
+_RPC_ENDPOINTS = [
+    "https://node.testnet.cspr.cloud/rpc",        # CSPR.cloud (fast, auth optional for testnet)
+    "https://node.testnet.casper.network/rpc",     # Official testnet node
+]
+
+
+def _build_rpc_endpoints(cfg: "Config") -> list[tuple[str, dict[str, str]]]:
+    """Build (url, headers) pairs for RPC fallback chain."""
+    endpoints: list[tuple[str, dict[str, str]]] = []
+    # CSPR.cloud — requires auth header
+    cspr_cloud_key = os.getenv("CSPR_CLOUD_API_KEY", "")
+    endpoints.append((
+        "https://node.testnet.cspr.cloud/rpc",
+        {"Authorization": cspr_cloud_key} if cspr_cloud_key else {},
+    ))
+    # NowNodes — add if key is set
+    nownodes_key = cfg.nownodes_api_key
+    if nownodes_key:
+        endpoints.append((
+            "https://casper-testnet.nownodes.io/rpc",
+            {"api-key": nownodes_key},
+        ))
+    # Official testnet (no auth)
+    endpoints.append(("https://node.testnet.casper.network/rpc", {}))
+    return endpoints
 
 
 class CasperClient:
-    """Casper 2.0 client.
+    """Casper 2.0 client with RPC fallback chain.
 
-    * Reads: JSON-RPC (state_get_dictionary_item).
+    * Reads: JSON-RPC (state_get_dictionary_item) — tries CSPR.cloud, NowNodes, official node.
     * Writes: subprocess to Node.js scripts (casper-js-sdk 5.0.12).
     """
 
@@ -74,19 +100,32 @@ class CasperClient:
         self._multi_asset_escrow_package_hash = cfg.multi_asset_escrow_package_hash
         self._test_token_contract_hash = cfg.test_token_contract_hash
         self._key_path = cfg.casper_private_key_path
-        self._rpc_url = RPC_TESTNET  # always use the working testnet node
+        self._rpc_endpoints = _build_rpc_endpoints(cfg)
+        self._rpc_url = self._rpc_endpoints[0][0]  # current primary for node scripts
         self._http = httpx.AsyncClient(timeout=30.0)
 
     # ── Internal helpers ───────────────────────────────────────────────────
 
     async def _rpc(self, method: str, params: dict[str, Any] | None = None) -> Any:
+        """Send JSON-RPC request with automatic fallback across configured endpoints."""
         payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params or {}}
-        resp = await self._http.post(self._rpc_url, json=payload)
-        resp.raise_for_status()
-        body = resp.json()
-        if "error" in body:
-            raise RuntimeError(f"RPC {method} error: {body['error']}")
-        return body.get("result")
+        last_err: Exception | None = None
+        for url, headers in self._rpc_endpoints:
+            try:
+                resp = await self._http.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                body = resp.json()
+                if "error" in body:
+                    raise RuntimeError(f"RPC {method} error: {body['error']}")
+                # Promote working endpoint to primary for node scripts
+                if url != self._rpc_url:
+                    logger.info("RPC fallback: %s → %s", self._rpc_url, url)
+                    self._rpc_url = url
+                return body.get("result")
+            except Exception as exc:
+                logger.warning("RPC %s failed on %s: %s", method, url, exc)
+                last_err = exc
+        raise RuntimeError(f"All RPC endpoints failed for {method}") from last_err
 
     async def _get_state_root_hash(self) -> str:
         """Return the latest state root hash (Casper 2.2 Version2 block format)."""
