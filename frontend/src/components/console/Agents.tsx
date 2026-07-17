@@ -123,7 +123,7 @@ const Agents: React.FC = () => {
       setAgents(res.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch agents.');
-      console.error('Agents fetch error:', err);
+      if (import.meta.env.DEV) console.error('Agents fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -145,13 +145,13 @@ const Agents: React.FC = () => {
         api.getIdentityCapabilities(agent.public_key),
       ]);
 
-      if (reputationRes.error) console.error('Failed to fetch reputation:', reputationRes.error);
+      if (reputationRes.error && import.meta.env.DEV) console.error('Failed to fetch reputation:', reputationRes.error);
       setAgentReputation(reputationRes.data || null);
 
-      if (capabilitiesRes.error) console.error('Failed to fetch capabilities:', capabilitiesRes.error);
+      if (capabilitiesRes.error && import.meta.env.DEV) console.error('Failed to fetch capabilities:', capabilitiesRes.error);
       setAgentCapabilities(capabilitiesRes.data || null);
     } catch (err) {
-      console.error('Failed to fetch agent details:', err);
+      if (import.meta.env.DEV) console.error('Failed to fetch agent details:', err);
     }
   };
 

@@ -136,7 +136,7 @@ const Insurance: React.FC = () => {
       setPoolStats(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch insurance pool stats.');
-      console.error('Insurance pool stats fetch error:', err);
+      if (import.meta.env.DEV) console.error('Insurance pool stats fetch error:', err);
     } finally {
       setLoading(false);
     }

@@ -95,7 +95,7 @@ const Overview: React.FC = () => {
       setLastFetchedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch overview data.');
-      console.error('Overview fetch error:', err);
+      if (import.meta.env.DEV) console.error('Overview fetch error:', err);
     } finally {
       if (showSpinner) setLoading(false);
     }
