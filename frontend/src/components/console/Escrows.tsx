@@ -9,6 +9,7 @@ import { useToast } from '../../lib/toast';
 import ExplorerLink from './ExplorerLink';
 import CopyButton from './CopyButton';
 import EmptyState from './EmptyState';
+import { SkeletonTable } from './Skeleton';
 import {
   PlusCircle,
   Eye,
@@ -469,8 +470,8 @@ const Escrows: React.FC = () => {
       {/* Escrow List */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-md overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="animate-spin h-10 w-10 text-amber-500" />
+          <div className="p-6">
+            <SkeletonTable rows={6} />
           </div>
         ) : error ? (
           <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-4 m-4 flex items-center">
