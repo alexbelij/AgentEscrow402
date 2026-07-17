@@ -23,6 +23,18 @@
 
 ---
 
+| | |
+|---|---|
+| 🌐 **Live App** | [ae402.xyz](https://ae402.xyz) |
+| 🔗 **API** | [agentescrow402-api-ywm8.onrender.com](https://agentescrow402-api-ywm8.onrender.com) |
+| 📜 **Contracts** | `612cead2...d9ec` ([view on testnet](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec)) |
+| 🎥 **Demo Video** | _coming soon_ |
+| 📚 **Docs** | [API](docs/API_SDK_MCP.md) · [SDK](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md) |
+| 🧪 **Tests** | 450 functions · 70%+ coverage |
+| 🏗️ **Contracts** | 8 deployed on Casper Testnet (v9) |
+
+---
+
 > [!IMPORTANT]
 > **What this is:** A deployed Casper testnet escrow console for AI-agent payments: signed x402 payment intent, Casper deploys for escrow lifecycle calls, Neon-backed hosted records, IsolationForest risk scoring, ML-KEM metadata encryption, and VRF-assisted arbitration. Console live at [ae402.xyz](https://ae402.xyz); API live at [agentescrow402-api-ywm8.onrender.com](https://agentescrow402-api-ywm8.onrender.com).
 
