@@ -10,6 +10,7 @@ import {
 } from '../../lib/api';
 import { randomHex64 } from '../../lib/format';
 import { Gavel, Dices, Loader2, CheckCircle, XCircle, UserPlus, Search } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
 
 type Tab = 'analyze' | 'elect' | 'register' | 'lookup';
 
@@ -47,6 +48,7 @@ export default function Arbitration() {
   const [receiverClaim, setReceiverClaim] = useState('Dataset was incomplete: missing 3 of the 10 promised files.');
   const [escrowAmount, setEscrowAmount] = useState(5000);
   const [analyzing, setAnalyzing] = useState(false);
+  const [confirmAnalyzeOpen, setConfirmAnalyzeOpen] = useState(false);
   const [result, setResult] = useState<ArbitrationRecommendation | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [history, setHistory] = useState<ArbitrationRecommendation[]>([]);
@@ -101,6 +103,17 @@ export default function Arbitration() {
     }
     setResult(res.data);
     await loadHistory();
+  };
+
+  const requestAnalysisConfirmation = () => {
+    setConfirmAnalyzeOpen(true);
+  };
+
+  const confirmAndRunAnalysis = () => {
+    setConfirmAnalyzeOpen(false);
+    // Fire-and-forget: runAnalysis is async but the UI already reflects
+    // the analyzing state via its own setAnalyzing calls.
+    void runAnalysis();
   };
 
   const runElection = async () => {
@@ -209,13 +222,22 @@ export default function Arbitration() {
             />
 
             <button
-              onClick={runAnalysis}
+              onClick={requestAnalysisConfirmation}
               disabled={analyzing}
               className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
             >
               {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gavel className="w-4 h-4" />}
               Run AI arbitration
             </button>
+            <ConfirmModal
+              open={confirmAnalyzeOpen}
+              title="Run AI arbitration?"
+              description="This submits both claims to the AI arbitration model and appends a verdict to the server history. Continue?"
+              confirmLabel="Run analysis"
+              danger={false}
+              onConfirm={confirmAndRunAnalysis}
+              onCancel={() => setConfirmAnalyzeOpen(false)}
+            />
             {analyzeError && <p className="text-red-400 text-sm mt-2">{analyzeError}</p>}
           </div>
 
