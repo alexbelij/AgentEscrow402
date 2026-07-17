@@ -17,6 +17,7 @@ import {
   ExternalLink,
   BarChart3,
 } from 'lucide-react';
+import CopyButton from './CopyButton';
 import { format } from 'date-fns';
 
 const EXPLORER_BASE = 'https://testnet.cspr.live';
@@ -184,19 +185,26 @@ const Overview: React.FC = () => {
           <p className="text-xs text-gray-500 mt-2">{modeLabel}</p>
         </div>
         {contractExplorerUrl ? (
-          <a
-            href={contractExplorerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md hover:border-ae-accent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright"
-          >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-400">Contract target</span>
-              <Info className="h-5 w-5 text-cyan-400" />
-            </div>
-            <p className="text-lg font-bold text-gray-50 break-all">{`${health?.contract_hash?.slice(0, 10)}…${health?.contract_hash?.slice(-8)}`}</p>
-            <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">View on CSPR.live <ExternalLink className="h-3 w-3" /></p>
-          </a>
+          <div className="relative bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md hover:border-ae-accent/50 transition-colors">
+            <a
+              href={contractExplorerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright rounded-lg"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm text-gray-400">Contract target</span>
+                <Info className="h-5 w-5 text-cyan-400" />
+              </div>
+              <p className="text-lg font-bold text-gray-50 break-all">{`${health?.contract_hash?.slice(0, 10)}…${health?.contract_hash?.slice(-8)}`}</p>
+              <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">View on CSPR.live <ExternalLink className="h-3 w-3" /></p>
+            </a>
+            {health?.contract_hash && (
+              <div className="absolute top-2 right-2">
+                <CopyButton text={health.contract_hash} />
+              </div>
+            )}
+          </div>
         ) : (
           <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
             <div className="flex items-center justify-between mb-3">
