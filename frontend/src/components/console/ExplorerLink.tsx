@@ -11,6 +11,18 @@ import { ExternalLink } from 'lucide-react';
  */
 const EXPLORER_BASE = 'https://testnet.cspr.live';
 
+// A Casper public key is 66 hex chars (`01`/`02` prefix + 64-hex),
+// and a bare account/contract hash is 64 hex chars. Anything shorter or
+// containing non-hex characters is either a truncated display value
+// (e.g. "612cea…d9ec") or noise, and doesn't route usefully to the
+// explorer — we render the text plainly in that case rather than link
+// to a broken page.
+const HEX_ID_RE = /^[0-9a-fA-F]{64}$|^0[12][0-9a-fA-F]{64}$/;
+
+export function isValidExplorerId(value: string): boolean {
+  return typeof value === 'string' && HEX_ID_RE.test(value.trim());
+}
+
 export function explorerAccountUrl(publicKeyOrHash: string): string {
   return `${EXPLORER_BASE}/account/${publicKeyOrHash}`;
 }
@@ -25,18 +37,33 @@ const ExplorerLink: React.FC<{
   children: React.ReactNode;
   className?: string;
   title?: string;
-}> = ({ value, kind = 'account', children, className, title }) => (
-  <a
-    href={kind === 'account' ? explorerAccountUrl(value) : explorerSearchUrl(value)}
-    target="_blank"
-    rel="noreferrer"
-    title={title || 'View on CSPR.live (testnet explorer)'}
-    onClick={(e) => e.stopPropagation()}
-    className={`inline-flex items-center gap-1 hover:text-ae-accent-bright hover:underline decoration-dotted underline-offset-2 transition-colors ${className || ''}`}
-  >
-    {children}
-    <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
-  </a>
-);
+}> = ({ value, kind = 'account', children, className, title }) => {
+  // Fallback: if the id looks malformed, render the children as plain
+  // text so we never send the visitor to a broken explorer page.
+  if (!isValidExplorerId(value)) {
+    return (
+      <span
+        className={`inline-flex items-center gap-1 text-gray-400 ${className || ''}`}
+        title={title || 'Invalid or truncated explorer id'}
+      >
+        {children}
+      </span>
+    );
+  }
+
+  return (
+    <a
+      href={kind === 'account' ? explorerAccountUrl(value) : explorerSearchUrl(value)}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={title || 'View on CSPR.live (testnet explorer)'}
+      onClick={(e) => e.stopPropagation()}
+      className={`inline-flex items-center gap-1 hover:text-ae-accent-bright hover:underline decoration-dotted underline-offset-2 transition-colors ${className || ''}`}
+    >
+      {children}
+      <ExternalLink className="h-3 w-3 shrink-0 opacity-70" />
+    </a>
+  );
+};
 
 export default ExplorerLink;
