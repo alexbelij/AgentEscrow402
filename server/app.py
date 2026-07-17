@@ -214,6 +214,16 @@ _rate_limits: dict[str, dict] = {}
 
 
 @app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID to every response for tracing."""
+    import uuid
+    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
+@app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     ip = request.client.host if request.client else "unknown"
     now = time.time()
@@ -282,6 +292,7 @@ async def health(cfg: Config = Depends(get_config)):
         contract_hash=contract_hash,
         db="connected" if connected else "disconnected",
         uptime=int(time.time() - _started_at),
+        mode="sandbox" if cfg.sandbox else "live",
     )
 
 
