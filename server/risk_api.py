@@ -17,7 +17,7 @@ import time as _time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from server.risk_scoring import (
     IsolationForest,
@@ -123,6 +123,8 @@ async def _get_or_train_engine(casper, db=None) -> RiskEngine:
 # ── Response models ────────────────────────────────────────────────────────
 
 class AgentRiskResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     agent: str
     risk_score: int
     anomaly_flag: bool
@@ -135,6 +137,8 @@ class AgentRiskResponse(BaseModel):
 
 
 class RiskDashboard(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     total_agents: int
     high_risk_count: int
     avg_risk_score: float

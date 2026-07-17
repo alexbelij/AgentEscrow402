@@ -264,6 +264,14 @@ def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
 # ---------------------------------------------------------------------------
 
 
+@app.get("/", include_in_schema=False)
+@app.head("/", include_in_schema=False)
+async def root():
+    """Render health-check probe hits / with HEAD — redirect to /health."""
+    from starlette.responses import RedirectResponse
+    return RedirectResponse(url="/health", status_code=307)
+
+
 @app.get("/health", response_model=HealthResponse)
 async def health(cfg: Config = Depends(get_config)):
     contract_hash = cfg.contract_hash or ""

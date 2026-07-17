@@ -54,6 +54,7 @@ const ERR_INSUFFICIENT_BALANCE: u16 = 1;
 const ERR_INSUFFICIENT_ALLOWANCE: u16 = 2;
 const ERR_ALREADY_INITIALIZED: u16 = 3;
 const ERR_UNAUTHORIZED: u16 = 4;
+const ERR_OVERFLOW: u16 = 5;
 
 fn revert(code: u16) -> ! {
     runtime::revert(ApiError::User(code))
@@ -247,8 +248,10 @@ pub extern "C" fn transfer() {
         revert(ERR_INSUFFICIENT_BALANCE);
     }
     let recipient_bal = read_balance(dict, &recipient_hex);
-    write_balance(dict, &sender_hex, sender_bal - amount);
-    write_balance(dict, &recipient_hex, recipient_bal + amount);
+    let new_sender = sender_bal.checked_sub(amount).unwrap_or_else(|| revert(ERR_INSUFFICIENT_BALANCE));
+    let new_recipient = recipient_bal.checked_add(amount).unwrap_or_else(|| revert(ERR_OVERFLOW));
+    write_balance(dict, &sender_hex, new_sender);
+    write_balance(dict, &recipient_hex, new_recipient);
 }
 
 #[no_mangle]
@@ -275,9 +278,12 @@ pub extern "C" fn transfer_from() {
     }
     let recipient_bal = read_balance(bal_dict, &recipient_hex);
 
-    write_allowance(allow_dict, &owner_hex, &spender_hex, current_allowance - amount);
-    write_balance(bal_dict, &owner_hex, owner_bal - amount);
-    write_balance(bal_dict, &recipient_hex, recipient_bal + amount);
+    let new_allowance = current_allowance.checked_sub(amount).unwrap_or_else(|| revert(ERR_INSUFFICIENT_ALLOWANCE));
+    let new_owner = owner_bal.checked_sub(amount).unwrap_or_else(|| revert(ERR_INSUFFICIENT_BALANCE));
+    let new_recipient = recipient_bal.checked_add(amount).unwrap_or_else(|| revert(ERR_OVERFLOW));
+    write_allowance(allow_dict, &owner_hex, &spender_hex, new_allowance);
+    write_balance(bal_dict, &owner_hex, new_owner);
+    write_balance(bal_dict, &recipient_hex, new_recipient);
 }
 
 #[no_mangle]
