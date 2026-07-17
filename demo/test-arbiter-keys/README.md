@@ -43,7 +43,7 @@ the fastest way to independently verify the 3-of-5 arbiter flow described in
 
 ```bash
 # Against the live production API (real testnet transactions):
-python examples/escrow_agent.py --api-url https://agentescrow402-api.onrender.com --scenario bad
+python examples/escrow_agent.py --api-url https://agentescrow402-api-ywm8.onrender.com --scenario bad
 
 # Or against your own local server (sandbox mode, no real chain calls):
 uvicorn server.app:app --reload &

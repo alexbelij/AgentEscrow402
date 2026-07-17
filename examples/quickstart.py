@@ -10,7 +10,7 @@ Run a local server first:
 
 Then:
     python examples/quickstart.py
-    python examples/quickstart.py --api-url https://agentescrow402-api.onrender.com
+    python examples/quickstart.py --api-url https://agentescrow402-api-ywm8.onrender.com
 
 For the full autonomous buyer/seller lifecycle (including a real dispute
 and AI arbitration call), see examples/escrow_agent.py.

@@ -28,7 +28,7 @@ Usage:
     # (this will submit real Casper testnet transactions signed by the
     # deployer key, since our client provides a verified sender identity
     # but no wallet_tx_hash):
-    python examples/escrow_agent.py --api-url https://agentescrow402-api.onrender.com --scenario good
+    python examples/escrow_agent.py --api-url https://agentescrow402-api-ywm8.onrender.com --scenario good
 """
 
 from __future__ import annotations

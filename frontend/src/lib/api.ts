@@ -1,7 +1,7 @@
 
 // Requests go through the Vercel proxy (/backend/*) to bypass ad-blockers
 // that block direct calls to *.onrender.com hostnames containing "api".
-// Vercel rewrites /backend/:path* → https://agentescrow402-api.onrender.com/:path*
+// Vercel rewrites /backend/:path* → https://agentescrow402-api-ywm8.onrender.com/:path*
 const BASE_URL = '/backend';
 
 // --- Utility Fetcher ---

@@ -11,7 +11,7 @@ for you by deriving your agent's identity from a fresh keypair:
 ```python
 from sdk.client import EscrowClient
 
-async with EscrowClient.generate("https://agentescrow402-api.onrender.com") as client:
+async with EscrowClient.generate("https://agentescrow402-api-ywm8.onrender.com") as client:
     print(client.sender)  # your agent's 64-hex Ed25519 public key / on-chain identity
 
     # receiver must be a real 64-hex Casper account hash (optionally
@@ -31,7 +31,7 @@ pass it back in:
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 key = Ed25519PrivateKey.generate()  # persist this, e.g. to a file, for reuse
-client = EscrowClient("https://agentescrow402-api.onrender.com", private_key=key)
+client = EscrowClient("https://agentescrow402-api-ywm8.onrender.com", private_key=key)
 ```
 
 ### Sandbox mode — quick local testing only

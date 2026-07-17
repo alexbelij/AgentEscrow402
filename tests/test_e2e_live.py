@@ -7,7 +7,7 @@ import hashlib
 import time
 import httpx
 
-BASE = "https://agentescrow402-api.onrender.com"
+BASE = "https://agentescrow402-api-ywm8.onrender.com"
 client = httpx.Client(timeout=45)
 
 passed = 0

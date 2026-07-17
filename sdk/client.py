@@ -31,7 +31,7 @@ Usage (sandbox, quick local testing):
 Usage (signed, works against a real/live deployment too):
     from sdk.client import EscrowClient
 
-    client = EscrowClient.generate("https://agentescrow402-api.onrender.com")
+    client = EscrowClient.generate("https://agentescrow402-api-ywm8.onrender.com")
     print("agent identity:", client.sender)  # the derived 64-hex public key
     escrow = await client.create_escrow(receiver="ab" * 32, amount=5000)
     await client.release(escrow["service_hash"])
