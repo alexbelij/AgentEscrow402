@@ -5,6 +5,7 @@ import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoS
 import { useToast } from '../../lib/toast';
 import { useSigner } from '../../lib/signer';
 import ExplorerLink from './ExplorerLink';
+import EmptyState from './EmptyState';
 import {
   Users,
   UserPlus,
@@ -265,7 +266,10 @@ const Agents: React.FC = () => {
             <p>Error: {error}</p>
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No agents match this filter.</div>
+          <EmptyState
+            title="No agents registered"
+            description="Register an agent via the API or the wallet to see it here."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">

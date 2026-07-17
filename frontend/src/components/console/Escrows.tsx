@@ -8,6 +8,7 @@ import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
 import ExplorerLink from './ExplorerLink';
 import CopyButton from './CopyButton';
+import EmptyState from './EmptyState';
 import {
   PlusCircle,
   Eye,
@@ -477,11 +478,14 @@ const Escrows: React.FC = () => {
             <p>Error: {error}</p>
           </div>
         ) : visibleEscrows.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">
-            {onlyMine
-              ? 'No escrows found where your active identity is payer or payee (checked against the last 200 records).'
-              : 'No escrows found.'}
-          </div>
+          <EmptyState
+            title={onlyMine ? 'No escrows for your identity' : 'No escrows yet'}
+            description={
+              onlyMine
+                ? 'None of the last 200 records list your active identity as payer or payee.'
+                : 'Create your first escrow to get started.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">
