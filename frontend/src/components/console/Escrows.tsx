@@ -7,6 +7,9 @@ import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
 import ExplorerLink from './ExplorerLink';
+import CopyButton from './CopyButton';
+import EmptyState from './EmptyState';
+import { SkeletonTable } from './Skeleton';
 import {
   PlusCircle,
   Eye,
@@ -201,7 +204,7 @@ const Escrows: React.FC = () => {
       setTotalEscrows(onlyMine ? rows.length : ((res.data as any)?.total ?? rows.length));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch escrows.');
-      console.error('Escrow fetch error:', err);
+      if (import.meta.env.DEV) console.error('Escrow fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -225,7 +228,7 @@ const Escrows: React.FC = () => {
       if (historyRes.error) throw new Error(historyRes.error);
       setHistory(historyRes.data || []);
     } catch (err) {
-      console.error('Failed to fetch escrow history:', err);
+      if (import.meta.env.DEV) console.error('Failed to fetch escrow history:', err);
       setHistory([]);
     }
   };
@@ -467,8 +470,8 @@ const Escrows: React.FC = () => {
       {/* Escrow List */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-md overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="animate-spin h-10 w-10 text-amber-500" />
+          <div className="p-6">
+            <SkeletonTable rows={6} />
           </div>
         ) : error ? (
           <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-4 m-4 flex items-center">
@@ -476,11 +479,14 @@ const Escrows: React.FC = () => {
             <p>Error: {error}</p>
           </div>
         ) : visibleEscrows.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">
-            {onlyMine
-              ? 'No escrows found where your active identity is payer or payee (checked against the last 200 records).'
-              : 'No escrows found.'}
-          </div>
+          <EmptyState
+            title={onlyMine ? 'No escrows for your identity' : 'No escrows yet'}
+            description={
+              onlyMine
+                ? 'None of the last 200 records list your active identity as payer or payee.'
+                : 'Create your first escrow to get started.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">
@@ -576,7 +582,10 @@ const Escrows: React.FC = () => {
                 <div className="flex items-center text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">
                   <Hash className="h-4 w-4 mr-1.5 text-amber-500" /> Hash
                 </div>
-                <p className="font-mono text-sm break-all">{selectedEscrow.hash}</p>
+                <div className="flex items-start gap-2">
+                  <p className="font-mono text-sm break-all">{selectedEscrow.hash}</p>
+                  <CopyButton text={selectedEscrow.hash} className="shrink-0 mt-0.5" />
+                </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>

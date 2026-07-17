@@ -14,12 +14,27 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg?style=flat-square)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
+[![Contracts](https://img.shields.io/badge/contracts-8_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
+[![Tests](https://img.shields.io/badge/tests-490_passing-22c55e.svg?style=flat-square)](#-testing)
+[![API](https://img.shields.io/badge/API-live-0ea5e9.svg?style=flat-square)](docs/API_SDK_MCP.md)
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
 **[🚀 Live Demo](https://ae402.xyz)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
 
 </div>
+
+---
+
+| | |
+|---|---|
+| 🌐 **Live App** | [ae402.xyz](https://ae402.xyz) |
+| 🔗 **API** | [agentescrow402-api-ywm8.onrender.com](https://agentescrow402-api-ywm8.onrender.com) |
+| 📜 **Contracts** | `612cead2...d9ec` ([view on testnet](https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec)) |
+| 🎥 **Demo Video** | _coming soon_ |
+| 📚 **Docs** | [API](docs/API_SDK_MCP.md) · [SDK](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md) |
+| 🧪 **Tests** | 450 functions · 70%+ coverage |
+| 🏗️ **Contracts** | 8 deployed on Casper Testnet (v9) |
 
 ---
 
@@ -622,6 +637,22 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 | **Frontend** | React + Vite console, Vercel |
 | **Backend hosting** | Render (always-on) |
 
+### Casper Agentic Buildathon — submission checklist
+
+| Casper primitive / integration | Used | Where |
+|---|:---:|---|
+| Casper Network (testnet deploys) | ✅ | 8 contracts live on `casper-test` |
+| Casper Smart Contracts (Rust → WASM) | ✅ | [`contracts/escrow`](contracts/escrow) — CEP-88 escrow, HTLC, arbitration |
+| Native CSPR transfers | ✅ | Escrow lifecycle (create, release, refund) |
+| CEP-18 fungible tokens | ✅ | Multi-asset escrow support |
+| CEP-78 NFT escrow | ✅ | Multi-asset escrow support |
+| Casper JS SDK / signer | ✅ | Browser wallet integration via [`@make-software/csprclick-ui`](frontend/package.json) |
+| Casper VRF | ✅ | Arbiter selection for dispute resolution |
+| MCP server / LangChain tool | ✅ | [`sdk/`](sdk/) — agent-facing integrations |
+| x402 protocol | ✅ | Custom header parser + validator, signed payment intents |
+| Post-quantum encryption (ML-KEM-768) | ✅ | Metadata confidentiality in escrow payloads |
+| Casper 2.x mainnet | ⬜ | Testnet-only for hackathon submission |
+
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
 ---
@@ -635,6 +666,15 @@ uv run --active python -m pytest -q          # 450 tests (server logic, x402, id
 cargo test --manifest-path contracts/escrow/Cargo.toml   # 40 tests (escrow, HTLC, arbitration)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
+
+### Test coverage
+
+| Suite | Framework | Count | Coverage |
+|---|---|---|---|
+| Server (Python) | pytest + Hypothesis | 450 | 70%+ |
+| Contracts (Rust) | cargo test + proptest | 40 | property-based |
+| Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
+| Frontend build | Vite + tsc --noEmit | — | type-checked |
 
 **Current status: 450/450 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
 property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,

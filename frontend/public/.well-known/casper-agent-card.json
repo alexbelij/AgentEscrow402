@@ -1,0 +1,28 @@
+{
+  "name": "AgentEscrow402",
+  "description": "HTTP 402 autonomous escrow for AI-to-AI micropayments on Casper Network",
+  "version": "1.0.0",
+  "homepage": "https://ae402.xyz",
+  "api_base": "https://agentescrow402-api-ywm8.onrender.com",
+  "capabilities": [
+    "x402-escrow",
+    "ai-arbitration",
+    "reputation-scoring",
+    "insurance-pool",
+    "risk-assessment",
+    "mlkem-encryption",
+    "vrf-arbiter-selection"
+  ],
+  "protocols": ["x402", "http"],
+  "network": "casper-test",
+  "contract_hash": "612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec",
+  "mcp_endpoint": "https://agentescrow402-api-ywm8.onrender.com/mcp",
+  "docs": {
+    "api": "https://ae402.xyz/console/docs?tab=api",
+    "sdk": "https://ae402.xyz/console/docs?tab=sdk",
+    "mcp": "https://ae402.xyz/console/docs?tab=mcp"
+  },
+  "contact": {
+    "github": "https://github.com/alexbelij/AgentEscrow402"
+  }
+}

@@ -5,6 +5,8 @@ import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoS
 import { useToast } from '../../lib/toast';
 import { useSigner } from '../../lib/signer';
 import ExplorerLink from './ExplorerLink';
+import EmptyState from './EmptyState';
+import { SkeletonTable } from './Skeleton';
 import {
   Users,
   UserPlus,
@@ -123,7 +125,7 @@ const Agents: React.FC = () => {
       setAgents(res.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch agents.');
-      console.error('Agents fetch error:', err);
+      if (import.meta.env.DEV) console.error('Agents fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -145,13 +147,13 @@ const Agents: React.FC = () => {
         api.getIdentityCapabilities(agent.public_key),
       ]);
 
-      if (reputationRes.error) console.error('Failed to fetch reputation:', reputationRes.error);
+      if (reputationRes.error && import.meta.env.DEV) console.error('Failed to fetch reputation:', reputationRes.error);
       setAgentReputation(reputationRes.data || null);
 
-      if (capabilitiesRes.error) console.error('Failed to fetch capabilities:', capabilitiesRes.error);
+      if (capabilitiesRes.error && import.meta.env.DEV) console.error('Failed to fetch capabilities:', capabilitiesRes.error);
       setAgentCapabilities(capabilitiesRes.data || null);
     } catch (err) {
-      console.error('Failed to fetch agent details:', err);
+      if (import.meta.env.DEV) console.error('Failed to fetch agent details:', err);
     }
   };
 
@@ -256,8 +258,8 @@ const Agents: React.FC = () => {
       {/* Agent List */}
       <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg shadow-md overflow-hidden">
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-            <Loader2 className="animate-spin h-10 w-10 text-amber-500" />
+          <div className="p-6">
+            <SkeletonTable rows={6} />
           </div>
         ) : error ? (
           <div className="text-red-500 bg-red-900/20 border border-red-700 rounded-lg p-4 m-4 flex items-center">
@@ -265,7 +267,10 @@ const Agents: React.FC = () => {
             <p>Error: {error}</p>
           </div>
         ) : filteredAgents.length === 0 ? (
-          <div className="p-6 text-center text-gray-400">No agents match this filter.</div>
+          <EmptyState
+            title="No agents registered"
+            description="Register an agent via the API or the wallet to see it here."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#1e1e2e]">
@@ -662,7 +667,10 @@ const DelegateCapabilityModal: React.FC<DelegateCapabilityModalProps> = ({ isOpe
             <p className="flex items-center"><CheckCircle className="h-5 w-5 mr-2" /> Delegation recorded and signature verified.</p>
             <p className="font-mono break-all">{result.delegator_id} → {result.delegatee_id}</p>
             <p>Capability: <span className="font-mono">{result.capability_uri}</span></p>
-            <p>Mode: <span className="font-mono">{result.mode}</span> · Deploy hash: <span className="font-mono">{result.deploy_hash}</span></p>
+            <p className="flex items-center flex-wrap gap-x-2">
+              <span>Mode: <span className="font-mono">{result.mode}</span> · Deploy hash: <span className="font-mono">{result.deploy_hash}</span></span>
+              {result.deploy_hash && <CopyButton text={result.deploy_hash} />}
+            </p>
           </div>
         )}
 

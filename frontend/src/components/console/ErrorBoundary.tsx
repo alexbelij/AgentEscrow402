@@ -15,7 +15,7 @@ class ErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('Console error:', error, info);
+    if (import.meta.env.DEV) console.error('Console error:', error, info);
   }
 
   componentDidUpdate() {
