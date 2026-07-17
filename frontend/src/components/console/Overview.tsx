@@ -18,6 +18,7 @@ import {
   BarChart3,
 } from 'lucide-react';
 import CopyButton from './CopyButton';
+import { SkeletonCard, SkeletonTable } from './Skeleton';
 import { format } from 'date-fns';
 
 const EXPLORER_BASE = 'https://testnet.cspr.live';
@@ -133,8 +134,18 @@ const Overview: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-amber-500"></div>
+      <div className="space-y-6" aria-busy="true" aria-label="Loading overview">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <SkeletonCard className="lg:col-span-2" />
+          <SkeletonCard />
+        </div>
+        <SkeletonTable rows={5} />
       </div>
     );
   }
