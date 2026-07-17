@@ -634,6 +634,22 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 | **Frontend** | React + Vite console, Vercel |
 | **Backend hosting** | Render (always-on) |
 
+### Casper Agentic Buildathon — submission checklist
+
+| Casper primitive / integration | Used | Where |
+|---|:---:|---|
+| Casper Network (testnet deploys) | ✅ | 8 contracts live on `casper-test` |
+| Casper Smart Contracts (Rust → WASM) | ✅ | [`contracts/escrow`](contracts/escrow) — CEP-88 escrow, HTLC, arbitration |
+| Native CSPR transfers | ✅ | Escrow lifecycle (create, release, refund) |
+| CEP-18 fungible tokens | ✅ | Multi-asset escrow support |
+| CEP-78 NFT escrow | ✅ | Multi-asset escrow support |
+| Casper JS SDK / signer | ✅ | Browser wallet integration via [`@make-software/csprclick-ui`](frontend/package.json) |
+| Casper VRF | ✅ | Arbiter selection for dispute resolution |
+| MCP server / LangChain tool | ✅ | [`sdk/`](sdk/) — agent-facing integrations |
+| x402 protocol | ✅ | Custom header parser + validator, signed payment intents |
+| Post-quantum encryption (ML-KEM-768) | ✅ | Metadata confidentiality in escrow payloads |
+| Casper 2.x mainnet | ⬜ | Testnet-only for hackathon submission |
+
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
 ---
