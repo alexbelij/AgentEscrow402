@@ -102,7 +102,16 @@ const WalletStatus: React.FC = () => {
                   : 'text-gray-400 hover:text-gray-200 border border-transparent'
               }`}
             >
-              {liveAddress ? shortKey(liveAddress) : ready ? 'Connect wallet' : 'Loading wallet SDK…'}
+              {liveAddress ? (
+                shortKey(liveAddress)
+              ) : ready ? (
+                'Connect wallet'
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-3 w-3 border-2 border-gray-500 border-t-ae-accent rounded-full animate-spin" aria-hidden="true" />
+                  <span>Connecting wallet…</span>
+                </span>
+              )}
             </button>
           </div>
           {isLive && (
