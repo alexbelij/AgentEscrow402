@@ -6,6 +6,7 @@ const LINKS = [
   { label: 'API Docs', href: '/console/docs?tab=api', external: false },
   { label: 'SDK', href: '/console/docs?tab=sdk', external: false },
   { label: 'MCP', href: '/console/docs?tab=mcp', external: false },
+  { label: 'Telegram', href: 'https://t.me/ae402_announcements', external: true },
   { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec', external: true },
 ]
 

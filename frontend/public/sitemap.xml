@@ -1,5 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://ae402.xyz/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
-  <url><loc>https://ae402.xyz/console</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://ae402.xyz/console/overview</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://ae402.xyz/console/use-cases</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console/escrows</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console/agents</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console/insurance</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ae402.xyz/console/risk</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ae402.xyz/console/contracts</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console/agent-demo</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ae402.xyz/console/sandbox</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ae402.xyz/console/docs</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://ae402.xyz/console/advanced</loc><changefreq>weekly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://ae402.xyz/console/arbitration</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://ae402.xyz/console/identity-registry</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>
 </urlset>

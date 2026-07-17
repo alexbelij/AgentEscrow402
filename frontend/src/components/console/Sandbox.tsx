@@ -182,7 +182,7 @@ const endpoints: EndpointConfig[] = [
       service_hash: SHARED_HASH,
       in_favor_of: 'sender',
       arbiter_pubkeys: ['01a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90'],
-      arbiter_signatures: ['demo-signature-placeholder'],
+      arbiter_signatures: [`demo-sig-${Date.now().toString(16)}`],
     },
     bodyFieldDocs: {
       service_hash: { type: 'string (64-char hex)', description: 'Hash of the disputed escrow to resolve.', required: true },

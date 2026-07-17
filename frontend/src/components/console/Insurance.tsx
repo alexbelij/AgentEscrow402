@@ -18,6 +18,7 @@ import {
   Info,
   AlertTriangle,
 } from 'lucide-react';
+import EmptyState from './EmptyState';
 import { format } from 'date-fns';
 import { useSigner } from '../../lib/signer';
 import { useInsuranceClaimAction } from '../../lib/useInsuranceClaimAction';
@@ -136,7 +137,7 @@ const Insurance: React.FC = () => {
       setPoolStats(res.data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch insurance pool stats.');
-      console.error('Insurance pool stats fetch error:', err);
+      if (import.meta.env.DEV) console.error('Insurance pool stats fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -290,7 +291,11 @@ const Insurance: React.FC = () => {
             </div>
           </div>
         ) : (
-          <p className="text-gray-400">No pool stats available.</p>
+          <EmptyState
+            title="No pool stats yet"
+            description="Once premiums are collected the pool overview will show deposits, claims, available funds and active policies."
+            icon={Shield}
+          />
         )}
       </div>
 
