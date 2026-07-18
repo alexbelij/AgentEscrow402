@@ -19,7 +19,7 @@ const NAV_ITEMS = [
 
 const EXTERNAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', external: true },
-  { label: 'Telegram', href: 'https://t.me/ae402_announcements', external: true },
+  { label: 'Telegram', href: 'https://t.me/AgentEscrow402', external: true },
   { label: 'SDK Docs', href: '/console/docs', external: false },
 ]
 
