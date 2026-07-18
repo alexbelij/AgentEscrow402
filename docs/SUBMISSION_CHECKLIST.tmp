@@ -1,0 +1,87 @@
+<!-- GENERATED TEMPLATE
+Purpose: DoraHacks submission checklist for AE402 covering all 8 judging criteria.
+Usage: Review content, verify each box against latest state, remove this header, rename to SUBMISSION_CHECKLIST.md.
+Remove when: After review and rename.
+-->
+
+# AE402 — DoraHacks Submission Checklist
+
+Every box below is grounded in a file, contract hash, URL, or command a
+judge can independently verify. Boxes are unchecked so a human can
+initial each one after re-running the verification.
+
+## 1. Technical Quality
+
+- [ ] `./verify.sh --api https://agentescrow402-api-ywm8.onrender.com` exits 0
+- [ ] CI green on `main` — `.github/workflows/ci.yml` (backend tests, ruff, black)
+- [ ] Frontend build green — `.github/workflows/frontend-build.yml` (`tsc && vite build`)
+- [ ] Secret-scan green — `.github/workflows/secret-scan.yml`
+- [ ] Backend test suite passes — 450/450 (`pytest -v` per `docs/STATUS_AND_ROADMAP.md`)
+- [ ] `docs/ARCHITECTURE.md` reflects current 8-contract layout + FastAPI endpoint count
+
+## 2. Innovation
+
+- [ ] AI arbitration returns `abstain` on insufficient evidence (see `server/ai_arbitration.py`)
+- [ ] LLM provider fallback chain works end-to-end (Groq → NIM → OpenRouter → heuristic)
+- [ ] RPC fallback: local VRF election kicks in when on-chain contract unreachable (`server/vrf_election.py`)
+- [ ] Multi-asset escrow (CEP-18 AETUSD / AEMAT) demo runs on `/console/advanced`
+- [ ] HTLC atomic swap commit/reveal path documented and reachable via SDK
+
+## 3. AI / Agentic Design
+
+- [ ] `docs/ARCHITECTURE.md` diagrams the AI-agent → x402 → escrow flow
+- [ ] MCP server exposes 26 tools (`docs/mcp_tools_schema.json`)
+- [ ] LangChain integration example lives in `sdk/` and imports without extra deps
+- [ ] Agent Identity Registry backs x402 signatures with on-chain reputation
+- [ ] `sdk/` sample scripts demonstrate an autonomous agent creating, releasing, and disputing an escrow
+
+## 4. Real-World Use
+
+- [ ] Insurance Pool has non-zero balance on-chain — verify via CSPR.live explorer link in `deploy-out/onchain.json`
+- [ ] Reputation scoring reflects live agent history (see `/console/identity-registry`)
+- [ ] Evidence page (`/console/evidence`) shows all 8 contracts with deploy links
+- [ ] 349+ real testnet transactions counted (see `docs/STATUS_AND_ROADMAP.md` line 1)
+- [ ] Public demo receiver + sender keys documented for reviewers (`sdk/` README)
+
+## 5. UX / Design
+
+- [ ] Mobile responsive — Console usable at ≤ 375px width
+- [ ] Skeleton loaders shown while data fetches (`components/console/Skeleton.tsx`)
+- [ ] Error boundaries scoped per route (`components/console/ErrorBoundary.tsx`)
+- [ ] Sandbox mode banner shown when API returns `X-Sandbox: 1`
+- [ ] All destructive actions gated by `ConfirmModal.tsx`
+- [ ] Wallet spinner shown during CSPR.click signing (`components/console/WalletStatus.tsx`)
+
+## 6. Contracts / On-chain
+
+- [ ] `deploy-out/onchain.json` contains 8 entries with `contract_hash` +
+      `contract_package_hash` + `deploy_hash` (verified against CSPR.cloud)
+- [ ] Each hash resolves on `https://testnet.cspr.live/contract/<hash>`
+- [ ] Each `deploy_hash` shows `success=true` on `https://testnet.cspr.live/deploy/<hash>`
+- [ ] Insurance-pool old variant (`e36b958d…`) documented as superseded in `onchain.json.notes`
+- [ ] Contract source under `contracts/` compiles with pinned nightly (`contracts/rust-toolchain.toml`)
+
+## 7. Launch Plans
+
+- [ ] Telegram channel linked from Footer (verify actual URL in `frontend/src/components/Footer.tsx`)
+- [ ] `docs/STATUS_AND_ROADMAP.md` current — "Last verified" date within submission week
+- [ ] Twitter / X handle discoverable from footer or docs
+- [ ] Submission video ≤ 3 min uploaded and linked
+- [ ] `README.md` opens with a live demo link and a "why it matters" paragraph
+
+## 8. Long-term Viability
+
+- [ ] Governance DAO path outlined in `docs/STATUS_AND_ROADMAP.md`
+- [ ] Allium (or equivalent) analytics ingestion planned — RPC-tap example in
+      `docs/ARCHITECTURE.md` "Event Monitor" section
+- [ ] Post-mainnet upgrade path via `contract_package_hash` versioning
+      described in `docs/DEPLOY.tmp` (Rollback section)
+- [ ] Public token distribution plan or funding runway documented
+- [ ] `docs/RED_TEAM.tmp` covers 15+ attack vectors with mitigation status
+
+---
+
+**Submitter should**: run through every unchecked box, tick it after
+verifying the referenced file / URL / command still passes, then rename
+this file to `SUBMISSION_CHECKLIST.md` (strip the GENERATED-TEMPLATE
+header) and commit.
