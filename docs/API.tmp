@@ -1,0 +1,366 @@
+<!-- GENERATED TEMPLATE
+Purpose: API reference with curl examples for all 64 REST endpoints, grouped by module.
+Usage: Review content, cross-check against docs/openapi.yaml and docs/API_SDK_MCP.md,
+       decide whether to (a) merge curl examples into docs/API_SDK_MCP.md and delete
+       this file, or (b) remove this header and rename to docs/API.md as a standalone
+       curl-focused companion.
+Remove when: After Viktor reviews and decides on the merge path.
+-->
+
+# AE402 REST API — Curl Reference
+
+> Companion to [`API_SDK_MCP.md`](./API_SDK_MCP.md) (narrative reference) and
+> [`openapi.yaml`](./openapi.yaml) (machine schema). This file focuses on
+> ready-to-run `curl` examples for every REST endpoint.
+
+**Base URL (dev):** `http://localhost:8000`
+**Base URL (prod):** `https://ae402.xyz/backend`
+
+Endpoints marked 🔐 require an `X-Payment` header. See
+[`API_SDK_MCP.md § Authentication`](./API_SDK_MCP.md#authentication-x402-payment-protocol)
+for the exact signing scheme; the Python SDK handles it automatically.
+
+Legend:
+- 🔐 — x402-signed request
+- ⚡ — admin/deployer key required
+- `$BASE` — export `BASE=http://localhost:8000` before running the snippets
+
+Endpoint count: **64** (verified via `grep '@(app|router)\.' server/*.py`).
+
+---
+
+## 1. Health / System
+
+| Method | Path | Auth | File |
+|--------|------|------|------|
+| GET | `/` | | server/app.py |
+| GET | `/health` | | server/app.py |
+| GET | `/stats` | | server/app.py |
+| GET | `/contracts` | | server/app.py |
+| GET | `/dashboard` | | server/app.py |
+| GET | `/wasm/escrow_funder` | | server/app.py |
+| GET | `/events` | | server/app.py |
+| GET | `/api/v1/events/stream` | | alias of `/events` |
+
+```bash
+curl -s $BASE/health | jq
+curl -s $BASE/stats | jq
+curl -s $BASE/contracts | jq '.contracts | keys'
+curl -N $BASE/api/v1/events/stream         # SSE stream, Ctrl+C to stop
+```
+
+---
+
+## 2. Core Escrow Lifecycle
+
+| Method | Path | Auth | File |
+|--------|------|------|------|
+| POST | `/escrow` | 🔐 | server/app.py |
+| GET | `/escrows` | | server/app.py |
+| GET | `/escrow/{service_hash}` | | server/app.py |
+| GET | `/escrow/{service_hash}/history` | | server/app.py |
+| POST | `/release` | 🔐 | server/app.py |
+| POST | `/refund` | 🔐 | server/app.py |
+| POST | `/dispute` | 🔐 | server/app.py |
+| POST | `/resolve` | 🔐 | server/app.py |
+| GET | `/estimate` | | server/app.py |
+| POST | `/compute-hash` | | server/app.py |
+
+```bash
+# Create escrow (payment header omitted for brevity — SDK signs it)
+curl -s -X POST $BASE/escrow \
+  -H 'Content-Type: application/json' \
+  -H 'X-Payment: x402-v1;...;<signature>' \
+  -d '{"service_hash":"<hex>","amount":5000,"receiver":"account-hash-<hex>"}' | jq
+
+curl -s "$BASE/escrows?limit=20&status=active" | jq
+curl -s $BASE/escrow/<service_hash> | jq
+curl -s $BASE/escrow/<service_hash>/history | jq
+curl -s "$BASE/estimate?amount=5000" | jq
+curl -s -X POST $BASE/compute-hash \
+  -H 'Content-Type: application/json' \
+  -d '{"sender":"...","receiver":"...","amount":5000,"nonce":"abc"}' | jq
+
+# Lifecycle (signed)
+curl -s -X POST $BASE/release  -H 'X-Payment: ...' -H 'Content-Type: application/json' -d '{"service_hash":"..."}' | jq
+curl -s -X POST $BASE/refund   -H 'X-Payment: ...' -H 'Content-Type: application/json' -d '{"service_hash":"..."}' | jq
+curl -s -X POST $BASE/dispute  -H 'X-Payment: ...' -H 'Content-Type: application/json' -d '{"service_hash":"...","reason":"non-delivery"}' | jq
+curl -s -X POST $BASE/resolve  -H 'X-Payment: ...' -H 'Content-Type: application/json' -d '{"service_hash":"...","verdict":"release","arbiter_sigs":[...]}' | jq
+```
+
+---
+
+## 3. Batch Operations (up to 50 per deploy)
+
+| Method | Path | Auth | File |
+|--------|------|------|------|
+| POST | `/escrows/batch` | 🔐 | server/app.py |
+| POST | `/escrows/batch-release` | 🔐 | server/app.py |
+| POST | `/escrows/batch-cancel` | 🔐 | server/app.py |
+
+```bash
+curl -s -X POST $BASE/escrows/batch \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"escrows":[{"service_hash":"...","amount":1000,"receiver":"..."}]}' | jq
+
+curl -s -X POST $BASE/escrows/batch-release \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hashes":["...","..."]}' | jq
+
+curl -s -X POST $BASE/escrows/batch-cancel \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hashes":["...","..."]}' | jq
+```
+
+---
+
+## 4. Multi-Asset / Streaming Escrow (`/escrow` prefix, server/multi_asset.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/escrow/multi-asset` | 🔐 |
+| POST | `/escrow/multi-asset/{service_hash}/release` | 🔐 |
+| POST | `/escrow/multi-asset/{service_hash}/refund` | 🔐 |
+| POST | `/escrow/multi-asset/{service_hash}/dispute` | 🔐 |
+| POST | `/escrow/multi-asset/{service_hash}/resolve` | 🔐 |
+| POST | `/escrow/stream` | 🔐 |
+| POST | `/escrow/{service_hash}/stream-claim` | 🔐 |
+| GET | `/escrow/{service_hash}/stream-status` | |
+| POST | `/escrow/atomic-swap/commit` | 🔐 |
+| POST | `/escrow/atomic-swap/reveal` | 🔐 |
+| GET | `/escrow/cep18-permit-nonce` | |
+
+```bash
+curl -s -X POST $BASE/escrow/multi-asset \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hash":"...","token":"AETUSD","amount":"1000000000"}' | jq
+
+curl -s -X POST $BASE/escrow/stream \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hash":"...","token":"AETUSD","total":"1000000000","duration_sec":86400}' | jq
+
+curl -s $BASE/escrow/<service_hash>/stream-status | jq
+
+curl -s -X POST $BASE/escrow/atomic-swap/commit \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"hashlock":"<sha256>","timelock":<unix_ts>,"counterparty":"..."}' | jq
+
+curl -s "$BASE/escrow/cep18-permit-nonce?owner=<account_hash>&token=AETUSD" | jq
+```
+
+---
+
+## 5. Insurance Pool (`/insurance` prefix, server/insurance.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/insurance/deposit` | 🔐 |
+| POST | `/insurance/claim` | 🔐 |
+| GET | `/insurance/pool-stats` | |
+| GET | `/insurance/premium-quote` | |
+| POST | `/insurance/configure-fee` | ⚡ |
+
+```bash
+curl -s -X POST $BASE/insurance/deposit \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"amount":"100000000000"}' | jq
+
+curl -s -X POST $BASE/insurance/claim \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hash":"...","reason":"arbitration-refund"}' | jq
+
+curl -s $BASE/insurance/pool-stats | jq
+curl -s "$BASE/insurance/premium-quote?amount=5000&risk_tier=medium" | jq
+```
+
+---
+
+## 6. AI Arbitration (server/app.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/arbitration/analyze` | 🔐 |
+| GET | `/arbitration/history` | |
+
+```bash
+curl -s -X POST $BASE/arbitration/analyze \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"service_hash":"...","evidence":{"sender":"...","receiver":"...","claim":"..."}}' | jq
+
+curl -s "$BASE/arbitration/history?limit=20" | jq
+```
+
+---
+
+## 7. VRF Arbiter Election (`/vrf` prefix, server/vrf_election.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/vrf/arbiters/register` | 🔐 |
+| GET | `/vrf/arbiters` | |
+| POST | `/vrf/elect` | 🔐 |
+| GET | `/vrf/election/{dispute_id}` | |
+
+```bash
+curl -s -X POST $BASE/vrf/arbiters/register \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"account":"...","stake":"10000000000"}' | jq
+
+curl -s $BASE/vrf/arbiters | jq
+
+curl -s -X POST $BASE/vrf/elect \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"dispute_id":"...","seed":"<hex>","committee_size":3}' | jq
+
+curl -s $BASE/vrf/election/<dispute_id> | jq
+```
+
+---
+
+## 8. Agent Identity — DID (`/identity` prefix, server/agent_identity.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/identity/register` | 🔐 |
+| GET | `/identity/{did}` | |
+| POST | `/identity/{did}/verify` | 🔐 |
+| POST | `/identity/{did}/capabilities` | 🔐 |
+| POST | `/identity/{did}/reputation` | 🔐 |
+| POST | `/identity/{did}/slash` | ⚡ |
+| POST | `/identity/{did}/decay` | ⚡ |
+
+```bash
+curl -s -X POST $BASE/identity/register \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"did":"did:casper:...","pubkey":"...","capabilities":["escrow","arbiter"]}' | jq
+
+curl -s $BASE/identity/did:casper:<account_hash> | jq
+
+curl -s -X POST $BASE/identity/<did>/verify \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"proof":"..."}' | jq
+
+curl -s -X POST $BASE/identity/<did>/capabilities \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"add":["dispute"],"remove":[]}' | jq
+```
+
+---
+
+## 9. Identity Registry (`/identity-registry` prefix, server/identity_registry_api.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/identity-registry/register` | 🔐 |
+| GET | `/identity-registry/{agent_id}` | |
+| GET | `/identity-registry/capabilities/{agent_id}` | |
+| GET | `/identity-registry/by-account/{account_hash}` | |
+| GET | `/identity-registry/search/agents` | |
+| POST | `/identity-registry/delegate` | 🔐 |
+| GET | `/identity-registry/stats/summary` | |
+
+```bash
+curl -s -X POST $BASE/identity-registry/register \
+  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
+  -d '{"agent_id":"agent-...","account_hash":"...","capabilities":["escrow"]}' | jq
+
+curl -s $BASE/identity-registry/agent-abc123 | jq
+curl -s $BASE/identity-registry/capabilities/agent-abc123 | jq
+curl -s $BASE/identity-registry/by-account/<account_hash> | jq
+curl -s "$BASE/identity-registry/search/agents?capability=arbiter&limit=10" | jq
+curl -s $BASE/identity-registry/stats/summary | jq
+```
+
+---
+
+## 10. Risk Scoring (`/risk` prefix, server/risk_api.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/risk/score/{agent}` | |
+
+```bash
+curl -s $BASE/risk/score/<account_hash> | jq
+```
+
+---
+
+## 11. Reputation & Agents (server/app.py)
+
+| Method | Path | Auth |
+|--------|------|------|
+| GET | `/reputation/{agent}` | |
+| GET | `/agents` | |
+
+```bash
+curl -s $BASE/reputation/<account_hash> | jq
+curl -s "$BASE/agents?limit=50&sort=reputation" | jq
+```
+
+---
+
+## 12. Admin (`/admin` prefix, server/admin_api.py, ⚡ deployer key)
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/admin/set-arbiters` | ⚡ |
+| POST | `/admin/set-release-cap` | ⚡ |
+| POST | `/admin/emergency-freeze` | ⚡ |
+| POST | `/admin/unfreeze` | ⚡ |
+
+```bash
+# All admin endpoints require deployer-key-signed X-Payment
+curl -s -X POST $BASE/admin/set-arbiters \
+  -H 'X-Payment: <deployer-sig>' -H 'Content-Type: application/json' \
+  -d '{"arbiters":["...","..."]}' | jq
+
+curl -s -X POST $BASE/admin/set-release-cap \
+  -H 'X-Payment: <deployer-sig>' -H 'Content-Type: application/json' \
+  -d '{"cap":"1000000000000"}' | jq
+
+curl -s -X POST $BASE/admin/emergency-freeze \
+  -H 'X-Payment: <deployer-sig>' | jq
+
+curl -s -X POST $BASE/admin/unfreeze \
+  -H 'X-Payment: <deployer-sig>' | jq
+```
+
+---
+
+## Error Responses
+
+All endpoints return errors as:
+
+```json
+{
+  "detail": "<human-readable message>",
+  "code": "<machine-readable code>"
+}
+```
+
+Status codes:
+
+| Code | Meaning |
+|------|---------|
+| 400 | Bad request / validation failure |
+| 402 | Payment required (missing / invalid x402 header) |
+| 403 | Forbidden (admin endpoint, non-deployer caller) |
+| 404 | Escrow / agent / DID not found |
+| 409 | State conflict (e.g. dispute on already-resolved escrow) |
+| 422 | Unprocessable entity (schema mismatch) |
+| 429 | Rate limit exceeded |
+| 500 | Internal error |
+| 503 | Sandbox refused fallback (`AE402_STRICT=1`, RPC unreachable) |
+
+---
+
+## Cross-refs
+
+- Narrative & Python SDK / MCP tools: [`docs/API_SDK_MCP.md`](./API_SDK_MCP.md)
+- Machine schema (import into Postman / Insomnia): [`docs/openapi.yaml`](./openapi.yaml)
+- Real-vs-sim disclosure: [`docs/REAL_VS_SIM.tmp`](./REAL_VS_SIM.tmp)
+- Deployment: [`docs/DEPLOY.tmp`](./DEPLOY.tmp)
+
+---
+
+*Total endpoints documented: 64. Generated 2026-07-18 against branch `fix/agent-batch-2`.*
