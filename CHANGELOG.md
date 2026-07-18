@@ -12,31 +12,26 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 *Delivered the console/backend work the 1.1.0 entry below prematurely claimed as shipped.*
 
 ### Added (2026-07-17)
-- **Red-team self-audit** (`docs/RED_TEAM.tmp`) — 15 attack-vector matrix with mitigation status; documents the one real gap (insurance-pool replay under specific reorg conditions) alongside the resistances (reentrancy, integer overflow, unauthorized cancellation, front-running, injection). Commit `15b6c44`.
-- **verify.sh** — single-command proof of on-chain deployment: checks all 8 contracts exist on Casper testnet (via CSPR.cloud), API `/health`, escrow round-trip, frontend serving, and `onchain.json` parity. Commit `82d950c`, merged in `a7ab56e`.
-
-### Added (2026-07-15)
-- **RPC fallback chain** — CSPR.cloud → NowNodes → official node; escrow lifecycle survives any single provider outage (`server/casper_client.py`). Commit `808606b`, merged in `1c03529`.
-- **`ABSTAIN` verdict** for arbiter conflict-of-interest — arbiters return `abstain` instead of a coerced vote when a party is a party (`server/vrf_election.py`). Commit `ce3db9c`.
-- **`X-Request-ID` middleware** for request tracing across backend logs (`server/middleware.py`). Commit `4c37b5e`.
-- **`/health`** returns `mode` (sandbox|live) and version bumped to `0.3.0`. Commit `0433916`.
-
-### Added (2026-07-14 batch)
-- `deploy-out/onchain.json` filled with CSPR.cloud-verified deploy hashes for all 8 contracts (`f31bd39`).
-- `SECURITY.md` self-audit table (`3c6bb42`).
-
-### Fixed (2026-07-14 batch)
-- `checked_sub` / `checked_add` in test-token `transfer` and `transfer_from` — prevents integer underflow on custody-compatible tokens (`589d4a0`).
-- Root `/` redirect to `/health` for Render probe (`c63ed61`).
-- Pydantic v2 `model_` namespace warning suppressed via `ConfigDict` (`07b5a30`).
-- Secret-scan workflow — removed `base`/`head` that fail on push events (`7b7b07c`).
-
-### Added (2026-06-14 frontend polish batch, merged 2026-06-14 as `b165033`)
+- **Red-team self-audit** (`docs/RED_TEAM.tmp`) — 15 attack-vector matrix with mitigation status; documents the one real gap (insurance-pool replay under specific reorg conditions) alongside the resistances (reentrancy, integer overflow, unauthorized cancellation, front-running, injection). Commit `a10e6a6`.
+- **verify.sh** — single-command proof of on-chain deployment: checks all 8 contracts exist on Casper testnet (via CSPR.cloud), API `/health`, escrow round-trip, frontend serving, and `onchain.json` parity. Commit `5b64081`, merged in `9184dbc`.
+- **RPC fallback chain** — CSPR.cloud → NowNodes → official node; escrow lifecycle survives any single provider outage (`server/casper_client.py`). Commit `d241726`, merged in `ce136ff`.
+- **`ABSTAIN` verdict** for arbiter conflict-of-interest — arbiters return `abstain` instead of a coerced vote when a party is a party (`server/vrf_election.py`). Commit `038585a`.
+- **`X-Request-ID` middleware** for request tracing across backend logs (`server/middleware.py`). Commit `80f376c`.
+- **`/health`** returns `mode` (sandbox|live) and version bumped to `0.3.0`. Commit `0dc28d1`.
+- `deploy-out/onchain.json` filled with CSPR.cloud-verified deploy hashes for all 8 contracts (`cdcbe92`).
+- `SECURITY.md` self-audit table (`a2b6273`).
 - Complete favicon set (16/32/apple-touch), sitemap.xml with all console routes, status badges, submission checklist table in README, skeleton loaders on Agents/Escrows tabs, CONTRIBUTING.md, frontend CI workflow, secret-scan workflow, Dependabot, `.well-known/casper-agent-card.json` for agent discovery, Telegram links in navbar and footer, ExplorerLink hardening (validation + `noopener`), wallet spinner during CSPR.click signing, confirmation modals for destructive actions, empty states, copy-to-clipboard utility + CopyButton, console.error suppression in production, real generated demo signature (no more placeholder), 404 page with console link and image fallback.
 
-### Fixed (2026-06-14)
-- Integer floor division in insurance-fee calculation avoids float precision loss (`43ed005`, closes #1).
+### Fixed (2026-07-17)
+- `checked_sub` / `checked_add` in test-token `transfer` and `transfer_from` — prevents integer underflow on custody-compatible tokens (`72f9594`).
+- Root `/` redirect to `/health` for Render probe (`089b3f5`).
+- Pydantic v2 `model_` namespace warning suppressed via `ConfigDict` (`577db34`).
+- Secret-scan workflow — removed `base`/`head` that fail on push events (`ef5302c`).
 
+> **Note (2026-07-18 changelog audit):** the entries above were previously misdated (spread across fictional "2026-07-15", "2026-07-14 batch" and "2026-06-14" labels); git history confirms all of them landed on 2026-07-17. Corrected in place. A block of ~30 real commits from 2026-07-06 (live-wallet escrow creation, secp256k1 x402 support, insurance-pool arbiter-quorum hardening, gasless CEP-18 permits, VRF read-path fix, and more) currently has **no changelog entries at all** — flagged for whoever picks up the changelog next, not written up here to avoid guessing at intent from commit messages alone.
+
+### Fixed (2026-07-08)
+- Integer floor division in insurance-fee calculation avoids float precision loss (`37ac252`, closes #1).
 
 ### Fixed (2026-07-05)
 - **v8 contract deploy**: `read_release_cap()` used `storage::read::<u64>(uref).unwrap_or_revert()`,
@@ -71,13 +66,13 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
   and signature hex decoders in `arbiter_crypto.py`. Coverage is now 70.11% (376 Python tests, up
   from 333) with the gate met honestly, not by lowering the threshold or excluding files.
 
-### Added
+### Added (2026-07-04)
 - **Advanced Escrow console panel** (`AdvancedEscrow.tsx`) — alt-token escrow (CSPR/CEP-18/CEP-78), linear streaming payouts, and commit-reveal atomic swaps, backed by `server/multi_asset.py`.
 - **Arbitration console panel** (`Arbitration.tsx`) — AI dispute evidence analysis (`server/ai_arbitration.py`, Groq → NVIDIA → heuristic fallback) and VRF-based neutral arbiter election (`server/vrf_election.py`).
 - **Identity Registry console panel** (`IdentityRegistry.tsx`) — first-ever HTTP API (`server/identity_registry_api.py`, prefix `/identity-registry`) for the previously-unreachable `server/identity_registry.py` DID reputation/staking module: register, get, update reputation, apply decay, slash, verify, search, stats.
 - `GET /arbitration/history` endpoint (previously no way to read back past AI arbitration verdicts).
 
-### Fixed
+### Fixed (2026-07-04)
 - `lib/api.ts`'s `getArbiters()` called a non-existent `/arbitration/arbiters` path; corrected to the real `/vrf/arbiters` endpoint and fixed its response field mapping.
 - 4 backend bugs in `server/multi_asset.py` that made atomic swaps/streaming escrows non-functional (broken auth/token-adapter dependencies, fictional DB calls, a demo-identity bypass that blocked two-party swaps).
 - `IdentityRegistry.update_reputation()` reset `reputation_score` to 0 on any call with zero new deals (e.g. a bare "touch"), instead of leaving it unchanged.
