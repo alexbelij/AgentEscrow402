@@ -110,6 +110,7 @@ async def _on_escrow_disputed(event: dict[str, Any]) -> None:
         _sandbox._escrows[sh]["status"] = "disputed"
     logger.info("On-chain event: escrow_disputed %s", sh[:16])
     _broadcast_event({"type": "escrow_disputed", "service_hash": sh, "ts": int(time.time())})
+    _broadcast_event({"type": "dispute_opened", "service_hash": sh, "ts": int(time.time())})
 
 
 def _broadcast_event(event: dict[str, Any]) -> None:
@@ -1048,6 +1049,10 @@ async def dispute_escrow(
         pgdb.bump_reputation(record.sender, disputed=1)
         await _sync_identity_registry(record.sender, disputed=1)
         _broadcast_event({"type": "escrow_disputed", "service_hash": req.service_hash, "ts": int(time.time())})
+        # Spec alias — mirror as `dispute_opened` so notification listeners
+        # that follow AE402_AGENT_SPEC.md (batch-2 A5) fire on the same event
+        # without breaking existing consumers of `escrow_disputed`.
+        _broadcast_event({"type": "dispute_opened", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
@@ -1179,6 +1184,10 @@ async def resolve_escrow(
         pgdb.bump_reputation(winner, completed=1)
         await _sync_identity_registry(winner, completed=1)
         _broadcast_event({"type": "escrow_resolved", "service_hash": req.service_hash, "ts": int(time.time())})
+        # Spec alias — mirror as `arbitration_complete` (see AE402_AGENT_SPEC.md
+        # batch-2 A5). Kept as an additional broadcast so any consumer still
+        # subscribed to the older `escrow_resolved` name keeps working.
+        _broadcast_event({"type": "arbitration_complete", "service_hash": req.service_hash, "ts": int(time.time())})
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")

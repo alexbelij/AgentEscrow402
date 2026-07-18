@@ -422,6 +422,25 @@ async def file_insurance_claim(
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain")
 
     logger.info("Claim for escrow %s by %s processed. Deploy hash: %s", request.escrow_hash[:16], claimant[:8], deploy_hash[:16])
+
+    # Fire an SSE `insurance_claimed` event so subscribers of `/events` get
+    # notified when a claim actually pays out. See AE402_AGENT_SPEC.md batch-2
+    # A5 for the event contract. Import is local to avoid a circular import
+    # between server/app.py (which mounts this router) and server/insurance.py.
+    try:
+        from server.app import _broadcast_event  # noqa: WPS433 — intentional local import
+
+        _broadcast_event(
+            {
+                "type": "insurance_claimed",
+                "escrow_hash": request.escrow_hash,
+                "amount": escrow_amount,
+                "ts": int(time.time()),
+            }
+        )
+    except Exception:  # pragma: no cover — SSE fan-out is best-effort
+        logger.debug("insurance_claimed broadcast skipped (event bus unavailable)")
+
     return {"message": "Claim filed and processed successfully", "deploy_hash": deploy_hash}
 
 
