@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNotifications } from '../../hooks/useNotifications';
 import ErrorBoundary from './ErrorBoundary';
 import BackendWakeOverlay from './BackendWakeOverlay';
 import WalletStatus from './WalletStatus';
@@ -218,6 +219,9 @@ function SidebarNav({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?
 }
 
 const ConsoleLayout: React.FC = () => {
+  // Subscribes to backend SSE and fires toast on escrow lifecycle events.
+  // Mounted only inside /console so the marketing landing stays quiet.
+  useNotifications();
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
   const info = SECTION_INFO[location.pathname];
