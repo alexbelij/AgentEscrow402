@@ -1,0 +1,90 @@
+<!-- GENERATED TEMPLATE
+Purpose: Honest disclosure of which AE402 components run against real Casper testnet vs. which are simulated / sandboxed.
+Usage: Review content, remove this header, rename to REAL_VS_SIM.md.
+Remove when: After review and rename.
+-->
+
+# AE402 — Real vs. Simulated
+
+This document is the **honest ground-truth** of what runs against Casper
+testnet (verifiable on-chain) vs. what is simulated in sandbox / heuristic
+mode. It supersedes any marketing language elsewhere.
+
+Two orthogonal axes govern behavior:
+
+- **`SANDBOX` env** (`server/config.py: Config.sandbox`, default `True`
+  in dev, set `SANDBOX=0` in prod) — when true, an in-memory
+  `SandboxStore` (`server/sandbox.py`) is used instead of hitting the
+  Casper RPC. Escrow lifecycle, reputation, and insurance are all
+  simulated in memory. **No real testnet transactions are produced.**
+- **Individual API keys** — even when `SANDBOX=0`, subcomponents may
+  degrade to a lower fallback tier if their upstream is unconfigured
+  (see AI arbitration chain below). This is by design, not a hidden
+  simulation.
+
+> The `AE402_STRICT=1` env flag (once landed in `server/config.py`) will
+> disable the in-memory fallbacks and force the backend to return an HTTP
+> error instead of degrading silently — see task A1 in `AE402_AGENT_SPEC.md`.
+
+---
+
+## Component-by-component
+
+| Component | Status | Details |
+|---|---|---|
+| 8 smart contracts on Casper testnet | ✅ REAL | Deployed and verifiable — hashes and deploy tx links in `deploy-out/onchain.json`. See CSPR.cloud explorer links in the same file. |
+| Escrow create / release / refund / dispute | ✅ REAL when `SANDBOX=0` | Full lifecycle via Casper RPC (`server/casper_client.py` → `contracts/escrow`). Falls back to `SandboxStore` in-memory when `SANDBOX=1` — sandbox mode is signposted in every API response. |
+| Batch escrow ops | ✅ REAL when `SANDBOX=0` | Via `escrow_manager` contract (`bfa8c02c…`), session WASM `batch_funder.wasm`. |
+| HTLC atomic swap (commit / reveal) | ✅ REAL | On-chain `commit_swap()` / `reveal_swap()` entry points on core escrow. |
+| Multi-asset escrow (CEP-18 tokens AETUSD / AEMAT) | ✅ REAL | `multi_asset_escrow` contract (`52db09a1…`), test tokens `177ca5d8…` (AETUSD) and `8ba7df6f…` (AEMAT). |
+| Insurance pool (fund / claim / withdraw) | ✅ REAL | `insurance_pool` contract (`e128780f…`), session WASM `pool_funder.wasm`. Fund flow: user → escrow (deducts `insurance_fee_bps` = 200 bps = 2%) → pool. |
+| Reputation scoring | ✅ REAL | On-chain via `agent_identity_registry` contract (`1f29271d…`), 9 entry points including `register`, `stake`, `slash`. Sandbox mirror kept in `_reputation` dict for demo without RPC. |
+| VRF-based arbiter election | 🟢 REAL / 🟡 FALLBACK | Real: `vrf_arbiter` contract (`78ae2870…`), `select_arbiters()` on-chain, backend reads `selected_arbiters_csv` from `elections_dict`. Fallback: local cryptographic HMAC-based selection if the contract is unavailable, unconfigured, or every on-chain candidate is excluded by INVARIANT 5 (arbiter ≠ dispute party). Fallback is deterministic, not "simulated" — see `server/vrf_election.py`. |
+| AI arbitration (LLM verdict) | 🟢 REAL / 🟡 HEURISTIC FALLBACK | Provider chain (`server/ai_arbitration.py`): Groq (llama-3.1-8b-instant, free) → NVIDIA NIM (meta/llama-3.1-8b-instruct, free) → OpenRouter (free tier) → deterministic heuristic scoring. First three require API keys in env; heuristic always works. Never invents a verdict; may return `abstain` or `escalate` when signals are insufficient. |
+| x402 payment verification | 🟡 PARTIAL | Payment header (`X-402-Payment`) validated in `server/middleware.py` — signature and nonce checked. When `SANDBOX=1` the corresponding CSPR transfer is simulated (no on-chain tx); when `SANDBOX=0` the transfer goes through Casper RPC. |
+| Event streaming (SSE) | 🟢 REAL | Backend `_broadcast_event` + `StreamingResponse` in `server/app.py` push escrow state changes to subscribed clients. Event Monitor (`server/event_monitor.py`) subscribes to CEP-88 contract events on the escrow contract. |
+| Rate limiting | 🟢 REAL | Per-IP token bucket in `server/middleware.py`. Auth-based per-agent rate limits are on the roadmap (see `docs/RED_TEAM.tmp` row 6). |
+| DID (Decentralized Identity) registry | 🟢 REAL | `identity_registry_api.py` → on-chain `agent_identity_registry` (9 entry points). |
+| Insurance claim adjudication | 🟢 REAL / 🟡 MANUAL | Automated eligibility check via on-chain state; final payout requires admin approval today (`server/admin_api.py`). Full auto-payout is planned once dispute resolution proves stable at scale. |
+| Frontend console (12 pages) | ✅ REAL | React/Vite (`frontend/`). Talks to production backend or sandbox via `VITE_API_URL`. Wallet integration via CSPR.click. |
+| Python SDK + MCP server + LangChain tool | ✅ REAL | `sdk/` — 26 MCP tools exposed to LLMs. All calls transit the same backend as the console. |
+
+---
+
+## What "sandbox mode" hides
+
+When `SANDBOX=1`:
+
+- No Casper RPC calls are made. `casper_client.py` is bypassed.
+- Escrows live in `SandboxStore._escrows` (in-memory dict), reset on
+  restart.
+- Deploy hashes are synthetic (`sandbox-<hex>`), NOT valid on
+  `testnet.cspr.live`.
+- Insurance pool balance is in-memory. Fund/claim operations do not touch
+  the on-chain pool.
+- VRF election uses local HMAC selection over the seeded demo arbiters
+  (`arbiter_alpha`, `arbiter_beta`, `arbiter_gamma`).
+
+Any API response served in sandbox mode SHOULD be returned with an
+`X-Sandbox: 1` header (verify — this is the invariant the console relies
+on to show its "sandbox mode" banner).
+
+## What `AE402_STRICT=1` will enforce (A1 task)
+
+- Backend refuses to fall back to `SandboxStore` when a real RPC call
+  fails. Instead returns HTTP 503 with a clear error message.
+- Refuses to serve AI-arbitration verdicts from the heuristic fallback
+  when no LLM provider is configured (returns HTTP 503 instead of a
+  deterministic-but-degraded verdict).
+- Refuses to run VRF election off-chain when the on-chain contract is
+  unavailable (returns HTTP 503 instead of local HMAC fallback).
+
+Effect: `AE402_STRICT=1` turns the entire backend into an all-real-or-die
+mode, useful for prod correctness proofs and for CI verification runs.
+
+---
+
+_Ground-truth check: `deploy-out/onchain.json` (contract hashes),
+`server/config.py` (env flags), `server/ai_arbitration.py` (LLM chain),
+`server/vrf_election.py` (VRF fallback), `server/sandbox.py`
+(in-memory store), `docs/ARCHITECTURE.md` (system diagram)._
