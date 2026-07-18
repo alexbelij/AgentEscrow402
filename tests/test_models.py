@@ -122,7 +122,7 @@ class TestHealthResponse:
     def test_defaults(self):
         h = HealthResponse()
         assert h.status == "ok"
-        assert h.version == "0.2.0"
+        assert h.version == "0.3.0"
         assert h.sandbox is True
 
 

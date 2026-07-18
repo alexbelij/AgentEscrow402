@@ -195,7 +195,7 @@ async def _sync_identity_registry(account_hash: str, completed: int = 0, dispute
 
 app = FastAPI(
     title="AgentEscrow402",
-    version="0.2.0",
+    version="0.3.0",
     description="x402-compatible payment middleware for AI agents on Casper",
     lifespan=lifespan,
 )

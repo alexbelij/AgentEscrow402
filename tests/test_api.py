@@ -51,7 +51,7 @@ class TestHealthEndpoint:
 
     def test_health_version(self, client):
         resp = client.get("/health")
-        assert resp.json()["version"] == "0.2.0"
+        assert resp.json()["version"] == "0.3.0"
 
 
 class TestEscrowEndpoint:
