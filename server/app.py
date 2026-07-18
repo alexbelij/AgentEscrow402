@@ -1334,8 +1334,14 @@ async def fee_estimate(amount: int, cfg: Config = Depends(get_config)):
 
 
 @app.get("/events")
+@app.get("/api/v1/events/stream")
 async def event_stream():
-    """Server-Sent Events stream for real-time escrow updates."""
+    """Server-Sent Events stream for real-time escrow updates.
+
+    Exposed on two paths:
+    - ``/events`` (canonical, historical)
+    - ``/api/v1/events/stream`` (AE402 Agent Spec alias)
+    """
     queue: asyncio.Queue = asyncio.Queue(maxsize=50)
     _event_subscribers.append(queue)
 
