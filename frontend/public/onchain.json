@@ -1,0 +1,75 @@
+{
+  "network": "casper-test",
+  "generated_at": "2026-07-17T10:00:00Z",
+  "contracts": {
+    "escrow_manager_v9": {
+      "name": "Core Escrow",
+      "contract_hash": "hash-612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec",
+      "contract_package_hash": "hash-d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb",
+      "deploy_hash": "3be113149f35f610116566c3834eb94f1b3a7d0ce0b6834f474747b322ff9094",
+      "version": 9,
+      "explorer": "https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec"
+    },
+    "batch_escrow_manager": {
+      "name": "Escrow Manager",
+      "contract_hash": "hash-bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
+      "contract_package_hash": "hash-cdc9924e260bd3a62789a610aae0c351760393b335ebb15a85d89e1df6a3f323",
+      "deploy_hash": "704768b711e6831bcd769280678d45326e2835063ccb08fa033b5228fa38db30",
+      "version": 1,
+      "explorer": "https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d"
+    },
+    "insurance_pool": {
+      "name": "Insurance Pool",
+      "contract_hash": "hash-e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929",
+      "contract_package_hash": "hash-4458f5ed31f84314718969d5f6e8112f1589770330930c9ad37feaedb501add7",
+      "deploy_hash": "4ea886beee6c1d302a4282c11390856da8ae89e6a05775e57bb6c5e7dae0b16f",
+      "version": 1,
+      "notes": "Hardened redeploy — the old e36b958d… had a fully public claim/withdraw and was superseded.",
+      "explorer": "https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929"
+    },
+    "vrf_arbiter": {
+      "name": "VRF Arbiter",
+      "contract_hash": "hash-78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93",
+      "contract_package_hash": "hash-53805f7866cd158ff091ab93efe2f19bd2e803414a5ef1badc7a46d759f36611",
+      "deploy_hash": "83babe5d1d0c80aff7e2f8edd62e3898bf175a6c6c495b5fafa9f7692de14e27",
+      "version": 1,
+      "explorer": "https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93"
+    },
+    "agent_identity_registry": {
+      "name": "Agent Identity Registry (ID-1)",
+      "contract_hash": "hash-1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+      "contract_package_hash": "hash-0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba",
+      "deploy_hash": "4c8a6e3c0bfa3f6ea9430e3a92b7c44c2b449c1dca5dd5e8f25f74f4506fe586",
+      "version": 2,
+      "explorer": "https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae"
+    },
+    "multi_asset_escrow": {
+      "name": "MultiAssetEscrow (CEP-18)",
+      "contract_hash": "hash-52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a",
+      "contract_package_hash": "hash-a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044",
+      "deploy_hash": "c909bc3dbe093ac3831fe8d5fa8a0e99e1f938ae9f40efaddbb37b67564f3d66",
+      "version": 1,
+      "explorer": "https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a"
+    },
+    "cep18_test_token_aetusd": {
+      "name": "CEP-18 test token (AETUSD)",
+      "contract_hash": "hash-177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754",
+      "contract_package_hash": "hash-ea6465021cf2c72b672f7a4fbb4039bb84764a800d279e957847bdff8e38f805",
+      "deploy_hash": "8e1ef9727f20dcead2af4da5994b0c52c68a0076eeeb15fc50062ce89eff3bda",
+      "version": 3,
+      "explorer": "https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754"
+    },
+    "cep18_test_token_aemat": {
+      "name": "CEP-18 test token (AEMAT)",
+      "contract_hash": "hash-8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
+      "contract_package_hash": "hash-5caa324c3073a8b9fc05076a01e9d4d658cb08a1b4839fa0aa93dac39213e3fd",
+      "deploy_hash": "8a0fb73e124e613c9e65fb5585331ce2196853fb2a98c1493c383e71749051a9",
+      "version": 3,
+      "notes": "Custody-compatible token — uses get_immediate_caller.",
+      "explorer": "https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5"
+    }
+  },
+  "api_url": "https://agentescrow402-api-ywm8.onrender.com",
+  "frontend_url": "https://ae402.xyz",
+  "source_ref": "CSPR.cloud API verified 2026-07-17"
+}

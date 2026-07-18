@@ -29,6 +29,7 @@ import AdvancedEscrow from './components/console/AdvancedEscrow'
 import Arbitration from './components/console/Arbitration'
 import IdentityRegistry from './components/console/IdentityRegistry'
 import UseCases from './components/console/UseCases'
+import Evidence from './components/console/Evidence'
 
 function Landing() {
   useEffect(() => {
@@ -96,6 +97,7 @@ export default function App() {
             <Route path="advanced" element={<AdvancedEscrow />} />
             <Route path="arbitration" element={<Arbitration />} />
             <Route path="identity-registry" element={<IdentityRegistry />} />
+            <Route path="evidence" element={<Evidence />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
