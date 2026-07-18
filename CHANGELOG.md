@@ -11,6 +11,33 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 *Delivered the console/backend work the 1.1.0 entry below prematurely claimed as shipped.*
 
+### Added (2026-07-17)
+- **Red-team self-audit** (`docs/RED_TEAM.tmp`) — 15 attack-vector matrix with mitigation status; documents the one real gap (insurance-pool replay under specific reorg conditions) alongside the resistances (reentrancy, integer overflow, unauthorized cancellation, front-running, injection). Commit `15b6c44`.
+- **verify.sh** — single-command proof of on-chain deployment: checks all 8 contracts exist on Casper testnet (via CSPR.cloud), API `/health`, escrow round-trip, frontend serving, and `onchain.json` parity. Commit `82d950c`, merged in `a7ab56e`.
+
+### Added (2026-07-15)
+- **RPC fallback chain** — CSPR.cloud → NowNodes → official node; escrow lifecycle survives any single provider outage (`server/casper_client.py`). Commit `808606b`, merged in `1c03529`.
+- **`ABSTAIN` verdict** for arbiter conflict-of-interest — arbiters return `abstain` instead of a coerced vote when a party is a party (`server/vrf_election.py`). Commit `ce3db9c`.
+- **`X-Request-ID` middleware** for request tracing across backend logs (`server/middleware.py`). Commit `4c37b5e`.
+- **`/health`** returns `mode` (sandbox|live) and version bumped to `0.3.0`. Commit `0433916`.
+
+### Added (2026-07-14 batch)
+- `deploy-out/onchain.json` filled with CSPR.cloud-verified deploy hashes for all 8 contracts (`f31bd39`).
+- `SECURITY.md` self-audit table (`3c6bb42`).
+
+### Fixed (2026-07-14 batch)
+- `checked_sub` / `checked_add` in test-token `transfer` and `transfer_from` — prevents integer underflow on custody-compatible tokens (`589d4a0`).
+- Root `/` redirect to `/health` for Render probe (`c63ed61`).
+- Pydantic v2 `model_` namespace warning suppressed via `ConfigDict` (`07b5a30`).
+- Secret-scan workflow — removed `base`/`head` that fail on push events (`7b7b07c`).
+
+### Added (2026-06-14 frontend polish batch, merged 2026-06-14 as `b165033`)
+- Complete favicon set (16/32/apple-touch), sitemap.xml with all console routes, status badges, submission checklist table in README, skeleton loaders on Agents/Escrows tabs, CONTRIBUTING.md, frontend CI workflow, secret-scan workflow, Dependabot, `.well-known/casper-agent-card.json` for agent discovery, Telegram links in navbar and footer, ExplorerLink hardening (validation + `noopener`), wallet spinner during CSPR.click signing, confirmation modals for destructive actions, empty states, copy-to-clipboard utility + CopyButton, console.error suppression in production, real generated demo signature (no more placeholder), 404 page with console link and image fallback.
+
+### Fixed (2026-06-14)
+- Integer floor division in insurance-fee calculation avoids float precision loss (`43ed005`, closes #1).
+
+
 ### Fixed (2026-07-05)
 - **v8 contract deploy**: `read_release_cap()` used `storage::read::<u64>(uref).unwrap_or_revert()`,
   which reverted `release()`/`reveal_swap()` with `ApiError::EarlyEndOfStream [17]` whenever a
