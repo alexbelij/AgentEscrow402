@@ -1,0 +1,38 @@
+name: hash-sweep
+
+# Guards against stale deployed-contract hashes leaking back into the tree as
+# ACTIVE references (i.e. as if they were the current live address).
+#
+# Historical mentions ("old X was superseded by Y", "the previous e36b958d…
+# contract had a bug we fixed in Z") are fine — the whole point of the codebase
+# knowing what changed. What we're blocking is a stale hash being used as the
+# canonical contract address anywhere: in code, config, onchain manifests, or
+# the top of a README table.
+#
+# Rule of thumb the workflow enforces:
+#   A line mentioning a superseded hash is OK if it also mentions:
+#     "old" | "previous" | "superseded" | "replaced" | "hardened" | "deprecated"
+#   Otherwise it must be in an explicitly allow-listed historical file
+#   (CHANGELOG.md, docs/DEPLOYMENT_LESSONS.md).
+#
+# To register a newly-superseded hash after a redeploy:
+#   1. Append its 8-char prefix to STALE_HASHES.
+#   2. Update the current-hash references (server/config.py, README, onchain.json,
+#      frontend/public/onchain.json, docs) to point at the NEW hash and to
+#      describe the old one with one of the marker words above.
+#   3. Re-run this workflow locally to confirm PASS before pushing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  hash-sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for superseded contract hashes
+        run: bash .github/workflows/hash-sweep.sh
