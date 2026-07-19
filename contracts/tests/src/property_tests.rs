@@ -23,7 +23,9 @@ fn validate_fee_bps(fee: u64) -> bool {
 }
 
 fn compute_fee(amount: u64, fee_bps: u64) -> u64 {
-    amount * fee_bps / 10_000
+    // Mirror the contract's overflow-safe U512 arithmetic while keeping this
+    // pure host-side property harness on u64 inputs.
+    ((amount as u128 * fee_bps as u128) / 10_000) as u64
 }
 
 fn compute_insurance(fee: u64) -> u64 {
