@@ -20,12 +20,12 @@
     },
     "insurance_pool": {
       "name": "Insurance Pool",
-      "contract_hash": "hash-e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929",
-      "contract_package_hash": "hash-4458f5ed31f84314718969d5f6e8112f1589770330930c9ad37feaedb501add7",
+      "contract_hash": "hash-ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4",
+      "contract_package_hash": "hash-78258f66b1ae08120f9c10186ce88772d92d2f84561ca8aa68cb8ffcc6d67f97",
       "deploy_hash": "4ea886beee6c1d302a4282c11390856da8ae89e6a05775e57bb6c5e7dae0b16f",
       "version": 1,
       "notes": "Hardened redeploy — the old e36b958d… had a fully public claim/withdraw and was superseded.",
-      "explorer": "https://testnet.cspr.live/contract/e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929"
+      "explorer": "https://testnet.cspr.live/contract/ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4"
     },
     "vrf_arbiter": {
       "name": "VRF Arbiter",

@@ -29,7 +29,7 @@ const FALLBACK_CONTRACTS = [
   },
   {
     name: 'Insurance Pool',
-    hash: 'e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929',
+    hash: 'ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4',
     role: 'Collects insurance premiums on escrow creation, manages claim payouts for disputed escrows.',
     category: 'core',
   },

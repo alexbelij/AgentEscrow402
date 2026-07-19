@@ -43,7 +43,7 @@ bold "1. On-chain contracts (Casper testnet)"
 CONTRACTS=(
   "612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec:Core Escrow v9"
   "bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d:Escrow Manager"
-  "e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929:Insurance Pool"
+  "ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4:Insurance Pool"
   "78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93:VRF Arbiter"
   "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae:Agent Identity Registry"
   "52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a:MultiAsset Escrow"

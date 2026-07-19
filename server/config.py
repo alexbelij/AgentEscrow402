@@ -108,11 +108,11 @@ class Config:
                 # the A1 arbiter-quorum fix on claim()/withdraw() (the old
                 # e36b958d... contract had a fully public claim()/withdraw()
                 # -- see contracts/insurance-pool/src/main.rs commit history).
-                "e128780fd7e41159df4ca14d8584c7ef0cea2d75e6d5ba4166d94ca41f2d8929",
+                "ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4",
             ),
             insurance_package_hash=os.getenv(
                 "INSURANCE_PACKAGE_HASH",
-                "4458f5ed31f84314718969d5f6e8112f1589770330930c9ad37feaedb501add7",
+                "78258f66b1ae08120f9c10186ce88772d92d2f84561ca8aa68cb8ffcc6d67f97",
             ),
             vrf_contract_hash=os.getenv(
                 "VRF_CONTRACT_HASH",
