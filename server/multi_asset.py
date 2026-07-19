@@ -14,19 +14,21 @@ from pydantic import BaseModel, Field
 from server import arbiter_crypto
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.sandbox import SandboxStore
-from server.models import EscrowRecord, EscrowStatus, PaymentHeader
 from server.middleware import (
-    parse_x402_header,
     _build_signing_payload,
     _check_replay,
     _verify_signature,
+    parse_x402_header,
 )
+from server.models import EscrowRecord, EscrowStatus, PaymentHeader
+from server.sandbox import SandboxStore
+
 
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
     # or imported from app.py. For this file generation, we assume it exists.
     from server.app import get_casper as _get_casper
+
     return _get_casper()
 
 
@@ -45,6 +47,7 @@ def get_sandbox_store() -> "SandboxStore":
     endpoint, not just one created via /escrow/multi-asset.
     """
     from server.app import get_sandbox as _get_sandbox
+
     return _get_sandbox()
 
 
@@ -87,8 +90,6 @@ async def get_x402_payment(request: Request, config: Config = Depends(get_config
     return parsed
 
 
-
-
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/escrow", tags=["multi-asset", "streaming"])
 
@@ -119,7 +120,9 @@ class PermitProof(BaseModel):
 class TokenIdentifier(BaseModel):
     """Identifies a token type (CSPR, CEP-18, CEP-78)."""
 
-    token_type: str = Field(..., pattern="^(cspr|cep18|cep78)$", description="Type of token: 'cspr', 'cep18', or 'cep78'")
+    token_type: str = Field(
+        ..., pattern="^(cspr|cep18|cep78)$", description="Type of token: 'cspr', 'cep18', or 'cep78'"
+    )
     contract_hash: str | None = Field(
         None, min_length=64, max_length=64, description="Contract hash for CEP-18/CEP-78 tokens"
     )
@@ -169,6 +172,7 @@ class StreamEscrowRequest(BaseModel):
         super().__init__(**data)
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be strictly after start_time")
+
     # Optional: interval_amount or duration for more granular control, for simplicity we derive from total/duration
     # interval_seconds: int = Field(..., gt=0, description="Interval in seconds for payment chunks")
 
@@ -403,9 +407,7 @@ class Cep78Adapter(TokenAdapter):
         }
 
 
-def _build_token_adapter(
-    token_id: TokenIdentifier, casper: CasperClient | None, config: Config
-) -> TokenAdapter:
+def _build_token_adapter(token_id: TokenIdentifier, casper: CasperClient | None, config: Config) -> TokenAdapter:
     """Plain helper (not a FastAPI dependency) that picks the right token adapter.
 
     Previously this was declared as `Depends(get_token_adapter)` with
@@ -429,7 +431,9 @@ def _build_token_adapter(
     elif token_id.token_type == "cep78":
         return Cep78Adapter(casper, config)
     else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported token type: {token_id.token_type}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported token type: {token_id.token_type}"
+        )
 
 
 @router.get("/cep18-permit-nonce")
@@ -559,7 +563,11 @@ async def create_multi_asset_escrow(
     # Also kept in the local dict so other multi-asset-specific reads (token
     # type, etc.) stay available without extending the shared SandboxStore.
     _multi_asset_escrows[request.service_hash] = escrow_record
-    logger.info("Multi-asset escrow %s created with deploy_hash %s", request.service_hash[:16], deploy_hash[:16] if deploy_hash else "sandbox")
+    logger.info(
+        "Multi-asset escrow %s created with deploy_hash %s",
+        request.service_hash[:16],
+        deploy_hash[:16] if deploy_hash else "sandbox",
+    )
     return escrow_record
 
 
@@ -606,7 +614,9 @@ async def create_streaming_escrow(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error("Failed to simulate token transfer for streaming escrow: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to initiate token transfer")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to initiate token transfer"
+        )
 
     try:
         escrow_record = store.create_escrow(
@@ -657,7 +667,7 @@ async def get_stream_status(service_hash: str) -> StreamStatusResponse:
     remaining_amount = escrow_record.amount - streamed_amount
     status_val = EscrowStatus.RELEASED if streamed_amount == escrow_record.amount else EscrowStatus.PENDING
     if current_time > stream_data["end_time"] and streamed_amount < escrow_record.amount:
-        status_val = EscrowStatus.EXPIRED # Or some other status for incomplete streams
+        status_val = EscrowStatus.EXPIRED  # Or some other status for incomplete streams
 
     # Update local state (in a real system, this would be from on-chain query)
     stream_data["streamed_amount"] = streamed_amount
@@ -715,12 +725,19 @@ async def claim_streamed_escrow(
         pct = int((elapsed / total) * 100) if total > 0 else 0
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Stream not fully vested yet ({pct}% elapsed). Claim available after end_time={stream_data['end_time']}",
+            detail=(
+                f"Stream not fully vested yet ({pct}% elapsed). "
+                f"Claim available after end_time={stream_data['end_time']}"
+            ),
         )
 
     escrow_record = stream_data["escrow_record"]
     if escrow_record.status == "released":
-        return {"status": "already_claimed", "service_hash": service_hash, "deploy_hash": escrow_record.deploy_hash}
+        return {
+            "status": "already_claimed",
+            "service_hash": service_hash,
+            "deploy_hash": escrow_record.deploy_hash,
+        }
 
     deploy_hash = ""
     if not cfg.sandbox and casper is not None:
@@ -743,7 +760,11 @@ async def claim_streamed_escrow(
     except Exception:
         pass  # may already be released in store
 
-    logger.info("Streaming escrow %s claimed and released on-chain: %s", service_hash[:16], deploy_hash[:16] if deploy_hash else "sandbox")
+    logger.info(
+        "Streaming escrow %s claimed and released on-chain: %s",
+        service_hash[:16],
+        deploy_hash[:16] if deploy_hash else "sandbox",
+    )
     return {"status": "claimed", "service_hash": service_hash, "deploy_hash": deploy_hash or None}
 
 
@@ -947,9 +968,7 @@ async def release_multi_asset_escrow(
     deploy_hash = ""
     if not config.sandbox and casper is not None and config.multi_asset_escrow_contract_hash:
         try:
-            deploy_hash = await casper.multi_asset_release(
-                service_hash, req.arbiter_pubkeys, req.arbiter_signatures
-            )
+            deploy_hash = await casper.multi_asset_release(service_hash, req.arbiter_pubkeys, req.arbiter_signatures)
         except Exception as exc:
             logger.error("On-chain multi-asset release failed: %s", exc)
             raise HTTPException(status_code=502, detail=f"On-chain release failed: {exc}")
@@ -959,7 +978,11 @@ async def release_multi_asset_escrow(
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"status": "released", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+    return {
+        "status": "released",
+        "deploy_hash": deploy_hash,
+        "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record),
+    }
 
 
 @router.post("/multi-asset/{service_hash}/refund")
@@ -988,7 +1011,11 @@ async def refund_multi_asset_escrow(
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"status": "refunded", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+    return {
+        "status": "refunded",
+        "deploy_hash": deploy_hash,
+        "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record),
+    }
 
 
 @router.post("/multi-asset/{service_hash}/dispute")
@@ -1017,7 +1044,11 @@ async def dispute_multi_asset_escrow(
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"status": "disputed", "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+    return {
+        "status": "disputed",
+        "deploy_hash": deploy_hash,
+        "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record),
+    }
 
 
 @router.post("/multi-asset/{service_hash}/resolve")
@@ -1049,9 +1080,16 @@ async def resolve_multi_asset_escrow(
 
     try:
         record = store.resolve_escrow(
-            service_hash, in_favor_of=req.in_favor_of, deploy_hash=deploy_hash,
+            service_hash,
+            in_favor_of=req.in_favor_of,
+            deploy_hash=deploy_hash,
         )
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    return {"status": "resolved", "in_favor_of": req.in_favor_of, "deploy_hash": deploy_hash, "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record)}
+    return {
+        "status": "resolved",
+        "in_favor_of": req.in_favor_of,
+        "deploy_hash": deploy_hash,
+        "escrow": record.model_dump() if hasattr(record, "model_dump") else str(record),
+    }

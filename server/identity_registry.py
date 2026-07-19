@@ -64,7 +64,9 @@ class IdentityRegistry:
         self._decay_interval = decay_interval
         self._decay_rate = decay_rate
 
-    async def register(self, account_hash: str, display_name: str, capabilities: list[AgentCapability] = None) -> AgentIdentity:
+    async def register(
+        self, account_hash: str, display_name: str, capabilities: list[AgentCapability] = None
+    ) -> AgentIdentity:
         async with self._lock:
             if account_hash in self._account_to_did:
                 raise ValueError("Account already registered")
@@ -86,7 +88,8 @@ class IdentityRegistry:
                 last_active=now,
                 metadata_hash="",
                 risk_score=50,
-                slashed_count=0, stake=0,
+                slashed_count=0,
+                stake=0,
             )
             identity.metadata_hash = self._compute_metadata_hash(identity)
 
@@ -182,7 +185,12 @@ class IdentityRegistry:
 
             return identity
 
-    async def search(self, capability_name: str = None, min_reputation: int = 0, min_verification: VerificationLevel = VerificationLevel.UNVERIFIED) -> list[AgentIdentity]:
+    async def search(
+        self,
+        capability_name: str = None,
+        min_reputation: int = 0,
+        min_verification: VerificationLevel = VerificationLevel.UNVERIFIED,
+    ) -> list[AgentIdentity]:
         async with self._lock:
             result = []
             level_order = list(VerificationLevel)
@@ -229,14 +237,18 @@ class IdentityRegistry:
 
     def _compute_metadata_hash(self, identity: AgentIdentity) -> str:
         # Use structured JSON to avoid delimiter-based hash collisions
-        data = _json.dumps({
-            "did": identity.did,
-            "account_hash": identity.account_hash,
-            "display_name": identity.display_name,
-            "verification_level": identity.verification_level.value,
-            "reputation_score": identity.reputation_score,
-            "last_active": identity.last_active,
-        }, sort_keys=True, separators=(",", ":"))
+        data = _json.dumps(
+            {
+                "did": identity.did,
+                "account_hash": identity.account_hash,
+                "display_name": identity.display_name,
+                "verification_level": identity.verification_level.value,
+                "reputation_score": identity.reputation_score,
+                "last_active": identity.last_active,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        )
         return hashlib.sha256(data.encode()).hexdigest()
 
 

@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import base64
 import json
-import os
 import logging
-from dataclasses import dataclass, asdict
+import os
+from dataclasses import asdict, dataclass
 
 from cryptography.hazmat.primitives.asymmetric.mlkem import MLKEM768PrivateKey
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM

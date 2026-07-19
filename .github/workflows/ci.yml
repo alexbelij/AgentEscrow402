@@ -18,7 +18,15 @@ jobs:
         run: |
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
-          pip install pytest-cov
+          pip install pytest-cov ruff black
+      - name: Ruff (lint gate)
+        # Baseline must stay green. If you land a PR that adds a lint
+        # error, this job fails; fix in the PR, do not gate-bypass here.
+        # Config lives in pyproject.toml (line-length 120, select E/F/I/W,
+        # per-file-ignores only for tests/test_business_logic.py::E402).
+        run: python -m ruff check .
+      - name: Black (format gate)
+        run: python -m black --check --line-length 120 .
       - name: Compile check
         run: python -m py_compile server/app.py
       - name: Run tests

@@ -5,6 +5,13 @@ target-version = "py311"
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 
+[tool.ruff.lint.per-file-ignores]
+# test_business_logic.py is a deliberately section-organized "mega" test
+# file: imports live next to the block of tests that exercises them, not
+# hoisted to the top, so a reader reviewing e.g. the "Risk Scoring" section
+# sees its imports right above the tests. E402 doesn't apply here.
+"tests/test_business_logic.py" = ["E402"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["server", "sdk"]
 

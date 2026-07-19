@@ -15,13 +15,13 @@ from server.casper_client import CasperClient
 from server.config import Config, get_config
 from server.middleware import _verify_signature
 
+
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
     # or imported from app.py. For this file generation, we assume it exists.
     from server.app import get_casper as _get_casper
+
     return _get_casper()
-
-
 
 
 logger = logging.getLogger(__name__)
@@ -29,15 +29,23 @@ router = APIRouter(prefix="/identity", tags=["identity"])
 
 # In-memory store for agent identities and capabilities (replace with proper DB)
 _agent_identities: dict[str, dict[str, Any]] = {}
-_capabilities: dict[str, list[dict[str, Any]]] = {} # agent_id -> list of capabilities
-_delegations: dict[str, list[dict[str, Any]]] = {} # delegator_id -> list of delegations
+_capabilities: dict[str, list[dict[str, Any]]] = {}  # agent_id -> list of capabilities
+_delegations: dict[str, list[dict[str, Any]]] = {}  # delegator_id -> list of delegations
 
 
 class RegisterAgentRequest(BaseModel):
     """Request to register a new agent identity."""
 
-    agent_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public agent identifier")
-    public_key: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$", description="Public key associated with the agent's identity")
+    agent_id: str = Field(
+        ..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public agent identifier"
+    )
+    public_key: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+        description="Public key associated with the agent's identity",
+    )
     did_document_hash: str = Field(
         ...,
         min_length=64,
@@ -63,13 +71,35 @@ class AgentIdentity(BaseModel):
 class DelegateCapabilityRequest(BaseModel):
     """Request to delegate a capability from one agent to another."""
 
-    delegator_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public ID of the delegating agent")
-    delegatee_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_:.-]+$", description="Public ID of the agent receiving the capability")
-    capability_uri: str = Field(..., min_length=1, max_length=256, pattern=r"^[a-zA-Z0-9_:/?.#=-]+$", description="URI identifying the capability (e.g., 'urn:escrow:release')")
-    expiry_timestamp: int = Field(
-        ..., gt=int(time.time()), description="Unix timestamp when the delegation expires"
+    delegator_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_:.-]+$",
+        description="Public ID of the delegating agent",
     )
-    signature: str = Field(..., min_length=128, max_length=128, pattern=r"^[0-9a-fA-F]{128}$", description="Ed25519 signature of the canonical delegation message")
+    delegatee_id: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_:.-]+$",
+        description="Public ID of the agent receiving the capability",
+    )
+    capability_uri: str = Field(
+        ...,
+        min_length=1,
+        max_length=256,
+        pattern=r"^[a-zA-Z0-9_:/?.#=-]+$",
+        description="URI identifying the capability (e.g., 'urn:escrow:release')",
+    )
+    expiry_timestamp: int = Field(..., gt=int(time.time()), description="Unix timestamp when the delegation expires")
+    signature: str = Field(
+        ...,
+        min_length=128,
+        max_length=128,
+        pattern=r"^[0-9a-fA-F]{128}$",
+        description="Ed25519 signature of the canonical delegation message",
+    )
 
 
 class CapabilityRecord(BaseModel):
@@ -131,7 +161,7 @@ async def register_agent_identity(
         "mode": mode,
     }
     _agent_identities[request.agent_id] = new_identity
-    _capabilities[request.agent_id] = [] # Initialize empty capabilities list
+    _capabilities[request.agent_id] = []  # Initialize empty capabilities list
 
     logger.info("Agent %s registered successfully. Deploy hash: %s", request.agent_id[:8], deploy_hash[:16])
     return AgentIdentity(**new_identity)
@@ -147,7 +177,9 @@ async def get_agent_identity(agent_id: str) -> AgentIdentity:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Agent identity not found")
 
     # Add capabilities to the response
-    agent_capabilities = [cap["capability_uri"] for cap in _capabilities.get(agent_id, []) if cap["expiry_timestamp"] > int(time.time())]
+    agent_capabilities = [
+        cap["capability_uri"] for cap in _capabilities.get(agent_id, []) if cap["expiry_timestamp"] > int(time.time())
+    ]
     identity_data["capabilities"] = agent_capabilities
 
     logger.debug("Retrieving identity for agent %s", agent_id[:8])
@@ -184,7 +216,9 @@ async def delegate_capability(
     )
 
     # Verify the delegator's signature to prevent unauthorized delegation.
-    delegation_msg = f"{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{request.expiry_timestamp}"
+    delegation_msg = (
+        f"{request.delegator_id}:{request.delegatee_id}:{request.capability_uri}:{request.expiry_timestamp}"
+    )
     msg_hash = hashlib.sha256(delegation_msg.encode()).hexdigest()
     signer_public_key = _agent_identities[request.delegator_id]["public_key"]
     is_valid = False
@@ -217,7 +251,11 @@ async def delegate_capability(
             #     args={...}
             # )
             mode = "identity_contract"
-        deploy_hash = f"local-delegation-{secrets.token_hex(16)}" if mode == "local_registry" else f"deploy-hash-delegate-{secrets.token_hex(16)}"
+        deploy_hash = (
+            f"local-delegation-{secrets.token_hex(16)}"
+            if mode == "local_registry"
+            else f"deploy-hash-delegate-{secrets.token_hex(16)}"
+        )
     except Exception as e:
         logger.error("Delegation recording failed: %s", e)
         raise HTTPException(

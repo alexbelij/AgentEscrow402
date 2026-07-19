@@ -4,13 +4,16 @@ Covers: escrow lifecycle, insurance fee, ML-KEM, VRF election,
         risk scoring, arbitration, middleware, config.
 Verified against real API signatures (no stubs).
 """
+
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import sys
 import threading
 import time
-sys.path.insert(0, '/work/temp/projects/AgentEscrow402')
+
+sys.path.insert(0, "/work/temp/projects/AgentEscrow402")
 
 # Shared event loop helper
 _loop = asyncio.new_event_loop()
@@ -23,8 +26,8 @@ def async_run(coro):
 
 # ── SandboxStore lifecycle ────────────────────────────────────────────────────
 
-from server.sandbox import SandboxStore
 from server.models import EscrowStatus
+from server.sandbox import SandboxStore
 
 
 class TestSandboxStore:
@@ -114,8 +117,9 @@ class TestInsuranceFee:
 
 # ── ML-KEM-768 ───────────────────────────────────────────────────────────────
 
-from server.mlkem_crypto import generate_keypair, encrypt_metadata, decrypt_metadata
 import base64
+
+from server.mlkem_crypto import decrypt_metadata, encrypt_metadata, generate_keypair
 
 
 class TestMLKEM:
@@ -175,16 +179,16 @@ class TestMLKEM:
 
 # ── VRF Election ─────────────────────────────────────────────────────────────
 
-import server.vrf_election as ve
-from server.vrf_election import _elect_local_csprng, _election_results
 from server.models import ReputationRecord
+from server.vrf_election import _elect_local_csprng, _election_results
 
 
 class TestVRFElection:
     @staticmethod
     def _arb(i):
-        return ReputationRecord(agent=f"acc-{i}", completed=10 + i, disputed=1,
-                                slashed=0, last_active=int(time.time()), score=80 + i)
+        return ReputationRecord(
+            agent=f"acc-{i}", completed=10 + i, disputed=1, slashed=0, last_active=int(time.time()), score=80 + i
+        )
 
     def test_elect_local_csprng(self):
         arbs = [self._arb(i) for i in range(5)]
@@ -200,8 +204,7 @@ class TestVRFElection:
     def test_different_seeds_produce_different_results(self):
         arbs = [self._arb(i) for i in range(10)]
         results = set(
-            _elect_local_csprng(arbs, hashlib.sha256(f"seed{i}".encode()).hexdigest()).agent
-            for i in range(20)
+            _elect_local_csprng(arbs, hashlib.sha256(f"seed{i}".encode()).hexdigest()).agent for i in range(20)
         )
         assert len(results) >= 2
 
@@ -225,6 +228,7 @@ class TestVRFElection:
 
     def test_dispute_id_validation_regex(self):
         import re
+
         pat = r"^[a-zA-Z0-9_:.-]{1,128}$"
         for v in ["abc123", "dispute-001", "d:1.0", "a" * 128]:
             assert re.match(pat, v), f"Valid should pass: {v}"
@@ -234,16 +238,24 @@ class TestVRFElection:
 
 # ── Risk Scoring ──────────────────────────────────────────────────────────────
 
-from server.risk_scoring import RiskEngine, TransactionFeatures, IsolationForest, RiskScore
+from server.risk_scoring import IsolationForest, RiskEngine, RiskScore, TransactionFeatures
 
 
 class TestRiskScoring:
     @staticmethod
     def _feat(**kw):
-        d = dict(amount=1_000_000_000, frequency=1.0, counterparty_count=3,
-                 avg_ttl=86400, dispute_rate=0.0, time_since_first=3600.0,
-                 total_volume=5_000_000_000, max_single=2_000_000_000,
-                 stddev_amount=100_000.0, hour_of_day=14)
+        d = dict(
+            amount=1_000_000_000,
+            frequency=1.0,
+            counterparty_count=3,
+            avg_ttl=86400,
+            dispute_rate=0.0,
+            time_since_first=3600.0,
+            total_volume=5_000_000_000,
+            max_single=2_000_000_000,
+            stddev_amount=100_000.0,
+            hour_of_day=14,
+        )
         d.update(kw)
         return TransactionFeatures(**d)
 
@@ -254,6 +266,7 @@ class TestRiskScoring:
             score = await eng.assess("esc-001", self._feat())
             assert isinstance(score, RiskScore)
             assert 0 <= score.score <= 100
+
         async_run(_run())
 
     def test_score_untrained_engine(self):
@@ -261,6 +274,7 @@ class TestRiskScoring:
             eng = RiskEngine()
             score = await eng.assess("esc-002", self._feat())
             assert score.score >= 0
+
         async_run(_run())
 
     def test_score_always_in_range(self):
@@ -270,6 +284,7 @@ class TestRiskScoring:
             for i in range(10):
                 s = await eng.assess(f"esc-{i}", self._feat())
                 assert 0 <= s.score <= 100
+
         async_run(_run())
 
     def test_forest_score_sample(self):
@@ -294,6 +309,7 @@ class TestRiskScoring:
             assert len(results) == 5
             for r in results:
                 assert 0 <= r.score <= 100
+
         async_run(_run())
 
 
@@ -306,7 +322,9 @@ class TestArbitration:
     @staticmethod
     def _ev(claimant="sender"):
         return DisputeEvidence(
-            escrow_id="esc-001", claimant=claimant, evidence_type="text",
+            escrow_id="esc-001",
+            claimant=claimant,
+            evidence_type="text",
             content_hash=hashlib.sha256(b"content").hexdigest(),
             description="proof of service delivery",
             timestamp=int(time.time()),
@@ -321,6 +339,7 @@ class TestArbitration:
             assert r.recommendation in ("sender", "receiver", "split")
             assert 0.0 <= r.confidence <= 1.0
             assert r.reasoning
+
         async_run(_run())
 
     def test_no_evidence_case(self):
@@ -329,6 +348,7 @@ class TestArbitration:
             r = await agent.analyze_dispute("ne", [], [], 100_000)
             assert isinstance(r, ArbitrationRecommendation)
             assert r.dispute_id == "ne"
+
         async_run(_run())
 
     def test_compute_slashing(self):

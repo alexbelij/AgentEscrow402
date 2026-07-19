@@ -7,7 +7,8 @@ added for the equivalent on-chain `compute_fee`/`compute_insurance` logic
 in contracts/tests/src/property_tests.rs.
 """
 
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from server.app import _apply_insurance_fee
 

@@ -6,6 +6,7 @@ CHANGELOG documenting an "Identity Registry" console tab - the whole module
 was unreachable from any client. These tests exercise the router end to end
 through the real FastAPI app.
 """
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

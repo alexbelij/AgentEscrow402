@@ -1,4 +1,5 @@
 """Tests for server/config.py — Config.from_env() and its env-var wiring."""
+
 from __future__ import annotations
 
 import base64

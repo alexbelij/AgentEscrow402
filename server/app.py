@@ -12,21 +12,27 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel
 
 from server import arbiter_crypto
 from server import db as pgdb
+from server.admin_api import router as admin_router
+from server.agent_identity import router as identity_router
+from server.ai_arbitration import ArbitrationAgent, ArbitrationRecommendation, DisputeEvidence
 from server.casper_client import CasperClient
 from server.config import Config
 from server.event_monitor import EventMonitor
+from server.identity_registry_api import _registry as _id_registry
+from server.identity_registry_api import router as identity_registry_router
+from server.insurance import router as insurance_router
 from server.middleware import (
-    compute_service_hash,
-    parse_x402_header,
     _build_signing_payload,
     _check_replay,
     _verify_signature,
+    compute_service_hash,
+    parse_x402_header,
 )
 from server.models import (
     BatchEscrowRequest,
@@ -40,17 +46,14 @@ from server.models import (
     ReputationRecord,
     ResolveRequest,
 )
-from server.sandbox import SandboxStore
 from server.multi_asset import router as multi_asset_router
-from server.insurance import router as insurance_router
-from server.vrf_election import router as vrf_router
-from server.agent_identity import router as identity_router
-from server.ai_arbitration import ArbitrationAgent, DisputeEvidence, ArbitrationRecommendation
 from server.risk_api import router as risk_router
-from server.identity_registry_api import router as identity_registry_router, _registry as _id_registry
-from server.admin_api import router as admin_router
+from server.sandbox import SandboxStore
+from server.vrf_election import router as vrf_router
+
 try:
-    from server.mlkem_crypto import generate_keypair, encrypt_metadata, EncryptedMetadata
+    from server.mlkem_crypto import encrypt_metadata, generate_keypair
+
     _MLKEM_AVAILABLE = True
 except Exception:
     _MLKEM_AVAILABLE = False
@@ -139,6 +142,7 @@ async def lifespan(application: FastAPI):
     # -- not a running-but-broken app -- when strict-mode is misconfigured.
     # See server/strict.py.
     from server.strict import ensure_strict
+
     ensure_strict(cfg)
 
     # Initialize Casper client
@@ -256,6 +260,7 @@ _rate_limits: dict[str, dict] = {}
 async def request_id_middleware(request: Request, call_next):
     """Attach a unique request ID to every response for tracing."""
     import uuid
+
     rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
     response = await call_next(request)
     response.headers["X-Request-ID"] = rid
@@ -318,6 +323,7 @@ def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
 async def root():
     """Render health-check probe hits / with HEAD — redirect to /health."""
     from starlette.responses import RedirectResponse
+
     return RedirectResponse(url="/health", status_code=307)
 
 
@@ -351,7 +357,10 @@ async def contracts(cfg: Config = Depends(get_config)):
             {
                 "name": "Core Escrow",
                 "hash": cfg.contract_hash,
-                "role": "Full escrow lifecycle: create → release / refund / dispute → 3-of-5 arbiter resolve, with release-cap guard and emergency freeze.",
+                "role": (
+                    "Full escrow lifecycle: create → release / refund / dispute → 3-of-5 "
+                    "arbiter resolve, with release-cap guard and emergency freeze."
+                ),
                 "category": "core",
             },
             {
@@ -369,31 +378,45 @@ async def contracts(cfg: Config = Depends(get_config)):
             {
                 "name": "VRF Arbiter",
                 "hash": cfg.vrf_contract_hash,
-                "role": "On-chain verifiable random arbiter election with staked purses; API falls back to local CSPRNG when unavailable.",
+                "role": (
+                    "On-chain verifiable random arbiter election with staked purses; "
+                    "API falls back to local CSPRNG when unavailable."
+                ),
                 "category": "core",
             },
             {
                 "name": "Agent Identity Registry",
                 "hash": "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
-                "role": "DID-style agent registration with on-chain staking, reputation tracking and capability delegation.",
+                "role": (
+                    "DID-style agent registration with on-chain staking, reputation tracking and capability delegation."
+                ),
                 "category": "identity",
             },
             {
                 "name": "MultiAssetEscrow",
                 "hash": cfg.multi_asset_escrow_contract_hash,
-                "role": "Contract-custody escrow for CEP-18 fungible tokens: approve → create → release/refund/dispute/resolve, all on-chain.",
+                "role": (
+                    "Contract-custody escrow for CEP-18 fungible tokens: approve → "
+                    "create → release/refund/dispute/resolve, all on-chain."
+                ),
                 "category": "multi-asset",
             },
             {
                 "name": "AEMAT (test token)",
                 "hash": cfg.test_token_contract_hash,
-                "role": "CEP-18 fungible test token for multi-asset escrow demos (custody-compatible, uses get_immediate_caller).",
+                "role": (
+                    "CEP-18 fungible test token for multi-asset escrow demos "
+                    "(custody-compatible, uses get_immediate_caller)."
+                ),
                 "category": "token",
             },
             {
                 "name": "AETNFT (test NFT)",
                 "hash": "c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
-                "role": "CEP-78 enhanced NFT collection for multi-asset escrow NFT demos (Transferable, Public minting, Ordinal IDs).",
+                "role": (
+                    "CEP-78 enhanced NFT collection for multi-asset escrow NFT demos "
+                    "(Transferable, Public minting, Ordinal IDs)."
+                ),
                 "category": "token",
             },
         ]
@@ -422,8 +445,13 @@ async def stats(store: SandboxStore = Depends(get_sandbox)):
         released = sum(1 for r in records if str(r.get("status")) == "released")
         disputed = sum(1 for r in records if str(r.get("status")) == "disputed")
         total_volume = sum(int(r.get("amount", 0) or 0) for r in records)
-        active_agents = len({r.get("sender") for r in records if r.get("sender")} | {r.get("receiver") for r in records if r.get("receiver")})
-        total_transactions = total + released + disputed + sum(1 for r in records if str(r.get("status")) in {"refunded", "expired"})
+        active_agents = len(
+            {r.get("sender") for r in records if r.get("sender")}
+            | {r.get("receiver") for r in records if r.get("receiver")}
+        )
+        total_transactions = (
+            total + released + disputed + sum(1 for r in records if str(r.get("status")) in {"refunded", "expired"})
+        )
         s = {
             "total": total,
             "pending": pending,
@@ -717,9 +745,7 @@ async def create_escrow_batch(
         pgdb.save_escrow(record)
         records.append(record)
 
-    _broadcast_event(
-        {"type": "escrow_batch_created", "count": len(records), "deploy_hash": deploy_hash, "ts": now}
-    )
+    _broadcast_event({"type": "escrow_batch_created", "count": len(records), "deploy_hash": deploy_hash, "ts": now})
     return BatchEscrowResponse(deploy_hash=deploy_hash, created=len(records), records=records)
 
 
@@ -729,8 +755,10 @@ async def create_escrow_batch(
 # single deploy is submitted. If ANY escrow fails the check, the entire
 # request is rejected (atomic all-or-nothing).
 
+
 class BatchLifecycleRequest(BaseModel):
     """Request to batch-release or batch-cancel escrows."""
+
     service_hashes: list[str]
     # Required only for release when any escrow exceeds release_cap
     arbiter_pubkeys: list[str] = []
@@ -825,7 +853,12 @@ async def batch_release_escrows(
             logger.warning("batch_release local update for %s failed: %s", sh[:16], exc)
 
     _broadcast_event(
-        {"type": "escrow_batch_released", "count": len(req.service_hashes), "deploy_hash": deploy_hash, "ts": int(time.time())}
+        {
+            "type": "escrow_batch_released",
+            "count": len(req.service_hashes),
+            "deploy_hash": deploy_hash,
+            "ts": int(time.time()),
+        }
     )
     return BatchLifecycleResponse(deploy_hash=deploy_hash or None, processed=len(req.service_hashes))
 
@@ -874,7 +907,12 @@ async def batch_cancel_escrows(
             logger.warning("batch_cancel local update for %s failed: %s", sh[:16], exc)
 
     _broadcast_event(
-        {"type": "escrow_batch_cancelled", "count": len(req.service_hashes), "deploy_hash": deploy_hash, "ts": int(time.time())}
+        {
+            "type": "escrow_batch_cancelled",
+            "count": len(req.service_hashes),
+            "deploy_hash": deploy_hash,
+            "ts": int(time.time()),
+        }
     )
     return BatchLifecycleResponse(deploy_hash=deploy_hash or None, processed=len(req.service_hashes))
 
@@ -941,9 +979,7 @@ async def release_escrow(
             deploy_hash = req.wallet_tx_hash
         else:
             try:
-                deploy_hash = await casper.release(
-                    req.service_hash, req.arbiter_pubkeys, req.arbiter_signatures
-                )
+                deploy_hash = await casper.release(req.service_hash, req.arbiter_pubkeys, req.arbiter_signatures)
             except Exception as exc:
                 logger.error("Casper release failed: %s", exc)
                 raise HTTPException(
@@ -1192,9 +1228,7 @@ async def resolve_escrow(
             last_error = await casper.get_deploy_error(deploy_hash)
             if last_error is None:
                 break
-            logger.warning(
-                "resolve() deploy %s reverted (%s), attempt %d/2", deploy_hash, last_error, attempt + 1
-            )
+            logger.warning("resolve() deploy %s reverted (%s), attempt %d/2", deploy_hash, last_error, attempt + 1)
             await asyncio.sleep(6.0)  # let the next block pass before retrying
 
         if last_error is not None:
@@ -1238,6 +1272,7 @@ async def resolve_escrow(
 # POST /arbitration/analyze — LLM-powered dispute analysis
 # ---------------------------------------------------------------------------
 
+
 class ArbitrateRequest(BaseModel):
     dispute_id: str
     sender_evidence: list[DisputeEvidence]
@@ -1263,7 +1298,10 @@ async def arbitrate_dispute(req: ArbitrateRequest):
         )
         logger.info(
             "Arbitration complete: dispute=%s provider=%s rec=%s conf=%.2f",
-            req.dispute_id[:16], result.provider, result.recommendation, result.confidence,
+            req.dispute_id[:16],
+            result.provider,
+            result.recommendation,
+            result.confidence,
         )
         return result
     except Exception as exc:

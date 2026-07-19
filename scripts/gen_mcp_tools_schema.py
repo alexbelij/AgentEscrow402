@@ -5,6 +5,7 @@ Writes: docs/mcp_tools_schema.json (name, description, inputSchema for each tool
 so integrators/judges can browse the full tool surface without running the
 MCP server itself. Requires `pip install mcp`.
 """
+
 import json
 import os
 import sys

@@ -15,6 +15,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+
 class TransactionFeatures(BaseModel):
     amount: int
     frequency: float
@@ -26,6 +27,7 @@ class TransactionFeatures(BaseModel):
     max_single: int
     stddev_amount: float
     hour_of_day: int
+
 
 class RiskScore(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
@@ -39,6 +41,7 @@ class RiskScore(BaseModel):
     scored_at: int
     explanation: str
 
+
 class IsolationNode(BaseModel):
     feature: Optional[str] = None
     threshold: Optional[float] = None
@@ -49,6 +52,7 @@ class IsolationNode(BaseModel):
     class Config:
         arbitrary_types_allowed = True
 
+
 class IsolationTree:
     @classmethod
     def build(cls, data: list[dict], max_depth: int = 8, rng: random.Random | None = None) -> IsolationNode:
@@ -57,7 +61,9 @@ class IsolationTree:
         return cls._build_recursive(data, max_depth, 0, rng)
 
     @classmethod
-    def _build_recursive(cls, data: list[dict], max_depth: int, current_depth: int, rng: random.Random) -> IsolationNode:
+    def _build_recursive(
+        cls, data: list[dict], max_depth: int, current_depth: int, rng: random.Random
+    ) -> IsolationNode:
         node = IsolationNode(size=len(data))
         if current_depth >= max_depth or len(data) <= 1:
             return node
@@ -96,6 +102,7 @@ class IsolationTree:
             return 0.0
         return 2.0 * (math.log(n - 1) + 0.5772156649) - (2.0 * (n - 1) / n)
 
+
 class IsolationForest:
     def __init__(self, n_trees: int = 100, sample_size: int = 256, max_depth: int = 8, seed: int | None = None):
         self.n_trees = n_trees
@@ -132,6 +139,7 @@ class IsolationForest:
         risk_int = min(100, max(0, int(anomaly_score * 100)))
         feature_values = self._to_dict(features)
         import time as _time
+
         return RiskScore(
             escrow_id=escrow_id,
             score=risk_int,
@@ -140,7 +148,7 @@ class IsolationForest:
             feature_values=feature_values,
             model_version="iforest-v1",
             scored_at=int(_time.time()),
-            explanation=f"Anomaly score: {anomaly_score:.4f}"
+            explanation=f"Anomaly score: {anomaly_score:.4f}",
         )
 
     def _to_dict(self, features: TransactionFeatures) -> dict[str, float]:
@@ -162,6 +170,7 @@ class IsolationForest:
             return data
         indices = self.rng.sample(range(len(data)), n)
         return [data[i] for i in indices]
+
 
 class RiskEngine:
     def __init__(self, threshold: float = 0.65, model: IsolationForest | None = None):

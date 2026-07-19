@@ -6,6 +6,7 @@ Fallback chain (cheapest/fastest first):
   3. OpenRouter    (free-tier model)
   4. Heuristic     (deterministic scoring, always works)
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -14,8 +15,8 @@ import logging
 import os
 import re
 import time
-from typing import Any
 from collections import defaultdict
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
@@ -25,6 +26,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Data models
 # ---------------------------------------------------------------------------
+
 
 class DisputeEvidence(BaseModel):
     escrow_id: str
@@ -95,11 +97,10 @@ def _build_arbitration_prompt(
         lines = []
         for i, e in enumerate(evs[:5]):  # cap at 5 items for token efficiency
             lines.append(
-                f"  [{i+1}] type={e.evidence_type} claimant={e.claimant[:12]}... "
-                f"description={e.description[:80]}"
+                f"  [{i + 1}] type={e.evidence_type} claimant={e.claimant[:12]}... description={e.description[:80]}"
             )
         if len(evs) > 5:
-            lines.append(f"  ... and {len(evs)-5} more items")
+            lines.append(f"  ... and {len(evs) - 5} more items")
         return "\n".join(lines)
 
     cspr = escrow_amount / 1_000_000_000
@@ -264,6 +265,7 @@ async def _try_openrouter(prompt: str) -> dict[str, Any] | None:
 # Heuristic fallback (kept from original, always works)
 # ---------------------------------------------------------------------------
 
+
 class _HeuristicArbitrator:
     """Pure scoring-based arbitration, no external calls."""
 
@@ -342,7 +344,7 @@ class _HeuristicArbitrator:
             types_seen.add(ev.evidence_type)
             scores.append(item)
         total = sum(scores) / len(scores) if scores else 0.0
-        total *= (1.0 + min(len(evidence) * 0.1, 0.5) + len(types_seen) * 0.1 - dup_count * 0.3)
+        total *= 1.0 + min(len(evidence) * 0.1, 0.5) + len(types_seen) * 0.1 - dup_count * 0.3
         return {"score": max(0.0, min(1.0, total)), "factors": list(types_seen)}
 
     def _confidence(self, s: dict, r: dict) -> float:
@@ -387,6 +389,7 @@ _heuristic = _HeuristicArbitrator()
 # Main ArbitrationAgent
 # ---------------------------------------------------------------------------
 
+
 class ArbitrationAgent:
     MAX_HISTORY = 10_000
 
@@ -413,9 +416,7 @@ class ArbitrationAgent:
         if escrow_amount < 0:
             raise ValueError("escrow_amount must be non-negative")
 
-        prompt = _build_arbitration_prompt(
-            dispute_id, sender_evidence, receiver_evidence, escrow_amount
-        )
+        prompt = _build_arbitration_prompt(dispute_id, sender_evidence, receiver_evidence, escrow_amount)
 
         # Try LLM providers in order: Groq → NVIDIA → OpenRouter → heuristic
         verdict: dict[str, Any] | None = None
@@ -428,8 +429,13 @@ class ArbitrationAgent:
         if not verdict:
             logger.warning("All LLM providers failed; using heuristic for %s", dispute_id[:16])
             verdict = _heuristic.analyze(
-                dispute_id, sender_evidence, receiver_evidence, escrow_amount,
-                self.min_evidence, self.max_evidence, dict(self._agent_disputes),
+                dispute_id,
+                sender_evidence,
+                receiver_evidence,
+                escrow_amount,
+                self.min_evidence,
+                self.max_evidence,
+                dict(self._agent_disputes),
             )
 
         provider = verdict.pop("_provider", "heuristic")
@@ -454,11 +460,11 @@ class ArbitrationAgent:
 
         self._history.append(result)
         if len(self._history) > self.MAX_HISTORY:
-            self._history = self._history[-self.MAX_HISTORY:]
+            self._history = self._history[-self.MAX_HISTORY :]
         for ev in sender_evidence + receiver_evidence:
             self._agent_disputes[ev.claimant].append(dispute_id)
             if len(self._agent_disputes[ev.claimant]) > self.MAX_HISTORY:
-                self._agent_disputes[ev.claimant] = self._agent_disputes[ev.claimant][-self.MAX_HISTORY:]
+                self._agent_disputes[ev.claimant] = self._agent_disputes[ev.claimant][-self.MAX_HISTORY :]
 
         return result
 
@@ -484,6 +490,7 @@ class ArbitrationHistory:
 
     def get_repeat_offenders(self, threshold: int = 3) -> list[str]:
         from collections import Counter
+
         counts: Counter[str] = Counter()
         for rec in self._records:
             for rf in rec.risk_factors:

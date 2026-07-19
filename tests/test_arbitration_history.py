@@ -8,6 +8,7 @@ frontend/src/lib/api.ts's `getArbiters()` called a non-existent
 `/vrf/arbiters`) - dead code that would have 404'd the first time any UI
 called it.
 """
+
 from __future__ import annotations
 
 from fastapi.testclient import TestClient

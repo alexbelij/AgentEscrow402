@@ -12,11 +12,13 @@ reachable and already has data — the two data paths are independent. To get
 deterministic, CI-safe coverage we patch `_load_escrow_records` directly
 instead of depending on either live DB state or the sandbox override.
 """
+
 from __future__ import annotations
+
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
 
 import server.risk_api as risk_api
 from server.app import app, get_config, get_sandbox
@@ -83,8 +85,14 @@ class TestHelperFunctions:
         # A record whose "amount" can't be coerced to int must be logged
         # and skipped rather than raising out of training.
         records = [
-            {"sender": SENDER_HEX, "receiver": RECEIVER_HEX, "amount": "not-a-number",
-             "ttl": 86400, "created_at": 0, "status": "pending"},
+            {
+                "sender": SENDER_HEX,
+                "receiver": RECEIVER_HEX,
+                "amount": "not-a-number",
+                "ttl": 86400,
+                "created_at": 0,
+                "status": "pending",
+            },
         ]
         with patch("server.risk_api._load_escrow_records", return_value=records):
             engine = await risk_api._get_or_train_engine(None)
@@ -146,18 +154,35 @@ class TestAgentRiskScoreEndpoint:
         assert resp.status_code == 200
         assert resp.json()["dispute_rate"] == 1.0
 
-
     def test_agent_score_ignores_unrelated_records_and_computes_stddev(self, client):
         other_hex = "34" * 32
         records = [
-            {"sender": SENDER_HEX, "receiver": RECEIVER_HEX, "amount": 1000,
-             "ttl": 3600, "created_at": 0, "status": "released"},
-            {"sender": SENDER_HEX, "receiver": RECEIVER_HEX, "amount": 3000,
-             "ttl": 7200, "created_at": 0, "status": "released"},
+            {
+                "sender": SENDER_HEX,
+                "receiver": RECEIVER_HEX,
+                "amount": 1000,
+                "ttl": 3600,
+                "created_at": 0,
+                "status": "released",
+            },
+            {
+                "sender": SENDER_HEX,
+                "receiver": RECEIVER_HEX,
+                "amount": 3000,
+                "ttl": 7200,
+                "created_at": 0,
+                "status": "released",
+            },
             # Unrelated record — must be skipped (neither sender nor receiver
             # match the queried agent).
-            {"sender": other_hex, "receiver": other_hex, "amount": 999,
-             "ttl": 100, "created_at": 0, "status": "released"},
+            {
+                "sender": other_hex,
+                "receiver": other_hex,
+                "amount": 999,
+                "ttl": 100,
+                "created_at": 0,
+                "status": "released",
+            },
         ]
         with patch("server.risk_api._load_escrow_records", return_value=records):
             resp = client.get(f"/risk/score/{SENDER_HEX}")
@@ -201,8 +226,14 @@ class TestRiskDashboardEndpoint:
 
     def test_dashboard_counts_disputes_per_agent(self, client):
         records = [
-            {"sender": SENDER_HEX, "receiver": RECEIVER_HEX, "amount": 500,
-             "ttl": 86400, "created_at": 0, "status": "disputed"},
+            {
+                "sender": SENDER_HEX,
+                "receiver": RECEIVER_HEX,
+                "amount": 500,
+                "ttl": 86400,
+                "created_at": 0,
+                "status": "disputed",
+            },
         ]
         with patch("server.risk_api._load_escrow_records", return_value=records):
             resp = client.get("/risk/dashboard")
@@ -215,8 +246,7 @@ class TestRiskDashboardEndpoint:
         # A record with an empty sender must not create a bogus "" agent
         # entry in the dashboard (the `if not ag: continue` guard).
         records = [
-            {"sender": "", "receiver": RECEIVER_HEX, "amount": 500,
-             "ttl": 86400, "created_at": 0, "status": "pending"},
+            {"sender": "", "receiver": RECEIVER_HEX, "amount": 500, "ttl": 86400, "created_at": 0, "status": "pending"},
         ]
         with patch("server.risk_api._load_escrow_records", return_value=records):
             resp = client.get("/risk/dashboard")

@@ -1,12 +1,14 @@
-import pytest
-from unittest.mock import AsyncMock, patch
-from datetime import datetime, timedelta
-from server.ai_arbitration import (
-    DisputeEvidence,
-    ArbitrationRecommendation,
-    ArbitrationAgent,
-)
 import time
+from unittest.mock import patch
+
+import pytest
+
+from server.ai_arbitration import (
+    ArbitrationAgent,
+    ArbitrationRecommendation,
+    DisputeEvidence,
+)
+
 
 class TestDisputeEvidence:
     def test_valid_dispute_evidence(self):
@@ -69,6 +71,7 @@ class TestDisputeEvidence:
         )
         assert evidence.description == ""
 
+
 class TestArbitrationRecommendation:
     def test_valid_recommendation(self):
         rec = ArbitrationRecommendation(
@@ -122,6 +125,7 @@ class TestArbitrationRecommendation:
                 analysis_hash="hash123",
             )
 
+
 class TestArbitrationAgentInit:
     def test_valid_init(self):
         agent = ArbitrationAgent(slashing_rate=0.1, min_evidence=2, max_evidence=10)
@@ -144,6 +148,7 @@ class TestArbitrationAgentInit:
     def test_invalid_max_evidence_less_than_min(self):
         with pytest.raises(ValueError, match="max_evidence must be >= min_evidence"):
             ArbitrationAgent(min_evidence=5, max_evidence=4)
+
 
 # NOTE on this rewrite: the previous version of these two classes assumed a
 # fictional, synchronous API surface directly on ArbitrationAgent
@@ -196,12 +201,8 @@ class TestArbitrationAgentAnalyzeDispute:
     async def test_excessive_evidence_truncation(self, base_agent, sample_evidence):
         # Create more evidence than max_evidence * 2; distinct content hashes
         # so the dedup penalty in _score doesn't dominate the result.
-        sender_ev = [
-            sample_evidence.model_copy(update={"content_hash": f"s{i}"}) for i in range(25)
-        ]
-        receiver_ev = [
-            sample_evidence.model_copy(update={"content_hash": f"r{i}"}) for i in range(25)
-        ]
+        sender_ev = [sample_evidence.model_copy(update={"content_hash": f"s{i}"}) for i in range(25)]
+        receiver_ev = [sample_evidence.model_copy(update={"content_hash": f"r{i}"}) for i in range(25)]
         result = await base_agent.analyze_dispute(
             dispute_id="dispute1",
             sender_evidence=sender_ev,
@@ -225,9 +226,10 @@ class TestArbitrationAgentAnalyzeDispute:
             assert "Low confidence" in result.reasoning
 
     async def test_split_recommendation(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._score", side_effect=[
-            {"score": 0.5, "factors": ["text"]}, {"score": 0.55, "factors": ["text"]}
-        ]):
+        with patch(
+            "server.ai_arbitration._heuristic._score",
+            side_effect=[{"score": 0.5, "factors": ["text"]}, {"score": 0.55, "factors": ["text"]}],
+        ):
             with patch("server.ai_arbitration._heuristic._confidence", return_value=0.5):
                 result = await base_agent.analyze_dispute(
                     dispute_id="dispute1",
@@ -239,9 +241,10 @@ class TestArbitrationAgentAnalyzeDispute:
                 assert result.suggested_split_pct == 50.0
 
     async def test_favor_sender_recommendation(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._score", side_effect=[
-            {"score": 0.7, "factors": ["text"]}, {"score": 0.3, "factors": ["text"]}
-        ]):
+        with patch(
+            "server.ai_arbitration._heuristic._score",
+            side_effect=[{"score": 0.7, "factors": ["text"]}, {"score": 0.3, "factors": ["text"]}],
+        ):
             with patch("server.ai_arbitration._heuristic._confidence", return_value=0.7):
                 result = await base_agent.analyze_dispute(
                     dispute_id="dispute1",
@@ -253,9 +256,10 @@ class TestArbitrationAgentAnalyzeDispute:
                 assert result.suggested_split_pct > 50.0
 
     async def test_favor_receiver_recommendation(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._score", side_effect=[
-            {"score": 0.3, "factors": ["text"]}, {"score": 0.7, "factors": ["text"]}
-        ]):
+        with patch(
+            "server.ai_arbitration._heuristic._score",
+            side_effect=[{"score": 0.3, "factors": ["text"]}, {"score": 0.7, "factors": ["text"]}],
+        ):
             with patch("server.ai_arbitration._heuristic._confidence", return_value=0.7):
                 result = await base_agent.analyze_dispute(
                     dispute_id="dispute1",
@@ -266,7 +270,9 @@ class TestArbitrationAgentAnalyzeDispute:
                 assert result.recommendation == "favor_receiver"
 
     async def test_risk_factors_detection(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._risks", return_value=["high_value_escrow", "unilateral_evidence"]):
+        with patch(
+            "server.ai_arbitration._heuristic._risks", return_value=["high_value_escrow", "unilateral_evidence"]
+        ):
             result = await base_agent.analyze_dispute(
                 dispute_id="dispute1",
                 sender_evidence=[sample_evidence],
@@ -277,7 +283,7 @@ class TestArbitrationAgentAnalyzeDispute:
             assert "unilateral_evidence" in result.risk_factors
 
     async def test_history_tracking(self, base_agent, sample_evidence):
-        result = await base_agent.analyze_dispute(
+        await base_agent.analyze_dispute(
             dispute_id="dispute1",
             sender_evidence=[sample_evidence],
             receiver_evidence=[sample_evidence],
@@ -316,9 +322,10 @@ class TestArbitrationAgentAnalyzeDispute:
         assert result.recommendation in ["split", "escalate", "favor_sender", "favor_receiver"]
 
     async def test_max_confidence_favor_sender(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._score", side_effect=[
-            {"score": 0.9, "factors": ["text"]}, {"score": 0.1, "factors": ["text"]}
-        ]):
+        with patch(
+            "server.ai_arbitration._heuristic._score",
+            side_effect=[{"score": 0.9, "factors": ["text"]}, {"score": 0.1, "factors": ["text"]}],
+        ):
             with patch("server.ai_arbitration._heuristic._confidence", return_value=1.0):
                 result = await base_agent.analyze_dispute(
                     dispute_id="dispute1",
@@ -330,9 +337,10 @@ class TestArbitrationAgentAnalyzeDispute:
                 assert result.suggested_split_pct == 90.0  # split = min(100, 50 + diff*50), diff = 0.9-0.1 = 0.8 -> 90
 
     async def test_boundary_score_difference(self, base_agent, sample_evidence):
-        with patch("server.ai_arbitration._heuristic._score", side_effect=[
-            {"score": 0.55, "factors": ["text"]}, {"score": 0.45, "factors": ["text"]}
-        ]):
+        with patch(
+            "server.ai_arbitration._heuristic._score",
+            side_effect=[{"score": 0.55, "factors": ["text"]}, {"score": 0.45, "factors": ["text"]}],
+        ):
             with patch("server.ai_arbitration._heuristic._confidence", return_value=0.5):
                 result = await base_agent.analyze_dispute(
                     dispute_id="dispute1",
@@ -421,6 +429,7 @@ class TestScoringFunctions:
     @pytest.fixture
     def heuristic(self):
         from server.ai_arbitration import _HeuristicArbitrator
+
         return _HeuristicArbitrator()
 
     async def test_score_empty_evidence(self, heuristic):
@@ -447,12 +456,20 @@ class TestScoringFunctions:
         # sits below the ceiling and the type multiplier becomes visible.
         aged_ts = int(time.time()) - 60 * 86400
         text_ev = DisputeEvidence(
-            escrow_id="e1", claimant="sender", evidence_type="text",
-            content_hash="h1", description="d", timestamp=aged_ts,
+            escrow_id="e1",
+            claimant="sender",
+            evidence_type="text",
+            content_hash="h1",
+            description="d",
+            timestamp=aged_ts,
         )
         shot_ev = DisputeEvidence(
-            escrow_id="e1", claimant="sender", evidence_type="screenshot",
-            content_hash="h2", description="d", timestamp=int(time.time()),
+            escrow_id="e1",
+            claimant="sender",
+            evidence_type="screenshot",
+            content_hash="h2",
+            description="d",
+            timestamp=int(time.time()),
         )
         assert heuristic._score([shot_ev])["score"] > heuristic._score([text_ev])["score"]
 
@@ -466,8 +483,12 @@ class TestScoringFunctions:
 
     async def test_risks_high_value_escrow(self, heuristic):
         ev = DisputeEvidence(
-            escrow_id="e1", claimant="sender", evidence_type="text",
-            content_hash="h1", description="d", timestamp=int(time.time()),
+            escrow_id="e1",
+            claimant="sender",
+            evidence_type="text",
+            content_hash="h1",
+            description="d",
+            timestamp=int(time.time()),
         )
         risks = heuristic._risks([ev], [ev], amount=2_000_000, agent_disputes={})
         assert "high_value_escrow" in risks
@@ -478,19 +499,29 @@ class TestScoringFunctions:
 
     async def test_risks_unilateral_evidence(self, heuristic):
         ev = DisputeEvidence(
-            escrow_id="e1", claimant="sender", evidence_type="text",
-            content_hash="h1", description="d", timestamp=int(time.time()),
+            escrow_id="e1",
+            claimant="sender",
+            evidence_type="text",
+            content_hash="h1",
+            description="d",
+            timestamp=int(time.time()),
         )
         risks = heuristic._risks([ev], [], amount=100, agent_disputes={})
         assert "unilateral_evidence" in risks
 
     async def test_risks_repeat_disputes(self, heuristic):
         ev = DisputeEvidence(
-            escrow_id="e1", claimant="serial-claimant", evidence_type="text",
-            content_hash="h1", description="d", timestamp=int(time.time()),
+            escrow_id="e1",
+            claimant="serial-claimant",
+            evidence_type="text",
+            content_hash="h1",
+            description="d",
+            timestamp=int(time.time()),
         )
         risks = heuristic._risks(
-            [ev], [ev], amount=100,
+            [ev],
+            [ev],
+            amount=100,
             agent_disputes={"serial-claimant": ["d1", "d2", "d3"]},
         )
         assert any(r.startswith("repeat_disputes:") for r in risks)

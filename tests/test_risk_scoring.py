@@ -1,16 +1,11 @@
-import pytest
-from unittest.mock import patch, MagicMock
 import random
-import math
-from typing import Optional
+from unittest.mock import patch
+
+import pytest
 from pydantic import ValidationError
-from server.risk_scoring import (
-    TransactionFeatures,
-    RiskScore,
-    IsolationNode,
-    IsolationTree,
-    IsolationForest
-)
+
+from server.risk_scoring import IsolationForest, IsolationNode, IsolationTree, RiskScore, TransactionFeatures
+
 
 class TestTransactionFeatures:
     """Test TransactionFeatures Pydantic model validation."""
@@ -27,7 +22,7 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
         assert features.amount == 1000
         assert features.frequency == 0.5
@@ -48,7 +43,7 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
         assert features.amount == -100
 
@@ -67,7 +62,7 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
         assert features.frequency == 1.5
 
@@ -84,7 +79,7 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
         assert features.dispute_rate == -0.01
 
@@ -100,7 +95,7 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=0
+            hour_of_day=0,
         )
         max_hour = TransactionFeatures(
             amount=1000,
@@ -112,10 +107,11 @@ class TestTransactionFeatures:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=23
+            hour_of_day=23,
         )
         assert min_hour.hour_of_day == 0
         assert max_hour.hour_of_day == 23
+
 
 class TestRiskScore:
     """Test RiskScore Pydantic model validation."""
@@ -130,7 +126,7 @@ class TestRiskScore:
             feature_values={"amount": 1000.0, "frequency": 0.5},
             model_version="iforest-v1",
             scored_at=1234567890,
-            explanation="High frequency anomaly detected"
+            explanation="High frequency anomaly detected",
         )
         assert risk_score.score == 75
         assert risk_score.anomaly_flag is True
@@ -145,7 +141,7 @@ class TestRiskScore:
             feature_values={"amount": 1000.0},
             model_version="iforest-v1",
             scored_at=1234567890,
-            explanation="Normal transaction"
+            explanation="Normal transaction",
         )
         max_score = RiskScore(
             escrow_id="escrow_123",
@@ -155,7 +151,7 @@ class TestRiskScore:
             feature_values={"amount": 1000.0},
             model_version="iforest-v1",
             scored_at=1234567890,
-            explanation="Normal transaction"
+            explanation="Normal transaction",
         )
         assert min_score.score == 0
         assert max_score.score == 100
@@ -171,7 +167,7 @@ class TestRiskScore:
                 feature_values={"amount": 1000.0},
                 model_version="iforest-v1",
                 scored_at=1234567890,
-                explanation="Normal transaction"
+                explanation="Normal transaction",
             )
 
     def test_risk_score_invalid_score_low(self):
@@ -185,8 +181,9 @@ class TestRiskScore:
                 feature_values={"amount": 1000.0},
                 model_version="iforest-v1",
                 scored_at=1234567890,
-                explanation="Normal transaction"
+                explanation="Normal transaction",
             )
+
 
 class TestIsolationNode:
     """Test IsolationNode Pydantic model."""
@@ -194,11 +191,7 @@ class TestIsolationNode:
     def test_isolation_node_with_all_fields(self):
         """Test IsolationNode with all fields populated."""
         node = IsolationNode(
-            feature="amount",
-            threshold=500.0,
-            left=IsolationNode(size=10),
-            right=IsolationNode(size=20),
-            size=30
+            feature="amount", threshold=500.0, left=IsolationNode(size=10), right=IsolationNode(size=20), size=30
         )
         assert node.feature == "amount"
         assert node.threshold == 500.0
@@ -213,20 +206,18 @@ class TestIsolationNode:
 
     def test_isolation_node_optional_fields(self):
         """Test IsolationNode with only some optional fields."""
-        node = IsolationNode(
-            feature="frequency",
-            size=5
-        )
+        node = IsolationNode(feature="frequency", size=5)
         assert node.feature == "frequency"
         assert node.threshold is None
         assert node.left is None
         assert node.right is None
         assert node.size == 5
 
+
 class TestIsolationTree:
     """Test IsolationTree class methods."""
 
-    @patch('server.risk_scoring.IsolationTree._build_recursive')
+    @patch("server.risk_scoring.IsolationTree._build_recursive")
     def test_build_calls_recursive_with_correct_params(self, mock_build_recursive):
         """Test IsolationTree.build calls _build_recursive with correct parameters."""
         mock_build_recursive.return_value = IsolationNode(size=10)
@@ -266,10 +257,7 @@ class TestIsolationTree:
 
     def test_build_recursive_feature_selection(self):
         """Test _build_recursive selects a feature from available ones."""
-        data = [
-            {"amount": 100, "frequency": 0.5},
-            {"amount": 200, "frequency": 0.3}
-        ]
+        data = [{"amount": 100, "frequency": 0.5}, {"amount": 200, "frequency": 0.3}]
         rng = random.Random(42)
         node = IsolationTree._build_recursive(data, max_depth=10, current_depth=0, rng=rng)
 
@@ -300,11 +288,7 @@ class TestIsolationTree:
     def test_path_length_left_branch(self):
         """Test path_length traverses left branch correctly."""
         node = IsolationNode(
-            feature="amount",
-            threshold=150.0,
-            left=IsolationNode(size=5),
-            right=IsolationNode(size=3),
-            size=8
+            feature="amount", threshold=150.0, left=IsolationNode(size=5), right=IsolationNode(size=3), size=8
         )
         sample = {"amount": 100}
 
@@ -316,11 +300,7 @@ class TestIsolationTree:
     def test_path_length_right_branch(self):
         """Test path_length traverses right branch correctly."""
         node = IsolationNode(
-            feature="amount",
-            threshold=150.0,
-            left=IsolationNode(size=5),
-            right=IsolationNode(size=3),
-            size=8
+            feature="amount", threshold=150.0, left=IsolationNode(size=5), right=IsolationNode(size=3), size=8
         )
         sample = {"amount": 200}
 
@@ -344,6 +324,7 @@ class TestIsolationTree:
         assert IsolationTree._c(0) == 0.0
         assert IsolationTree._c(1) == 0.0
         assert IsolationTree._c(2) > 0.0
+
 
 class TestIsolationForest:
     """Test IsolationForest class."""
@@ -386,18 +367,20 @@ class TestIsolationForest:
     def test_fit_single_sample(self):
         """Test fit with single sample."""
         forest = IsolationForest(n_trees=1, sample_size=1, max_depth=5, seed=42)
-        data = [TransactionFeatures(
-            amount=1000,
-            frequency=0.5,
-            counterparty_count=5,
-            avg_ttl=30.0,
-            dispute_rate=0.01,
-            time_since_first=100,
-            total_volume=5000,
-            max_single=2000,
-            stddev_amount=100.0,
-            hour_of_day=14
-        )]
+        data = [
+            TransactionFeatures(
+                amount=1000,
+                frequency=0.5,
+                counterparty_count=5,
+                avg_ttl=30.0,
+                dispute_rate=0.01,
+                time_since_first=100,
+                total_volume=5000,
+                max_single=2000,
+                stddev_amount=100.0,
+                hour_of_day=14,
+            )
+        ]
         forest.fit(data)
         assert len(forest.trees) == 1
         assert forest._feature_names == list(TransactionFeatures.model_fields.keys())
@@ -416,30 +399,33 @@ class TestIsolationForest:
                 total_volume=5000 + i * 100,
                 max_single=2000 + i * 50,
                 stddev_amount=100.0 + i * 5.0,
-                hour_of_day=14
-            ) for i in range(20)
+                hour_of_day=14,
+            )
+            for i in range(20)
         ]
         forest.fit(data)
         assert len(forest.trees) == 3
         assert len(forest._feature_names) == 10
 
-    @patch('server.risk_scoring.IsolationTree.build')
+    @patch("server.risk_scoring.IsolationTree.build")
     def test_fit_calls_build_correctly(self, mock_build):
         """Test fit calls IsolationTree.build with correct parameters."""
         mock_build.return_value = IsolationNode(size=10)
         forest = IsolationForest(n_trees=2, sample_size=5, max_depth=6, seed=42)
-        data = [TransactionFeatures(
-            amount=1000,
-            frequency=0.5,
-            counterparty_count=5,
-            avg_ttl=30.0,
-            dispute_rate=0.01,
-            time_since_first=100,
-            total_volume=5000,
-            max_single=2000,
-            stddev_amount=100.0,
-            hour_of_day=14
-        )] * 10
+        data = [
+            TransactionFeatures(
+                amount=1000,
+                frequency=0.5,
+                counterparty_count=5,
+                avg_ttl=30.0,
+                dispute_rate=0.01,
+                time_since_first=100,
+                total_volume=5000,
+                max_single=2000,
+                stddev_amount=100.0,
+                hour_of_day=14,
+            )
+        ] * 10
 
         forest.fit(data)
 
@@ -463,7 +449,7 @@ class TestIsolationForest:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
         forest = IsolationForest()
         result = forest._to_dict(features)
@@ -493,7 +479,7 @@ class TestIsolationForest:
 
         assert sample1 != sample2
 
-    @patch('server.risk_scoring.IsolationTree.path_length')
+    @patch("server.risk_scoring.IsolationTree.path_length")
     def test_score_sample_average_path(self, mock_path_length):
         """Test score_sample calculates average path length correctly."""
         mock_path_length.return_value = 5.0
@@ -510,7 +496,7 @@ class TestIsolationForest:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
 
         score = forest.score_sample(sample)
@@ -539,10 +525,11 @@ class TestIsolationForest:
             total_volume=5000,
             max_single=2000,
             stddev_amount=100.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
 
         assert forest.score_sample(sample) == 0.5
+
 
 class TestIntegration:
     """Integration tests for the risk scoring module."""
@@ -561,8 +548,9 @@ class TestIntegration:
                 total_volume=5000 + i * 100,
                 max_single=2000 + i * 50,
                 stddev_amount=100.0 + i * 5.0,
-                hour_of_day=14
-            ) for i in range(50)
+                hour_of_day=14,
+            )
+            for i in range(50)
         ]
 
         # Train forest
@@ -580,7 +568,7 @@ class TestIntegration:
             total_volume=6000,
             max_single=2200,
             stddev_amount=110.0,
-            hour_of_day=15
+            hour_of_day=15,
         )
 
         score = forest.score_sample(sample)
@@ -602,8 +590,9 @@ class TestIntegration:
                 total_volume=5000,
                 max_single=2000,
                 stddev_amount=100.0,
-                hour_of_day=14
-            ) for _ in range(100)
+                hour_of_day=14,
+            )
+            for _ in range(100)
         ]
 
         anomalous_data = [
@@ -617,8 +606,9 @@ class TestIntegration:
                 total_volume=50000,  # High volume
                 max_single=10000,  # High single transaction
                 stddev_amount=5000.0,  # High stddev
-                hour_of_day=3  # Unusual hour
-            ) for _ in range(10)
+                hour_of_day=3,  # Unusual hour
+            )
+            for _ in range(10)
         ]
 
         # Train forest
@@ -636,7 +626,7 @@ class TestIntegration:
             total_volume=5200,
             max_single=2100,
             stddev_amount=105.0,
-            hour_of_day=14
+            hour_of_day=14,
         )
 
         # Score anomalous sample
@@ -650,7 +640,7 @@ class TestIntegration:
             total_volume=45000,
             max_single=9000,
             stddev_amount=4500.0,
-            hour_of_day=4
+            hour_of_day=4,
         )
 
         normal_score = forest.score_sample(normal_sample)

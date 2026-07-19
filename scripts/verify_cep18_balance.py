@@ -1,7 +1,10 @@
-import asyncio, sys
+import asyncio
+import sys
+
 sys.path.insert(0, "/work/temp/projects/AgentEscrow402")
-from server.config import Config
 from server.casper_client import CasperClient
+from server.config import Config
+
 
 async def main():
     cfg = Config.from_env()
@@ -10,5 +13,6 @@ async def main():
     installer_hex = "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8"
     r = await client.query_contract_dict("balances", installer_hex, contract_hash=contract_hash)
     print("balance raw:", r)
+
 
 asyncio.run(main())

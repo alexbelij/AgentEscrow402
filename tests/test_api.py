@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
 
-from unittest.mock import AsyncMock
-
-from server.app import app, get_config, get_sandbox, get_casper
+from server.app import app, get_casper, get_config, get_sandbox
 from server.config import Config
 from server.sandbox import SandboxStore
 
@@ -149,8 +148,7 @@ class TestBatchEscrowEndpoint:
 
     def test_create_batch_over_max_size_rejected(self, client):
         escrows = [
-            {"receiver": RECEIVER_HEX, "amount": 100, "service_hash": _hash(f"batch-big-{i}")}
-            for i in range(51)
+            {"receiver": RECEIVER_HEX, "amount": 100, "service_hash": _hash(f"batch-big-{i}")} for i in range(51)
         ]
         resp = client.post("/escrows/batch", json={"escrows": escrows})
         assert resp.status_code == 422
@@ -164,12 +162,7 @@ class TestBatchLifecycle:
         hashes = [_hash(f"{prefix}-{i}") for i in range(count)]
         resp = client.post(
             "/escrows/batch",
-            json={
-                "escrows": [
-                    {"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h}
-                    for h in hashes
-                ]
-            },
+            json={"escrows": [{"receiver": RECEIVER_HEX, "amount": 1000, "service_hash": h} for h in hashes]},
         )
         assert resp.status_code == 200
         return hashes
@@ -235,7 +228,6 @@ class TestStreamClaim:
     def _seed_stream(sandbox_store, service_hash, start_time, end_time, amount=5000):
         """Seed a streaming escrow directly into the in-memory store."""
         from server.multi_asset import _streaming_escrows
-        from server.models import EscrowRecord
 
         record = sandbox_store.create_escrow(
             sender="aa" * 32,
@@ -260,6 +252,7 @@ class TestStreamClaim:
     def test_stream_claim_before_vested(self, client, sandbox_store):
         """Stream not yet fully elapsed → 422."""
         import time
+
         now = int(time.time())
         h = _hash("stream-early")
         self._seed_stream(sandbox_store, h, now - 10, now + 3600)
@@ -270,6 +263,7 @@ class TestStreamClaim:
     def test_stream_claim_after_vested(self, client, sandbox_store):
         """Stream fully elapsed → on-chain release triggered."""
         import time
+
         now = int(time.time())
         h = _hash("stream-done")
         self._seed_stream(sandbox_store, h, now - 3600, now - 1)
@@ -282,6 +276,7 @@ class TestStreamClaim:
     def test_stream_double_claim(self, client, sandbox_store):
         """Second claim returns already_claimed."""
         import time
+
         now = int(time.time())
         h = _hash("stream-dbl")
         self._seed_stream(sandbox_store, h, now - 3600, now - 1)
@@ -580,9 +575,7 @@ class TestResolveEndpoint:
             "/escrow",
             json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
         )
-        resp = client.post(
-            "/dispute", json={"service_hash": h, "reason_hash": "b" * 64}
-        )
+        resp = client.post("/dispute", json={"service_hash": h, "reason_hash": "b" * 64})
         assert resp.status_code == 200
 
     def test_resolve_with_valid_threshold_signatures_succeeds(self, sandbox_store):

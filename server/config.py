@@ -163,9 +163,7 @@ class Config:
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
-            arbiter_pubkeys=tuple(
-                p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()
-            ),
+            arbiter_pubkeys=tuple(p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()),
             arbiter_threshold=int(os.getenv("ARBITER_THRESHOLD", "3")),
             release_cap_motes=int(os.getenv("RELEASE_CAP_MOTES", "1000000000000")),
             admin_api_key=os.getenv("ADMIN_API_KEY", ""),
@@ -207,12 +205,16 @@ class Config:
             "enabled": self.strict_mode,
             "preconditions_ok": len(violations) == 0,
             "violations": violations,
-            "guarantees": [
-                "any RPC failure raises hard error instead of silent fallback",
-                "missing contract hash raises hard error at request time",
-                "missing private key raises hard error before submitting",
-                "DB write failure propagates as 5xx (no in-memory-only claims)",
-            ] if self.strict_mode else [],
+            "guarantees": (
+                [
+                    "any RPC failure raises hard error instead of silent fallback",
+                    "missing contract hash raises hard error at request time",
+                    "missing private key raises hard error before submitting",
+                    "DB write failure propagates as 5xx (no in-memory-only claims)",
+                ]
+                if self.strict_mode
+                else []
+            ),
         }
 
 
