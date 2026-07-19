@@ -1,6 +1,44 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+/* Tailwind v4: theme moved from tailwind.config.ts into CSS. Mirrors the
+   old theme.extend block (colors, fonts, animations, keyframes). */
+@theme {
+  --color-ae-bg: #0a0a1a;
+  --color-ae-card: #12122a;
+  --color-ae-border: #1e1e3a;
+  --color-ae-accent: #6C5CE7;
+  --color-ae-accent-bright: #A29BFE;
+  --color-ae-cyan: #00D2FF;
+  --color-ae-green: #00E676;
+  --color-ae-gray: #9CA3AF;
+  --color-ae-gray-dark: #4B5563;
+
+  --font-sans: Inter, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+
+  --animate-fade-in-up: fadeInUp 0.6s ease-out both;
+  --animate-fade-in-down: fadeInDown 0.6s ease-out both;
+  --animate-float: float 6s ease-in-out infinite;
+  --animate-pulse-glow: pulseGlow 3s ease-in-out infinite;
+  --animate-pulse-slow: pulse 4s ease-in-out infinite;
+
+  @keyframes fadeInUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeInDown {
+    0% { opacity: 0; transform: translateY(-10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 0 15px rgba(108,92,231,0.3); }
+    50% { box-shadow: 0 0 30px rgba(108,92,231,0.6); }
+  }
+}
 
 @layer base {
   * { box-sizing: border-box; }
@@ -16,7 +54,9 @@
 }
 
 @layer components {
-  .ae-section { @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8; }
+  .ae-section { max-width: 80rem; width: 100%; margin-left: auto; margin-right: auto; padding-left: 1rem; padding-right: 1rem; }
+  @media (min-width: 640px) { .ae-section { padding-left: 1.5rem; padding-right: 1.5rem; } }
+  @media (min-width: 1024px) { .ae-section { padding-left: 2rem; padding-right: 2rem; } }
 }
 
 /* Rocket flame trail animation */
