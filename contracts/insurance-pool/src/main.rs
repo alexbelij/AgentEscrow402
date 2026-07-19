@@ -21,6 +21,7 @@ use casper_types::{EntryPointPayment,
 // Constants
 const CONTRACT_PURSE: &str = "insurance_contract_purse";
 const DICT_CLAIMS: &str = "claims";
+const DICT_CLAIMED_ESCROWS: &str = "claimed_escrow_ids";
 const KEY_PREMIUM_RATE_BPS: &str = "premium_rate_bps";
 const KEY_TOTAL_CLAIMED: &str = "total_claimed";
 const KEY_INSTALLER: &str = "installer";
@@ -42,6 +43,8 @@ const ERR_MAX_COVERAGE_EXCEEDED: u16 = 5;
 const ERR_CLAIM_AMOUNT_TOO_LARGE: u16 = 6;
 const ERR_ACCOUNT_HASH_PARSE: u16 = 7;
 const ERR_INSUFFICIENT_ARBITER_SIGS: u16 = 8;
+const ERR_ESCROW_ALREADY_CLAIMED: u16 = 9;
+const ERR_INVALID_ESCROW_ID: u16 = 10;
 
 const COOLDOWN_SECONDS: u64 = 86400; // 24 hours
 const MAX_COVERAGE_BPS: u64 = 8000; // 80% of pool balance
@@ -205,8 +208,24 @@ pub extern "C" fn claim() {
     let arbiter_pubkeys: Vec<String> = runtime::get_named_arg("arbiter_pubkeys");
     let arbiter_signatures: Vec<String> = runtime::get_named_arg("arbiter_signatures");
 
+    if escrow_id.is_empty() || escrow_id.len() > 128 {
+        runtime::revert(ApiError::User(ERR_INVALID_ESCROW_ID));
+    }
+
     let caller = runtime::get_caller();
     let caller_str = caller.to_string();
+
+    // Global escrow tombstone: cooldown is claimant-scoped and therefore
+    // cannot stop the same signed claim being replayed later (or by another
+    // route). Check before quorum work and mark before the external transfer;
+    // Casper reverts atomically if the transfer fails.
+    let claimed_escrows = get_dict_uref(DICT_CLAIMED_ESCROWS);
+    let already_claimed: bool = storage::dictionary_get(claimed_escrows, &escrow_id)
+        .unwrap_or_revert()
+        .unwrap_or(false);
+    if already_claimed {
+        runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED));
+    }
 
     let claim_message = build_claim_message(&caller_str, &escrow_id, amount);
     require_arbiter_quorum(&claim_message, &arbiter_pubkeys, &arbiter_signatures);
@@ -236,6 +255,10 @@ pub extern "C" fn claim() {
     if amount > pool_balance {
         runtime::revert(ApiError::User(ERR_CLAIM_AMOUNT_TOO_LARGE));
     }
+
+    // Effects before interaction. If the transfer reverts, Casper rolls the
+    // tombstone back with the transaction, so no valid claim is lost.
+    storage::dictionary_put(claimed_escrows, &escrow_id, true);
 
     // Transfer funds from contract purse to caller's main purse
     system::transfer_from_purse_to_account(contract_purse, caller, amount, None).unwrap_or_revert();
@@ -327,6 +350,7 @@ pub extern "C" fn call() {
     let arbiter_list_uref = storage::new_uref(Vec::<String>::new());
     let arbiter_threshold_uref = storage::new_uref(3u64);
     let withdraw_nonce_uref = storage::new_uref(0u64);
+    let claimed_escrows_uref = storage::new_dictionary(DICT_CLAIMED_ESCROWS).unwrap_or_revert();
 
     let mut named_keys = NamedKeys::new();
     named_keys.insert(CONTRACT_PURSE.into(), contract_purse.into());
@@ -336,6 +360,7 @@ pub extern "C" fn call() {
     named_keys.insert(KEY_ARBITER_LIST.into(), arbiter_list_uref.into());
     named_keys.insert(KEY_ARBITER_THRESHOLD.into(), arbiter_threshold_uref.into());
     named_keys.insert(KEY_WITHDRAW_NONCE.into(), withdraw_nonce_uref.into());
+    named_keys.insert(DICT_CLAIMED_ESCROWS.into(), claimed_escrows_uref.into());
 
     let mut entry_points = EntryPoints::new();
 
