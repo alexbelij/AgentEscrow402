@@ -1,0 +1,217 @@
+[
+  {
+    "n": 0,
+    "leaves": [],
+    "root": "2e1cfa82b035c26cbbbdae632cea070514eb8b773f616aaeaf668e2f0be8f10d"
+  },
+  {
+    "n": 1,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      }
+    ],
+    "root": "2d4e5359762dcf2e084f927ff72130739851e63b94194acf2830fdb2e9a2ff88"
+  },
+  {
+    "n": 2,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      },
+      {
+        "claimant": "alice-1",
+        "content_hash": "hash-1",
+        "evidence_type": "hash",
+        "timestamp": "1700000001"
+      }
+    ],
+    "root": "83f7a8b99d34e8b90d51a78ec6df10b5543c03a5ca7c67f491779223d93d5c7e"
+  },
+  {
+    "n": 3,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      },
+      {
+        "claimant": "alice-1",
+        "content_hash": "hash-1",
+        "evidence_type": "hash",
+        "timestamp": "1700000001"
+      },
+      {
+        "claimant": "alice-2",
+        "content_hash": "hash-2",
+        "evidence_type": "text",
+        "timestamp": "1700000002"
+      }
+    ],
+    "root": "f8b688743ceb084eb1a62367f57d6160cdaf3834fa230929bbb741526c05ce81"
+  },
+  {
+    "n": 5,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      },
+      {
+        "claimant": "alice-1",
+        "content_hash": "hash-1",
+        "evidence_type": "hash",
+        "timestamp": "1700000001"
+      },
+      {
+        "claimant": "alice-2",
+        "content_hash": "hash-2",
+        "evidence_type": "text",
+        "timestamp": "1700000002"
+      },
+      {
+        "claimant": "alice-3",
+        "content_hash": "hash-3",
+        "evidence_type": "hash",
+        "timestamp": "1700000003"
+      },
+      {
+        "claimant": "alice-4",
+        "content_hash": "hash-4",
+        "evidence_type": "text",
+        "timestamp": "1700000004"
+      }
+    ],
+    "root": "2f38427d0751182d70ecf55b0311c37e2e137e5970f99f0668a43209312b6a7c"
+  },
+  {
+    "n": 8,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      },
+      {
+        "claimant": "alice-1",
+        "content_hash": "hash-1",
+        "evidence_type": "hash",
+        "timestamp": "1700000001"
+      },
+      {
+        "claimant": "alice-2",
+        "content_hash": "hash-2",
+        "evidence_type": "text",
+        "timestamp": "1700000002"
+      },
+      {
+        "claimant": "alice-3",
+        "content_hash": "hash-3",
+        "evidence_type": "hash",
+        "timestamp": "1700000003"
+      },
+      {
+        "claimant": "alice-4",
+        "content_hash": "hash-4",
+        "evidence_type": "text",
+        "timestamp": "1700000004"
+      },
+      {
+        "claimant": "alice-5",
+        "content_hash": "hash-5",
+        "evidence_type": "hash",
+        "timestamp": "1700000005"
+      },
+      {
+        "claimant": "alice-6",
+        "content_hash": "hash-6",
+        "evidence_type": "text",
+        "timestamp": "1700000006"
+      },
+      {
+        "claimant": "alice-7",
+        "content_hash": "hash-7",
+        "evidence_type": "hash",
+        "timestamp": "1700000007"
+      }
+    ],
+    "root": "abfce28d111c5c05ffd10a6d1bc0af942dd1b21c3007640ddac3d805bc82130f"
+  },
+  {
+    "n": 10,
+    "leaves": [
+      {
+        "claimant": "alice-0",
+        "content_hash": "hash-0",
+        "evidence_type": "text",
+        "timestamp": "1700000000"
+      },
+      {
+        "claimant": "alice-1",
+        "content_hash": "hash-1",
+        "evidence_type": "hash",
+        "timestamp": "1700000001"
+      },
+      {
+        "claimant": "alice-2",
+        "content_hash": "hash-2",
+        "evidence_type": "text",
+        "timestamp": "1700000002"
+      },
+      {
+        "claimant": "alice-3",
+        "content_hash": "hash-3",
+        "evidence_type": "hash",
+        "timestamp": "1700000003"
+      },
+      {
+        "claimant": "alice-4",
+        "content_hash": "hash-4",
+        "evidence_type": "text",
+        "timestamp": "1700000004"
+      },
+      {
+        "claimant": "alice-5",
+        "content_hash": "hash-5",
+        "evidence_type": "hash",
+        "timestamp": "1700000005"
+      },
+      {
+        "claimant": "alice-6",
+        "content_hash": "hash-6",
+        "evidence_type": "text",
+        "timestamp": "1700000006"
+      },
+      {
+        "claimant": "alice-7",
+        "content_hash": "hash-7",
+        "evidence_type": "hash",
+        "timestamp": "1700000007"
+      },
+      {
+        "claimant": "alice-8",
+        "content_hash": "hash-8",
+        "evidence_type": "text",
+        "timestamp": "1700000008"
+      },
+      {
+        "claimant": "alice-9",
+        "content_hash": "hash-9",
+        "evidence_type": "hash",
+        "timestamp": "1700000009"
+      }
+    ],
+    "root": "e1e780203b16666e3ed533d5f1ab10c91eb19e56391ac8706804f1c407546e7f"
+  }
+]
