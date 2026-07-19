@@ -493,7 +493,7 @@ pub extern "C" fn call() {
     // against an existing deployment, add a new version to the same
     // package instead of creating a brand-new one.
     if let Some(existing_package_key) = runtime::get_key("agent_identity_registry_package_hash") {
-        let package_hash_addr = existing_package_key.into_hash_addr().unwrap_or_revert();
+        let package_hash_addr = existing_package_key.into_entity_hash_addr().unwrap_or_revert();
         let package_hash: casper_types::contracts::ContractPackageHash = package_hash_addr.into();
         let (contract_hash, _) = storage::add_contract_version(
             package_hash,

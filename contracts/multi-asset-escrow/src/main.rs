@@ -161,7 +161,7 @@ fn parse_contract_hash(s: &str) -> ContractHash {
 /// `get_immediate_caller()` (see module doc comment).
 fn read_self_package_hash() -> ContractPackageHash {
     let key = runtime::get_key(SELF_PACKAGE_KEY).unwrap_or_revert();
-    let addr = key.into_hash_addr().unwrap_or_revert();
+    let addr = key.into_entity_hash_addr().unwrap_or_revert();
     addr.into()
 }
 
@@ -666,7 +666,7 @@ pub extern "C" fn call() {
     // `self_package_hash`, added at genesis only) are NOT retrofitted by
     // this path -- see module-level SKILL.md note on this limitation.
     if let Some(existing_package_key) = runtime::get_key(PACKAGE_KEY) {
-        let package_hash_addr = existing_package_key.into_hash_addr().unwrap_or_revert();
+        let package_hash_addr = existing_package_key.into_entity_hash_addr().unwrap_or_revert();
         let package_hash: ContractPackageHash = package_hash_addr.into();
         let (contract_hash, _version) = storage::add_contract_version(
             package_hash,

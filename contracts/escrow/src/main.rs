@@ -1097,7 +1097,7 @@ pub extern "C" fn call() {
     // arbiter_list urefs etc.) -- only the entry-point set changes.
     if let Some(existing_package_key) = runtime::get_key("escrow_package_hash") {
         let package_hash_addr = existing_package_key
-            .into_hash_addr()
+            .into_entity_hash_addr()
             .unwrap_or_revert();
         let package_hash: casper_types::contracts::ContractPackageHash =
             package_hash_addr.into();
