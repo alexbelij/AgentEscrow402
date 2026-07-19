@@ -67,6 +67,22 @@ class Config:
     # once from alexbelij_secret_key.pem via casper-js-sdk; update if the
     # operator key is ever rotated.
     casper_operator_account_hash: str = "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8"
+    # Strict / fail-loud mode. When AE402_STRICT=1 in the environment, any
+    # code path that would ordinarily silently fall back to sandbox / demo /
+    # mock behaviour must instead raise StrictModeError. The purpose is to
+    # make production configuration mistakes (missing key, wrong RPC, empty
+    # contract hash, RPC 5xx, DB down) crash loudly rather than serve fake
+    # results. Judges / operators enabling this flag get a guarantee that a
+    # 200 response means the write actually reached testnet.
+    #
+    # The three well-known preconditions checked at startup (see
+    # Config.require_strict_preconditions()) are:
+    #   - casper_node_url non-empty
+    #   - contract_hash non-empty
+    #   - sandbox is False
+    # A running app under AE402_STRICT=1 additionally raises StrictModeError
+    # in every code path that ships a "silent fallback" branch.
+    strict_mode: bool = False
 
     @classmethod
     def from_env(cls) -> Config:
@@ -152,7 +168,47 @@ class Config:
                 "CASPER_OPERATOR_ACCOUNT_HASH",
                 "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8",
             ),
+            strict_mode=os.getenv("AE402_STRICT", "0") == "1",
         )
+
+    def require_strict_preconditions(self) -> list[str]:
+        """Return a list of strict-mode precondition violations.
+
+        Used at startup and by /health to expose the strict-mode readiness
+        picture. An empty list means the app is safe to run under strict
+        mode; a non-empty list means starting up under AE402_STRICT=1 will
+        raise StrictModeError.
+        """
+        violations: list[str] = []
+        if not self.casper_node_url:
+            violations.append("casper_node_url is empty (set CASPER_NODE_URL)")
+        if not self.contract_hash:
+            violations.append("contract_hash is empty (set ESCROW_CONTRACT_HASH)")
+        if self.sandbox:
+            violations.append("sandbox=true (set SANDBOX=false for live mode)")
+        return violations
+
+    def strict_mode_capabilities(self) -> dict[str, object]:
+        """Structured capability breakdown for /health.
+
+        Returns a dict with:
+          - enabled: bool -- whether AE402_STRICT=1
+          - preconditions_ok: bool -- whether all preconditions are satisfied
+          - violations: list[str] -- specific issues (empty if preconditions_ok)
+          - guarantees: list[str] -- what a 200 response means under strict mode
+        """
+        violations = self.require_strict_preconditions()
+        return {
+            "enabled": self.strict_mode,
+            "preconditions_ok": len(violations) == 0,
+            "violations": violations,
+            "guarantees": [
+                "any RPC failure raises hard error instead of silent fallback",
+                "missing contract hash raises hard error at request time",
+                "missing private key raises hard error before submitting",
+                "DB write failure propagates as 5xx (no in-memory-only claims)",
+            ] if self.strict_mode else [],
+        }
 
 
 def get_config() -> Config:

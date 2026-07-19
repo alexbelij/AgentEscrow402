@@ -95,6 +95,44 @@ verify_health() {
 }
 check verify_health
 
+# ── 2b. Strict-mode readiness ───────────────────────────────────────────
+#
+# Reports whether the running app has AE402_STRICT=1 enabled and whether
+# its preconditions are satisfied. This does not force strict mode to be
+# on -- for hosted demo the operator may deliberately leave it off. It
+# reports the picture so a judge can see the guarantee level at a glance.
+#
+# See server/strict.py and server/config.py::Config.strict_mode_capabilities()
+# for the underlying contract.
+
+verify_strict_mode() {
+  local resp caps enabled ok violations
+  resp=$(curl -sf "${API}/health" 2>/dev/null || echo "FAIL")
+  # /health returns {..., "strict_mode": {enabled, preconditions_ok, violations, guarantees}}
+  if ! echo "$resp" | jq -e '.strict_mode' > /dev/null 2>&1; then
+    yellow "API /health does not include strict_mode block (older backend version)"
+    WARN=$((WARN + 1))
+    return 0
+  fi
+
+  enabled=$(echo "$resp" | jq -r '.strict_mode.enabled')
+  ok=$(echo "$resp" | jq -r '.strict_mode.preconditions_ok')
+  violations=$(echo "$resp" | jq -r '.strict_mode.violations | join("; ")')
+
+  if [ "$enabled" = "true" ] && [ "$ok" = "true" ]; then
+    green "AE402_STRICT=1 enabled AND all preconditions satisfied (fail-loud guarantees active)"
+    return 0
+  elif [ "$enabled" = "true" ] && [ "$ok" = "false" ]; then
+    red "AE402_STRICT=1 enabled but preconditions FAIL: ${violations}"
+    return 1
+  else
+    yellow "AE402_STRICT=0 (silent fallbacks allowed — not fail-loud)"
+    WARN=$((WARN + 1))
+    return 0
+  fi
+}
+check verify_strict_mode
+
 # ── 3. Escrow round-trip ─────────────────────────────────────────────────
 
 echo ""
