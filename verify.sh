@@ -164,6 +164,34 @@ verify_frontend() {
 }
 check verify_frontend
 
+# ── 5b. Insurance replay guard invariant (contract named_keys) ───────────
+
+echo ""
+bold "5b. Insurance replay guard (on-chain dictionary)"
+
+verify_insurance_replay_guard() {
+  # The redeployed insurance-pool (ead90738…95fff4) MUST expose a
+  # `claimed_escrow_ids` named key — this is the storage that tombstones
+  # every processed escrow_id and blocks replay after cooldown.
+  # Contract source: contracts/insurance-pool/src/main.rs line 24 + call()
+  # entry point. If this key is absent, either the old contract is still
+  # live under a shadow name or the redeploy silently failed.
+  local insurance_hash="ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4"
+  local resp
+  resp=$(curl -sf "https://node.testnet.casper.network/rpc" \
+    -H "Content-Type: application/json" \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query_global_state\",\"params\":{\"state_identifier\":null,\"key\":\"hash-${insurance_hash}\",\"path\":[]}}" \
+    2>/dev/null || echo "FAIL")
+  if echo "$resp" | jq -e '.result.stored_value.Contract.named_keys[] | select(.name == "claimed_escrow_ids")' > /dev/null 2>&1; then
+    green "insurance_pool.claimed_escrow_ids dictionary present (replay guard armed)"
+    return 0
+  else
+    red "insurance_pool.claimed_escrow_ids NOT FOUND — replay guard MISSING on live contract"
+    return 1
+  fi
+}
+check verify_insurance_replay_guard
+
 # ── 5. onchain.json consistency ──────────────────────────────────────────
 
 echo ""
