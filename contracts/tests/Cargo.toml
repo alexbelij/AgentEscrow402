@@ -23,3 +23,7 @@ path = "src/property_tests.rs"
 [[test]]
 name = "agent_identity_registry_property_tests"
 path = "src/agent_identity_registry_property_tests.rs"
+
+[[test]]
+name = "insurance_replay_tests"
+path = "src/insurance_replay_tests.rs"
