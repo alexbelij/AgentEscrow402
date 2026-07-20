@@ -21,6 +21,8 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field, field_validator
 
+from server.merkle_provenance import EvidenceLeaf, compute_merkle_root
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,11 @@ class ArbitrationRecommendation(BaseModel):
     escalated_to_panel: bool = False
     panel_election: dict[str, Any] | None = None
     escalation_reason: str | None = None
+    # AE-8: Merkle root over the (deduplicated, sorted) evidence set the
+    # arbitrator saw. Anyone can later prove independently that a specific
+    # piece of evidence was in the set, without needing every evidence
+    # hash on-chain. Empty when no evidence was provided.
+    evidence_root: str = ""
 
 
 # ---------------------------------------------------------------------------
@@ -447,10 +454,29 @@ class ArbitrationAgent:
 
         provider = verdict.pop("_provider", "heuristic")
 
-        # Build analysis_hash
+        # AE-8: Merkle root over the evidence set the arbitrator saw.
+        # Deterministic per (dispute_id, evidence set), independent of
+        # provider. Sender evidence first (order-preserving), then
+        # receiver evidence. The root binds the verdict to the exact
+        # inputs; a caller can later prove a specific evidence item was
+        # in that set given the root, the leaf, and its sibling path.
+        all_evidence = list(sender_evidence) + list(receiver_evidence)
+        evidence_leaves = [
+            EvidenceLeaf(
+                claimant=ev.claimant,
+                content_hash=ev.content_hash,
+                evidence_type=ev.evidence_type,
+                timestamp=str(ev.timestamp),
+            )
+            for ev in all_evidence
+        ]
+        evidence_root = compute_merkle_root(evidence_leaves) if evidence_leaves else ""
+
+        # Build analysis_hash (now includes evidence_root so tampering
+        # with the evidence set is caught by the analysis-hash check).
         content = (
             f"{dispute_id}:{verdict['recommendation']}:{verdict['confidence']:.4f}:"
-            f"{escrow_amount}:{','.join(sorted(verdict['risk_factors']))}"
+            f"{escrow_amount}:{','.join(sorted(verdict['risk_factors']))}:{evidence_root}"
         )
         analysis_hash = hashlib.sha256(content.encode()).hexdigest()
 
@@ -463,6 +489,7 @@ class ArbitrationAgent:
             suggested_split_pct=round(float(verdict["suggested_split_pct"]), 2),
             analysis_hash=analysis_hash,
             provider=provider,
+            evidence_root=evidence_root,
         )
 
         self._history.append(result)
