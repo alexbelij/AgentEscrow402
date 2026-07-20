@@ -35,4 +35,6 @@ node_modules/
 target/
 venv/
 graphify-out/
-.venv-ae
+
+# local test virtualenv (not part of repo)
+.venv-ae/
