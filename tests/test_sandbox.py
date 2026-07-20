@@ -63,7 +63,8 @@ class TestSandboxEscrow:
     def test_release_already_released_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.release_escrow(service_hash, sender)
-        with pytest.raises(ValueError, match="Cannot release"):
+        # AE-14: deny-by-default FSM surfaces terminal-state message.
+        with pytest.raises(ValueError, match=r"action 'release'.*terminal state 'released'"):
             sandbox.release_escrow(service_hash, sender)
 
     def test_refund_by_sender(self, sandbox, sender, receiver, service_hash):
@@ -84,7 +85,8 @@ class TestSandboxEscrow:
     def test_dispute_already_released_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.release_escrow(service_hash, sender)
-        with pytest.raises(ValueError, match="Cannot dispute"):
+        # AE-14: FSM denies any action on terminal RELEASED state.
+        with pytest.raises(ValueError, match=r"action 'dispute'.*terminal state 'released'"):
             sandbox.dispute_escrow(service_hash)
 
     def test_get_nonexistent_returns_none(self, sandbox):
@@ -100,7 +102,11 @@ class TestSandboxEscrow:
     def test_refund_disputed_escrow_raises(self, sandbox, sender, receiver, service_hash):
         sandbox.create_escrow(sender, receiver, 1000, service_hash, 300)
         sandbox.dispute_escrow(service_hash)
-        with pytest.raises(ValueError, match="Cannot refund"):
+        # AE-14: DISPUTED accepts only resolve_sender / resolve_receiver.
+        with pytest.raises(
+            ValueError,
+            match=r"action 'refund'.*state 'disputed'.*resolve_sender, resolve_receiver",
+        ):
             sandbox.refund_escrow(service_hash, sender)
 
     def test_multiple_escrows(self, sandbox, sender, receiver):

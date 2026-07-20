@@ -23,6 +23,7 @@ from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, ArbitrationRecommendation, DisputeEvidence
 from server.casper_client import CasperClient
 from server.config import Config
+from server.escrow_fsm import InvalidTransitionError
 from server.event_monitor import EventMonitor
 from server.identity_registry_api import _registry as _id_registry
 from server.identity_registry_api import router as identity_registry_router
@@ -114,6 +115,21 @@ async def _on_escrow_disputed(event: dict[str, Any]) -> None:
     logger.info("On-chain event: escrow_disputed %s", sh[:16])
     _broadcast_event({"type": "escrow_disputed", "service_hash": sh, "ts": int(time.time())})
     _broadcast_event({"type": "dispute_opened", "service_hash": sh, "ts": int(time.time())})
+
+
+def _raise_fsm_or_generic(exc: ValueError) -> None:
+    """AE-14: turn a chained :class:`InvalidTransitionError` into HTTP 409.
+
+    ``server.sandbox`` and other stores wrap the FSM error in a
+    ``ValueError`` for backwards-compatible tests, but preserve the
+    original as ``__cause__``. When we see one, surface the structured
+    payload as a 409 so clients can drive UX off ``allowed_actions``.
+    Anything else stays a 400 with plain-string detail.
+    """
+    cause = exc.__cause__
+    if isinstance(cause, InvalidTransitionError):
+        raise HTTPException(status_code=409, detail=cause.to_payload())
+    raise HTTPException(status_code=400, detail=str(exc))
 
 
 def _broadcast_event(event: dict[str, Any]) -> None:
@@ -1005,8 +1021,10 @@ async def release_escrow(
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
-    except (ValueError, PermissionError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        _raise_fsm_or_generic(exc)
 
 
 @app.post("/refund", response_model=EscrowRecord)
@@ -1058,8 +1076,10 @@ async def refund_escrow(
         return record
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
-    except (ValueError, PermissionError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+    except ValueError as exc:
+        _raise_fsm_or_generic(exc)
 
 
 @app.post("/dispute", response_model=EscrowRecord)
@@ -1132,7 +1152,7 @@ async def dispute_escrow(
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        _raise_fsm_or_generic(exc)
 
 
 @app.post("/resolve", response_model=EscrowRecord)
@@ -1265,7 +1285,7 @@ async def resolve_escrow(
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        _raise_fsm_or_generic(exc)
 
 
 # ---------------------------------------------------------------------------

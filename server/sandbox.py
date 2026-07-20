@@ -6,7 +6,8 @@ import asyncio
 import time
 from typing import Any
 
-from server.models import EscrowRecord, ReputationRecord
+from server.escrow_fsm import EscrowAction, EscrowFSM, InvalidTransitionError
+from server.models import EscrowRecord, EscrowStatus, ReputationRecord
 
 
 class SandboxStore:
@@ -35,11 +36,12 @@ class SandboxStore:
 
     def release_escrow(self, service_hash: str, caller: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
-        if rec["status"] != "pending":
-            raise ValueError(f"Cannot release escrow in status {rec['status']}")
+        # AE-14: deny-by-default FSM guards the state change before any
+        # side effect (reputation bump, deploy-hash write) can happen.
+        next_state = self._advance(rec, EscrowAction.RELEASE)
         if rec["sender"] != caller:
             raise PermissionError("Only sender can release")
-        rec["status"] = "released"
+        rec["status"] = next_state.value
         if deploy_hash:
             # Each lifecycle action is its own on-chain deploy -- the record
             # must reflect the *release* deploy, not the stale one from
@@ -51,22 +53,23 @@ class SandboxStore:
 
     def refund_escrow(self, service_hash: str, caller: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
-        if rec["status"] != "pending":
-            raise ValueError(f"Cannot refund escrow in status {rec['status']}")
         now = int(time.time())
         expired = now > rec["created_at"] + rec["ttl"]
         if not expired and rec["sender"] != caller:
             raise PermissionError("Only sender can refund before TTL")
-        rec["status"] = "expired" if expired else "refunded"
+        # Two distinct FSM edges from PENDING: EXPIRE when TTL has passed,
+        # REFUND otherwise. Both are validated by the same allow-matrix.
+        action = EscrowAction.EXPIRE if expired else EscrowAction.REFUND
+        next_state = self._advance(rec, action)
+        rec["status"] = next_state.value
         if deploy_hash:
             rec["deploy_hash"] = deploy_hash
         return EscrowRecord(**rec)
 
     def dispute_escrow(self, service_hash: str, deploy_hash: str = "") -> EscrowRecord:
         rec = self._get_or_raise(service_hash)
-        if rec["status"] != "pending":
-            raise ValueError(f"Cannot dispute escrow in status {rec['status']}")
-        rec["status"] = "disputed"
+        next_state = self._advance(rec, EscrowAction.DISPUTE)
+        rec["status"] = next_state.value
         if deploy_hash:
             rec["deploy_hash"] = deploy_hash
         self._bump_reputation(rec["sender"], disputed=1)
@@ -85,11 +88,11 @@ class SandboxStore:
         `in_favor_of`, and marks the escrow `resolved`.
         """
         rec = self._get_or_raise(service_hash)
-        if rec["status"] != "disputed":
-            raise ValueError(f"Cannot resolve escrow in status {rec['status']} (must be disputed)")
         if in_favor_of not in ("sender", "receiver"):
             raise ValueError(f"in_favor_of must be 'sender' or 'receiver', got: {in_favor_of!r}")
-        rec["status"] = "resolved"
+        action = EscrowAction.RESOLVE_SENDER if in_favor_of == "sender" else EscrowAction.RESOLVE_RECEIVER
+        next_state = self._advance(rec, action)
+        rec["status"] = next_state.value
         if deploy_hash:
             rec["deploy_hash"] = deploy_hash
         winner = rec["sender"] if in_favor_of == "sender" else rec["receiver"]
@@ -115,6 +118,23 @@ class SandboxStore:
             last_active=rep.get("last_active", 0),
             score=score,
         )
+
+    def _advance(self, rec: dict[str, Any], action: str) -> EscrowStatus:
+        """Run ``rec['status']`` through :class:`EscrowFSM`.
+
+        Preserves the historical ``ValueError`` surface — callers and
+        FastAPI handlers already convert ``ValueError`` into HTTP 400 —
+        while attaching the FSM's machine-readable payload for the
+        newer 409-based error path.
+        """
+        current = EscrowStatus(rec["status"])
+        try:
+            return EscrowFSM.transition(current, action)
+        except InvalidTransitionError as exc:
+            # Chain the FSM error so surfaces that want the structured
+            # payload can re-raise it (see server/app.py), while the
+            # ValueError message keeps existing tests happy.
+            raise ValueError(exc._message()) from exc
 
     def _get_or_raise(self, service_hash: str) -> dict[str, Any]:
         rec = self._escrows.get(service_hash)
