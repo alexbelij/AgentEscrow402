@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
@@ -11,7 +12,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
@@ -1298,19 +1299,135 @@ class ArbitrateRequest(BaseModel):
     sender_evidence: list[DisputeEvidence]
     receiver_evidence: list[DisputeEvidence]
     escrow_amount: int
+    # AE-A1.4: optional dispute-party account hashes. When present, an
+    # abstain / low-confidence-escalate verdict auto-triggers VRF panel
+    # election (excluding these two accounts). Format: lowercase hex
+    # Casper account hash without 'account-hash-' prefix (see
+    # vrf_election.ElectArbiterRequest).
+    sender_account: str | None = None
+    receiver_account: str | None = None
+    # Verifiable random seed for panel election. When omitted, we hash
+    # the dispute_id + verdict.analysis_hash — deterministic but bound
+    # to a state the arbiter has already committed to.
+    election_seed_hash: str | None = None
+
+
+# Confidence gate for escalate-with-low-confidence → panel. Above this
+# threshold, an 'escalate' verdict is left as-is (the arbiter is
+# confident that a human should look, not that a panel should re-vote).
+_ESCALATION_CONFIDENCE_MAX = 0.3
+
+
+def _should_escalate(verdict: ArbitrationRecommendation) -> bool:
+    """AE-A1.4 escalation policy.
+
+    'abstain'  → always escalate (LLM refused to judge).
+    'escalate' → escalate only when confidence < _ESCALATION_CONFIDENCE_MAX
+                 (below this, LLM had no signal; above, a human review
+                 is the intended path, not a panel re-vote).
+    Anything else → no escalation.
+    """
+    if verdict.recommendation == "abstain":
+        return True
+    if verdict.recommendation == "escalate" and verdict.confidence < _ESCALATION_CONFIDENCE_MAX:
+        return True
+    return False
+
+
+async def _try_escalate_to_panel(
+    verdict: ArbitrationRecommendation,
+    req: ArbitrateRequest,
+) -> None:
+    """Populate verdict.escalated_to_panel / .panel_election / .escalation_reason
+    in place. Never raises — escalation failures are recorded as
+    escalation_reason and the flat verdict is still returned.
+    """
+    if not req.sender_account or not req.receiver_account:
+        verdict.escalation_reason = (
+            "missing_party_accounts: abstain/low-conf-escalate verdict "
+            "needs sender_account + receiver_account for VRF panel election"
+        )
+        return
+
+    # Deterministic seed: dispute + analysis_hash. Caller-supplied seed
+    # (e.g. a recent block hash) wins.
+    seed_hash = (
+        req.election_seed_hash
+        or hashlib.sha256(f"{req.dispute_id}:{verdict.analysis_hash}".encode("utf-8")).hexdigest()
+    )
+
+    try:
+        from server.vrf_election import (
+            ElectArbiterRequest,
+            _election_results,
+            elect_arbiter,
+        )
+
+        election_req = ElectArbiterRequest(
+            dispute_id=req.dispute_id,
+            sender=req.sender_account,
+            receiver=req.receiver_account,
+            seed_hash=seed_hash,
+        )
+        election = await elect_arbiter(
+            request=election_req,
+            casper=None,  # forces local CSPRNG unless on-chain VRF configured
+            cfg=get_config(),
+        )
+        verdict.escalated_to_panel = True
+        verdict.panel_election = election.model_dump()
+        verdict.escalation_reason = (
+            "abstain_verdict"
+            if verdict.recommendation == "abstain"
+            else f"low_confidence_escalate:{verdict.confidence:.2f}"
+        )
+        logger.info(
+            "Arbitration escalated: dispute=%s rec=%s conf=%.2f → panel=%s method=%s",
+            req.dispute_id[:16],
+            verdict.recommendation,
+            verdict.confidence,
+            election.elected_arbiter.arbiter_id,
+            election.method,
+        )
+    except HTTPException as he:
+        # 409 = already elected earlier for this dispute; look it up.
+        if he.status_code == status.HTTP_409_CONFLICT:
+            from server.vrf_election import _election_results
+
+            prior = _election_results.get(req.dispute_id)
+            if prior:
+                verdict.escalated_to_panel = True
+                verdict.panel_election = prior
+                verdict.escalation_reason = "prior_election_reused"
+                return
+        logger.warning("VRF panel escalation returned %s: %s", he.status_code, he.detail)
+        verdict.escalation_reason = f"panel_election_failed_http_{he.status_code}"
+    except Exception as exc:
+        logger.warning("VRF panel escalation raised: %s", exc)
+        verdict.escalation_reason = f"panel_election_failed:{type(exc).__name__}"
 
 
 @app.post("/arbitration/analyze", response_model=ArbitrationRecommendation, tags=["arbitration"])
 async def arbitrate_dispute(req: ArbitrateRequest):
     """Run LLM arbitration on dispute evidence.
 
-    Tries Groq → NVIDIA NIM → heuristic fallback.
-    Returns recommendation: favor_sender | favor_receiver | split | escalate.
+    Tries Groq → NVIDIA NIM → OpenRouter → heuristic fallback. Returns
+    recommendation: favor_sender | favor_receiver | split | escalate |
+    abstain.
+
+    AE-A1.4 auto-escalation (flat fields on the response):
+      * verdict.recommendation == 'abstain'  → always route to VRF panel
+      * verdict.recommendation == 'escalate' AND confidence <
+        _ESCALATION_CONFIDENCE_MAX → route to VRF panel
+      * escalation needs sender_account + receiver_account in the
+        request (they must be excluded from the panel); when missing,
+        the verdict is returned with escalated_to_panel=false and
+        escalation_reason set so the caller knows what to add.
     """
     if req.escrow_amount < 0:
         raise HTTPException(status_code=400, detail="escrow_amount must be non-negative")
     try:
-        result = await _arbitration_agent.analyze_dispute(
+        verdict = await _arbitration_agent.analyze_dispute(
             dispute_id=req.dispute_id,
             sender_evidence=req.sender_evidence,
             receiver_evidence=req.receiver_evidence,
@@ -1319,11 +1436,17 @@ async def arbitrate_dispute(req: ArbitrateRequest):
         logger.info(
             "Arbitration complete: dispute=%s provider=%s rec=%s conf=%.2f",
             req.dispute_id[:16],
-            result.provider,
-            result.recommendation,
-            result.confidence,
+            verdict.provider,
+            verdict.recommendation,
+            verdict.confidence,
         )
-        return result
+
+        if _should_escalate(verdict):
+            await _try_escalate_to_panel(verdict, req)
+
+        return verdict
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Arbitration error: %s", exc)
         raise HTTPException(status_code=500, detail=f"Arbitration failed: {exc}")

@@ -55,6 +55,13 @@ class ArbitrationRecommendation(BaseModel):
     suggested_split_pct: float = Field(..., ge=0.0, le=100.0)
     analysis_hash: str
     provider: str = "heuristic"  # which provider answered
+    # AE-A1.4: auto-escalation to VRF arbiter panel. Non-default only
+    # when the LLM verdict was 'abstain' or a low-confidence 'escalate'
+    # and the panel election ran. Preserved as flat fields so existing
+    # clients that read `recommendation`/`confidence` keep working.
+    escalated_to_panel: bool = False
+    panel_election: dict[str, Any] | None = None
+    escalation_reason: str | None = None
 
 
 # ---------------------------------------------------------------------------
