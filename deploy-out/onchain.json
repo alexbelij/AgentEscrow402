@@ -23,8 +23,9 @@
       "contract_hash": "hash-ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4",
       "contract_package_hash": "hash-78258f66b1ae08120f9c10186ce88772d92d2f84561ca8aa68cb8ffcc6d67f97",
       "deploy_hash": "4ea886beee6c1d302a4282c11390856da8ae89e6a05775e57bb6c5e7dae0b16f",
+      "deploy_hash_note": "deploy_hash is the ORIGINAL 2026-07-06 install of this package. The contract_hash above is the current live version after the 2026-07-19 hardened redeploy (claim-tombstone fix). scripts/audit_contract_artifact.py verifies the fix against the contract_hash's live named-keys, not the deploy_hash bytes.",
       "version": 1,
-      "notes": "Hardened redeploy — the old e36b958d… had a fully public claim/withdraw and was superseded.",
+      "notes": "Hardened redeploy — the old e36b958d… had a fully public claim/withdraw and was superseded. Anti-replay tombstone (claimed_escrow_ids) added 2026-07-19.",
       "explorer": "https://testnet.cspr.live/contract/ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4"
     },
     "vrf_arbiter": {
