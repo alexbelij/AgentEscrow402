@@ -109,7 +109,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/insurance': {
     title: 'Insurance Pool',
-    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. The insurance-pool contract is deployed on testnet (e128780f…); on the hosted console, pool accounting is managed server-side.',
+    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. The insurance-pool contract is deployed on testnet (ead90738…); on the hosted console, pool accounting is managed server-side.',
     source: 'demo',
   },
   '/console/risk': {

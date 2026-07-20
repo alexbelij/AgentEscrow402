@@ -104,10 +104,15 @@ class Config:
             ),
             insurance_contract_hash=os.getenv(
                 "INSURANCE_CONTRACT_HASH",
-                # e128780f... is the redeployed insurance-pool contract with
-                # the A1 arbiter-quorum fix on claim()/withdraw() (the old
-                # e36b958d... contract had a fully public claim()/withdraw()
-                # -- see contracts/insurance-pool/src/main.rs commit history).
+                # ead90738... is the redeployed insurance-pool contract
+                # (2026-07-18, deploy 74ce85ac...096) with:
+                #   * A1: arbiter-quorum fix on claim()/withdraw() (the previous
+                #     e36b958d... contract, now superseded, had a fully public
+                #     claim()/withdraw()).
+                #   * Insurance-replay guard: global claimed_escrow_ids dict,
+                #     tombstone-before-payout, atomic revert (commit ab17a1b).
+                # Old e128780f... (superseded by this deploy) still lingers in
+                # Render prod env vars -- see docs/DEPLOYMENT_LESSONS.md open items.
                 "ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4",
             ),
             insurance_package_hash=os.getenv(

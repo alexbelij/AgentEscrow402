@@ -1,3 +1,18 @@
+# Pinned to nightly-2025-01-01 for Casper testnet WASM compatibility.
+#
+# Background (discovered 2026-07-18 during insurance-pool redeploy):
+#   - nightly-2025-03-01 emits WASM with bulk-memory operations that Casper
+#     testnet preprocessing rejects: "Bulk memory operations are not supported".
+#   - nightly-2025-02-01 was NOT verified against live testnet; it may or may
+#     not still emit incompatible bulk-memory ops depending on wasm-opt path.
+#   - nightly-2025-01-01 is confirmed deploy-compatible by the successful
+#     insurance-pool redeploy at ead9073...95fff4 (deploy 74ce85ac...096).
+#
+# Before bumping this pin: run a full end-to-end deploy against casper-test
+# through a *disposable* wallet, confirm preprocessing accepts the wasm.
+# Never bump based on cargo/rustc release notes alone.
+#
+# See docs/DEPLOYMENT_LESSONS.md for the full context.
 [toolchain]
-channel = "nightly-2025-02-01"
+channel = "nightly-2025-01-01"
 targets = ["wasm32-unknown-unknown"]
