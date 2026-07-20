@@ -1,44 +1,67 @@
-import httpx
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
+import httpx
+
 from .models import (
-    EscrowCreate, EscrowResponse, StreamConfig, InsuranceQuote, AgentIdentity,
-    EscrowStatus, TokenType, EscrowActionRequest, InsuranceDepositRequest,
-    ArbitrationSubmitRequest, StreamStatusResponse
+    AgentIdentity,
+    ArbitrationSubmitRequest,
+    EscrowActionRequest,
+    EscrowCreate,
+    EscrowResponse,
+    EscrowStatus,
+    InsuranceDepositRequest,
+    InsuranceQuote,
+    StreamConfig,
+    StreamStatusResponse,
+    TokenType,
 )
+
 
 class AgentEscrowError(Exception):
     """Base exception for AgentEscrow402 SDK errors."""
+
     def __init__(self, message: str, status_code: Optional[int] = None, details: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.status_code = status_code
         self.details = details
 
+
 class APIError(AgentEscrowError):
     """Raised for general API errors (e.g., 5xx)."""
+
     pass
+
 
 class BadRequestError(AgentEscrowError):
     """Raised for 400 Bad Request errors."""
+
     pass
+
 
 class UnauthorizedError(AgentEscrowError):
     """Raised for 401 Unauthorized errors."""
+
     pass
+
 
 class ForbiddenError(AgentEscrowError):
     """Raised for 403 Forbidden errors."""
+
     pass
+
 
 class NotFoundError(AgentEscrowError):
     """Raised for 404 Not Found errors."""
+
     pass
+
 
 class ConflictError(AgentEscrowError):
     """Raised for 409 Conflict errors."""
+
     pass
+
 
 class AgentEscrow402Client:
     """
@@ -68,7 +91,7 @@ class AgentEscrow402Client:
         path: str,
         json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
-        response_model: Optional[Any] = None
+        response_model: Optional[Any] = None,
     ) -> Any:
         """
         Internal helper for making API requests and handling responses.
@@ -126,7 +149,9 @@ class AgentEscrow402Client:
         Returns:
             EscrowResponse: The created escrow's details.
         """
-        return await self._request("POST", "/escrow", json=escrow_data.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST", "/escrow", json=escrow_data.model_dump(mode="json"), response_model=EscrowResponse
+        )
 
     async def fund_escrow(self, escrow_id: UUID, amount: float, token_type: TokenType) -> EscrowResponse:
         """
@@ -141,7 +166,12 @@ class AgentEscrow402Client:
             EscrowResponse: The updated escrow details.
         """
         action_data = EscrowActionRequest(action="fund", amount=amount, token_type=token_type)
-        return await self._request("POST", f"/escrow/{escrow_id}/action", json=action_data.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST",
+            f"/escrow/{escrow_id}/action",
+            json=action_data.model_dump(mode="json"),
+            response_model=EscrowResponse,
+        )
 
     async def release(self, escrow_id: UUID, amount: Optional[float] = None) -> EscrowResponse:
         """
@@ -155,7 +185,12 @@ class AgentEscrow402Client:
             EscrowResponse: The updated escrow details.
         """
         action_data = EscrowActionRequest(action="release", amount=amount)
-        return await self._request("POST", f"/escrow/{escrow_id}/action", json=action_data.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST",
+            f"/escrow/{escrow_id}/action",
+            json=action_data.model_dump(mode="json"),
+            response_model=EscrowResponse,
+        )
 
     async def dispute(self, escrow_id: UUID, reason: str) -> EscrowResponse:
         """
@@ -169,7 +204,12 @@ class AgentEscrow402Client:
             EscrowResponse: The updated escrow details, now in DISPUTED status.
         """
         action_data = EscrowActionRequest(action="dispute", reason=reason)
-        return await self._request("POST", f"/escrow/{escrow_id}/action", json=action_data.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST",
+            f"/escrow/{escrow_id}/action",
+            json=action_data.model_dump(mode="json"),
+            response_model=EscrowResponse,
+        )
 
     async def refund(self, escrow_id: UUID, amount: Optional[float] = None) -> EscrowResponse:
         """
@@ -183,7 +223,12 @@ class AgentEscrow402Client:
             EscrowResponse: The updated escrow details.
         """
         action_data = EscrowActionRequest(action="refund", amount=amount)
-        return await self._request("POST", f"/escrow/{escrow_id}/action", json=action_data.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST",
+            f"/escrow/{escrow_id}/action",
+            json=action_data.model_dump(mode="json"),
+            response_model=EscrowResponse,
+        )
 
     async def get_escrow(self, escrow_id: UUID) -> EscrowResponse:
         """
@@ -203,7 +248,7 @@ class AgentEscrow402Client:
         agent_id: Optional[str] = None,
         status: Optional[EscrowStatus] = None,
         limit: int = 100,
-        offset: int = 0
+        offset: int = 0,
     ) -> List[EscrowResponse]:
         """
         Lists escrows based on provided filters.
@@ -238,7 +283,12 @@ class AgentEscrow402Client:
         Returns:
             EscrowResponse: The updated escrow details with streaming configuration.
         """
-        return await self._request("POST", f"/escrow/{escrow_id}/stream", json=stream_config.model_dump(mode='json'), response_model=EscrowResponse)
+        return await self._request(
+            "POST",
+            f"/escrow/{escrow_id}/stream",
+            json=stream_config.model_dump(mode="json"),
+            response_model=EscrowResponse,
+        )
 
     async def get_stream_status(self, escrow_id: UUID) -> StreamStatusResponse:
         """
@@ -274,9 +324,11 @@ class AgentEscrow402Client:
         Returns:
             Dict[str, Any]: Confirmation of the deposit.
         """
-        return await self._request("POST", "/insurance/deposit", json=deposit_request.model_dump(mode='json'))
+        return await self._request("POST", "/insurance/deposit", json=deposit_request.model_dump(mode="json"))
 
-    async def submit_arbitration(self, escrow_id: UUID, arbitration_request: ArbitrationSubmitRequest) -> Dict[str, Any]:
+    async def submit_arbitration(
+        self, escrow_id: UUID, arbitration_request: ArbitrationSubmitRequest
+    ) -> Dict[str, Any]:
         """
         Submits an arbitration claim for a disputed escrow.
 
@@ -287,7 +339,9 @@ class AgentEscrow402Client:
         Returns:
             Dict[str, Any]: Confirmation of the arbitration submission.
         """
-        return await self._request("POST", f"/arbitration/{escrow_id}/submit", json=arbitration_request.model_dump(mode='json'))
+        return await self._request(
+            "POST", f"/arbitration/{escrow_id}/submit", json=arbitration_request.model_dump(mode="json")
+        )
 
     async def get_agent_identity(self, agent_id: str) -> AgentIdentity:
         """

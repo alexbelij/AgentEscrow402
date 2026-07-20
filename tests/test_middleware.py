@@ -290,8 +290,12 @@ class TestRequirePaymentDecorator:
 
     def _sign(self, key: Ed25519PrivateKey, escrow_hash, amount, sender, ts, nonce, method, path):
         unsigned = PaymentHeader(
-            escrow_hash=escrow_hash, amount=amount, sender=sender,
-            signature="0" * 128, timestamp=ts, nonce=nonce,
+            escrow_hash=escrow_hash,
+            amount=amount,
+            sender=sender,
+            signature="0" * 128,
+            timestamp=ts,
+            nonce=nonce,
         )
         msg = _build_signing_payload(unsigned, method=method, path=path)
         return key.sign(msg).hex()
@@ -305,6 +309,7 @@ class TestRequirePaymentDecorator:
         resp = await handler(self._request({}))
         assert resp.status_code == 402
         import json
+
         assert json.loads(resp.body)["error"] == "payment_required"
 
     @pytest.mark.asyncio
@@ -382,6 +387,7 @@ class TestRequirePaymentDecorator:
     async def test_signature_bound_to_path_rejects_reuse_on_other_route(self):
         """A signature valid for POST /protected must not verify against a
         different path -- proves method+path binding actually matters."""
+
         @require_payment()
         async def handler(request: Request):
             return {"ok": True}
@@ -400,6 +406,7 @@ class TestRequirePaymentDecorator:
         """Sandbox mode (verify_sig=False) accepts a well-formed but
         cryptographically bogus signature as long as replay checks pass --
         exactly the documented sandbox behavior, now actually exercised."""
+
         @require_payment(verify_sig=False)
         async def handler(request: Request):
             return {"ok": True}

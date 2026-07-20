@@ -48,21 +48,23 @@ from typing import Any
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
-    Ed25519PublicKey,
 )
 
 X402_VERSION = "x402-v1"
 
 
 def _canonical_payload(
-    version: str, escrow_hash: str, amount: int, sender: str, timestamp: int,
-    nonce: str, method: str, path: str,
+    version: str,
+    escrow_hash: str,
+    amount: int,
+    sender: str,
+    timestamp: int,
+    nonce: str,
+    method: str,
+    path: str,
 ) -> bytes:
     """Must match ``server/middleware.py::_build_signing_payload`` exactly."""
-    payload = (
-        f"{version};{escrow_hash};{amount};{sender};{timestamp};{nonce};"
-        f"{method};{path}"
-    )
+    payload = f"{version};{escrow_hash};{amount};{sender};{timestamp};{nonce};{method};{path}"
     return payload.encode("utf-8")
 
 
@@ -123,7 +125,12 @@ class EscrowClient:
         return f"{X402_VERSION};{escrow_hash};{amount};{self._sender};{ts};{nonce};{signature}"
 
     async def _request(
-        self, method: str, path: str, *, escrow_hash: str, amount: int,
+        self,
+        method: str,
+        path: str,
+        *,
+        escrow_hash: str,
+        amount: int,
         json_body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         headers = {}
@@ -133,7 +140,11 @@ class EscrowClient:
         elif self._sandbox:
             params = {"sender": self._sender}
         resp = await self._http.request(
-            method, f"{self._base}{path}", json=json_body, params=params, headers=headers,
+            method,
+            f"{self._base}{path}",
+            json=json_body,
+            params=params,
+            headers=headers,
         )
         resp.raise_for_status()
         return resp.json()
@@ -152,7 +163,10 @@ class EscrowClient:
             nonce = uuid.uuid4().hex
         service_hash = self.compute_hash(self._sender, receiver, amount, nonce)
         return await self._request(
-            "POST", "/escrow", escrow_hash=service_hash, amount=amount,
+            "POST",
+            "/escrow",
+            escrow_hash=service_hash,
+            amount=amount,
             json_body={
                 "receiver": receiver,
                 "amount": amount,
@@ -170,21 +184,30 @@ class EscrowClient:
     async def release(self, service_hash: str, amount: int = 0) -> dict[str, Any]:
         """Release escrowed funds to the receiver."""
         return await self._request(
-            "POST", "/release", escrow_hash=service_hash, amount=amount,
+            "POST",
+            "/release",
+            escrow_hash=service_hash,
+            amount=amount,
             json_body={"service_hash": service_hash},
         )
 
     async def refund(self, service_hash: str, amount: int = 0) -> dict[str, Any]:
         """Request refund of escrowed funds back to sender."""
         return await self._request(
-            "POST", "/refund", escrow_hash=service_hash, amount=amount,
+            "POST",
+            "/refund",
+            escrow_hash=service_hash,
+            amount=amount,
             json_body={"service_hash": service_hash},
         )
 
     async def dispute(self, service_hash: str, reason_hash: str, amount: int = 0) -> dict[str, Any]:
         """Open a dispute on an active escrow."""
         return await self._request(
-            "POST", "/dispute", escrow_hash=service_hash, amount=amount,
+            "POST",
+            "/dispute",
+            escrow_hash=service_hash,
+            amount=amount,
             json_body={"service_hash": service_hash, "reason_hash": reason_hash},
         )
 
@@ -325,7 +348,11 @@ class EscrowClient:
     # -- VRF election -----------------------------------------------------
 
     async def elect_arbiter(
-        self, dispute_id: str, sender: str, receiver: str, seed_hash: str,
+        self,
+        dispute_id: str,
+        sender: str,
+        receiver: str,
+        seed_hash: str,
     ) -> dict[str, Any]:
         """Run VRF-based on-chain arbiter election for a dispute."""
         resp = await self._http.post(

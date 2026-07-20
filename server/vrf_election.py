@@ -15,8 +15,6 @@ On-chain VRF via the deployed vrf-arbiter contract:
 from __future__ import annotations
 
 import hashlib
-import re
-import threading
 import logging
 import time
 from typing import Any
@@ -24,9 +22,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from server.casper_client import CasperClient
 from server.config import Config
 from server.models import ReputationRecord
-from server.casper_client import CasperClient
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/vrf", tags=["vrf"])
@@ -44,6 +42,7 @@ _election_results: dict[str, dict[str, Any]] = {}
 def get_casper() -> CasperClient | None:
     try:
         from server.app import get_casper as _get_casper
+
         return _get_casper()
     except Exception:
         return None
@@ -51,6 +50,7 @@ def get_casper() -> CasperClient | None:
 
 def get_config() -> Config:
     from server.app import get_config as _get_config
+
     return _get_config()
 
 
@@ -60,6 +60,7 @@ def get_db():
 
 
 # ── Pydantic models ────────────────────────────────────────────────────────
+
 
 class ReputationScore(BaseModel):
     agent: str
@@ -112,6 +113,7 @@ class ArbiterListResponse(BaseModel):
 
 # ── On-chain VRF helper ────────────────────────────────────────────────────
 
+
 async def _elect_via_onchain_vrf(
     casper: CasperClient,
     dispute_id: str,
@@ -157,9 +159,7 @@ async def _elect_via_onchain_vrf(
 
         if not selected_csv:
             deploy_hash = await casper.select_arbiters(dispute_id, select_count)
-            selected_csv, revert_reason = await casper.confirm_election(
-                dispute_id, deploy_hash=deploy_hash
-            )
+            selected_csv, revert_reason = await casper.confirm_election(dispute_id, deploy_hash=deploy_hash)
             if revert_reason:
                 logger.warning("On-chain select_arbiters reverted for %s: %s", dispute_id, revert_reason)
                 return None
@@ -192,7 +192,7 @@ def _elect_local_csprng(
     seed_hash: str,
 ) -> ReputationRecord:
     """Cryptographically secure local arbiter election (fallback).
-    
+
     Uses HMAC-SHA256 with seed_hash for deterministic, verifiable selection.
     Reputation-weighted: arbiters with higher scores have proportionally higher
     probability of selection.
@@ -222,6 +222,7 @@ def _elect_local_csprng(
 
 # ── Endpoints ──────────────────────────────────────────────────────────────
 
+
 @router.post("/elect", response_model=ElectArbiterResponse, status_code=status.HTTP_201_CREATED)
 async def elect_arbiter(
     request: ElectArbiterRequest,
@@ -243,9 +244,7 @@ async def elect_arbiter(
 
     # 1. Filter eligible arbiters (not a dispute party)
     excluded = {request.sender, request.receiver}
-    eligible: list[ReputationRecord] = [
-        r for aid, r in _registered_arbiters.items() if aid not in excluded
-    ]
+    eligible: list[ReputationRecord] = [r for aid, r in _registered_arbiters.items() if aid not in excluded]
 
     if not eligible:
         raise HTTPException(
@@ -282,8 +281,7 @@ async def elect_arbiter(
     elected_record = _registered_arbiters.get(elected_id, ReputationRecord(agent=elected_id))
     weights = [max(1, int(r.score)) for r in eligible]
     election_proof = (
-        f"method={method}|seed={request.seed_hash}|"
-        f"candidates={eligible_ids}|weights={weights}|elected={elected_id}"
+        f"method={method}|seed={request.seed_hash}|candidates={eligible_ids}|weights={weights}|elected={elected_id}"
     )
 
     arbiter_details = ArbiterRecord(

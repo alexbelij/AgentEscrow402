@@ -30,9 +30,10 @@ try:
 except ImportError:
     HAS_MCP = False
 
-import httpx
 import re
 import urllib.parse
+
+import httpx
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -274,7 +275,6 @@ TOOLS = [
         description="Check API and blockchain connection health status.",
         inputSchema={"type": "object", "properties": {}},
     ),
-
     # ------------------------------------------------------------------
     # AI Arbitration tools (3)
     # ------------------------------------------------------------------
@@ -323,7 +323,6 @@ TOOLS = [
             "required": ["arbitration_id", "appellant"],
         },
     ),
-
     # ------------------------------------------------------------------
     # Risk Scoring tools (3)
     # ------------------------------------------------------------------
@@ -346,7 +345,6 @@ TOOLS = [
         description="Get aggregated risk scores for all known agents.",
         inputSchema={"type": "object", "properties": {}},
     ),
-
     # ------------------------------------------------------------------
     # Identity Registry tools (3)
     # ------------------------------------------------------------------
@@ -378,7 +376,6 @@ TOOLS = [
             "required": ["agent_id"],
         },
     ),
-
     # ------------------------------------------------------------------
     # VRF Arbiter Election (1)
     # ------------------------------------------------------------------
@@ -396,7 +393,6 @@ TOOLS = [
             "required": ["dispute_id", "sender", "receiver", "seed_hash"],
         },
     ),
-
     # ------------------------------------------------------------------
     # Batch Escrow (2)
     # ------------------------------------------------------------------
@@ -432,7 +428,6 @@ TOOLS = [
             "required": ["sender", "service_hashes"],
         },
     ),
-
     # ------------------------------------------------------------------
     # Streaming Escrow (1)
     # ------------------------------------------------------------------
@@ -475,15 +470,26 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
             )
 
         elif name == "release_escrow":
-            result = await _post(f"{base}/release", {"service_hash": _validate_hash(args["service_hash"], "service_hash")}, params={"sender": _validate_id(args["sender"], "sender")})
+            result = await _post(
+                f"{base}/release",
+                {"service_hash": _validate_hash(args["service_hash"], "service_hash")},
+                params={"sender": _validate_id(args["sender"], "sender")},
+            )
 
         elif name == "refund_escrow":
-            result = await _post(f"{base}/refund", {"service_hash": _validate_hash(args["service_hash"], "service_hash")}, params={"sender": _validate_id(args["sender"], "sender")})
+            result = await _post(
+                f"{base}/refund",
+                {"service_hash": _validate_hash(args["service_hash"], "service_hash")},
+                params={"sender": _validate_id(args["sender"], "sender")},
+            )
 
         elif name == "dispute_escrow":
             result = await _post(
                 f"{base}/dispute",
-                {"service_hash": _validate_hash(args["service_hash"], "service_hash"), "reason_hash": _validate_hash(args["reason_hash"], "reason_hash")},
+                {
+                    "service_hash": _validate_hash(args["service_hash"], "service_hash"),
+                    "reason_hash": _validate_hash(args["reason_hash"], "reason_hash"),
+                },
                 params={"sender": _validate_id(args["sender"], "sender")},
             )
 
@@ -517,7 +523,9 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
             result = await _get(f"{base}/estimate", params={"amount": str(amount)})
 
         elif name == "get_escrow_history":
-            result = await _get(f"{base}/escrow/{_safe_path(_validate_hash(args['service_hash'], 'service_hash'))}/history")
+            result = await _get(
+                f"{base}/escrow/{_safe_path(_validate_hash(args['service_hash'], 'service_hash'))}/history"
+            )
 
         elif name == "list_agents":
             result = await _get(f"{base}/agents")
@@ -527,28 +535,43 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
             result = await _get(f"{base}/escrows", params={"limit": str(limit)})
 
         elif name == "compute_hash":
-            result = await _post(f"{base}/compute-hash", {"sender": _validate_id(args["sender"], "sender"), "receiver": _validate_id(args["receiver"], "receiver"), "amount": _validate_amount(args["amount"])})
+            result = await _post(
+                f"{base}/compute-hash",
+                {
+                    "sender": _validate_id(args["sender"], "sender"),
+                    "receiver": _validate_id(args["receiver"], "receiver"),
+                    "amount": _validate_amount(args["amount"]),
+                },
+            )
 
         elif name == "health_check":
             result = await _get(f"{base}/health")
 
         # --- AI Arbitration ---
         elif name == "submit_dispute_arbitration":
-            result = await _post(f"{base}/arbitration/analyze", {
-                "service_hash": _validate_hash(args["service_hash"], "service_hash"),
-                "evidence_sender": str(args["evidence_sender"])[:10000],
-                "evidence_receiver": str(args["evidence_receiver"])[:10000],
-                "category": args.get("category", "non_delivery"),
-            })
+            result = await _post(
+                f"{base}/arbitration/analyze",
+                {
+                    "service_hash": _validate_hash(args["service_hash"], "service_hash"),
+                    "evidence_sender": str(args["evidence_sender"])[:10000],
+                    "evidence_receiver": str(args["evidence_receiver"])[:10000],
+                    "category": args.get("category", "non_delivery"),
+                },
+            )
 
         elif name == "get_arbitration_result":
-            result = await _get(f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}")
+            result = await _get(
+                f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}"
+            )
 
         elif name == "appeal_arbitration":
-            result = await _post(f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}/appeal", {
-                "appellant": _validate_id(args["appellant"], "appellant"),
-                "new_evidence": str(args.get("new_evidence", ""))[:10000],
-            })
+            result = await _post(
+                f"{base}/arbitration/{_safe_path(_validate_id(args['arbitration_id'], 'arbitration_id'))}/appeal",
+                {
+                    "appellant": _validate_id(args["appellant"], "appellant"),
+                    "new_evidence": str(args.get("new_evidence", ""))[:10000],
+                },
+            )
 
         # --- Risk Scoring ---
         elif name == "calculate_risk_score":
@@ -560,23 +583,29 @@ async def handle_tool(name: str, args: dict[str, Any], api_url: str) -> str:
 
         # --- Identity Registry ---
         elif name == "register_identity":
-            result = await _post(f"{base}/identity/register", {
-                "agent_id": _validate_id(args["agent_id"], "agent_id"),
-                "public_key": str(args["public_key"])[:256],
-                "capabilities": args.get("capabilities", []),
-            })
+            result = await _post(
+                f"{base}/identity/register",
+                {
+                    "agent_id": _validate_id(args["agent_id"], "agent_id"),
+                    "public_key": str(args["public_key"])[:256],
+                    "capabilities": args.get("capabilities", []),
+                },
+            )
 
         elif name == "get_identity":
             result = await _get(f"{base}/identity/{_safe_path(_validate_id(args['agent_id'], 'agent_id'))}")
 
         # --- VRF Election ---
         elif name == "elect_arbiter":
-            result = await _post(f"{base}/vrf/elect", {
-                "dispute_id": _validate_id(args["dispute_id"], "dispute_id"),
-                "sender": _validate_id(args["sender"], "sender"),
-                "receiver": _validate_id(args["receiver"], "receiver"),
-                "seed_hash": _validate_hash(args["seed_hash"], "seed_hash"),
-            })
+            result = await _post(
+                f"{base}/vrf/elect",
+                {
+                    "dispute_id": _validate_id(args["dispute_id"], "dispute_id"),
+                    "sender": _validate_id(args["sender"], "sender"),
+                    "receiver": _validate_id(args["receiver"], "receiver"),
+                    "seed_hash": _validate_hash(args["seed_hash"], "seed_hash"),
+                },
+            )
 
         # --- Batch Lifecycle ---
         elif name == "batch_release":

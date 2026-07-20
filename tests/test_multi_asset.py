@@ -27,6 +27,7 @@ hosted-console demo-identity bypass the frontend console uses
 (`lib/api.ts`'s `buildDemoPaymentHeaders`), via `SandboxStore` as the shared
 escrow store (same one the main /escrow lifecycle endpoints use).
 """
+
 from __future__ import annotations
 
 import hashlib

@@ -70,12 +70,22 @@ class TestSigningPrimitives:
         from server.models import PaymentHeader
 
         ph = PaymentHeader(
-            escrow_hash="ab" * 32, amount=100, sender="cd" * 32,
-            signature="ef" * 64, timestamp=1234, nonce="noncenonce",
+            escrow_hash="ab" * 32,
+            amount=100,
+            sender="cd" * 32,
+            signature="ef" * 64,
+            timestamp=1234,
+            nonce="noncenonce",
         )
         client_side = _canonical_payload(
-            "x402-v1", ph.escrow_hash, ph.amount, ph.sender, ph.timestamp, ph.nonce,
-            "POST", "/escrow",
+            "x402-v1",
+            ph.escrow_hash,
+            ph.amount,
+            ph.sender,
+            ph.timestamp,
+            ph.nonce,
+            "POST",
+            "/escrow",
         )
         server_side = _build_signing_payload(ph, method="POST", path="/escrow")
         assert client_side == server_side
@@ -123,8 +133,10 @@ class TestSignedRequestsAgainstRealServerAuth:
             resp = tc.post(
                 "/escrow",
                 json={
-                    "receiver": RECEIVER_HEX, "amount": 1000,
-                    "service_hash": "44" * 32, "ttl": 300,
+                    "receiver": RECEIVER_HEX,
+                    "amount": 1000,
+                    "service_hash": "44" * 32,
+                    "ttl": 300,
                 },
                 params={"sender": "not-a-signature-plain-string"},
             )
@@ -139,7 +151,8 @@ class TestSignedRequestsAgainstRealServerAuth:
         # still exercising the exact same signing + server-verification code
         # a request against a real deployment would use.
         client._http = httpx.AsyncClient(
-            transport=httpx.ASGITransport(app=app), base_url="http://testserver",
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://testserver",
         )
         try:
             escrow = await client.create_escrow(receiver=RECEIVER_HEX, amount=2500)

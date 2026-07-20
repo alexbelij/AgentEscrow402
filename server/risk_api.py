@@ -7,7 +7,6 @@ Trains on-the-fly from testnet transaction history.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import math
 import random
@@ -16,13 +15,11 @@ import secrets
 import time as _time
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from server.risk_scoring import (
-    IsolationForest,
     RiskEngine,
-    RiskScore,
     TransactionFeatures,
 )
 
@@ -38,6 +35,7 @@ _TRAIN_TTL = 300  # retrain every 5 minutes
 def get_casper():
     try:
         from server.app import get_casper as _gc
+
         return _gc()
     except Exception:
         return None
@@ -47,6 +45,7 @@ def _load_escrow_records() -> list[dict[str, Any]]:
     """Load escrow records from Neon or the running in-memory demo store."""
     try:
         from server import db as pgdb
+
         records = pgdb.load_escrows()
         if records:
             return records
@@ -54,6 +53,7 @@ def _load_escrow_records() -> list[dict[str, Any]]:
         logger.debug("Neon escrow load failed for risk API: %s", exc)
     try:
         from server.app import get_sandbox
+
         store = get_sandbox()
         return list(store._escrows.values())
     except Exception as exc:
@@ -79,18 +79,20 @@ async def _get_or_train_engine(casper, db=None) -> RiskEngine:
             status = str(e.get("status", "pending"))
             disputed = 1 if status in ("disputed", "resolved") else 0
 
-            training_samples.append(TransactionFeatures(
-                amount=amount,
-                frequency=1.0,
-                counterparty_count=1,
-                avg_ttl=float(ttl),
-                dispute_rate=float(disputed),
-                time_since_first=max(0, int(now) - created_at),
-                total_volume=amount,
-                max_single=amount,
-                stddev_amount=0.0,
-                hour_of_day=_time.gmtime(created_at).tm_hour,
-            ))
+            training_samples.append(
+                TransactionFeatures(
+                    amount=amount,
+                    frequency=1.0,
+                    counterparty_count=1,
+                    avg_ttl=float(ttl),
+                    dispute_rate=float(disputed),
+                    time_since_first=max(0, int(now) - created_at),
+                    total_volume=amount,
+                    max_single=amount,
+                    stddev_amount=0.0,
+                    hour_of_day=_time.gmtime(created_at).tm_hour,
+                )
+            )
         except Exception as exc:
             logger.debug("Skipping malformed escrow record: %s", exc)
 
@@ -99,18 +101,20 @@ async def _get_or_train_engine(casper, db=None) -> RiskEngine:
         rng = random.Random(secrets.randbits(64))  # non-deterministic synthetic seed
         for i in range(50):
             amount = int(rng.gauss(500_000_000_000, 200_000_000_000))  # ~500 CSPR
-            training_samples.append(TransactionFeatures(
-                amount=max(1_000_000_000, amount),
-                frequency=rng.uniform(0.1, 5.0),
-                counterparty_count=rng.randint(1, 10),
-                avg_ttl=rng.uniform(3600, 604800),
-                dispute_rate=rng.uniform(0.0, 0.1),
-                time_since_first=rng.randint(0, 30 * 86400),
-                total_volume=max(1_000_000_000, amount),
-                max_single=max(1_000_000_000, amount),
-                stddev_amount=rng.uniform(0, amount * 0.3),
-                hour_of_day=rng.randint(0, 23),
-            ))
+            training_samples.append(
+                TransactionFeatures(
+                    amount=max(1_000_000_000, amount),
+                    frequency=rng.uniform(0.1, 5.0),
+                    counterparty_count=rng.randint(1, 10),
+                    avg_ttl=rng.uniform(3600, 604800),
+                    dispute_rate=rng.uniform(0.0, 0.1),
+                    time_since_first=rng.randint(0, 30 * 86400),
+                    total_volume=max(1_000_000_000, amount),
+                    max_single=max(1_000_000_000, amount),
+                    stddev_amount=rng.uniform(0, amount * 0.3),
+                    hour_of_day=rng.randint(0, 23),
+                )
+            )
 
     engine = RiskEngine(threshold=0.65)
     engine.model.fit(training_samples)
@@ -121,6 +125,7 @@ async def _get_or_train_engine(casper, db=None) -> RiskEngine:
 
 
 # ── Response models ────────────────────────────────────────────────────────
+
 
 class AgentRiskResponse(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
@@ -270,17 +275,19 @@ async def get_risk_dashboard() -> RiskDashboard:
             hour_of_day=_time.gmtime().tm_hour,
         )
         rs = await engine.assess(ag, features)
-        scored.append(AgentRiskResponse(
-            agent=ag,
-            risk_score=rs.score,
-            anomaly_flag=rs.anomaly_flag,
-            explanation=rs.explanation,
-            model_version=rs.model_version,
-            scored_at=rs.scored_at,
-            escrow_count=cnt,
-            total_volume_motes=total,
-            dispute_rate=disputes / max(1, cnt),
-        ))
+        scored.append(
+            AgentRiskResponse(
+                agent=ag,
+                risk_score=rs.score,
+                anomaly_flag=rs.anomaly_flag,
+                explanation=rs.explanation,
+                model_version=rs.model_version,
+                scored_at=rs.scored_at,
+                escrow_count=cnt,
+                total_volume_motes=total,
+                dispute_rate=disputes / max(1, cnt),
+            )
+        )
 
     scored.sort(key=lambda x: x.risk_score, reverse=True)
     high_risk = sum(1 for s in scored if s.anomaly_flag)

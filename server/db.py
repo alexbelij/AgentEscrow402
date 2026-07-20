@@ -41,8 +41,7 @@ def _get_pool():
 def _ensure_schema(pool) -> None:
     """Create the small Neon schema used by the hosted console if it is missing."""
     with pool.connection() as conn:
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS escrows (
+        conn.execute("""CREATE TABLE IF NOT EXISTS escrows (
                    service_hash TEXT PRIMARY KEY,
                    sender TEXT NOT NULL,
                    receiver TEXT NOT NULL,
@@ -51,25 +50,20 @@ def _ensure_schema(pool) -> None:
                    ttl INTEGER NOT NULL DEFAULT 300,
                    created_at BIGINT NOT NULL,
                    deploy_hash TEXT DEFAULT ''
-               )"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS reputation (
+               )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS reputation (
                    agent TEXT PRIMARY KEY,
                    completed INTEGER NOT NULL DEFAULT 0,
                    disputed INTEGER NOT NULL DEFAULT 0,
                    slashed INTEGER NOT NULL DEFAULT 0,
                    last_active BIGINT NOT NULL DEFAULT 0,
                    score INTEGER NOT NULL DEFAULT 50
-               )"""
-        )
-        conn.execute(
-            """CREATE TABLE IF NOT EXISTS insurance_pool (
+               )""")
+        conn.execute("""CREATE TABLE IF NOT EXISTS insurance_pool (
                    service_hash TEXT PRIMARY KEY,
                    fee_amount BIGINT NOT NULL DEFAULT 0,
                    collected_at BIGINT NOT NULL DEFAULT 0
-               )"""
-        )
+               )""")
 
 
 def is_connected() -> bool:
@@ -141,7 +135,9 @@ def load_escrows() -> list[dict[str, Any]]:
     try:
         with pool.connection() as conn:
             rows = conn.execute(
-                "SELECT service_hash, sender, receiver, amount, status, ttl, created_at, COALESCE(deploy_hash, '') FROM escrows ORDER BY created_at DESC"
+                "SELECT service_hash, sender, receiver, amount, status, ttl, "
+                "created_at, COALESCE(deploy_hash, '') "
+                "FROM escrows ORDER BY created_at DESC"
             ).fetchall()
         result = []
         for r in rows:
@@ -256,18 +252,18 @@ def get_reputation_db(agent: str) -> dict[str, Any] | None:
 
 class InMemoryDB:
     """Simple in-memory store for batch 3 modules that need Depends(get_db)."""
-    
+
     def __init__(self):
         self._data: dict[str, list[dict]] = {}
-    
+
     def get_collection(self, name: str) -> list[dict]:
         if name not in self._data:
             self._data[name] = []
         return self._data[name]
-    
+
     def insert(self, collection: str, item: dict) -> None:
         self.get_collection(collection).append(item)
-    
+
     def find(self, collection: str, **kwargs) -> list[dict]:
         results = self.get_collection(collection)
         for k, v in kwargs.items():

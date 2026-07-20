@@ -9,6 +9,7 @@ exercise the real routes: /insurance/pool-stats, /insurance/premium-quote,
 /insurance/deposit (auth-gated), /insurance/claim (auth-gated), and the
 vrf_election arbiter registration/election/list flow.
 """
+
 from __future__ import annotations
 
 import time
@@ -473,9 +474,7 @@ class TestOnchainVrfWritePath:
             "/vrf/arbiters/register",
             json={"agent": "local-fallback-arbiter", "score": 70, "completed": 3, "disputed": 0},
         )
-        fake = _FakeVrfCasper(
-            selected_csv="cccc333333333333333333333333333333333333333333333333333333333333"
-        )
+        fake = _FakeVrfCasper(selected_csv="cccc333333333333333333333333333333333333333333333333333333333333")
         appmod._casper = fake
         res = client.post(
             "/vrf/elect",

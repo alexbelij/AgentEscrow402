@@ -13,9 +13,9 @@ from pydantic import BaseModel, Field
 from server import arbiter_crypto
 from server.casper_client import CasperClient
 from server.config import Config, get_config
-from server.db import get_db, InMemoryDB, get_reputation_db
-from server.models import EscrowRecord, EscrowStatus, ReputationRecord, PaymentHeader
-from server.middleware import parse_x402_header, _build_signing_payload, _check_replay, _verify_signature
+from server.db import InMemoryDB, get_db, get_reputation_db
+from server.middleware import _build_signing_payload, _check_replay, _verify_signature, parse_x402_header
+from server.models import EscrowStatus
 
 DEMO_CONSOLE_SENDER = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 DEMO_CONSOLE_SIGNATURE = "a" * 128
@@ -38,13 +38,13 @@ def _extract_payment_from_request(http_request: Request):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid x402 signature")
     return x402
 
+
 def get_casper() -> CasperClient | None:
     # This function is a placeholder, in a real app.py it would be defined globally
     # or imported from app.py. For this file generation, we assume it exists.
     from server.app import get_casper as _get_casper
+
     return _get_casper()
-
-
 
 
 logger = logging.getLogger(__name__)
@@ -78,14 +78,22 @@ class InsuranceClaimRequest(BaseModel):
     # real `claim()` call to the insurance-pool contract (which pays out to
     # `runtime::get_caller()` directly on-chain) -- the backend only confirms
     # the resulting on-chain state instead of ever holding the payout key.
-    wallet_tx_hash: str | None = Field(default=None, description="Transaction hash of a wallet-submitted on-chain claim() call")
+    wallet_tx_hash: str | None = Field(
+        default=None, description="Transaction hash of a wallet-submitted on-chain claim() call"
+    )
     sender_public_key_hex: str | None = Field(
         default=None,
-        description="Connected wallet's public key hex, matched against the escrow's recorded sender/receiver (required when wallet_tx_hash is set)",
+        description=(
+            "Connected wallet's public key hex, matched against the escrow's recorded "
+            "sender/receiver (required when wallet_tx_hash is set)"
+        ),
     )
     claimant_account_hash: str | None = Field(
         default=None,
-        description="account-hash-{hex} of the connected wallet, used to poll the on-chain claims dict (required when wallet_tx_hash is set)",
+        description=(
+            "account-hash-{hex} of the connected wallet, used to poll the on-chain "
+            "claims dict (required when wallet_tx_hash is set)"
+        ),
     )
     # Backend-submitted path (no connected wallet / no wallet_tx_hash): the
     # caller must have already collected a quorum of real arbiter votes over
@@ -163,14 +171,24 @@ async def deposit_to_insurance_pool(
         async with _pool_lock:
             _insurance_pool["total_assets"] += request.amount
             _insurance_pool["total_premiums_collected"] += request.amount
-        logger.info("Deposit of %s motes by %s recorded (demo/no-chain mode). Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
-        return {"message": "Deposit successful (demo mode, no live Casper client configured)", "deploy_hash": deploy_hash}
+        logger.info(
+            "Deposit of %s motes by %s recorded (demo/no-chain mode). Deploy hash: %s",
+            request.amount,
+            depositor[:8],
+            deploy_hash[:16],
+        )
+        return {
+            "message": "Deposit successful (demo mode, no live Casper client configured)",
+            "deploy_hash": deploy_hash,
+        }
 
     try:
         deploy_hash = await casper.deposit_to_insurance_pool(request.amount)
     except Exception as e:
         logger.error("Failed to submit insurance deposit deploy for %s: %s", depositor[:8], e)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit deposit transaction on-chain")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit deposit transaction on-chain"
+        )
 
     # Poll for a revert before declaring success -- the session-wasm's own
     # cross-contract call can fail (e.g. contract paused) even though the
@@ -186,13 +204,17 @@ async def deposit_to_insurance_pool(
             break
     if revert_reason:
         logger.error("Insurance deposit deploy %s reverted: %s", deploy_hash[:16], revert_reason)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Deposit transaction reverted on-chain: {revert_reason}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Deposit transaction reverted on-chain: {revert_reason}"
+        )
 
     async with _pool_lock:
         _insurance_pool["total_assets"] += request.amount
         _insurance_pool["total_premiums_collected"] += request.amount
 
-    logger.info("Deposit of %s motes by %s successful. Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16])
+    logger.info(
+        "Deposit of %s motes by %s successful. Deploy hash: %s", request.amount, depositor[:8], deploy_hash[:16]
+    )
     return {"message": "Deposit successful", "deploy_hash": deploy_hash}
 
 
@@ -235,6 +257,7 @@ async def file_insurance_claim(
     if escrow is None:
         try:
             from server.app import get_sandbox
+
             escrow = get_sandbox().get_escrow(request.escrow_hash)
         except Exception:
             escrow = None
@@ -254,7 +277,9 @@ async def file_insurance_claim(
     # 1. Escrow must be in a disputable or failed state
     eligible_statuses = {EscrowStatus.DISPUTED, EscrowStatus.EXPIRED, "disputed", "expired"}
     if escrow_status not in eligible_statuses:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Escrow status '{escrow_status}' is not eligible for claim")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Escrow status '{escrow_status}' is not eligible for claim"
+        )
 
     # 2. Check claimant's reputation (simplified)
     reputation = None
@@ -263,10 +288,15 @@ async def file_insurance_claim(
     else:
         try:
             from server.app import get_sandbox
+
             reputation = get_sandbox().get_reputation(claimant)
         except Exception:
             reputation = None
-    slashed = (reputation.get("slashed", 0) if isinstance(reputation, dict) else getattr(reputation, "slashed", 0)) if reputation else 0
+    slashed = (
+        (reputation.get("slashed", 0) if isinstance(reputation, dict) else getattr(reputation, "slashed", 0))
+        if reputation
+        else 0
+    )
     if slashed > 2:  # Example: too many previous slashes
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Claimant has a poor reputation history")
 
@@ -286,7 +316,9 @@ async def file_insurance_claim(
             "deploy_hash": None,
         }
 
-    logger.info("Agent %s filing claim for escrow %s. Reason: %s", claimant[:8], request.escrow_hash[:16], request.reason[:50])
+    logger.info(
+        "Agent %s filing claim for escrow %s. Reason: %s", claimant[:8], request.escrow_hash[:16], request.reason[:50]
+    )
 
     if request.wallet_tx_hash:
         # Live-wallet path: the wallet already submitted a real `claim()`
@@ -338,7 +370,9 @@ async def file_insurance_claim(
         if len(request.arbiter_pubkeys) != len(request.arbiter_signatures):
             async with _pool_lock:
                 _claims.pop(request.escrow_hash, None)
-            raise HTTPException(status_code=422, detail="arbiter_pubkeys and arbiter_signatures must have the same length")
+            raise HTTPException(
+                status_code=422, detail="arbiter_pubkeys and arbiter_signatures must have the same length"
+            )
         if config.arbiter_pubkeys:
             valid_votes = arbiter_crypto.count_valid_insurance_claim_votes(
                 request.arbiter_pubkeys,
@@ -367,7 +401,9 @@ async def file_insurance_claim(
             logger.error("Failed to submit insurance claim deploy for %s: %s", claimant[:8], e)
             async with _pool_lock:
                 _claims.pop(request.escrow_hash, None)
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit claim transaction on-chain")
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail="Failed to submit claim transaction on-chain"
+            )
 
         confirmed, revert_reason = await casper.confirm_wallet_insurance_claim(
             config.casper_operator_account_hash, request.escrow_hash, deploy_hash=deploy_hash
@@ -419,9 +455,13 @@ async def file_insurance_claim(
                 _claims[request.escrow_hash]["status"] = "paid"
         except Exception as e:
             logger.error("Failed to process insurance claim for %s: %s", claimant[:8], e)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process claim on-chain"
+            )
 
-    logger.info("Claim for escrow %s by %s processed. Deploy hash: %s", request.escrow_hash[:16], claimant[:8], deploy_hash[:16])
+    logger.info(
+        "Claim for escrow %s by %s processed. Deploy hash: %s", request.escrow_hash[:16], claimant[:8], deploy_hash[:16]
+    )
 
     # Fire an SSE `insurance_claimed` event so subscribers of `/events` get
     # notified when a claim actually pays out. See AE402_AGENT_SPEC.md batch-2
@@ -468,7 +508,7 @@ async def get_insurance_pool_stats(
     # Or simply total assets / (total potential liabilities from active escrows)
     # For simplicity, let's use a fixed value or a simple calculation.
     coverage_ratio = total_assets / max(1, total_claims_filed * 1_000_000_000) if total_claims_filed > 0 else 1.0
-    coverage_ratio = min(coverage_ratio, 10.0) # Cap for display
+    coverage_ratio = min(coverage_ratio, 10.0)  # Cap for display
 
     return PoolStatsResponse(
         total_assets=total_assets,
@@ -522,7 +562,7 @@ async def get_premium_quote(
     risk_multiplier = max(0.5, min(risk_multiplier, 5.0))
 
     premium_amount = int((request.escrow_amount * base_rate_bps / 10000) * risk_multiplier)
-    premium_amount = max(premium_amount, 1000000) # Minimum premium of 1 CSPR mote
+    premium_amount = max(premium_amount, 1000000)  # Minimum premium of 1 CSPR mote
 
     logger.info(
         "Premium quote for agent %s, escrow %s: %s motes (risk_multiplier=%.2f)",

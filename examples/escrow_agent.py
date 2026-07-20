@@ -39,7 +39,6 @@ import hashlib
 import os
 import sys
 import time
-import uuid
 from dataclasses import dataclass
 
 from sdk.arbiter_signing import sign_arbiter_vote
@@ -81,9 +80,10 @@ ARBITER_KEYS_DIR = os.environ.get("ARBITER_KEYS_DIR", "demo/test-arbiter-keys")
 ACCEPTANCE_CRITERIA = [
     ("has_function_signature", lambda code: "def fibonacci(" in code),
     ("has_a_test", lambda code: "assert" in code or "def test_" in code),
-    ("no_stub_markers", lambda code: not any(
-        m in code for m in ("TODO", "NotImplementedError", "pass  # stub", "...")
-    )),
+    (
+        "no_stub_markers",
+        lambda code: not any(m in code for m in ("TODO", "NotImplementedError", "pass  # stub", "...")),
+    ),
     ("nontrivial_length", lambda code: len(code.strip()) > 60),
 ]
 
@@ -100,11 +100,11 @@ def test_fibonacci_known_value():
     assert fibonacci(10) == 55
 '''.strip()
 
-BAD_DELIVERABLE = '''
+BAD_DELIVERABLE = """
 def fibonacci(n):
     # TODO: implement this properly, ran out of time
     raise NotImplementedError
-'''.strip()
+""".strip()
 
 
 def _content_hash(text: str) -> str:
@@ -142,8 +142,10 @@ class BuyerAgent:
 
         escrow = await self.client.create_escrow(receiver=seller.client.sender, amount=amount)
         service_hash = escrow["service_hash"]
-        log.append(f"escrow created : {service_hash} (status={escrow['status']}, "
-                    f"deploy_hash={escrow.get('deploy_hash') or '(sandbox, no on-chain deploy)'})")
+        log.append(
+            f"escrow created : {service_hash} (status={escrow['status']}, "
+            f"deploy_hash={escrow.get('deploy_hash') or '(sandbox, no on-chain deploy)'})"
+        )
 
         deliverable = seller.deliver(scenario)
         log.append(f"seller delivered {len(deliverable)} chars of work")
@@ -154,8 +156,10 @@ class BuyerAgent:
 
         if passed:
             result = await self.client.release(service_hash, amount=amount)
-            log.append(f"acceptance criteria MET -> released escrow. status={result['status']}, "
-                        f"deploy_hash={result.get('deploy_hash') or '(sandbox)'}")
+            log.append(
+                f"acceptance criteria MET -> released escrow. status={result['status']}, "
+                f"deploy_hash={result.get('deploy_hash') or '(sandbox)'}"
+            )
             return {"log": log, "outcome": "released", "escrow": result}
 
         log.append("acceptance criteria FAILED -> opening dispute with real evidence")
@@ -165,20 +169,32 @@ class BuyerAgent:
         log.append(f"dispute opened : status={disputed['status']}")
 
         now = int(time.time())
-        buyer_evidence = [{
-            "escrow_id": service_hash, "claimant": self.client.sender,
-            "evidence_type": "text", "content_hash": _content_hash(deliverable),
-            "description": reason, "timestamp": now,
-        }]
-        seller_evidence = [{
-            "escrow_id": service_hash, "claimant": seller.client.sender,
-            "evidence_type": "text", "content_hash": _content_hash(TASK_DESCRIPTION),
-            "description": "Delivered a working implementation as requested.", "timestamp": now,
-        }]
+        buyer_evidence = [
+            {
+                "escrow_id": service_hash,
+                "claimant": self.client.sender,
+                "evidence_type": "text",
+                "content_hash": _content_hash(deliverable),
+                "description": reason,
+                "timestamp": now,
+            }
+        ]
+        seller_evidence = [
+            {
+                "escrow_id": service_hash,
+                "claimant": seller.client.sender,
+                "evidence_type": "text",
+                "content_hash": _content_hash(TASK_DESCRIPTION),
+                "description": "Delivered a working implementation as requested.",
+                "timestamp": now,
+            }
+        ]
 
         verdict = await self.client.arbitrate(
-            dispute_id=service_hash, sender_evidence=buyer_evidence,
-            receiver_evidence=seller_evidence, escrow_amount=amount,
+            dispute_id=service_hash,
+            sender_evidence=buyer_evidence,
+            receiver_evidence=seller_evidence,
+            escrow_amount=amount,
         )
         log.append(
             f"AI arbitration : provider={verdict['provider']} "

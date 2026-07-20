@@ -7,6 +7,7 @@ keypair signs sha256(f"{delegator_id}:{delegatee_id}:{capability_uri}:{expiry_ti
 and the backend verifies it cryptographically against the delegator's
 registered public key. No demo/x402 bypass applies to this endpoint.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -16,10 +17,10 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
+from server import agent_identity as agent_identity_module
 from server.app import app, get_config, get_sandbox
 from server.config import Config
 from server.sandbox import SandboxStore
-from server import agent_identity as agent_identity_module
 
 
 @pytest.fixture(autouse=True)
@@ -50,7 +51,9 @@ def _keypair():
     return priv, pub_hex
 
 
-def _sign_delegation(priv: Ed25519PrivateKey, delegator_id: str, delegatee_id: str, capability_uri: str, expiry_timestamp: int) -> str:
+def _sign_delegation(
+    priv: Ed25519PrivateKey, delegator_id: str, delegatee_id: str, capability_uri: str, expiry_timestamp: int
+) -> str:
     msg = f"{delegator_id}:{delegatee_id}:{capability_uri}:{expiry_timestamp}"
     msg_hash_hex = hashlib.sha256(msg.encode()).hexdigest()
     return priv.sign(msg_hash_hex.encode("utf-8")).hex()
@@ -106,7 +109,9 @@ class TestIdentityDelegationEndToEnd:
         _register(client, "delegatee-agent", delegatee_pub)
 
         expiry = int(time.time()) + 3600
-        forged_signature = _sign_delegation(attacker_priv, "delegator-agent", "delegatee-agent", "urn:escrow:release", expiry)
+        forged_signature = _sign_delegation(
+            attacker_priv, "delegator-agent", "delegatee-agent", "urn:escrow:release", expiry
+        )
 
         res = client.post(
             "/identity/delegate",
@@ -166,7 +171,9 @@ class TestIdentityDelegationEndToEnd:
 
         past_expiry = int(time.time()) - 10
         # Pydantic's gt=now validator on the model itself should reject this before signature check.
-        signature = _sign_delegation(delegator_priv, "delegator-agent", "delegatee-agent", "urn:escrow:release", past_expiry)
+        signature = _sign_delegation(
+            delegator_priv, "delegator-agent", "delegatee-agent", "urn:escrow:release", past_expiry
+        )
         res = client.post(
             "/identity/delegate",
             json={

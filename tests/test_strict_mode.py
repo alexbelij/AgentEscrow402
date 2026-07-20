@@ -27,15 +27,15 @@ Every test uses an isolated Config instance and does NOT touch process
 env vars, so the whole file runs cleanly regardless of the caller's
 AE402_STRICT setting.
 """
+
 from __future__ import annotations
 
 import pytest
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from server.config import Config
 from server.strict import StrictModeError, ensure_strict, guard
-
 
 # ---------------------------------------------------------------------------
 # Layer 1: config preconditions + startup gate

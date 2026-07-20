@@ -8,7 +8,7 @@ Usage:
     python3 scripts/query_multi_asset_state.py balance <token_contract_hash> <owner_hex_or_contract-hex>
     python3 scripts/query_multi_asset_state.py escrow <escrow_contract_hash> <service_hash>
 """
-import base64
+
 import json
 import os
 import sys

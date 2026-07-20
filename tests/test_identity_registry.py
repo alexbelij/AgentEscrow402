@@ -1,14 +1,17 @@
-import pytest
-from unittest.mock import patch, MagicMock
-from datetime import datetime
-from server.identity_registry import (
-    IdentityRegistry,
-    AgentIdentity,
-    AgentCapability,
-    VerificationLevel,
-    DIDResolver,
-)
 import asyncio
+from datetime import datetime
+from unittest.mock import patch
+
+import pytest
+
+from server.identity_registry import (
+    AgentCapability,
+    AgentIdentity,
+    DIDResolver,
+    IdentityRegistry,
+    VerificationLevel,
+)
+
 
 @pytest.fixture
 def event_loop():
@@ -16,25 +19,19 @@ def event_loop():
     yield loop
     loop.close()
 
+
 @pytest.fixture
 def registry(event_loop):
     return IdentityRegistry(decay_interval=86400, decay_rate=0.01)
 
+
 @pytest.fixture
 def sample_capabilities():
     return [
-        AgentCapability(
-            name="compute",
-            version="1.0",
-            description="Compute capability",
-            verified=True
-        ),
-        AgentCapability(
-            name="storage",
-            version="2.0",
-            description="Storage capability"
-        )
+        AgentCapability(name="compute", version="1.0", description="Compute capability", verified=True),
+        AgentCapability(name="storage", version="2.0", description="Storage capability"),
     ]
+
 
 @pytest.mark.asyncio
 async def test_register_new_identity(registry, sample_capabilities):
@@ -55,6 +52,7 @@ async def test_register_new_identity(registry, sample_capabilities):
     assert identity.stake == 0
     assert identity.metadata_hash != ""
 
+
 @pytest.mark.asyncio
 async def test_register_duplicate_account(registry, sample_capabilities):
     account_hash = "abc123"
@@ -62,6 +60,7 @@ async def test_register_duplicate_account(registry, sample_capabilities):
 
     with pytest.raises(ValueError, match="Account already registered"):
         await registry.register(account_hash, "Another Agent", sample_capabilities)
+
 
 @pytest.mark.asyncio
 async def test_register_without_capabilities(registry):
@@ -75,6 +74,7 @@ async def test_register_without_capabilities(registry):
     assert identity.capabilities == []
     assert identity.verification_level == VerificationLevel.UNVERIFIED
 
+
 @pytest.mark.asyncio
 async def test_get_existing_identity(registry, sample_capabilities):
     account_hash = "abc123"
@@ -83,10 +83,12 @@ async def test_get_existing_identity(registry, sample_capabilities):
     retrieved = await registry.get(identity.did)
     assert retrieved == identity
 
+
 @pytest.mark.asyncio
 async def test_get_nonexistent_identity(registry):
     retrieved = await registry.get("did:casper:nonexistent")
     assert retrieved is None
+
 
 @pytest.mark.asyncio
 async def test_get_by_account_existing(registry, sample_capabilities):
@@ -96,10 +98,12 @@ async def test_get_by_account_existing(registry, sample_capabilities):
     retrieved = await registry.get_by_account(account_hash)
     assert retrieved == identity
 
+
 @pytest.mark.asyncio
 async def test_get_by_account_nonexistent(registry):
     retrieved = await registry.get_by_account("nonexistent")
     assert retrieved is None
+
 
 @pytest.mark.asyncio
 async def test_update_reputation_with_new_deals(registry, sample_capabilities):
@@ -109,12 +113,13 @@ async def test_update_reputation_with_new_deals(registry, sample_capabilities):
     updated = await registry.update_reputation(identity.did, completed=5, disputed=1)
 
     assert updated.total_deals == 6
-    assert updated.dispute_rate == 1/6
+    assert updated.dispute_rate == 1 / 6
     # reputation_score is an int field (see AgentIdentity), so compare
     # against the same rounding the implementation applies rather than the
     # raw float - an int can never equal (5/6)*100 == 83.333... exactly.
-    assert updated.reputation_score == round((1 - 1/6) * 100)
+    assert updated.reputation_score == round((1 - 1 / 6) * 100)
     assert updated.last_active == updated.registered_at
+
 
 @pytest.mark.asyncio
 async def test_update_reputation_no_new_deals(registry, sample_capabilities):
@@ -127,10 +132,12 @@ async def test_update_reputation_no_new_deals(registry, sample_capabilities):
     assert updated.dispute_rate == 0.0
     assert updated.reputation_score == 50  # unchanged
 
+
 @pytest.mark.asyncio
 async def test_update_reputation_nonexistent_identity(registry):
     with pytest.raises(ValueError, match="Identity not found"):
         await registry.update_reputation("did:casper:nonexistent", completed=1)
+
 
 @pytest.mark.asyncio
 async def test_update_reputation_max_score(registry, sample_capabilities):
@@ -141,6 +148,7 @@ async def test_update_reputation_max_score(registry, sample_capabilities):
 
     assert updated.reputation_score == 100
 
+
 @pytest.mark.asyncio
 async def test_update_reputation_min_score(registry, sample_capabilities):
     account_hash = "abc123"
@@ -149,6 +157,7 @@ async def test_update_reputation_min_score(registry, sample_capabilities):
     updated = await registry.update_reputation(identity.did, completed=0, disputed=100)
 
     assert updated.reputation_score == 0
+
 
 @pytest.mark.asyncio
 async def test_apply_decay_updates_scores(registry, sample_capabilities):
@@ -160,7 +169,7 @@ async def test_apply_decay_updates_scores(registry, sample_capabilities):
     old_score = updated.reputation_score
 
     # Mock time to control decay application
-    with patch('server.identity_registry.datetime') as mock_datetime:
+    with patch("server.identity_registry.datetime") as mock_datetime:
         mock_datetime.utcnow.return_value = datetime.fromtimestamp(updated.registered_at + 86400)
         decayed = await registry.apply_decay(identity.did)
 
@@ -169,10 +178,12 @@ async def test_apply_decay_updates_scores(registry, sample_capabilities):
     # adjusted by slash() - it intentionally stays unchanged here.
     assert decayed.risk_score == 50
 
+
 @pytest.mark.asyncio
 async def test_apply_decay_nonexistent_identity(registry):
     with pytest.raises(ValueError, match="Identity not found"):
         await registry.apply_decay("did:casper:nonexistent")
+
 
 @pytest.mark.asyncio
 async def test_metadata_hash_changes_on_update(registry, sample_capabilities):
@@ -183,14 +194,12 @@ async def test_metadata_hash_changes_on_update(registry, sample_capabilities):
     updated = await registry.update_reputation(identity.did, completed=1)
     assert updated.metadata_hash != original_hash
 
+
 @pytest.mark.asyncio
 async def test_capability_validation(registry):
-    capability = AgentCapability(
-        name="test",
-        version="1.0",
-        description="Test capability"
-    )
+    capability = AgentCapability(name="test", version="1.0", description="Test capability")
     assert capability.verified is False
+
 
 @pytest.mark.asyncio
 async def test_verification_level_enum():
@@ -198,6 +207,7 @@ async def test_verification_level_enum():
     assert VerificationLevel.BASIC.value == "BASIC"
     assert VerificationLevel.ENHANCED.value == "ENHANCED"
     assert VerificationLevel.FULL.value == "FULL"
+
 
 @pytest.mark.asyncio
 async def test_did_validation_with_invalid_did(registry):
@@ -216,8 +226,9 @@ async def test_did_validation_with_invalid_did(registry):
             metadata_hash="",
             risk_score=50,
             slashed_count=0,
-            stake=0
+            stake=0,
         )
+
 
 @pytest.mark.asyncio
 async def test_reputation_score_bounds(registry, sample_capabilities):
@@ -232,6 +243,7 @@ async def test_reputation_score_bounds(registry, sample_capabilities):
     updated = await registry.update_reputation(identity.did, completed=0, disputed=1000)
     assert updated.reputation_score == 0
 
+
 @pytest.mark.asyncio
 async def test_risk_score_bounds(registry, sample_capabilities):
     account_hash = "abc123"
@@ -244,10 +256,8 @@ async def test_risk_score_bounds(registry, sample_capabilities):
     dump.pop("risk_score")
 
     with pytest.raises(ValueError):
-        AgentIdentity(
-            **dump,
-            risk_score=150
-        )
+        AgentIdentity(**dump, risk_score=150)
+
 
 @pytest.mark.asyncio
 async def test_stake_field_validation(registry, sample_capabilities):
@@ -259,10 +269,8 @@ async def test_stake_field_validation(registry, sample_capabilities):
     dump = identity.model_dump()
     dump.pop("stake")
     with pytest.raises(ValueError):
-        AgentIdentity(
-            **dump,
-            stake=-10
-        )
+        AgentIdentity(**dump, stake=-10)
+
 
 @pytest.mark.asyncio
 async def test_concurrent_registration(registry, sample_capabilities):
@@ -282,6 +290,7 @@ async def test_concurrent_registration(registry, sample_capabilities):
     assert len(failed) == 4
     assert all(isinstance(f, ValueError) for f in failed)
 
+
 @pytest.mark.asyncio
 async def test_last_active_updated_on_reputation_change(registry, sample_capabilities):
     account_hash = "abc123"
@@ -295,11 +304,13 @@ async def test_last_active_updated_on_reputation_change(registry, sample_capabil
     updated = await registry.update_reputation(identity.did, completed=1)
     assert updated.last_active > original_last_active
 
+
 @pytest.mark.asyncio
 async def test_empty_display_name(registry):
     account_hash = "abc123"
     identity = await registry.register(account_hash, "")
     assert identity.display_name == ""
+
 
 @pytest.mark.asyncio
 async def test_capability_with_empty_fields(registry):
@@ -308,6 +319,7 @@ async def test_capability_with_empty_fields(registry):
     assert capability.version == ""
     assert capability.description == ""
     assert capability.verified is False
+
 
 @pytest.mark.asyncio
 async def test_decay_interval_and_rate_properties(registry):
@@ -318,6 +330,7 @@ async def test_decay_interval_and_rate_properties(registry):
     assert new_registry._decay_interval == 3600
     assert new_registry._decay_rate == 0.05
 
+
 @pytest.mark.asyncio
 async def test_identity_equality(registry, sample_capabilities):
     account_hash = "abc123"
@@ -325,6 +338,7 @@ async def test_identity_equality(registry, sample_capabilities):
     identity2 = await registry.get(identity1.did)
 
     assert identity1 == identity2
+
 
 @pytest.mark.asyncio
 async def test_metadata_hash_format(registry, sample_capabilities):

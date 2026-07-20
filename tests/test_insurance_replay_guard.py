@@ -26,6 +26,7 @@ Existing tests in test_insurance_and_arbiter_routes.py cover the
 positive/negative single-claim paths; nothing there hits the replay
 branch. This file adds that missing coverage.
 """
+
 from __future__ import annotations
 
 import time
@@ -57,9 +58,7 @@ def client():
     return TestClient(appmod.app)
 
 
-def _signed_x402_header(
-    method: str, path: str, amount: int = 1000, escrow_hash: str | None = None
-) -> tuple[str, str]:
+def _signed_x402_header(method: str, path: str, amount: int = 1000, escrow_hash: str | None = None) -> tuple[str, str]:
     """Build a real Ed25519-signed X-Payment header (copied from the
     existing insurance test file for parity)."""
     private_key = Ed25519PrivateKey.generate()
@@ -276,9 +275,7 @@ class TestOnChainReplayGuard:
         # constructs a raw on-chain call directly.
         service_hash = "5a" * 32
         fake = _FakeCasper()
-        fake.confirm_wallet_insurance_claim = AsyncMock(
-            return_value=(False, "User error: 10")
-        )
+        fake.confirm_wallet_insurance_claim = AsyncMock(return_value=(False, "User error: 10"))
         appmod._casper = fake
         _seed_disputed_escrow(service_hash, "aa" * 32)
 

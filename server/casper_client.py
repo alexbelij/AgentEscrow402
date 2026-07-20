@@ -56,8 +56,8 @@ _STATUS_MAP = {
 # Ordered fallback list.  First entry that responds wins.
 # NowNodes free tier: 20 req/sec, 50k req/day — good fallback.
 _RPC_ENDPOINTS = [
-    "https://node.testnet.cspr.cloud/rpc",        # CSPR.cloud (fast, auth optional for testnet)
-    "https://node.testnet.casper.network/rpc",     # Official testnet node
+    "https://node.testnet.cspr.cloud/rpc",  # CSPR.cloud (fast, auth optional for testnet)
+    "https://node.testnet.casper.network/rpc",  # Official testnet node
 ]
 
 
@@ -66,17 +66,21 @@ def _build_rpc_endpoints(cfg: "Config") -> list[tuple[str, dict[str, str]]]:
     endpoints: list[tuple[str, dict[str, str]]] = []
     # CSPR.cloud — requires auth header
     cspr_cloud_key = os.getenv("CSPR_CLOUD_API_KEY", "")
-    endpoints.append((
-        "https://node.testnet.cspr.cloud/rpc",
-        {"Authorization": cspr_cloud_key} if cspr_cloud_key else {},
-    ))
+    endpoints.append(
+        (
+            "https://node.testnet.cspr.cloud/rpc",
+            {"Authorization": cspr_cloud_key} if cspr_cloud_key else {},
+        )
+    )
     # NowNodes — add if key is set
     nownodes_key = cfg.nownodes_api_key
     if nownodes_key:
-        endpoints.append((
-            "https://casper-testnet.nownodes.io/rpc",
-            {"api-key": nownodes_key},
-        ))
+        endpoints.append(
+            (
+                "https://casper-testnet.nownodes.io/rpc",
+                {"api-key": nownodes_key},
+            )
+        )
     # Official testnet (no auth)
     endpoints.append(("https://node.testnet.casper.network/rpc", {}))
     return endpoints
@@ -132,9 +136,7 @@ class CasperClient:
         result = await self._rpc("chain_get_block", {})
         try:
             # Casper 2.2+ returns block_with_signatures.block.Version2.header.state_root_hash
-            return (
-                result["block_with_signatures"]["block"]["Version2"]["header"]["state_root_hash"]
-            )
+            return result["block_with_signatures"]["block"]["Version2"]["header"]["state_root_hash"]
         except (KeyError, TypeError):
             pass
         # Fallback: Casper 1.x / older testnet nodes
@@ -143,9 +145,7 @@ class CasperClient:
         except (KeyError, TypeError):
             raise RuntimeError("Cannot extract state_root_hash from chain_get_block response")
 
-    async def _run_node_script(
-        self, script: pathlib.Path, env_extra: dict[str, str]
-    ) -> str:
+    async def _run_node_script(self, script: pathlib.Path, env_extra: dict[str, str]) -> str:
         """Run a Node.js tx script. Returns tx hash on success, raises on failure."""
         env = {**os.environ, **env_extra}
         proc = await asyncio.create_subprocess_exec(
@@ -192,9 +192,7 @@ class CasperClient:
             raise RuntimeError("private key not configured")
 
         # receiver may arrive as "account-hash-{hex}" or raw 64-char hex
-        receiver_hex = (
-            receiver.replace("account-hash-", "") if receiver.startswith("account-hash-") else receiver
-        )
+        receiver_hex = receiver.replace("account-hash-", "") if receiver.startswith("account-hash-") else receiver
         if len(receiver_hex) != 64:
             raise ValueError(f"receiver must be 64-char hex account hash, got: {receiver!r}")
 
@@ -239,10 +237,7 @@ class CasperClient:
         if n > 50:
             raise ValueError("batch size exceeds contract MAX_BATCH_SIZE (50)")
 
-        receivers_hex = [
-            r.replace("account-hash-", "") if r.startswith("account-hash-") else r
-            for r in receivers
-        ]
+        receivers_hex = [r.replace("account-hash-", "") if r.startswith("account-hash-") else r for r in receivers]
         for r in receivers_hex:
             if len(r) != 64:
                 raise ValueError(f"receiver must be 64-char hex account hash, got: {r!r}")
@@ -321,9 +316,7 @@ class CasperClient:
         contracts/escrow/src/main.rs. Below cap, pass None/empty lists;
         the contract accepts empty vecs there.
         """
-        return await self._lifecycle(
-            "release", service_hash, arbiter_pubkeys or [], arbiter_signatures or []
-        )
+        return await self._lifecycle("release", service_hash, arbiter_pubkeys or [], arbiter_signatures or [])
 
     async def refund(self, service_hash: str) -> str:
         return await self._lifecycle("refund", service_hash)
@@ -591,9 +584,7 @@ class CasperClient:
         if not self._vrf_contract_hash:
             return None, "vrf_contract_hash not configured"
         for _ in range(attempts):
-            raw = await self.query_contract_dict(
-                "elections_dict", dispute_id, contract_hash=self._vrf_contract_hash
-            )
+            raw = await self.query_contract_dict("elections_dict", dispute_id, contract_hash=self._vrf_contract_hash)
             parsed = raw.get("parsed") if raw else None
             if parsed and isinstance(parsed, (list, tuple)) and len(parsed) == 2:
                 inner = parsed[1]
@@ -761,9 +752,7 @@ class CasperClient:
         Returns (confirmed, revert_reason). `revert_reason` is only ever set
         when `confirmed` is False and we found a concrete on-chain failure.
         """
-        expected_statuses = (
-            (expected_status,) if isinstance(expected_status, str) else expected_status
-        )
+        expected_statuses = (expected_status,) if isinstance(expected_status, str) else expected_status
         for _ in range(attempts):
             record = await self.get_escrow(service_hash)
             if record is not None and record.status.value in expected_statuses:
@@ -841,9 +830,7 @@ class CasperClient:
             return False, "insurance contract hash not configured"
         dict_key = claimant_account_hash.replace("account-hash-", "")
         for _ in range(attempts):
-            raw = await self.query_contract_dict(
-                "claims", dict_key, contract_hash=self._insurance_contract_hash
-            )
+            raw = await self.query_contract_dict("claims", dict_key, contract_hash=self._insurance_contract_hash)
             parsed = raw.get("parsed") if raw else None
             if parsed and isinstance(parsed, list) and len(parsed) >= 3:
                 last_escrow_id = parsed[2]
@@ -973,9 +960,7 @@ class CasperClient:
         if not self._key_path:
             raise RuntimeError("private key not configured")
         recipient_hex = (
-            recipient_hex.replace("account-hash-", "")
-            if recipient_hex.startswith("account-hash-")
-            else recipient_hex
+            recipient_hex.replace("account-hash-", "") if recipient_hex.startswith("account-hash-") else recipient_hex
         )
         if len(recipient_hex) != 64:
             raise ValueError(f"recipient must be 64-char hex account hash, got: {recipient_hex!r}")
@@ -1185,9 +1170,7 @@ class CasperClient:
         don't compute real asset hashes here)."""
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        owner_hex = (
-            owner_hex.replace("account-hash-", "") if owner_hex.startswith("account-hash-") else owner_hex
-        )
+        owner_hex = owner_hex.replace("account-hash-", "") if owner_hex.startswith("account-hash-") else owner_hex
         if len(owner_hex) != 64:
             raise ValueError(f"owner must be 64-char hex account hash, got: {owner_hex!r}")
 
@@ -1205,9 +1188,7 @@ class CasperClient:
             },
         )
 
-    async def cep78_transfer(
-        self, contract_hash: str, token_id: int, source_hex: str, target_hex: str
-    ) -> str:
+    async def cep78_transfer(self, contract_hash: str, token_id: int, source_hex: str, target_hex: str) -> str:
         """Call the CEP-78 `transfer` entry point (Ordinal identifier mode).
         Returns tx hash. Note: the contract requires the deploy's caller to
         be the token owner/approved account, so `source_hex` must correspond
@@ -1215,12 +1196,8 @@ class CasperClient:
         same as create_escrow/cep18_transfer)."""
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        source_hex = (
-            source_hex.replace("account-hash-", "") if source_hex.startswith("account-hash-") else source_hex
-        )
-        target_hex = (
-            target_hex.replace("account-hash-", "") if target_hex.startswith("account-hash-") else target_hex
-        )
+        source_hex = source_hex.replace("account-hash-", "") if source_hex.startswith("account-hash-") else source_hex
+        target_hex = target_hex.replace("account-hash-", "") if target_hex.startswith("account-hash-") else target_hex
         if len(source_hex) != 64 or len(target_hex) != 64:
             raise ValueError("source/target must be 64-char hex account hashes")
 
@@ -1268,9 +1245,7 @@ class CasperClient:
                 "state_get_dictionary_item",
                 {
                     "state_root_hash": srh,
-                    "dictionary_identifier": {
-                        "URef": {"seed_uref": owners_uref, "dictionary_item_key": str(token_id)}
-                    },
+                    "dictionary_identifier": {"URef": {"seed_uref": owners_uref, "dictionary_item_key": str(token_id)}},
                 },
             )
         except RuntimeError:
@@ -1297,9 +1272,7 @@ class CasperClient:
         minted_result = await self._rpc("query_global_state", {"key": minted_uref, "state_identifier": None})
         minted_count = minted_result.get("stored_value", {}).get("CLValue", {}).get("parsed") or 0
 
-        owners = await asyncio.gather(
-            *[self.get_cep78_owner(contract_hash, i) for i in range(int(minted_count))]
-        )
+        owners = await asyncio.gather(*[self.get_cep78_owner(contract_hash, i) for i in range(int(minted_count))])
         return sum(1 for owner in owners if owner == target)
 
     async def get_cep78_token_info(self, contract_hash: str) -> dict[str, Any]:
@@ -1327,9 +1300,7 @@ class CasperClient:
 
     # ── MultiAssetEscrow on-chain operations ─────────────────────────────
 
-    async def multi_asset_approve(
-        self, token_contract_hash: str, amount: int
-    ) -> str:
+    async def multi_asset_approve(self, token_contract_hash: str, amount: int) -> str:
         """Approve the MultiAssetEscrow contract as spender for `amount` tokens."""
         if not self._multi_asset_escrow_package_hash:
             raise RuntimeError("multi_asset_escrow_package_hash not configured")

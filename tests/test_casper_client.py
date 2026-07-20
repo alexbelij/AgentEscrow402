@@ -30,11 +30,7 @@ class TestGetStateRootHash:
     async def test_version2_block_format(self):
         client = make_client()
         client._rpc = AsyncMock(
-            return_value={
-                "block_with_signatures": {
-                    "block": {"Version2": {"header": {"state_root_hash": "abc123"}}}
-                }
-            }
+            return_value={"block_with_signatures": {"block": {"Version2": {"header": {"state_root_hash": "abc123"}}}}}
         )
         result = await client._get_state_root_hash()
         assert result == "abc123"
@@ -42,9 +38,7 @@ class TestGetStateRootHash:
     @pytest.mark.asyncio
     async def test_legacy_block_format_fallback(self):
         client = make_client()
-        client._rpc = AsyncMock(
-            return_value={"block": {"header": {"state_root_hash": "legacy456"}}}
-        )
+        client._rpc = AsyncMock(return_value={"block": {"header": {"state_root_hash": "legacy456"}}})
         result = await client._get_state_root_hash()
         assert result == "legacy456"
 
@@ -109,9 +103,7 @@ class TestGetReputation:
     async def test_parses_valid_entry(self):
         client = make_client()
         # ReputationRecord.score is `int` — on-chain values are whole numbers.
-        client.query_contract_dict = AsyncMock(
-            return_value={"parsed": [5, 1, 0, 1_700_000_000, 87]}
-        )
+        client.query_contract_dict = AsyncMock(return_value={"parsed": [5, 1, 0, 1_700_000_000, 87]})
         rep = await client.get_reputation("agent-1")
         assert rep.completed == 5
         assert rep.disputed == 1
@@ -124,9 +116,7 @@ class TestGetReputation:
         get_reputation silently falls back to the default record instead of
         raising. Worth revisiting if on-chain scores ever become fractional."""
         client = make_client()
-        client.query_contract_dict = AsyncMock(
-            return_value={"parsed": [5, 1, 0, 1_700_000_000, 87.5]}
-        )
+        client.query_contract_dict = AsyncMock(return_value={"parsed": [5, 1, 0, 1_700_000_000, 87.5]})
         rep = await client.get_reputation("agent-1")
         assert rep.completed == 0
         assert rep.score == 50
@@ -295,7 +285,9 @@ class TestLifecycleValidation:
         client._contract_hash = "contract-hash"
         client._key_path = "/tmp/key.pem"
         client._run_node_script = AsyncMock(return_value="deploy-release-1")
-        result = await client.release("svc-1", arbiter_pubkeys=["01" + "aa" * 32], arbiter_signatures=["01" + "bb" * 64])
+        result = await client.release(
+            "svc-1", arbiter_pubkeys=["01" + "aa" * 32], arbiter_signatures=["01" + "bb" * 64]
+        )
         assert result == "deploy-release-1"
 
     @pytest.mark.asyncio
@@ -461,11 +453,7 @@ class TestGetDeployError:
         async def fake_rpc(method, params):
             if method == "info_get_transaction":
                 raise RuntimeError("No such transaction")
-            return {
-                "execution_results": [
-                    {"result": {"Failure": {"error_message": "User error: 5"}}}
-                ]
-            }
+            return {"execution_results": [{"result": {"Failure": {"error_message": "User error: 5"}}}]}
 
         client._rpc = AsyncMock(side_effect=fake_rpc)
         assert await client.get_deploy_error("deploy-1") == "User error: 5"
@@ -480,11 +468,7 @@ class TestGetDeployError:
     async def test_transaction_v1_returns_none_on_success(self):
         client = make_client()
         client._rpc = AsyncMock(
-            return_value={
-                "execution_info": {
-                    "execution_result": {"Version2": {"error_message": None}}
-                }
-            }
+            return_value={"execution_info": {"execution_result": {"Version2": {"error_message": None}}}}
         )
         assert await client.get_deploy_error("tx-1") is None
 
@@ -492,13 +476,7 @@ class TestGetDeployError:
     async def test_transaction_v1_returns_error_message_on_failure(self):
         client = make_client()
         client._rpc = AsyncMock(
-            return_value={
-                "execution_info": {
-                    "execution_result": {
-                        "Version2": {"error_message": "User error: 8"}
-                    }
-                }
-            }
+            return_value={"execution_info": {"execution_result": {"Version2": {"error_message": "User error: 8"}}}}
         )
         assert await client.get_deploy_error("tx-1") == "User error: 8"
 
@@ -541,9 +519,7 @@ class TestConfirmWalletCreatedEscrow:
     async def test_confirms_once_record_exists_on_chain(self):
         client = make_client()
         client.get_escrow = AsyncMock(return_value=_fake_escrow_record())
-        confirmed, reason = await client.confirm_wallet_created_escrow(
-            "svc-wallet-1", attempts=3, delay_seconds=0
-        )
+        confirmed, reason = await client.confirm_wallet_created_escrow("svc-wallet-1", attempts=3, delay_seconds=0)
         assert confirmed is True
         assert reason is None
 
@@ -562,9 +538,7 @@ class TestConfirmWalletCreatedEscrow:
     async def test_times_out_without_deploy_hash_gives_no_reason(self):
         client = make_client()
         client.get_escrow = AsyncMock(return_value=None)
-        confirmed, reason = await client.confirm_wallet_created_escrow(
-            "svc-wallet-1", attempts=2, delay_seconds=0
-        )
+        confirmed, reason = await client.confirm_wallet_created_escrow("svc-wallet-1", attempts=2, delay_seconds=0)
         assert confirmed is False
         assert reason is None
 
