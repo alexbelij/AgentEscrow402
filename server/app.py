@@ -7,6 +7,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -1749,6 +1750,95 @@ async def arbitration_history(limit: int = 20):
     if limit < 1 or limit > 200:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 200")
     return list(reversed(_arbitration_agent._history[-limit:]))
+
+
+# ---------------------------------------------------------------------------
+# POST /arbitration/verify-evidence — UI "verify" button (AE-A2)
+#
+# Verifies that a specific evidence leaf was in the batch that produced a
+# published `evidence_root`. Does NOT need to trust the server: the caller
+# supplies (leaf_hash, siblings[], expected_root); we fold the proof and
+# report whether the running hash equals the root. Same math as the TS
+# port on the RWA-Sentinel side, so a UI-side verifier can be swapped in
+# and produce byte-identical results.
+# ---------------------------------------------------------------------------
+
+
+class VerifyEvidenceStep(BaseModel):
+    hash: str
+    position: str  # "left" | "right"
+
+
+class VerifyEvidenceRequest(BaseModel):
+    leaf: str          # already-hashed leaf (sha256 hex, 64 chars)
+    siblings: list[VerifyEvidenceStep]
+    expected_root: str  # sha256 hex, 64 chars
+
+
+class VerifyEvidenceResponse(BaseModel):
+    valid: bool
+    computed_root: str
+    expected_root: str
+    steps: int
+    reason: str | None = None
+
+
+_HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+@app.post(
+    "/arbitration/verify-evidence",
+    response_model=VerifyEvidenceResponse,
+    tags=["arbitration"],
+)
+async def arbitration_verify_evidence(req: VerifyEvidenceRequest):
+    """Verify an evidence Merkle inclusion proof against a published root.
+
+    This is the "UI verify button" surface (AE-A2). A judge or auditor
+    can independently reproduce the check with any language that has
+    sha256 — the endpoint is a convenience, not a source of trust.
+    """
+    from server.merkle_provenance import (  # local import: avoids cycle
+        MerkleInclusionProof,
+        ProofStep,
+        verify_inclusion_proof,
+    )
+
+    if not _HEX64.match(req.leaf):
+        raise HTTPException(status_code=400, detail="leaf must be a 64-char sha256 hex string")
+    if not _HEX64.match(req.expected_root):
+        raise HTTPException(status_code=400, detail="expected_root must be a 64-char sha256 hex string")
+    for i, step in enumerate(req.siblings):
+        if not _HEX64.match(step.hash):
+            raise HTTPException(status_code=400, detail=f"siblings[{i}].hash must be a 64-char sha256 hex string")
+        if step.position not in ("left", "right"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"siblings[{i}].position must be 'left' or 'right'",
+            )
+
+    proof = MerkleInclusionProof(
+        leaf=req.leaf,
+        siblings=[ProofStep(hash=s.hash, position=s.position) for s in req.siblings],
+    )
+    # Reproduce the folded root for the UI to display alongside expected.
+    running = req.leaf
+    for step in proof.siblings:
+        h = hashlib.sha256()
+        if step.position == "left":
+            h.update((step.hash + running).encode("utf-8"))
+        else:
+            h.update((running + step.hash).encode("utf-8"))
+        running = h.hexdigest()
+
+    valid = verify_inclusion_proof(proof, req.expected_root)
+    return VerifyEvidenceResponse(
+        valid=valid,
+        computed_root=running,
+        expected_root=req.expected_root,
+        steps=len(req.siblings),
+        reason=None if valid else "computed_root != expected_root",
+    )
 
 
 @app.get("/escrow/{service_hash}", response_model=EscrowRecord)
