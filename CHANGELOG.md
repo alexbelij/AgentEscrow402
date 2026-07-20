@@ -11,6 +11,9 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 *Delivered the console/backend work the 1.1.0 entry below prematurely claimed as shipped.*
 
+### Added (2026-07-19)
+- **`AE402_STRICT=1` fail-loud mode** (`server/strict.py`, feat/ae402-strict-mode). Opt-in operator guarantee that a 200 response corresponds to a real testnet write: every documented silent-fallback branch raises `StrictModeError` -> 503 with a structured JSON body instead of returning a synthesised / mock response. Startup refuses to boot if `AE402_STRICT=1` is set but any of the three preconditions is missing (empty `CASPER_NODE_URL`, empty `ESCROW_CONTRACT_HASH`, `SANDBOX=true`). `/health` exposes a `strict_mode` capability breakdown ({enabled, preconditions_ok, violations, guarantees}) so a judge can see the guarantee level at a glance. `verify.sh` gained a `verify_strict_mode` check that reports the picture without forcing strict on for the hosted demo. 17 unit + integration tests in `tests/test_strict_mode.py` cover the config-precondition matrix, the runtime `guard()` no-op / raise asymmetry, the `/health` shape in all three states (off / on+ok / on+misconfigured), and the FastAPI exception handler round-trip. Guard call sites inside chain / RPC / DB paths are staged separately (see `docs/STRICT_MODE_ROLLOUT.md`).
+
 ### Added (2026-07-17)
 - **Red-team self-audit** (`docs/RED_TEAM.tmp`) — 15 attack-vector matrix with mitigation status; documents the one real gap (insurance-pool replay under specific reorg conditions) alongside the resistances (reentrancy, integer overflow, unauthorized cancellation, front-running, injection). Commit `a10e6a6`.
 - **verify.sh** — single-command proof of on-chain deployment: checks all 8 contracts exist on Casper testnet (via CSPR.cloud), API `/health`, escrow round-trip, frontend serving, and `onchain.json` parity. Commit `5b64081`, merged in `9184dbc`.

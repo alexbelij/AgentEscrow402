@@ -182,3 +182,8 @@ class HealthResponse(BaseModel):
     db: str = "disconnected"
     uptime: int = 0
     mode: str = "sandbox"  # "sandbox" | "live" — explicit mode indicator
+    # Strict / fail-loud capability breakdown. Populated by
+    # Config.strict_mode_capabilities(); see server/strict.py.
+    # When enabled=True, every documented silent-fallback branch raises
+    # StrictModeError instead of returning a mock response.
+    strict_mode: dict = {}

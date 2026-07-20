@@ -132,6 +132,15 @@ async def lifespan(application: FastAPI):
     global _casper, _monitor, _monitor_task
     cfg = get_config()
 
+    # Fail-loud precondition check. Under AE402_STRICT=1, refuse to start
+    # if any of the three well-known preconditions are missing (empty
+    # CASPER_NODE_URL, empty ESCROW_CONTRACT_HASH, or SANDBOX=true). This
+    # is the first thing that runs so an operator gets an immediate crash
+    # -- not a running-but-broken app -- when strict-mode is misconfigured.
+    # See server/strict.py.
+    from server.strict import ensure_strict
+    ensure_strict(cfg)
+
     # Initialize Casper client
     if not cfg.sandbox and cfg.casper_node_url and cfg.casper_private_key_path:
         _casper = CasperClient(cfg)
@@ -206,6 +215,35 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Strict-mode exception handler
+#
+# Any request-time code path that hits `strict.guard(cfg, path, reason)`
+# under AE402_STRICT=1 raises StrictModeError. Render it as a 503 with a
+# structured body so UI / CLI callers can distinguish it from a generic
+# 500. See server/strict.py.
+# ---------------------------------------------------------------------------
+from server.strict import StrictModeError as _StrictModeError  # noqa: E402
+
+
+@app.exception_handler(_StrictModeError)
+async def _strict_mode_exception_handler(request: Request, exc: _StrictModeError):
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": "strict_mode_violation",
+            "path": exc.path,
+            "reason": exc.reason,
+            "detail": (
+                "AE402_STRICT=1 is set and a silent-fallback code path was "
+                "about to trigger. The request has been rejected to avoid "
+                "returning a synthesised / mock response. Fix the underlying "
+                "configuration (see reason) or unset AE402_STRICT."
+            ),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -294,6 +332,7 @@ async def health(cfg: Config = Depends(get_config)):
         db="connected" if connected else "disconnected",
         uptime=int(time.time() - _started_at),
         mode="sandbox" if cfg.sandbox else "live",
+        strict_mode=cfg.strict_mode_capabilities(),
     )
 
 
