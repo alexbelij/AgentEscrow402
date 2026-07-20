@@ -24,6 +24,61 @@ This directory contains three integration layers for AgentEscrow402:
 
 ---
 
+## 2-minute quickstart
+
+> **For judges and first-time developers.** Zero config, zero secrets, works
+> against the live sandbox.
+
+```bash
+# 1. clone + install (30s)
+git clone https://github.com/alexbelij/AgentEscrow402.git
+cd AgentEscrow402
+pip install httpx cryptography pydantic
+
+# 2. run the quickstart (60s)
+python examples/quickstart.py --api-url https://agentescrow402-api-ywm8.onrender.com
+```
+
+Expected output (real testnet, one create + one release):
+
+```
+connected: {'status': 'ok', ...}
+buyer identity: <64-hex>
+escrow created: <service_hash> status=created
+escrow released: status=released deploy_hash=<hex>
+```
+
+That's it. The deploy_hash links to cspr.live if you want to inspect
+the on-chain state yourself.
+
+### What just happened
+
+1. `EscrowClient.generate()` produced a fresh Ed25519 identity (no
+   wallet setup, no funded testnet account required for the sandbox
+   flow).
+2. `create_escrow` produced a signed request; the server locked funds
+   and returned a `service_hash` you can reference later.
+3. `release` produced another signed request; the server released the
+   funds and returned a `deploy_hash`.
+
+For the full autonomous buyer/seller/arbiter loop (with a real dispute
+and an LLM arbitration call), run:
+
+```bash
+python examples/escrow_agent.py --api-url https://agentescrow402-api-ywm8.onrender.com
+```
+
+### Next steps
+
+- **LangChain**: drop `EscrowPaymentTool` into any agent — see
+  `sdk/langchain_tool.py`.
+- **MCP**: expose 26 escrow tools to Claude / GPT / any MCP client —
+  see `sdk/mcp_server.py`.
+- **Judging**: `docs/HOW_TO_JUDGE.md` maps the 8 criteria to concrete
+  files and endpoints.
+
+---
+
 ## Quick Start
 
 ### Install

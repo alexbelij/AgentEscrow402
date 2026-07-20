@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -431,6 +432,189 @@ async def health(cfg: Config = Depends(get_config)):
         uptime=int(time.time() - _started_at),
         mode="sandbox" if cfg.sandbox else "live",
         strict_mode=cfg.strict_mode_capabilities(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# GET /ops/health — operator surface (AE-A2)
+#
+# Enriched health for operators and judges evaluating operator UX.
+# Different from /health, which is the LB probe and must stay boolean.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/ops/health", tags=["ops"])
+async def ops_health(cfg: Config = Depends(get_config)):
+    """Deep operator snapshot: dependency status, retry queue depth,
+    circuit-breaker state, active warnings. No secrets in the payload;
+    provider config is reported as boolean + configured model name.
+    """
+    from server.ops_health import build_snapshot
+
+    snap = build_snapshot(
+        started_at=_started_at,
+        build_sha=os.getenv("BUILD_SHA", "dev"),
+        config_version=os.getenv("CONFIG_VERSION", "v3"),
+        mode="sandbox" if cfg.sandbox else "live",
+        strict_mode=cfg.strict_mode_capabilities(),
+    )
+    return snap.as_dict()
+
+
+# ---------------------------------------------------------------------------
+# POST /demo/three-step — guided demo contract (AE-A2)
+#
+# Returns a deterministic 3-step script a UI (or a judge running curl)
+# can replay end-to-end. Deliberately does not execute anything; it's a
+# machine-readable contract that keeps the demo path stable regardless
+# of what the console does.
+# ---------------------------------------------------------------------------
+
+
+class ThreeStepRequest(BaseModel):
+    scenario: str = "happy"  # "happy" | "dispute" | "abstain"
+
+
+class ThreeStepStep(BaseModel):
+    index: int
+    title: str
+    verb: str  # HTTP verb, e.g. "POST"
+    path: str  # e.g. "/escrow"
+    body: dict[str, Any] | None = None
+    expected_status: int
+    verify_link: str | None = None
+
+
+class ThreeStepResponse(BaseModel):
+    scenario: str
+    steps: list[ThreeStepStep]
+    outro: str
+
+
+@app.post("/demo/three-step", response_model=ThreeStepResponse, tags=["demo"])
+async def demo_three_step(req: ThreeStepRequest):
+    """Return the 3-step guided-demo contract for one of the well-known
+    scenarios. Deterministic. Same request → same response.
+    """
+    scenario = req.scenario.strip().lower()
+    if scenario not in ("happy", "dispute", "abstain"):
+        raise HTTPException(status_code=400, detail="scenario must be one of: happy, dispute, abstain")
+
+    if scenario == "happy":
+        return ThreeStepResponse(
+            scenario="happy",
+            steps=[
+                ThreeStepStep(
+                    index=1,
+                    title="Create escrow",
+                    verb="POST",
+                    path="/escrow",
+                    body={"amount_motes": 500_000, "receiver": "<hex64>"},
+                    expected_status=200,
+                    verify_link="/health",
+                ),
+                ThreeStepStep(
+                    index=2,
+                    title="Release funds",
+                    verb="POST",
+                    path="/escrow/{service_hash}/release",
+                    body={"amount_motes": 500_000},
+                    expected_status=200,
+                    verify_link="/escrow/{service_hash}",
+                ),
+                ThreeStepStep(
+                    index=3,
+                    title="Inspect final state",
+                    verb="GET",
+                    path="/escrow/{service_hash}",
+                    body=None,
+                    expected_status=200,
+                    verify_link=None,
+                ),
+            ],
+            outro="Every step emitted a real testnet deploy. Compare hashes with cspr.live.",
+        )
+
+    if scenario == "dispute":
+        return ThreeStepResponse(
+            scenario="dispute",
+            steps=[
+                ThreeStepStep(
+                    index=1,
+                    title="Create escrow + open dispute",
+                    verb="POST",
+                    path="/escrow",
+                    body={"amount_motes": 500_000, "receiver": "<hex64>"},
+                    expected_status=200,
+                    verify_link="/escrow/{service_hash}",
+                ),
+                ThreeStepStep(
+                    index=2,
+                    title="Run LLM arbitration",
+                    verb="POST",
+                    path="/arbitration/analyze",
+                    body={
+                        "dispute_id": "<uuid>",
+                        "sender_evidence": [],
+                        "receiver_evidence": [],
+                        "escrow_amount": 500_000,
+                    },
+                    expected_status=200,
+                    verify_link="/arbitration/history",
+                ),
+                ThreeStepStep(
+                    index=3,
+                    title="Verify evidence Merkle inclusion",
+                    verb="POST",
+                    path="/arbitration/verify-evidence",
+                    body={"leaf": "<hex64>", "siblings": [], "expected_root": "<hex64>"},
+                    expected_status=200,
+                    verify_link=None,
+                ),
+            ],
+            outro="Arbitration commits a Merkle evidence root; anyone can verify inclusion client-side.",
+        )
+
+    # abstain
+    return ThreeStepResponse(
+        scenario="abstain",
+        steps=[
+            ThreeStepStep(
+                index=1,
+                title="Trigger arbitration with weak evidence",
+                verb="POST",
+                path="/arbitration/analyze",
+                body={
+                    "dispute_id": "<uuid>",
+                    "sender_evidence": [],
+                    "receiver_evidence": [],
+                    "escrow_amount": 500_000,
+                    "sender_account": "<hex64>",
+                    "receiver_account": "<hex64>",
+                },
+                expected_status=200,
+                verify_link="/arbitration/history",
+            ),
+            ThreeStepStep(
+                index=2,
+                title="Auto-escalate to VRF panel",
+                verb="GET",
+                path="/arbitration/history",
+                body=None,
+                expected_status=200,
+                verify_link=None,
+            ),
+            ThreeStepStep(
+                index=3,
+                title="Read elected panel and their signatures",
+                verb="GET",
+                path="/arbiter/panel/{dispute_id}",
+                body=None,
+                expected_status=200,
+                verify_link=None,
+            ),
+        ],
+        outro="On abstain/low-confidence the LLM verdict is superseded by a VRF-elected human/agent panel; the escalation rule is one function in server/app.py.",
     )
 
 
