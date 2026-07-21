@@ -39,6 +39,7 @@ from server.middleware import (
     _verify_signature,
     compute_service_hash,
     parse_x402_header,
+    verify_signed_envelope_if_present,
 )
 from server.models import (
     BatchEscrowRequest,
@@ -833,6 +834,7 @@ async def wasm_escrow_funder():
 
 
 @app.post("/escrow", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.deposit")
 async def create_escrow(
     req: EscrowRequest,
     request: Request,
@@ -1226,6 +1228,7 @@ async def batch_cancel_escrows(
 
 
 @app.post("/release", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.release")
 async def release_escrow(
     req: ReleaseRequest,
     request: Request,
@@ -1320,6 +1323,7 @@ async def release_escrow(
 
 
 @app.post("/refund", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.refund")
 async def refund_escrow(
     req: RefundRequest,
     request: Request,
@@ -1375,6 +1379,7 @@ async def refund_escrow(
 
 
 @app.post("/dispute", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.dispute")
 async def dispute_escrow(
     req: DisputeRequest,
     request: Request,

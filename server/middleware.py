@@ -298,6 +298,18 @@ ENVELOPE_HEADER = "X-AE402-Envelope"
 DEFAULT_ENVELOPE_PROTOCOL = "AgentEscrow402"
 DEFAULT_ENVELOPE_VERSION = "v1"
 
+# When set to a truthy value, ``require_signed_envelope`` and its advisory
+# sibling ``verify_signed_envelope_if_present`` both refuse requests that
+# omit the header.  When unset (default), the *require* decorator is still
+# strict but the *advisory* helper is permissive so existing clients keep
+# working while operators roll signed envelopes out.
+ENFORCE_ENVELOPES_ENV = "AE402_ENFORCE_SIGNED_ENVELOPES"
+
+
+def _enforce_signed_envelopes() -> bool:
+    val = _os.environ.get(ENFORCE_ENVELOPES_ENV, "").strip().lower()
+    return val in {"1", "true", "yes", "on"}
+
 
 @lru_cache(maxsize=1)
 def _default_nonce_store() -> PersistentNonceStore:
@@ -460,6 +472,165 @@ def require_signed_envelope(
         # Rewrite the wrapper's signature so that FastAPI's dependency
         # resolver only sees the parameters the underlying handler
         # actually declares (minus ``envelope`` — we inject that).
+        new_params = [
+            p for name, p in sig.parameters.items() if name != "envelope"
+        ]
+        wrapper.__signature__ = sig.replace(parameters=new_params)
+        return wrapper
+
+    return decorator
+
+
+# ---------------------------------------------------------------------------
+# Advisory verification: use for *existing* endpoints (deposit, release,
+# refund, dispute) so that clients that opt into signed envelopes get the
+# full protection (domain-separator, nonce, timestamp, signature) while
+# clients that have not migrated keep working.  Flip
+# ``AE402_ENFORCE_SIGNED_ENVELOPES=1`` to promote to strict enforcement
+# without touching handler code.
+# ---------------------------------------------------------------------------
+
+
+def verify_signed_envelope_if_present(
+    *,
+    purpose: str,
+    protocol: str = DEFAULT_ENVELOPE_PROTOCOL,
+    version: str = DEFAULT_ENVELOPE_VERSION,
+    chain_id: str | None = None,
+    replay_window_seconds: int | None = None,
+) -> Callable[[Callable], Callable]:
+    """Advisory sibling of :func:`require_signed_envelope`.
+
+    Semantics:
+
+    * If ``AE402_ENFORCE_SIGNED_ENVELOPES`` is truthy, this behaves
+      identically to :func:`require_signed_envelope` — no header means
+      401 and every failure short-circuits.
+    * Otherwise, a *present* envelope is fully verified (same 4xx codes
+      on mismatch/replay/tamper) but a *missing* envelope is allowed
+      through with ``request.state.ae402_envelope = None``.
+
+    This lets deployments roll signed envelopes out gradually: first
+    ship server + client changes, wait until observability confirms all
+    real callers are attaching envelopes, then set the enforce flag.
+    """
+
+    from server.signed_envelope import (
+        DEFAULT_REPLAY_WINDOW_SECONDS,
+        KNOWN_PURPOSES,
+    )
+
+    if purpose not in KNOWN_PURPOSES:
+        raise ValueError(
+            f"verify_signed_envelope_if_present: unknown purpose {purpose!r}; "
+            f"extend KNOWN_PURPOSES in server.signed_envelope first"
+        )
+
+    window = (
+        replay_window_seconds
+        if replay_window_seconds is not None
+        else DEFAULT_REPLAY_WINDOW_SECONDS
+    )
+
+    def decorator(fn: Callable) -> Callable:
+        sig = _inspect.signature(fn)
+        accepts_envelope = "envelope" in sig.parameters
+
+        @wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for a in args:
+                    if isinstance(a, Request):
+                        request = a
+                        break
+            if request is None:
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "envelope_middleware_needs_request"},
+                )
+
+            raw = request.headers.get(ENVELOPE_HEADER)
+            enforce = _enforce_signed_envelopes()
+
+            if not raw:
+                if enforce:
+                    return JSONResponse(
+                        status_code=401,
+                        content={
+                            "error": "envelope_missing",
+                            "reason": "envelope_missing",
+                        },
+                    )
+                # Advisory / not enforced — let the handler run with no envelope.
+                request.state.ae402_envelope = None
+                if accepts_envelope:
+                    kwargs["envelope"] = None
+                return await fn(*args, **kwargs)
+
+            # Header present — full verify regardless of enforcement mode.
+            try:
+                obj = _json.loads(raw)
+            except (ValueError, TypeError):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "envelope_bad_json", "reason": "envelope_bad_json"},
+                )
+            if not isinstance(obj, dict):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "envelope_bad_shape", "reason": "envelope_bad_shape"},
+                )
+
+            try:
+                envelope = SignedEnvelope.from_dict(obj)
+            except (ValueError, KeyError, TypeError) as exc:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "envelope_bad_fields",
+                        "reason": "envelope_bad_fields",
+                        "detail": str(exc),
+                    },
+                )
+
+            resolved_chain = (
+                chain_id if chain_id is not None else _chain_id_from_env()
+            )
+            if not resolved_chain:
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "chain_id_unset", "reason": "chain_id_unset"},
+                )
+            expected = DomainSeparator(
+                protocol=protocol,
+                version=version,
+                chain_id=resolved_chain,
+                purpose=purpose,
+            )
+            result = verify_envelope(
+                envelope,
+                expected_domain=expected,
+                replay_window_seconds=window,
+                nonce_store=_default_nonce_store(),
+            )
+            if not result.ok:
+                status = 401 if result.reason in {
+                    "bad_signature",
+                    "nonce_reused",
+                    "timestamp_stale",
+                    "timestamp_future",
+                } else 400
+                return JSONResponse(
+                    status_code=status,
+                    content={"error": "envelope_rejected", "reason": result.reason},
+                )
+
+            if accepts_envelope:
+                kwargs["envelope"] = envelope
+            request.state.ae402_envelope = envelope
+            return await fn(*args, **kwargs)
+
         new_params = [
             p for name, p in sig.parameters.items() if name != "envelope"
         ]
