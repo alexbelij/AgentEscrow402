@@ -265,3 +265,205 @@ def compute_service_hash(sender: str, receiver: str, amount: int, nonce: str) ->
     """Compute deterministic service hash for escrow lookup."""
     payload = f"{sender}:{receiver}:{amount}:{nonce}"
     return hashlib.sha256(payload.encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Strict signed-envelope surface (opt-in).
+#
+# Backward compatibility: the ``@require_payment`` decorator above and the
+# x402-v1 header format continue to work unchanged.  New routes that need
+# domain-separated / detached signatures should use
+# ``@require_signed_envelope(purpose=...)`` instead and read the
+# ``X-AE402-Envelope`` request header (a JSON-encoded SignedEnvelope).
+#
+# The persistent nonce store defaults to a per-process on-disk SQLite file
+# under ``$AE402_NONCE_STORE_PATH`` (or a sensible tmp default).  Setting
+# ``AE402_NONCE_STORE_PATH=:memory:`` uses a shared in-memory store, which
+# is useful in tests but resets on restart.
+# ---------------------------------------------------------------------------
+
+import inspect as _inspect
+import json as _json  # local alias to avoid touching the top-of-file imports
+import os as _os
+from functools import lru_cache, wraps
+
+from server.signed_envelope import (
+    DomainSeparator,
+    PersistentNonceStore,
+    SignedEnvelope,
+    verify_envelope,
+)
+
+ENVELOPE_HEADER = "X-AE402-Envelope"
+DEFAULT_ENVELOPE_PROTOCOL = "AgentEscrow402"
+DEFAULT_ENVELOPE_VERSION = "v1"
+
+
+@lru_cache(maxsize=1)
+def _default_nonce_store() -> PersistentNonceStore:
+    """Process-wide singleton store, configurable via env var.
+
+    Cached so that repeated calls (one per decorated handler) do not
+    reopen the database.  Cache is per-process, which matches the
+    per-worker lifecycle of a FastAPI/uvicorn deployment.
+    """
+    path = _os.environ.get("AE402_NONCE_STORE_PATH", "")
+    if path == ":memory:":
+        return PersistentNonceStore.in_memory()
+    if not path:
+        # Default: writable tmp path.  In production the operator
+        # should point this at a persistent volume alongside the DB.
+        path = _os.path.join(_os.environ.get("TMPDIR", "/tmp"), "ae402_nonces.sqlite")
+    return PersistentNonceStore(path)
+
+
+def _chain_id_from_env() -> str:
+    """Chain id the verifier expects.  Reads AE402_CHAIN_ID.
+
+    Fails fast (returns empty string) if not set, so a decorated route
+    surfaces a clear 500 rather than silently accepting envelopes for
+    the wrong chain.
+    """
+    return _os.environ.get("AE402_CHAIN_ID", "")
+
+
+def require_signed_envelope(
+    *,
+    purpose: str,
+    protocol: str = DEFAULT_ENVELOPE_PROTOCOL,
+    version: str = DEFAULT_ENVELOPE_VERSION,
+    chain_id: str | None = None,
+    replay_window_seconds: int | None = None,
+) -> Callable[[Callable], Callable]:
+    """FastAPI decorator: enforce a domain-separated signed envelope.
+
+    The wrapped handler receives the parsed :class:`SignedEnvelope` as
+    a keyword argument ``envelope`` in addition to whatever it already
+    accepts.  Missing header, malformed JSON, wrong domain, replayed
+    nonce, stale timestamp, or bad signature all resolve to a 4xx
+    response with a structured ``reason`` code, never a 500.
+
+    ``chain_id`` defaults to ``AE402_CHAIN_ID`` from the environment;
+    passing it explicitly is useful for tests that want to pin one
+    chain without touching the process env.
+    """
+
+    from server.signed_envelope import (
+        DEFAULT_REPLAY_WINDOW_SECONDS,
+        KNOWN_PURPOSES,
+    )
+
+    if purpose not in KNOWN_PURPOSES:
+        raise ValueError(
+            f"require_signed_envelope: unknown purpose {purpose!r}; "
+            f"extend KNOWN_PURPOSES in server.signed_envelope first"
+        )
+
+    window = (
+        replay_window_seconds
+        if replay_window_seconds is not None
+        else DEFAULT_REPLAY_WINDOW_SECONDS
+    )
+
+    def decorator(fn: Callable) -> Callable:
+        sig = _inspect.signature(fn)
+        accepts_envelope = "envelope" in sig.parameters
+
+        @wraps(fn)
+        async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            request: Request | None = kwargs.get("request")
+            if request is None:
+                for a in args:
+                    if isinstance(a, Request):
+                        request = a
+                        break
+            if request is None:
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "envelope_middleware_needs_request"},
+                )
+
+            raw = request.headers.get(ENVELOPE_HEADER)
+            if not raw:
+                return JSONResponse(
+                    status_code=401,
+                    content={"error": "envelope_missing", "reason": "envelope_missing"},
+                )
+
+            try:
+                obj = _json.loads(raw)
+            except (ValueError, TypeError):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "envelope_bad_json", "reason": "envelope_bad_json"},
+                )
+            if not isinstance(obj, dict):
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "envelope_bad_shape", "reason": "envelope_bad_shape"},
+                )
+
+            try:
+                envelope = SignedEnvelope.from_dict(obj)
+            except (ValueError, KeyError, TypeError) as exc:
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "error": "envelope_bad_fields",
+                        "reason": "envelope_bad_fields",
+                        "detail": str(exc),
+                    },
+                )
+
+            resolved_chain = (
+                chain_id if chain_id is not None else _chain_id_from_env()
+            )
+            if not resolved_chain:
+                # Refuse to run without a configured chain id — better
+                # to 500 than to accept envelopes for an unknown chain.
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "chain_id_unset", "reason": "chain_id_unset"},
+                )
+            expected = DomainSeparator(
+                protocol=protocol,
+                version=version,
+                chain_id=resolved_chain,
+                purpose=purpose,
+            )
+
+            result = verify_envelope(
+                envelope,
+                expected_domain=expected,
+                replay_window_seconds=window,
+                nonce_store=_default_nonce_store(),
+            )
+            if not result.ok:
+                status = 401 if result.reason in {
+                    "bad_signature",
+                    "nonce_reused",
+                    "timestamp_stale",
+                    "timestamp_future",
+                } else 400
+                return JSONResponse(
+                    status_code=status,
+                    content={"error": "envelope_rejected", "reason": result.reason},
+                )
+
+            if accepts_envelope:
+                kwargs["envelope"] = envelope
+            # Stash on request.state as well so handlers that don't take
+            # it as a kwarg can still fetch it explicitly.
+            request.state.ae402_envelope = envelope
+            return await fn(*args, **kwargs)
+
+        # Rewrite the wrapper's signature so that FastAPI's dependency
+        # resolver only sees the parameters the underlying handler
+        # actually declares (minus ``envelope`` — we inject that).
+        new_params = [
+            p for name, p in sig.parameters.items() if name != "envelope"
+        ]
+        wrapper.__signature__ = sig.replace(parameters=new_params)
+        return wrapper
+
+    return decorator
