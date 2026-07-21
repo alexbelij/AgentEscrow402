@@ -112,6 +112,48 @@ Everything the server produces is either:
 If any of these fails a judge's spot-check, that's a security bug,
 not a demo failing gracefully.
 
+## Regulatory posture (30-second read)
+
+AE402 is designed to be **regulator-friendly by construction**.
+Full analysis in `docs/COMPLIANCE.md`.
+
+- **EU MiCA** — out of CASP scope. The escrow contract is
+  non-custodial: users retain private keys, the smart contract
+  holds funds under programmatic release conditions. Recital 83
+  explicitly excludes non-custodial wallet software from CASP
+  authorisation. AE402 provides utility infrastructure, not a
+  crypto-asset service.
+- **EU AI Act** — AE402 is classified as a **high-risk AI system**
+  under Annex III 8(a) (alternative dispute resolution with binding
+  legal effect), per the July 2024 Commission Draft Guidelines
+  that name arbitration explicitly. What we already implement
+  to satisfy Art. 8-15 + 26: redacted audit trace (Art. 12),
+  Merkle-committed evidence lineage (Art. 12), VRF-panel human
+  escalation on abstain (Art. 14), deterministic policy layer
+  before LLM call (Art. 15), CUSUM/Page-Hinkley post-market
+  monitoring on decision drift (Art. 72). Full mapping in
+  `docs/COMPLIANCE.md`.
+- **US FinCEN (2019 guidance)** — not a money transmitter. AE402
+  is a non-custodial software provider under the integral-service
+  analog of Section 4.5.1(b). Value moves peer-to-peer under
+  smart-contract control; we do not accept or transmit customer
+  funds.
+- **US SEC / CFTC** — AE402 handles service-work escrow, not
+  investment contracts or derivatives. CSPR is the payment rail;
+  no yield, no pooled investment, no leverage.
+- **NIST AI RMF 1.0 + GenAI Profile (July 2024)** — explicit
+  Govern/Map/Measure/Manage mapping in `docs/COMPLIANCE.md`
+  (GV-1.1, GV-3.2, MS-2.5, MS-2.11, MG-4.1, MG-4.2).
+- **GDPR** — evidence-minimisation by design: only hashes,
+  decisions, provider IDs and confidence scores are audited;
+  raw prompts and secrets are redacted before the trace event
+  is emitted.
+
+Honest gap-list in `docs/COMPLIANCE.md`: FRIA / DPA / Art. 30
+templates, per-jurisdiction deployer runbooks, formal legal
+opinion under the first commercial deployer, cross-border
+transfer mechanism for upstream LLM provider.
+
 ## Contact
 
 - Repo: https://github.com/alexbelij/AgentEscrow402
