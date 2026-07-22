@@ -434,6 +434,34 @@ async def health(cfg: Config = Depends(get_config)):
     )
 
 
+@app.get("/metrics", include_in_schema=False)
+async def metrics(cfg: Config = Depends(get_config)):
+    """Prometheus / OpenMetrics 1.0.0 scrape endpoint.
+
+    Exposes operator-visible signals in the standard text format so
+    Prometheus, Grafana Agent, VictoriaMetrics vmagent and any
+    OpenMetrics-compliant collector can ingest without extra tooling.
+    See server/metrics.py for the metric catalogue.
+    """
+    from starlette.responses import Response
+
+    from server.metrics import build_metrics_text, openmetrics_content_type
+
+    body = build_metrics_text(
+        started_at=_started_at,
+        db_connected=pgdb.is_connected(),
+        chain_name=cfg.casper_chain_name,
+        contract_hashes={
+            "escrow": cfg.contract_hash or "",
+            "manager": cfg.manager_contract_hash or "",
+            "insurance": cfg.insurance_contract_hash or "",
+            "vrf": cfg.vrf_contract_hash or "",
+        },
+        sandbox_mode=cfg.sandbox,
+    )
+    return Response(content=body, media_type=openmetrics_content_type())
+
+
 @app.get("/contracts")
 async def contracts(cfg: Config = Depends(get_config)):
     """Backend-configured deployed contract addresses.
