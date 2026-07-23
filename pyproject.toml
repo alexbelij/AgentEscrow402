@@ -95,6 +95,7 @@ target-version = ["py311"]
 # normal, isolated test failure — this caused two flaky red CI runs in one
 # session even though nothing in the actual codebase was broken. Ignore it
 # in automated CI; run it manually when you want a live-deployment check.
+<<<<<<< HEAD
 #
 # tests/integration/ requires a running local NCTL Casper network
 # (docker-compose.casper-nctl.yml) and is not run in default CI; see
@@ -108,5 +109,10 @@ addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration -m 'not te
 markers = [
     "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
     "network: integration tests that require live network access (e.g. Sepolia RPC) — skipped offline",
-    "testnet: live Casper testnet integration test (requires network, opt-in only)",
+    "testnet: opt-in tests hitting live Casper testnet RPC (skipped by default)",
+=======
+addopts = "--ignore=tests/test_e2e_live.py -m 'not testnet'"
+markers = [
+    "testnet: opt-in tests hitting live Casper testnet RPC (skipped by default)",
+>>>>>>> e90c7dd (fix(testnet-tests): make @pytest.mark.testnet suite actually runnable)
 ]

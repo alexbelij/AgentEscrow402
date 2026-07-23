@@ -20,6 +20,7 @@ types, and known-deployed contract hashes staying queryable.
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 
 from server.casper_client import CasperClient
 from server.config import Config
@@ -37,7 +38,14 @@ def live_config() -> Config:
     )
 
 
-@pytest.fixture
+# NOTE: async fixture generators MUST use @pytest_asyncio.fixture under
+# pytest-asyncio's strict mode (see pyproject.toml -> asyncio_mode="strict").
+# Plain @pytest.fixture with an async body was silently rejected at setup
+# with "requested an async fixture ... with no plugin or hook that handled
+# it" — the test would error before touching the network. This mistake in
+# the original commit meant *none* of the four @testnet tests were actually
+# runnable, defeating the purpose of the opt-in marker.
+@pytest_asyncio.fixture
 async def live_client(live_config: Config):
     client = CasperClient(live_config)
     yield client
