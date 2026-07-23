@@ -5,13 +5,12 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM"],
     "strict": true,
-    "declaration": true,
-    "outDir": "dist",
-    "rootDir": ".",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["*.ts"],
-  "exclude": ["dist", "*.test.ts"]
+  "exclude": ["*.test.ts"]
 }
