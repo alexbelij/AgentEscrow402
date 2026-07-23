@@ -716,6 +716,50 @@ Full deploy-hash-by-deploy-hash log:
 
 ---
 
+## 📈 Observability (SigNoz / OpenTelemetry)
+
+The server exports **traces + metrics** over OTLP/gRPC when the `SIGNOZ_OTEL_ENDPOINT`
+environment variable is set. If it is unset (the default), telemetry is a graceful **no-op** —
+the server starts cleanly and the escrow hot path is untouched.
+
+### What is captured
+
+**Traces** — every FastAPI request is auto-instrumented, plus custom lifecycle spans for:
+
+- `escrow.escrow_created`
+- `escrow.escrow_released`
+- `escrow.arbitration_complete`
+- `escrow.escrow_resolved`
+
+Each span carries `escrow.service_hash` so a full lifecycle can be traced end-to-end.
+
+**Metrics** — four business counters/histograms:
+
+- `escrow.opened` (counter) — every new escrow accepted
+- `escrow.paid_out` (counter) — every release / arbiter-resolve payout
+- `arbiter.approved` (counter) — every completed arbitration cycle
+- `agent.claim_ms` (histogram) — end-to-end claim latency
+
+### Enabling it
+
+```bash
+export SIGNOZ_OTEL_ENDPOINT=http://your-signoz-collector:4317
+export SIGNOZ_OTEL_HEADERS="signoz-access-token=<token>"   # optional, cloud SigNoz
+export SIGNOZ_SERVICE_NAME=agentescrow402
+export SIGNOZ_DEPLOYMENT_ENV=production
+export SIGNOZ_SAMPLE_RATIO=1.0                              # TraceIdRatioBased
+
+python -m uvicorn server.app:app --host 0.0.0.0 --port 8000
+```
+
+SDK dependencies (`opentelemetry-{api,sdk,exporter-otlp,instrumentation-fastapi}`) ship in
+`requirements.txt`. See [`server/telemetry.py`](server/telemetry.py) for the wiring; it is
+called once from the FastAPI `lifespan` and never blocks the event path.
+
+<div align="right"><a href="#readme-top">↑ back to top</a></div>
+
+---
+
 ## 📚 All documentation
 
 | Doc | What's in it |
