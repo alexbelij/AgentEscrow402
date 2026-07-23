@@ -57,6 +57,11 @@ Last reviewed: 2026-07-17 (pre-submission audit)
 This is a structural guarantee: even a compromised backend cannot extract
 locked funds without the corresponding on-chain signatures.
 
+### Full Threat Model
+
+See [`docs/THREAT_MODEL.md`](docs/THREAT_MODEL.md) for asset inventory, actor
+trust boundaries, per-surface mitigations, and accepted-risk rationale.
+
 ### CI Security Pipeline
 
 - **TruffleHog**: scans every push + PR for leaked secrets (weekly cron)
