@@ -99,8 +99,14 @@ target-version = ["py311"]
 # tests/integration/ requires a running local NCTL Casper network
 # (docker-compose.casper-nctl.yml) and is not run in default CI; see
 # .github/workflows/casper-nctl-integration.yml for its own job.
-addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration"
+#
+# tests/test_testnet_integration.py's `testnet` marker gates tests that hit
+# the real Casper testnet RPC fallback chain -- excluded from the default
+# run for the same reason (no network dependency for CI/local dev). Run
+# them explicitly with `pytest -m testnet tests/test_testnet_integration.py`.
+addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration -m 'not testnet'"
 markers = [
     "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
     "network: integration tests that require live network access (e.g. Sepolia RPC) — skipped offline",
+    "testnet: live Casper testnet integration test (requires network, opt-in only)",
 ]
