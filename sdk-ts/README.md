@@ -28,15 +28,17 @@ project.
 - `types.ts` — `TokenType`, `EscrowStatus`, `EscrowResponse`, and friends,
   mirroring `sdk/agentescrow402/models.py`.
 - `client.ts` — `AgentEscrow402ReadClient`: `getEscrow`, `getReputation`,
-  `health`. Read-only, unauthenticated — matches the unauthenticated GET
-  routes in `server/app.py` (no `X-Payment` / `X-402-Auth` header
-  required for these endpoints).
+  `riskScore`, `health`. Read-only, unauthenticated — matches the
+  unauthenticated GET routes in `server/app.py` (no `X-Payment` /
+  `X-402-Auth` header required for these endpoints).
 - `verify.ts` — canonical-message builders (`buildResolveMessage`,
   `buildCapApprovalMessage`, `buildInsuranceClaimMessage`) and
-  `verifyEd25519Vote` / `countValidVotes`, a byte-for-byte TypeScript
-  mirror of `server/arbiter_crypto.py`'s tag-prefixed-hex Ed25519 checks.
-  Also `verifySignedCheckpoint`, mirroring `server/audit_log.py`'s
-  checkpoint-signature verification.
+  `verifyEd25519Vote` / `countValidVotes` /
+  `countValidCapApprovalVotes` / `countValidInsuranceClaimVotes`, a
+  byte-for-byte TypeScript mirror of `server/arbiter_crypto.py`'s
+  tag-prefixed-hex Ed25519 checks. Checkpoint-signature verification
+  (see `server/audit_log.py`) is out of scope for this port — planned
+  for a follow-up SDK release.
 
 ## Usage
 
@@ -63,3 +65,18 @@ directly, no build step or ts-node needed):
 ```bash
 node --test sdk-ts/*.test.ts
 ```
+
+## Build model
+
+This SDK is **zero-build**: it ships as `.ts` sources meant to be run
+directly under Node 22+'s native type-stripping (`node --test`,
+`node --experimental-strip-types`) or vendored into a downstream
+TypeScript project that already has its own build pipeline.
+
+`tsconfig.json` is set to `noEmit: true` +
+`allowImportingTsExtensions: true` so the source files' explicit
+`.ts` imports type-check cleanly with `tsc --noEmit`. There is no
+`dist/` output and no `.d.ts` emission from this package itself — if
+you need standalone `.js`/`.d.ts` artifacts (e.g. for a browser
+bundle), compile the sources in a downstream project after
+substituting the `.ts` imports for `.js`.
