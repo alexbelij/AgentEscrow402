@@ -133,13 +133,45 @@ def _raise_fsm_or_generic(exc: ValueError) -> None:
     raise HTTPException(status_code=400, detail=str(exc))
 
 
+# Map event.type -> (metric_name, value) for the four lifecycle events
+# we care about. Anything else just goes to SSE and is ignored by OTel.
+_LIFECYCLE_METRIC = {
+    "escrow_created": ("escrow.opened", 1.0),
+    "escrow_released": ("escrow.paid_out", 1.0),
+    "arbitration_complete": ("arbiter.approved", 1.0),
+    "escrow_resolved": ("escrow.paid_out", 1.0),
+}
+
+
 def _broadcast_event(event: dict[str, Any]) -> None:
-    """Push event to all SSE subscribers."""
+    """Push event to all SSE subscribers, and record OTel metric/span."""
     for q in _event_subscribers:
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
             pass
+    # Fire-and-forget OTel side effect. No-op when telemetry disabled.
+    try:
+        from server import telemetry
+
+        etype = event.get("type", "")
+        sh = event.get("service_hash", "") or ""
+        # metric
+        metric = _LIFECYCLE_METRIC.get(etype)
+        if metric:
+            telemetry.record_escrow_metric(
+                metric[0],
+                metric[1],
+                event_type=etype,
+                service_hash_prefix=sh[:16] if sh else "",
+            )
+        # span (only when we've got a lifecycle event with a service_hash)
+        if etype in _LIFECYCLE_METRIC and sh:
+            with telemetry.escrow_lifecycle_span(etype, sh):
+                pass
+    except Exception:  # noqa: BLE001
+        # Telemetry must never break the event path.
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -159,8 +191,12 @@ async def lifespan(application: FastAPI):
     # -- not a running-but-broken app -- when strict-mode is misconfigured.
     # See server/strict.py.
     from server.strict import ensure_strict
+    from server.telemetry import setup_telemetry, shutdown_telemetry
 
     ensure_strict(cfg)
+
+    # OpenTelemetry — no-op when SIGNOZ_OTEL_ENDPOINT is unset.
+    setup_telemetry(application)
 
     # Initialize Casper client
     if not cfg.sandbox and cfg.casper_node_url and cfg.casper_private_key_path:
@@ -200,6 +236,7 @@ async def lifespan(application: FastAPI):
     yield
 
     # Shutdown
+    shutdown_telemetry()
     if _monitor:
         await _monitor.stop()
     if _monitor_task and not _monitor_task.done():
