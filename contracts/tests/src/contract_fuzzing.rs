@@ -29,9 +29,17 @@ fn calculate_premium(base_rate: u64, amount: u64, risk_score: u64) -> u64 {
 
 /// Mirrors vrf-arbiter/src/main.rs `get_random_u64`: blake2b(seed) truncated
 /// to the first 8 bytes, little-endian.
+///
+/// IMPORTANT: on-chain `runtime::blake2b` uses `BLAKE2B_DIGEST_LENGTH = 32`
+/// (Blake2b-256), NOT the crate default of Blake2b-512. Blake2b mixes the
+/// configured output length into its parameter block, so the two variants
+/// diverge from byte 0 for the same input. This mirror MUST use the
+/// 32-byte-output variant to accurately fuzz on-chain behavior.
 fn get_random_u64(seed: &[u8]) -> u64 {
-    use blake2::{Blake2b512, Digest};
-    let mut hasher = Blake2b512::new();
+    use blake2::digest::consts::U32;
+    use blake2::{Blake2b, Digest};
+    type Blake2b256 = Blake2b<U32>;
+    let mut hasher = Blake2b256::new();
     hasher.update(seed);
     let hash = hasher.finalize();
     u64::from_le_bytes([
