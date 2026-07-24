@@ -21,15 +21,12 @@ node_modules on PATH (image already has both).
 
 from __future__ import annotations
 
-import asyncio
 import hashlib
 import json
 import os
 import pathlib
 import subprocess
-import time
 import uuid
-from typing import Any
 
 import httpx
 import pytest
@@ -177,7 +174,7 @@ def deployed_escrow_contract_hash(
     assert result.returncode == 0, f"deploy failed: {result.stderr}\n{result.stdout}"
     payload = json.loads(result.stdout.strip().splitlines()[-1])
     assert payload.get("success"), payload
-    deploy_hash = payload["hash"]
+    assert payload.get("hash"), f"deploy payload missing hash: {payload}"
 
     # Wait for inclusion + contract entry to appear in named keys.
     wait_for_block(timeout=90.0)

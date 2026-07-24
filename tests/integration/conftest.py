@@ -18,11 +18,9 @@ from __future__ import annotations
 import os
 import pathlib
 import time
-from typing import Any
 
 import httpx
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Environment
