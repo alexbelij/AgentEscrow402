@@ -4,7 +4,22 @@ from __future__ import annotations
 
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+
+# AE-1: canonical wire field for value transfer is `amount_motes` (integer
+# motes; 1 CSPR = 1_000_000_000 motes). Existing clients that send `amount`
+# continue to work — every model below accepts both names on input via
+# `validation_alias=AliasChoices("amount_motes", "amount")` and Pydantic
+# `populate_by_name=True`. Python attribute stays `.amount` so ~100 call
+# sites are unchanged; OpenAPI description flags `amount_motes` as the
+# canonical name and `amount` as a legacy alias slated for removal in v2.
+# See AE_AUDIT_REPORT_2026-07-24.md AE-1 Gap #1.
+_AMOUNT_ALIAS = AliasChoices("amount_motes", "amount")
+_AMOUNT_DESCRIPTION = (
+    "Deposit amount in motes (1 CSPR = 1_000_000_000 motes). "
+    "Canonical wire name is `amount_motes`; legacy `amount` is accepted "
+    "as an input alias and will be removed in API v2."
+)
 
 
 class EscrowStatus(str, Enum):
@@ -22,12 +37,19 @@ class EscrowStatus(str, Enum):
 class EscrowRequest(BaseModel):
     """Request to create a new escrow."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     receiver: str = Field(
         ...,
         pattern=r"^(account-hash-)?[0-9a-fA-F]{64}$",
         description="Casper account hash of the receiver (raw 64-hex or account-hash- prefixed)",
     )
-    amount: int = Field(..., gt=0, description="Amount in motes")
+    amount: int = Field(
+        ...,
+        gt=0,
+        validation_alias=_AMOUNT_ALIAS,
+        description=_AMOUNT_DESCRIPTION,
+    )
     service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
     # Set when the wallet-connected caller already built, signed (via their
@@ -68,12 +90,19 @@ class EscrowRecord(BaseModel):
 class BatchEscrowItem(BaseModel):
     """A single escrow spec within a batch-create request."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     receiver: str = Field(
         ...,
         pattern=r"^(account-hash-)?[0-9a-fA-F]{64}$",
         description="Casper account hash of the receiver (raw 64-hex or account-hash- prefixed)",
     )
-    amount: int = Field(..., gt=0, description="Amount in motes")
+    amount: int = Field(
+        ...,
+        gt=0,
+        validation_alias=_AMOUNT_ALIAS,
+        description=_AMOUNT_DESCRIPTION,
+    )
     service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
 

@@ -9,7 +9,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from server import arbiter_crypto
 from server.casper_client import CasperClient
@@ -139,8 +139,21 @@ class TokenIdentifier(BaseModel):
 class MultiAssetEscrowRequest(BaseModel):
     """Request to create a new multi-asset escrow."""
 
+    # AE-1: accept both `amount_motes` (canonical) and `amount` (legacy alias)
+    # for CSPR-type multi-asset escrows; token-unit escrows still use `amount`.
+    model_config = ConfigDict(populate_by_name=True)
+
     receiver: str = Field(..., description="Casper account hash of the receiver")
-    amount: int = Field(..., gt=0, description="Amount in motes or token units")
+    amount: int = Field(
+        ...,
+        gt=0,
+        validation_alias=AliasChoices("amount_motes", "amount"),
+        description=(
+            "Amount in motes (for token_type=cspr, 1 CSPR = 1_000_000_000 motes) "
+            "or in token units for CEP-18/CEP-78. Canonical wire name is "
+            "`amount_motes`; `amount` is a legacy input alias."
+        ),
+    )
     token: TokenIdentifier = Field(..., description="Details of the token being escrowed")
     service_hash: str = Field(..., min_length=64, max_length=64)
     ttl: int = Field(default=300, ge=60, le=86400, description="Time-to-live in seconds")
@@ -157,8 +170,30 @@ class MultiAssetEscrowRequest(BaseModel):
 class StreamEscrowRequest(BaseModel):
     """Request to create a new streaming escrow."""
 
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "receiver": "account-hash-...",
+                "amount_motes": 1000000000,
+                "token": {"token_type": "cspr"},
+                "service_hash": "a" * 64,
+                # start_time / end_time filled at request time.
+            }
+        },
+    )
+
     receiver: str = Field(..., description="Casper account hash of the receiver")
-    amount: int = Field(..., gt=0, description="Total amount in motes or token units")
+    amount: int = Field(
+        ...,
+        gt=0,
+        validation_alias=AliasChoices("amount_motes", "amount"),
+        description=(
+            "Total amount in motes (CSPR) or token units. Canonical wire name "
+            "is `amount_motes` for CSPR; `amount` accepted as legacy alias."
+        ),
+    )
     token: TokenIdentifier = Field(..., description="Details of the token being streamed")
     service_hash: str = Field(..., min_length=64, max_length=64)
     start_time: int = Field(..., description="Unix timestamp when streaming starts")
@@ -175,19 +210,6 @@ class StreamEscrowRequest(BaseModel):
 
     # Optional: interval_amount or duration for more granular control, for simplicity we derive from total/duration
     # interval_seconds: int = Field(..., gt=0, description="Interval in seconds for payment chunks")
-
-    class Config:
-        extra = "forbid"
-        json_schema_extra = {
-            "example": {
-                "receiver": "account-hash-...",
-                "amount": 1000000000,
-                "token": {"token_type": "cspr"},
-                "service_hash": "a" * 64,
-                "start_time": int(time.time()),
-                "end_time": int(time.time()) + 3600,
-            }
-        }
 
 
 class StreamStatusResponse(BaseModel):
