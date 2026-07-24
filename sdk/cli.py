@@ -42,7 +42,7 @@ import asyncio
 import json
 import os
 import sys
-from typing import Any, Callable
+from typing import Any
 
 # Deferred import so `--help` still works on a stripped-down deploy.
 try:  # pragma: no cover - trivial import guard
