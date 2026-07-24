@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from server import arbiter_crypto
 from server import db as pgdb
+from server import strict
 from server.admin_api import router as admin_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, ArbitrationRecommendation, DisputeEvidence
@@ -609,7 +610,12 @@ async def create_escrow(
                 service_hash=req.service_hash,
                 ttl=req.ttl,
             )
-            pgdb.save_escrow(record)
+            if not pgdb.save_escrow(record):
+                strict.guard(
+                    cfg,
+                    "app.create_escrow.sandbox_db_write_failed",
+                    "pgdb.save_escrow returned False (DB disconnected), escrow only persisted in memory",
+                )
             if fee > 0:
                 pgdb.record_insurance_fee(req.service_hash, fee)
             # ML-KEM: encrypt service metadata for post-quantum confidentiality
@@ -675,7 +681,13 @@ async def create_escrow(
         "ttl": req.ttl,
         "deploy_hash": deploy_hash,
     }
-    pgdb.save_escrow(record)
+    if not pgdb.save_escrow(record):
+        strict.guard(
+            cfg,
+            "app.create_escrow.live_db_write_failed",
+            "pgdb.save_escrow returned False (DB disconnected) after a real on-chain write; "
+            "the escrow exists on testnet but would not be recorded in Postgres",
+        )
     if fee > 0:
         pgdb.record_insurance_fee(req.service_hash, fee)
     _broadcast_event(
@@ -735,7 +747,12 @@ async def create_escrow_batch(
             for item in req.escrows
         ]
         for rec in records:
-            pgdb.save_escrow(rec)
+            if not pgdb.save_escrow(rec):
+                strict.guard(
+                    cfg,
+                    "app.create_escrow_batch.sandbox_db_write_failed",
+                    "pgdb.save_escrow returned False (DB disconnected), escrow only persisted in memory",
+                )
         return BatchEscrowResponse(deploy_hash=None, created=len(records), records=records)
 
     # Live mode — one real deploy covering the whole batch.
@@ -768,7 +785,13 @@ async def create_escrow_batch(
             "ttl": item.ttl,
             "deploy_hash": deploy_hash,
         }
-        pgdb.save_escrow(record)
+        if not pgdb.save_escrow(record):
+            strict.guard(
+                cfg,
+                "app.create_escrow_batch.live_db_write_failed",
+                "pgdb.save_escrow returned False (DB disconnected) after a real on-chain write; "
+                "the escrow exists on testnet but would not be recorded in Postgres",
+            )
         records.append(record)
 
     _broadcast_event({"type": "escrow_batch_created", "count": len(records), "deploy_hash": deploy_hash, "ts": now})

@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from server import strict
 from server.casper_client import CasperClient
 from server.config import Config
 from server.models import ReputationRecord
@@ -114,6 +115,15 @@ class ArbiterListResponse(BaseModel):
 # ── On-chain VRF helper ────────────────────────────────────────────────────
 
 
+class _OnchainVrfUnavailable(Exception):
+    """Raised by :func:`_elect_via_onchain_vrf` when the on-chain election
+    genuinely could not be completed (RPC exception, timeout, on-chain
+    revert) -- as opposed to a legitimate business outcome (VRF not
+    configured, or every on-chain candidate happens to be a dispute party
+    under INVARIANT 5), which returns ``None`` without raising and is not a
+    strict-mode violation."""
+
+
 async def _elect_via_onchain_vrf(
     casper: CasperClient,
     dispute_id: str,
@@ -161,11 +171,9 @@ async def _elect_via_onchain_vrf(
             deploy_hash = await casper.select_arbiters(dispute_id, select_count)
             selected_csv, revert_reason = await casper.confirm_election(dispute_id, deploy_hash=deploy_hash)
             if revert_reason:
-                logger.warning("On-chain select_arbiters reverted for %s: %s", dispute_id, revert_reason)
-                return None
+                raise _OnchainVrfUnavailable(f"select_arbiters reverted for {dispute_id}: {revert_reason}")
             if not selected_csv:
-                logger.warning("On-chain election for %s did not finalize in time", dispute_id)
-                return None
+                raise _OnchainVrfUnavailable(f"on-chain election for {dispute_id} did not finalize in time")
 
         candidates = [a.strip() for a in selected_csv.split(",") if a.strip()]
         for candidate in candidates:
@@ -173,6 +181,11 @@ async def _elect_via_onchain_vrf(
                 logger.info("On-chain VRF elected arbiter: %s (deploy=%s)", candidate, deploy_hash)
                 return candidate
 
+        # Legitimate business outcome, not a failure: the on-chain election
+        # succeeded but every candidate it returned happens to be a dispute
+        # party. Falling back to local CSPRNG here is by design (INVARIANT
+        # 5 has no on-chain enforcement), so this must NOT raise even under
+        # AE402_STRICT=1.
         logger.warning(
             "All %d on-chain VRF candidates for dispute %s are excluded dispute parties "
             "(INVARIANT 5) -- falling back to local CSPRNG (deploy=%s, candidates=%s)",
@@ -181,10 +194,11 @@ async def _elect_via_onchain_vrf(
             deploy_hash,
             candidates,
         )
+        return None
+    except _OnchainVrfUnavailable:
+        raise
     except Exception as exc:
-        logger.warning("On-chain VRF election failed, using local fallback: %s", exc)
-
-    return None
+        raise _OnchainVrfUnavailable(f"on-chain VRF election raised: {exc}") from exc
 
 
 def _elect_local_csprng(
@@ -269,8 +283,19 @@ async def elect_arbiter(
             )
             if elected_id:
                 method = "onchain_vrf"
-        except Exception as exc:
+        except _OnchainVrfUnavailable as exc:
+            # Genuine failure (RPC exception, timeout, on-chain revert) --
+            # as opposed to the legitimate "all candidates excluded"
+            # business outcome, which _elect_via_onchain_vrf returns as
+            # elected_id=None without raising. A judge running strict mode
+            # must see this as a hard error, not a silent downgrade to
+            # local CSPRNG.
             logger.warning("On-chain VRF election failed, using local fallback: %s", exc)
+            strict.guard(
+                cfg,
+                "vrf_election.elect_arbiter.onchain_vrf_failed",
+                f"on-chain VRF election could not complete, would silently fall back to local CSPRNG: {exc}",
+            )
 
     # 3. Fallback: local CSPRNG with reputation weighting
     if not elected_id:

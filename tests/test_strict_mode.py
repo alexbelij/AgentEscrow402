@@ -47,28 +47,50 @@ class TestConfigPreconditions:
         cfg = Config()
         assert cfg.strict_mode is False
 
-    def test_defaults_violate_all_three_preconditions(self):
-        # Empty node_url, empty contract_hash, sandbox=True (default) --
-        # this is the *dev* baseline. It must report all three violations.
+    def test_defaults_violate_all_four_preconditions(self):
+        # Empty node_url, empty contract_hash, sandbox=True (default), empty
+        # private key path -- this is the *dev* baseline. It must report
+        # all four violations.
         cfg = Config()
         violations = cfg.require_strict_preconditions()
-        assert len(violations) == 3
+        assert len(violations) == 4
         joined = " ".join(violations)
         assert "casper_node_url" in joined
         assert "contract_hash" in joined
         assert "sandbox" in joined
+        assert "casper_private_key_path" in joined
 
     def test_fully_configured_has_no_violations(self):
         cfg = Config(
             casper_node_url="https://node.testnet.example",
             contract_hash="hash-abcdef",
             sandbox=False,
+            casper_private_key_path="/tmp/key.pem",
         )
         assert cfg.require_strict_preconditions() == []
 
+    def test_missing_private_key_is_a_violation_even_with_everything_else_set(self):
+        # server/app.py only constructs a live CasperClient when
+        # `not sandbox and casper_node_url and casper_private_key_path` are
+        # ALL set. Before this precondition existed, a strict-mode app with
+        # casper_node_url/contract_hash/sandbox=false but no private key
+        # would pass require_strict_preconditions() yet still silently fall
+        # through to the None-casper-client / SandboxStore branch on every
+        # request -- a strict-mode app returning green 200s that never
+        # touched testnet. See docs/STRICT_MODE_ROLLOUT.md.
+        cfg = Config(
+            casper_node_url="https://node.testnet.example",
+            contract_hash="hash-abcdef",
+            sandbox=False,
+            casper_private_key_path="",
+        )
+        violations = cfg.require_strict_preconditions()
+        assert len(violations) == 1
+        assert "casper_private_key_path" in violations[0]
+
     def test_partial_config_reports_specific_violations(self):
         # Node URL missing but everything else OK.
-        cfg = Config(contract_hash="hash-abc", sandbox=False)
+        cfg = Config(contract_hash="hash-abc", sandbox=False, casper_private_key_path="/tmp/key.pem")
         violations = cfg.require_strict_preconditions()
         assert len(violations) == 1
         assert "casper_node_url" in violations[0]
@@ -98,6 +120,7 @@ class TestConfigPreconditions:
             casper_node_url="https://node.testnet.example",
             contract_hash="hash-abc",
             sandbox=False,
+            casper_private_key_path="/tmp/key.pem",
         )
         ensure_strict(cfg)  # no exception
 
@@ -143,6 +166,7 @@ class TestRuntimeGuard:
                 "casper_node_url is empty (set CASPER_NODE_URL)",
                 "contract_hash is empty (set ESCROW_CONTRACT_HASH)",
                 "sandbox=true (set SANDBOX=false for live mode)",
+                "casper_private_key_path is empty (set CASPER_PRIVATE_KEY_PATH or DEPLOYER_KEY_B64)",
             ],
             "guarantees": [],
         }
@@ -153,6 +177,7 @@ class TestRuntimeGuard:
             casper_node_url="https://node.example",
             contract_hash="hash-abc",
             sandbox=False,
+            casper_private_key_path="/tmp/key.pem",
         )
         caps = cfg.strict_mode_capabilities()
         assert caps["enabled"] is True
@@ -239,7 +264,7 @@ class TestHealthEndpoint:
         assert body["strict_mode"]["enabled"] is False
         # Still reports the underlying preconditions state.
         assert body["strict_mode"]["preconditions_ok"] is False
-        assert len(body["strict_mode"]["violations"]) == 3
+        assert len(body["strict_mode"]["violations"]) == 4
 
     def test_health_reports_strict_enabled_and_configured(self):
         cfg = Config(
@@ -247,6 +272,7 @@ class TestHealthEndpoint:
             casper_node_url="https://node.example",
             contract_hash="hash-abc",
             sandbox=False,
+            casper_private_key_path="/tmp/key.pem",
         )
         client = TestClient(_minimal_app(cfg))
         r = client.get("/health")
@@ -263,14 +289,14 @@ class TestHealthEndpoint:
         # observability signal: /health must show enabled=True + the
         # violations so an operator inspecting a stuck app sees the
         # actual reason.
-        cfg = Config(strict_mode=True)  # all 3 defaults violated
+        cfg = Config(strict_mode=True)  # all 4 defaults violated
         client = TestClient(_minimal_app(cfg))
         r = client.get("/health")
         assert r.status_code == 200
         caps = r.json()["strict_mode"]
         assert caps["enabled"] is True
         assert caps["preconditions_ok"] is False
-        assert len(caps["violations"]) == 3
+        assert len(caps["violations"]) == 4
 
 
 class TestExceptionHandler:
@@ -299,3 +325,159 @@ class TestExceptionHandler:
         r = client.get("/_test/trigger_strict")
         assert r.status_code == 200
         assert r.json() == {"status": "ok"}
+
+
+class TestSandboxDbWriteGuard:
+    """server/db.py::save_escrow returns False (does not raise) when
+    Postgres is unreachable, and server/app.py's create_escrow /
+    create_escrow_batch handlers previously ignored that return value --
+    a strict-mode app could report a created escrow that was never
+    persisted. See docs/STRICT_MODE_ROLLOUT.md."""
+
+    def test_create_escrow_raises_under_strict_when_db_write_fails(self):
+        import hashlib
+        from unittest.mock import patch
+
+        import server.app as appmod
+        from server.sandbox import SandboxStore
+
+        strict_cfg = Config(
+            strict_mode=True,
+            casper_node_url="https://node.example",
+            contract_hash="hash-abc",
+            sandbox=True,  # sandbox path is the one under test
+            casper_private_key_path="/tmp/key.pem",
+        )
+        sandbox_store = SandboxStore()
+        appmod.app.dependency_overrides[appmod.get_config] = lambda: strict_cfg
+        appmod.app.dependency_overrides[appmod.get_sandbox] = lambda: sandbox_store
+        try:
+            with patch("server.app.pgdb.save_escrow", return_value=False):
+                client = TestClient(appmod.app)
+                h = hashlib.sha256(b"strict-db-write-fail").hexdigest()
+                res = client.post(
+                    "/escrow",
+                    json={"receiver": "ab" * 32, "amount": 5000, "service_hash": h},
+                )
+            assert res.status_code == 503
+            body = res.json()
+            assert body["error"] == "strict_mode_violation"
+            assert body["path"] == "app.create_escrow.sandbox_db_write_failed"
+        finally:
+            appmod.app.dependency_overrides.clear()
+
+    def test_create_escrow_succeeds_when_strict_disabled_even_if_db_write_fails(self):
+        import hashlib
+        from unittest.mock import patch
+
+        import server.app as appmod
+        from server.sandbox import SandboxStore
+
+        cfg = Config(sandbox=True)  # strict_mode=False
+        sandbox_store = SandboxStore()
+        appmod.app.dependency_overrides[appmod.get_config] = lambda: cfg
+        appmod.app.dependency_overrides[appmod.get_sandbox] = lambda: sandbox_store
+        try:
+            with patch("server.app.pgdb.save_escrow", return_value=False):
+                client = TestClient(appmod.app)
+                h = hashlib.sha256(b"non-strict-db-write-fail").hexdigest()
+                res = client.post(
+                    "/escrow",
+                    json={"receiver": "cd" * 32, "amount": 5000, "service_hash": h},
+                )
+            assert res.status_code == 200
+        finally:
+            appmod.app.dependency_overrides.clear()
+
+
+class TestVrfElectionGuard:
+    """server/vrf_election.py::elect_arbiter silently falls back from
+    on-chain VRF to local CSPRNG when the on-chain call raises or returns no
+    candidate. Under AE402_STRICT=1 with VRF configured, that fallback must
+    raise StrictModeError instead (docs/STRICT_MODE_ROLLOUT.md item 6)."""
+
+    def _reset(self):
+        import server.vrf_election as vrf_mod
+
+        vrf_mod._registered_arbiters.clear()
+        vrf_mod._election_results.clear()
+
+    def test_onchain_vrf_exception_raises_under_strict(self):
+        import server.app as appmod
+        import server.vrf_election as vrf_mod
+
+        self._reset()
+        strict_cfg = Config(
+            strict_mode=True,
+            casper_node_url="https://node.example",
+            contract_hash="hash-abc",
+            sandbox=False,
+            casper_private_key_path="/tmp/key.pem",
+            vrf_contract_hash="hash-vrf",
+        )
+
+        class _RaisingCasper:
+            async def select_arbiters(self, dispute_id: str, count: int) -> str:
+                raise RuntimeError("RPC timeout")
+
+            async def confirm_election(self, *a, **kw):
+                return None, None
+
+        appmod._casper = _RaisingCasper()
+        appmod.app.dependency_overrides[vrf_mod.get_config] = lambda: strict_cfg
+        try:
+            client = TestClient(appmod.app)
+            client.post(
+                "/vrf/arbiters/register",
+                json={"agent": "neutral-arbiter", "score": 70, "completed": 3, "disputed": 0},
+            )
+            res = client.post(
+                "/vrf/elect",
+                json={
+                    "dispute_id": "strict-onchain-fail-dispute",
+                    "sender": "sender-account-hash",
+                    "receiver": "receiver-account-hash",
+                    "seed_hash": "ab" * 32,
+                },
+            )
+            assert res.status_code == 503
+            body = res.json()
+            assert body["error"] == "strict_mode_violation"
+            assert body["path"] == "vrf_election.elect_arbiter.onchain_vrf_failed"
+        finally:
+            appmod.app.dependency_overrides.pop(vrf_mod.get_config, None)
+            appmod._casper = None
+
+    def test_onchain_vrf_still_falls_back_when_strict_disabled(self):
+        import server.app as appmod
+        import server.vrf_election as vrf_mod
+
+        self._reset()
+
+        class _RaisingCasper:
+            async def select_arbiters(self, dispute_id: str, count: int) -> str:
+                raise RuntimeError("RPC timeout")
+
+            async def confirm_election(self, *a, **kw):
+                return None, None
+
+        appmod._casper = _RaisingCasper()
+        try:
+            client = TestClient(appmod.app)
+            client.post(
+                "/vrf/arbiters/register",
+                json={"agent": "neutral-arbiter-2", "score": 70, "completed": 3, "disputed": 0},
+            )
+            res = client.post(
+                "/vrf/elect",
+                json={
+                    "dispute_id": "non-strict-onchain-fail-dispute",
+                    "sender": "sender-account-hash",
+                    "receiver": "receiver-account-hash",
+                    "seed_hash": "cd" * 32,
+                },
+            )
+            assert res.status_code == 201
+            assert res.json()["method"] == "local_csprng"
+        finally:
+            appmod._casper = None

@@ -89,11 +89,16 @@ class Config:
     # results. Judges / operators enabling this flag get a guarantee that a
     # 200 response means the write actually reached testnet.
     #
-    # The three well-known preconditions checked at startup (see
+    # The well-known preconditions checked at startup (see
     # Config.require_strict_preconditions()) are:
     #   - casper_node_url non-empty
     #   - contract_hash non-empty
     #   - sandbox is False
+    #   - casper_private_key_path non-empty (server/app.py only constructs a
+    #     live CasperClient when all of sandbox=false, casper_node_url and
+    #     casper_private_key_path are set -- without this check a strict app
+    #     missing only the key would still silently fall through to the
+    #     None-casper-client / SandboxStore branch on every request)
     # A running app under AE402_STRICT=1 additionally raises StrictModeError
     # in every code path that ships a "silent fallback" branch.
     strict_mode: bool = False
@@ -218,6 +223,18 @@ class Config:
             violations.append("contract_hash is empty (set ESCROW_CONTRACT_HASH)")
         if self.sandbox:
             violations.append("sandbox=true (set SANDBOX=false for live mode)")
+        if not self.casper_private_key_path:
+            # server/app.py only constructs a live CasperClient when
+            # `not sandbox and casper_node_url and casper_private_key_path`
+            # are ALL set; before this check, a strict-mode app with
+            # casper_node_url/contract_hash/sandbox=false but no key would
+            # pass this precondition gate yet still fall through to the
+            # None-casper-client / SandboxStore branch on every request --
+            # exactly the "green 200, nothing hit testnet" failure strict
+            # mode exists to prevent. See tests/test_strict_mode.py.
+            violations.append(
+                "casper_private_key_path is empty (set CASPER_PRIVATE_KEY_PATH or DEPLOYER_KEY_B64)"
+            )
         return violations
 
     def strict_mode_capabilities(self) -> dict[str, object]:
