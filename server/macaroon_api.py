@@ -88,6 +88,19 @@ class MintResponse(BaseModel):
 
 @router.post("/mint", response_model=MintResponse)
 async def mint(request: MintRequest, config: Config = Depends(get_config)) -> MintResponse:
+    # SECURITY (reviewed 2026-07-24, not yet fixed -- tracked follow-up):
+    # this endpoint has no caller-identity check today. A macaroon's caveats
+    # are exactly what the caller asks for (`capability=release`,
+    # `amount<=...`, etc.), so anyone who can reach this endpoint can mint a
+    # token that *claims* any capability string they like. That is
+    # currently safe because nothing in the codebase yet trusts a verified
+    # macaroon to authorize a real escrow/insurance action -- see
+    # docs/MACAROONS.md "Known limitation". Before any endpoint is wired to
+    # accept a macaroon as proof of authority, mint() must first check the
+    # caller already holds that authority through an existing auth path
+    # (e.g. agent-identity-registry delegation or a session token) and only
+    # allow attenuation, never grant of capabilities the caller doesn't
+    # already have from elsewhere.
     root = _load_root_secret(config)
     try:
         macaroon = mint_root(root, identifier=request.identifier) if request.identifier else mint_root(root)
