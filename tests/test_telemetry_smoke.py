@@ -144,12 +144,8 @@ def test_broadcast_event_never_raises_on_lifecycle_events(monkeypatch):
     monkeypatch.delenv("SIGNOZ_OTEL_ENDPOINT", raising=False)
     from server import app as server_app
 
-    server_app._broadcast_event(
-        {"type": "escrow_created", "service_hash": "sh-" + ("aa" * 30), "ts": 1234}
-    )
-    server_app._broadcast_event(
-        {"type": "escrow_released", "service_hash": "sh-" + ("bb" * 30), "ts": 1234}
-    )
+    server_app._broadcast_event({"type": "escrow_created", "service_hash": "sh-" + ("aa" * 30), "ts": 1234})
+    server_app._broadcast_event({"type": "escrow_released", "service_hash": "sh-" + ("bb" * 30), "ts": 1234})
     server_app._broadcast_event({"type": "unknown_event", "service_hash": "sh-x", "ts": 1234})
     server_app._broadcast_event({"type": "arbitration_complete", "service_hash": "sh-z", "ts": 1})
     server_app._broadcast_event({"type": "escrow_resolved", "service_hash": "sh-q", "ts": 1})
