@@ -119,12 +119,60 @@ export default function Hero() {
             AI agents lock funds in on-chain escrow, deliver work, and release payment — no humans, no facilitators. With x402 payment headers, multi-asset support, reputation scoring, ML risk pricing, and VRF-assisted arbitration.
           </p>
 
-          <div className="flex flex-wrap gap-3 mb-14">
-            <a href="/console/overview" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl bg-ae-accent text-white font-semibold shadow-lg shadow-purple-600/20 hover:bg-ae-accent-bright hover:shadow-purple-600/30 transition-all">
-              Inspect live console
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+          {/* Three audience entry points — each links to an existing
+              working console route: /console/escrows (the actual
+              buyer→release lifecycle panel), /console/docs (API + SDK +
+              MCP reference), /console/feature-map (read-only inventory
+              of every capability with strict status labels). */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8 max-w-2xl">
+            <a
+              href="/console/escrows"
+              className="group flex flex-col justify-between px-5 py-4 rounded-xl bg-ae-accent text-white shadow-lg shadow-purple-600/20 hover:bg-ae-accent-bright hover:shadow-purple-600/30 transition-all"
+            >
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider opacity-80">For agents & operators</div>
+                <div className="text-base font-semibold mt-1">Use AgentEscrow</div>
+              </div>
+              <div className="text-xs opacity-90 mt-3 flex items-center gap-1">
+                Lock, release, dispute
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
             </a>
-            <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl border border-ae-border text-gray-300 font-medium hover:border-gray-500 hover:text-white transition-colors">
+            <a
+              href="/console/docs"
+              className="group flex flex-col justify-between px-5 py-4 rounded-xl bg-[#12121a] border border-ae-border text-gray-100 hover:border-ae-accent-bright hover:bg-[#151521] transition-colors"
+            >
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">For developers</div>
+                <div className="text-base font-semibold mt-1">Build with AE402</div>
+              </div>
+              <div className="text-xs text-gray-400 mt-3 flex items-center gap-1">
+                API · Python SDK · MCP
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
+            </a>
+            <a
+              href="/console/feature-map"
+              className="group flex flex-col justify-between px-5 py-4 rounded-xl bg-[#12121a] border border-ae-border text-gray-100 hover:border-ae-accent-bright hover:bg-[#151521] transition-colors"
+            >
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">For evaluators</div>
+                <div className="text-base font-semibold mt-1">Evaluate the project</div>
+              </div>
+              <div className="text-xs text-gray-400 mt-3 flex items-center gap-1">
+                Feature map with statuses
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </div>
+            </a>
+          </div>
+
+          {/* Secondary row preserves the previous "inspect live console"
+              door and the repo link so nothing is lost. */}
+          <div className="flex flex-wrap gap-3 mb-14">
+            <a href="/console/overview" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ae-border text-gray-300 text-sm font-medium hover:border-gray-500 hover:text-white transition-colors">
+              Inspect live console
+            </a>
+            <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ae-border text-gray-300 text-sm font-medium hover:border-gray-500 hover:text-white transition-colors">
               <Github className="w-4 h-4" />
               GitHub
             </a>
