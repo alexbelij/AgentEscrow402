@@ -24,6 +24,7 @@ import {
   X,
   Github,
   BookOpen,
+  Compass,
 } from 'lucide-react';
 
 interface NavItem {
@@ -37,41 +38,54 @@ interface NavGroup {
   items: NavItem[];
 }
 
-// Grouped/nested structure: real console sections, advanced modules and
-// developer-only tools are visually separated instead of one flat list, so
-// visitors can tell at a glance what is "the product" vs. a dev/demo tool.
+// Grouped by product purpose (five audiences of the same console):
+//   - Core escrow          — the lifecycle that moves money.
+//   - Trust & resolution   — who to trust, how disagreements are settled.
+//   - Operations           — the risk / insurance / infra layer around it.
+//   - Developer tools      — anything a builder needs to wire an agent up.
+//   - Explore              — narrative / map entry points into the same UI.
+// Every route from the previous flat/three-group layout is preserved; no
+// section is hidden, moved off /console, or renamed. Only the sidebar
+// headings and their ordering change.
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: '',
-    items: [
-      { name: 'Overview', path: '/console/overview', icon: Monitor },
-      { name: 'Use Cases', path: '/console/use-cases', icon: Sparkles },
-    ],
-  },
-  {
-    label: 'Core console',
+    label: 'Core escrow',
     items: [
       { name: 'Escrows', path: '/console/escrows', icon: DollarSign },
-      { name: 'Agents', path: '/console/agents', icon: Users },
-      { name: 'Identity Registry', path: '/console/identity-registry', icon: BadgeCheck },
+      { name: 'Advanced Escrow', path: '/console/advanced', icon: Layers },
     ],
   },
   {
-    label: 'Advanced modules',
+    label: 'Trust & resolution',
     items: [
-      { name: 'Advanced Escrow', path: '/console/advanced', icon: Layers },
       { name: 'Arbitration', path: '/console/arbitration', icon: Gavel },
+      { name: 'Identity Registry', path: '/console/identity-registry', icon: BadgeCheck },
+      { name: 'Agents', path: '/console/agents', icon: Users },
+      { name: 'Evidence', path: '/console/evidence', icon: FileText },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
       { name: 'Insurance', path: '/console/insurance', icon: Shield },
       { name: 'Risk', path: '/console/risk', icon: Activity },
+      { name: 'Contracts', path: '/console/contracts', icon: FileText },
     ],
   },
   {
     label: 'Developer tools',
     items: [
-      { name: 'Contracts', path: '/console/contracts', icon: FileText },
-      { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
       { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
+      { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
       { name: 'API / SDK / MCP Docs', path: '/console/docs', icon: BookOpen },
+    ],
+  },
+  {
+    label: 'Explore',
+    items: [
+      { name: 'Overview', path: '/console/overview', icon: Monitor },
+      { name: 'Use Cases', path: '/console/use-cases', icon: Sparkles },
+      { name: 'Feature Map', path: '/console/feature-map', icon: Compass },
     ],
   },
 ];
@@ -151,6 +165,16 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'API / SDK / MCP Documentation',
     desc: 'Complete reference for all 62 REST API endpoints, the Python SDK with code examples, LangChain integration, and the 26-tool MCP server for AI agent interoperability.',
     source: 'tool',
+  },
+  '/console/evidence': {
+    title: 'Evidence Bundle',
+    desc: 'Attach and inspect the evidence a dispute is being decided on — the payload the arbitration analyzer consumes when a case is opened. Kept alongside Arbitration and Agents so a reviewer can walk a dispute end-to-end without leaving the console.',
+    source: 'demo',
+  },
+  '/console/feature-map': {
+    title: 'Feature Map',
+    desc: 'A single, read-only inventory of every capability the console exposes, grouped by purpose, with a strict status label on each row (On-chain, Live API, Local demo, Simulation, Planned) so it is easy to tell at a glance what is backed by a deployed contract versus a hosted demo or a simulator.',
+    source: 'guide',
   },
 };
 
