@@ -102,6 +102,12 @@ class Config:
     # A running app under AE402_STRICT=1 additionally raises StrictModeError
     # in every code path that ships a "silent fallback" branch.
     strict_mode: bool = False
+    # Root secret for the Macaroon capability layer (see sdk/macaroons.py
+    # and server/macaroon_api.py). Accepts base64url or hex; must decode to
+    # >=24 bytes. Empty by default — the /macaroons/* endpoints fail closed
+    # with 503 until this is configured, so misconfigured deployments never
+    # accept macaroon-authenticated calls.
+    macaroon_root_secret: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -191,6 +197,7 @@ class Config:
                 # "cep78_test_token_aetnft" for the canonical record.
                 "c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
             ),
+            macaroon_root_secret=os.getenv("MACAROON_ROOT_SECRET", ""),
             agent_identity_contract_hash=os.getenv(
                 "AGENT_IDENTITY_CONTRACT_HASH",
                 "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
