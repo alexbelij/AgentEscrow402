@@ -15,7 +15,7 @@ import sys
 
 import pytest
 
-from agentescrow402_sdk import cli
+from sdk import cli
 
 
 def _run(argv: list[str], monkeypatch: pytest.MonkeyPatch) -> tuple[int, str, str]:

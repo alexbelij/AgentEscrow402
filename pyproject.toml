@@ -1,3 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentescrow402"
+version = "0.2.0"
+description = "Python SDK, LangChain tool, MCP server, and CLI for AgentEscrow402 — trustless AI agent escrow payments on Casper Network"
+readme = "sdk/README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "AgentEscrow402", email = "hello@ae402.xyz" },
+]
+keywords = ["casper", "escrow", "x402", "ai-agents", "web3", "ed25519"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "httpx>=0.24",
+    "cryptography>=41",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+langchain = ["langchain>=0.1"]
+mcp = ["mcp>=0.9"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-httpx>=0.28",
+    "ruff>=0.1",
+    "mypy>=1.5",
+]
+
+[project.scripts]
+ae402 = "sdk.cli:main"
+
+[project.urls]
+Homepage = "https://ae402.xyz"
+Repository = "https://github.com/alexbelij/AgentEscrow402"
+Documentation = "https://github.com/alexbelij/AgentEscrow402/blob/main/sdk/README.md"
+Issues = "https://github.com/alexbelij/AgentEscrow402/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sdk"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "sdk",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+exclude = [
+    "sdk/__pycache__",
+]
+
 [tool.ruff]
 line-length = 120
 target-version = "py311"
@@ -30,17 +96,10 @@ target-version = ["py311"]
 # session even though nothing in the actual codebase was broken. Ignore it
 # in automated CI; run it manually when you want a live-deployment check.
 #
-# sdk/python/ is a standalone, independently publishable package
-# (agentescrow402-sdk) with its own tests/ directory. Because both it and
-# the repo root tests/ dir use plain `tests` as their package name
-# (sdk/python/tests/__init__.py), collecting both from one pytest run
-# causes a "No module named 'tests.test_client'" import collision. Run
-# sdk/python's suite separately: `cd sdk/python && pytest`.
-#
 # tests/integration/ requires a running local NCTL Casper network
 # (docker-compose.casper-nctl.yml) and is not run in default CI; see
 # .github/workflows/casper-nctl-integration.yml for its own job.
-addopts = "--ignore=tests/test_e2e_live.py --ignore=sdk/python --ignore=tests/integration"
+addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration"
 markers = [
     "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
 ]

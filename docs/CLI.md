@@ -1,12 +1,12 @@
 # ae402 — command-line client
 
 `ae402` is a thin, ergonomic wrapper over the Python SDK
-(`agentescrow402_sdk.client.EscrowClient`). It ships with the SDK
-package, so:
+(`sdk.client.EscrowClient`). It ships with the SDK package, so:
 
-    pip install agentescrow402-sdk
+    pip install .
 
-installs both the library and the `ae402` console script.
+from the repo root installs both the library and the `ae402` console
+script.
 
 ## Design
 

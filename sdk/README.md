@@ -16,7 +16,9 @@ This directory contains three integration layers for AgentEscrow402:
 
 | Component | File | Description |
 |-----------|------|-------------|
-| **Python SDK** | [`client.py`](client.py) / [`agentescrow402/`](agentescrow402/) | Async client with Ed25519 signing, full escrow lifecycle |
+| **Python SDK** | [`client.py`](client.py) | Async client with Ed25519 signing, full escrow lifecycle |
+| **CLI** | [`cli.py`](cli.py) | `ae402` console script — thin wrapper over the SDK |
+| **Verifier** | [`verify.py`](verify.py) | Offline Ed25519 verification of arbiter multisig votes |
 | **LangChain Tool** | [`langchain_tool.py`](langchain_tool.py) | Drop-in `EscrowPaymentTool` for any LangChain agent |
 | **MCP Server** | [`mcp_server.py`](mcp_server.py) | 26 tools for any MCP-compatible LLM (Claude, GPT, etc.) |
 

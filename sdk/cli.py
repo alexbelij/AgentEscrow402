@@ -46,7 +46,7 @@ from typing import Any, Callable
 
 # Deferred import so `--help` still works on a stripped-down deploy.
 try:  # pragma: no cover - trivial import guard
-    from agentescrow402_sdk.client import EscrowClient
+    from sdk.client import EscrowClient
 except ImportError:  # pragma: no cover
     EscrowClient = None  # type: ignore[assignment]
 

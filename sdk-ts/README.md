@@ -9,7 +9,7 @@ authenticate a webhook delivery.
 
 The **write path** (`createEscrow`, `release`, `refund`, `dispute`,
 `resolve`, batch ops, VRF election, streaming claim) stays in the
-Python SDK (`sdk/python/`, see PR #25) — it requires the full x402
+Python SDK (`sdk/`) — it requires the full x402
 signing flow. This package covers "look something up" and "verify
 something I was handed", which is what most integrators actually need.
 
@@ -186,6 +186,6 @@ release runbook), `npm publish` from `sdk-ts/` cuts a release.
 
 **Not shipped in `0.1.0`:**
 
-- Write path — use `@ae402/python-sdk` (`sdk/python/`, PR #25).
+- Write path — use the Python SDK (`sdk/`), which ships the full x402 signing flow.
 - Checkpoint-signature verification (`server/audit_log.py` mirror) —
   planned for `0.2.0`.

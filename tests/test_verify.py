@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from agentescrow402_sdk.verify import (
+from sdk.verify import (
     build_cap_approval_message,
     build_insurance_claim_message,
     build_resolve_message,

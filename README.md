@@ -286,7 +286,7 @@ curl -X POST http://localhost:8000/release \
 Everything the `curl` calls above can be done with a first-class CLI too:
 
 ```bash
-pip install -e sdk/python        # or: pip install agentescrow402-sdk
+pip install -e .                 # installs the SDK + `ae402` console script
 
 ae402 --api-url http://localhost:8000 health
 ae402 --api-url http://localhost:8000 stats
