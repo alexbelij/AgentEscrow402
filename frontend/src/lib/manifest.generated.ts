@@ -5,7 +5,7 @@
 
 
 export const NETWORK = "casper-test";
-export const MANIFEST_GENERATED_AT = "2026-07-17T10:00:00Z";
+export const MANIFEST_GENERATED_AT = "2026-07-24T13:00:00Z";
 export const API_URL = "https://agentescrow402-api-ywm8.onrender.com";
 export const FRONTEND_URL = "https://ae402.xyz";
 
@@ -23,11 +23,11 @@ export const CONTRACTS: Record<string, ManifestContract> = {
   escrowManagerV9: {
     key: "escrow_manager_v9",
     name: "Core Escrow",
-    contractHash: "612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec",
+    contractHash: "07527a37742b4da87c9cc38baf752f53b1525b53d0825269d9952a3813739ef1",
     contractPackageHash: "d3ca33d192dda5ece798db91811ec1259d2197ca0e8d3ea4de043b977d3c8eeb",
-    deployHash: "3be113149f35f610116566c3834eb94f1b3a7d0ce0b6834f474747b322ff9094",
-    version: 9,
-    explorer: "https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec",
+    deployHash: "ce65b0a5120aab3fc47766daf5f6cea3ed3f491e7b45e31208ee8f2a8aa16862",
+    version: 10,
+    explorer: "https://testnet.cspr.live/contract/07527a37742b4da87c9cc38baf752f53b1525b53d0825269d9952a3813739ef1",
   },
   batchEscrowManager: {
     key: "batch_escrow_manager",
@@ -59,20 +59,20 @@ export const CONTRACTS: Record<string, ManifestContract> = {
   agentIdentityRegistry: {
     key: "agent_identity_registry",
     name: "Agent Identity Registry (ID-1)",
-    contractHash: "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+    contractHash: "345c179cd28eae46bfcda5cd4d8b9192d631593f936af85ccfe3a2cece5c7b1f",
     contractPackageHash: "0b760bb7bf9be5a74ee4ed5626bcc74a8154f221a059e29fc9d768d45fb4a2ba",
-    deployHash: "4c8a6e3c0bfa3f6ea9430e3a92b7c44c2b449c1dca5dd5e8f25f74f4506fe586",
-    version: 2,
-    explorer: "https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+    deployHash: "4ce05bb49b9e5c69447547bc27ad6ea7b715dcdfc7a10bd3b6fd0fafdcd3e865",
+    version: 3,
+    explorer: "https://testnet.cspr.live/contract/345c179cd28eae46bfcda5cd4d8b9192d631593f936af85ccfe3a2cece5c7b1f",
   },
   multiAssetEscrow: {
     key: "multi_asset_escrow",
     name: "MultiAssetEscrow (CEP-18)",
-    contractHash: "52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a",
+    contractHash: "8080845bad4f12c4a720dd96551dc64d116208aa71e0ce1410b75afca8e8eb61",
     contractPackageHash: "a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044",
-    deployHash: "c909bc3dbe093ac3831fe8d5fa8a0e99e1f938ae9f40efaddbb37b67564f3d66",
-    version: 1,
-    explorer: "https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a",
+    deployHash: "836158d90d480df131b8e4cc490ab93f59b672be74f68f151317b36464dce4df",
+    version: 2,
+    explorer: "https://testnet.cspr.live/contract/8080845bad4f12c4a720dd96551dc64d116208aa71e0ce1410b75afca8e8eb61",
   },
   cep18TestTokenAetusd: {
     key: "cep18_test_token_aetusd",
@@ -86,11 +86,11 @@ export const CONTRACTS: Record<string, ManifestContract> = {
   cep18TestTokenAemat: {
     key: "cep18_test_token_aemat",
     name: "CEP-18 test token (AEMAT)",
-    contractHash: "8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
+    contractHash: "2e319caa09768162144fed4c53f0259ef733ffd97e56a107064026022ac0377b",
     contractPackageHash: "5caa324c3073a8b9fc05076a01e9d4d658cb08a1b4839fa0aa93dac39213e3fd",
-    deployHash: "8a0fb73e124e613c9e65fb5585331ce2196853fb2a98c1493c383e71749051a9",
-    version: 3,
-    explorer: "https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
+    deployHash: "9025fc473f170f2a6d89e5f394bfae170ec5ce899291d3fce1e3af41e4a43045",
+    version: 4,
+    explorer: "https://testnet.cspr.live/contract/2e319caa09768162144fed4c53f0259ef733ffd97e56a107064026022ac0377b",
   },
   cep78TestTokenAetnft: {
     key: "cep78_test_token_aetnft",

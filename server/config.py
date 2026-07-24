@@ -176,7 +176,9 @@ class Config:
             ),
             multi_asset_escrow_contract_hash=os.getenv(
                 "MULTI_ASSET_ESCROW_CONTRACT_HASH",
-                "52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a",
+                # Key-fix redeploy 2026-07-24 (into_entity_hash_addr for Casper
+                # 2.0 compat, fix commit a9d7071); see deploy-out/onchain.json.
+                "8080845bad4f12c4a720dd96551dc64d116208aa71e0ce1410b75afca8e8eb61",
             ),
             multi_asset_escrow_package_hash=os.getenv(
                 "MULTI_ASSET_ESCROW_PACKAGE_HASH",
@@ -184,7 +186,10 @@ class Config:
             ),
             test_token_contract_hash=os.getenv(
                 "TEST_TOKEN_CONTRACT_HASH",
-                "8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
+                # Key-fix redeploy 2026-07-24 (into_entity_hash_addr for Casper
+                # 2.0 compat, fix commit a9d7071); see deploy-out/onchain.json
+                # "cep18_test_token_aemat".
+                "2e319caa09768162144fed4c53f0259ef733ffd97e56a107064026022ac0377b",
             ),
             cep18_aetusd_contract_hash=os.getenv(
                 "CEP18_AETUSD_CONTRACT_HASH",
@@ -200,7 +205,9 @@ class Config:
             macaroon_root_secret=os.getenv("MACAROON_ROOT_SECRET", ""),
             agent_identity_contract_hash=os.getenv(
                 "AGENT_IDENTITY_CONTRACT_HASH",
-                "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+                # Key-fix redeploy 2026-07-24 (into_entity_hash_addr for Casper
+                # 2.0 compat, fix commit a9d7071); see deploy-out/onchain.json.
+                "345c179cd28eae46bfcda5cd4d8b9192d631593f936af85ccfe3a2cece5c7b1f",
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
