@@ -109,7 +109,7 @@ mod insurance_replay {
 
     // ── error codes (mirror insurance-pool/src/main.rs) ─────────────────
     const ERR_INSUFFICIENT_ARBITER_SIGS: u16 = 8;
-    const ERR_ESCROW_ALREADY_CLAIMED: u16 = 11;
+    const ERR_ESCROW_ALREADY_CLAIMED: u16 = 9;
 
     // ── mock host state ──────────────────────────────────────────────────
     //

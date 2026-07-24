@@ -44,3 +44,32 @@ jobs:
       - run: cd frontend && npm ci
       - run: cd frontend && npx tsc --noEmit
       - run: cd frontend && npm run build
+
+  contracts:
+    # Host-target logic tests for the Casper/Odra contracts: the
+    # workspace's #[cfg(test)] modules (tests/ crate + multi-asset-escrow's
+    # lib.rs/logic.rs split) exercise state-machine invariants (fee/TTL/HTLC/
+    # quorum/reputation math, insurance anti-replay, escrow status
+    # transitions) on the host target, since the contracts themselves are
+    # `#![no_std] #![no_main]` wasm32-only binaries that can't run a normal
+    # test harness. This job was missing entirely before 2026-07-24 despite
+    # docs/README claiming "cargo test" runs in CI -- add carefully, don't
+    # remove without updating those docs.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install pinned nightly toolchain
+        # Must match contracts/rust-toolchain.toml. See that file's comment
+        # for why this exact nightly is pinned (wasm preprocessing
+        # compatibility) -- unrelated to these host-target tests, but keep
+        # a single source of truth for the toolchain version.
+        run: |
+          rustup toolchain install nightly-2025-01-01 --profile minimal
+          rustup default nightly-2025-01-01
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts
+      - name: Mirrored-logic tests (tests/ crate)
+        run: cd contracts && cargo test -p tests
+      - name: multi-asset-escrow host-target logic tests
+        run: cd contracts && cargo test -p multi-asset-escrow --lib
