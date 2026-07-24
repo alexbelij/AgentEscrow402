@@ -9,7 +9,7 @@ Publishable pip package. Wraps the AgentEscrow402 HTTP API with:
 See ``README.md`` for quick-start.
 """
 
-from agentescrow402_sdk.client import EscrowClient, X402_VERSION
+from agentescrow402_sdk.client import X402_VERSION, EscrowClient
 from agentescrow402_sdk.verify import (
     build_cap_approval_message,
     build_insurance_claim_message,

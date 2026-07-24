@@ -96,7 +96,7 @@ class EscrowClient:
             self._sender = sender
 
     @classmethod
-    def generate(cls, base_url: str = "http://localhost:8000", timeout: float = 30.0) -> "EscrowClient":
+    def generate(cls, base_url: str = "http://localhost:8000", timeout: float = 30.0) -> EscrowClient:
         """Create a client with a freshly generated Ed25519 identity, ready
         to sign requests for a real (non-sandbox) deployment.
 
@@ -309,7 +309,7 @@ class EscrowClient:
     async def close(self) -> None:
         await self._http.aclose()
 
-    async def __aenter__(self) -> "EscrowClient":
+    async def __aenter__(self) -> EscrowClient:
         return self
 
     async def __aexit__(self, *exc: Any) -> None:

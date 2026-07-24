@@ -29,7 +29,7 @@ ED25519_TAG_HEX = "01"
 
 def build_resolve_message(service_hash: str, in_favor_of: str) -> bytes:
     """Canonical message an arbiter signs to cast a ``resolve()`` vote."""
-    return f"resolve:{service_hash}:{in_favor_of}".encode("utf-8")
+    return f"resolve:{service_hash}:{in_favor_of}".encode()
 
 
 def build_cap_approval_message(action: str, service_hash: str) -> bytes:
@@ -38,7 +38,7 @@ def build_cap_approval_message(action: str, service_hash: str) -> bytes:
 
     ``action`` must be ``"release"`` or ``"reveal_swap"``.
     """
-    return f"{action}:{service_hash}:cap_approval".encode("utf-8")
+    return f"{action}:{service_hash}:cap_approval".encode()
 
 
 def build_insurance_claim_message(escrow_id: str, claimant_account_hash: str, amount: int) -> bytes:
@@ -48,7 +48,7 @@ def build_insurance_claim_message(escrow_id: str, claimant_account_hash: str, am
     ``claimant_account_hash`` is the raw lowercase-hex account hash of the
     caller who will submit the on-chain ``claim()`` deploy.
     """
-    return f"claim:{escrow_id}:{claimant_account_hash}:{amount}".encode("utf-8")
+    return f"claim:{escrow_id}:{claimant_account_hash}:{amount}".encode()
 
 
 # ---------------------------------------------------------------------------
@@ -118,7 +118,7 @@ def count_valid_votes_for_message(
     registered_set = set(registered)
     seen: set[str] = set()
     valid = 0
-    for pubkey_hex, sig_hex in zip(pubkeys, signatures):
+    for pubkey_hex, sig_hex in zip(pubkeys, signatures, strict=True):
         if pubkey_hex in seen or pubkey_hex not in registered_set:
             continue
         if not verify_ed25519_vote(pubkey_hex, sig_hex, message):

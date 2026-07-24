@@ -29,4 +29,11 @@ target-version = ["py311"]
 # normal, isolated test failure — this caused two flaky red CI runs in one
 # session even though nothing in the actual codebase was broken. Ignore it
 # in automated CI; run it manually when you want a live-deployment check.
-addopts = "--ignore=tests/test_e2e_live.py"
+#
+# sdk/python/ is a standalone, independently publishable package
+# (agentescrow402-sdk) with its own tests/ directory. Because both it and
+# the repo root tests/ dir use plain `tests` as their package name
+# (sdk/python/tests/__init__.py), collecting both from one pytest run
+# causes a "No module named 'tests.test_client'" import collision. Run
+# sdk/python's suite separately: `cd sdk/python && pytest`.
+addopts = "--ignore=tests/test_e2e_live.py --ignore=sdk/python"

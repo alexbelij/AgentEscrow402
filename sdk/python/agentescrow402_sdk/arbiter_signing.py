@@ -28,7 +28,7 @@ def sign_arbiter_vote(pem_path: str, service_hash: str, in_favor_of: str) -> tup
     if not isinstance(private_key, Ed25519PrivateKey):
         raise ValueError(f"{pem_path} is not an Ed25519 private key")
 
-    message = f"resolve:{service_hash}:{in_favor_of}".encode("utf-8")
+    message = f"resolve:{service_hash}:{in_favor_of}".encode()
     signature = private_key.sign(message)
     pubkey_raw = private_key.public_key().public_bytes_raw()
 
