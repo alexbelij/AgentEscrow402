@@ -29,6 +29,7 @@ from server.event_monitor import EventMonitor
 from server.identity_registry_api import _registry as _id_registry
 from server.identity_registry_api import router as identity_registry_router
 from server.insurance import router as insurance_router
+from server.macaroon_api import router as macaroon_router
 from server.middleware import (
     _build_signing_payload,
     _check_replay,
@@ -310,6 +311,7 @@ app.include_router(vrf_router)
 app.include_router(identity_router)
 app.include_router(risk_router)
 app.include_router(identity_registry_router)
+app.include_router(macaroon_router)
 app.include_router(admin_router)
 
 
