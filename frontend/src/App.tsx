@@ -30,6 +30,7 @@ import Arbitration from './components/console/Arbitration'
 import IdentityRegistry from './components/console/IdentityRegistry'
 import UseCases from './components/console/UseCases'
 import Evidence from './components/console/Evidence'
+import FeatureMap from './components/console/FeatureMap'
 
 function Landing() {
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function App() {
             <Route path="arbitration" element={<Arbitration />} />
             <Route path="identity-registry" element={<IdentityRegistry />} />
             <Route path="evidence" element={<Evidence />} />
+            <Route path="feature-map" element={<FeatureMap />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
