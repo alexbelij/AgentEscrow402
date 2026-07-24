@@ -27,6 +27,7 @@ import {
   Github,
   BookOpen,
   Compass,
+  Terminal,
 } from 'lucide-react';
 
 interface NavItem {
@@ -79,6 +80,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Sandbox', path: '/console/sandbox', icon: FlaskConical },
       { name: 'Agent Demo', path: '/console/agent-demo', icon: Bot },
+      { name: 'MCP Playground', path: '/console/mcp-playground', icon: Terminal },
       { name: 'API / SDK / MCP Docs', path: '/console/docs', icon: BookOpen },
     ],
   },
@@ -177,6 +179,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'Feature Map',
     desc: 'A single, read-only inventory of every capability the console exposes, grouped by purpose, with a strict status label on each row (On-chain, Live API, Local demo, Simulation, Planned) so it is easy to tell at a glance what is backed by a deployed contract versus a hosted demo or a simulator.',
     source: 'guide',
+  },
+  '/console/mcp-playground': {
+    title: 'MCP Playground',
+    desc: 'Browse and dry-run the 26-tool MCP server AE402 ships with. Each tool dispatches in-process to its underlying REST endpoint, so the same x402 payment fence, Observer/Driver policy, and rate limits apply here as everywhere else — there is no bypass path. Read-only tools work in Observer mode; writes require Driver.',
+    source: 'tool',
   },
 };
 
