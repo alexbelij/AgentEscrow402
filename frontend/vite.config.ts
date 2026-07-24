@@ -90,7 +90,17 @@ export default defineConfig({
         // file (network transfer is still gzipped).
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         cleanupOutdatedCaches: true,
-        navigateFallback: '/offline.html',
+        // IMPORTANT: this must be the SPA app shell (`index.html`), not the
+        // static `offline.html` page. `navigateFallback` is served for
+        // *every* navigation that isn't an exact precache hit (i.e. every
+        // client-routed URL like `/console/docs`), unconditionally — not
+        // only when offline. Pointing it at `offline.html` previously broke
+        // every deep-linked route (they always rendered the offline shell
+        // instead of the real app, even online). `offline.html` is still
+        // precached and still used for the case where fetching the app
+        // shell itself truly cannot be served (see workbox `catchHandler`
+        // semantics) — it must never be the primary navigation handler.
+        navigateFallback: '/index.html',
         navigateFallbackDenylist: [
           // Never fall back for API traffic or the SSE stream.
           /^\/backend\//,
