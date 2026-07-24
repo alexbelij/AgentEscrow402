@@ -31,3 +31,7 @@ path = "src/insurance_replay_tests.rs"
 [[test]]
 name = "const_parity_tests"
 path = "src/const_parity_tests.rs"
+
+[[test]]
+name = "two_key_account_property_tests"
+path = "src/two_key_account_property_tests.rs"
