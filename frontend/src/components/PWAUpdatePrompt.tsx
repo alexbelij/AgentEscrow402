@@ -39,8 +39,11 @@ export default function PWAUpdatePrompt() {
     <div
       style={{
         position: 'fixed',
-        bottom: '1rem',
-        right: '1rem',
+        // Bottom-right, stacked directly above the scroll-to-top button
+        // (ScrollToTop.tsx: `fixed bottom-6 right-6`, 44px tall) with a
+        // clear gap so it's never covered by it.
+        bottom: '5rem',
+        right: '1.5rem',
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column',
@@ -53,8 +56,11 @@ export default function PWAUpdatePrompt() {
       {offlineReady && (
         <div
           style={{
-            background: 'rgba(74,222,128,0.10)',
-            border: '1px solid rgba(74,222,128,0.45)',
+            // Solid, near-opaque background — a translucent card here let
+            // console page content bleed through and made the text hard
+            // to read on busy pages like /console.
+            background: '#0e2417',
+            border: '1px solid rgba(74,222,128,0.55)',
             color: '#e6ffe9',
             padding: '0.75rem 1rem',
             borderRadius: '10px',
@@ -85,8 +91,11 @@ export default function PWAUpdatePrompt() {
       {update && (
         <div
           style={{
-            background: 'rgba(108,92,231,0.14)',
-            border: '1px solid rgba(108,92,231,0.55)',
+            // Solid dark card instead of a 14%-opacity tint: at that
+            // opacity the underlying page text showed straight through
+            // and made this unreadable on /console.
+            background: '#191735',
+            border: '1px solid rgba(108,92,231,0.6)',
             color: '#e5e7f0',
             padding: '0.85rem 1rem',
             borderRadius: '10px',
@@ -103,9 +112,9 @@ export default function PWAUpdatePrompt() {
               type="button"
               onClick={() => setUpdate(null)}
               style={{
-                background: 'transparent',
+                background: 'rgba(255,255,255,0.08)',
                 color: '#cbd0ff',
-                border: '1px solid rgba(108,92,231,0.5)',
+                border: '1px solid rgba(108,92,231,0.6)',
                 padding: '0.4rem 0.75rem',
                 borderRadius: '8px',
                 cursor: 'pointer',

@@ -1,7 +1,9 @@
 /**
  * Lightweight, dependency-free toast notifications, styled to match the
  * console. Replaces native `alert()`/`window.confirm()` popups: transient,
- * bottom-right, auto-dismiss after a few seconds, dismissible early.
+ * bottom-right — stacked above the scroll-to-top button (see
+ * ScrollToTop.tsx) so it's never covered by it — auto-dismiss after a few
+ * seconds, dismissible early.
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -23,10 +25,12 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | undefined>(undefined)
 
+// Near-opaque backgrounds: a translucent card let underlying page text
+// (busy pages like /console) bleed through and become unreadable.
 const KIND_STYLES: Record<ToastKind, { icon: typeof CheckCircle2; cls: string }> = {
-  success: { icon: CheckCircle2, cls: 'border-green-500/40 bg-green-950/90 text-green-100' },
-  error: { icon: XCircle, cls: 'border-red-500/40 bg-red-950/90 text-red-100' },
-  info: { icon: Info, cls: 'border-ae-accent/40 bg-ae-card/95 text-gray-100' },
+  success: { icon: CheckCircle2, cls: 'border-green-500/60 bg-green-950 text-green-100' },
+  error: { icon: XCircle, cls: 'border-red-500/60 bg-red-950 text-red-100' },
+  info: { icon: Info, cls: 'border-ae-accent/60 bg-ae-card text-gray-100' },
 }
 
 const AUTO_DISMISS_MS = 4500
@@ -60,14 +64,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-[calc(100vw-2rem)] max-w-sm">
+      <div className="fixed bottom-24 right-6 z-[100] flex flex-col gap-2 w-[calc(100vw-2rem)] max-w-sm">
         {items.map((t) => {
           const { icon: Icon, cls } = KIND_STYLES[t.kind]
           return (
             <div
               key={t.id}
               role="status"
-              className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-xl backdrop-blur animate-fade-in-up ${cls}`}
+              className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm shadow-xl animate-fade-in-up ${cls}`}
             >
               <Icon className="h-[18px] w-[18px] shrink-0 mt-0.5" />
               <p className="flex-1 leading-snug break-all">{t.message}</p>
@@ -75,7 +79,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 type="button"
                 onClick={() => dismiss(t.id)}
                 aria-label="Dismiss notification"
-                className="shrink-0 opacity-60 hover:opacity-100"
+                className="shrink-0 opacity-80 hover:opacity-100"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
