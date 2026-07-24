@@ -53,11 +53,10 @@ were on.
 - Restored the real math in `format.ts`.
 - Migrated `server/seed.py` to seed real motes values (`_cspr(25000)`
   reads as "25,000 CSPR" but stores `25_000_000_000_000` motes).
-- Kept a bounded legacy heuristic in `motesToCspr()`: any incoming value
-  strictly below `LEGACY_CSPR_HEURISTIC_MAX = 1_000_000` (0.001 CSPR) is
-  treated as a legacy whole-CSPR row and passed through untouched at the
-  read boundary only. This means demo rows written before the fix keep
-  displaying correctly; writes always go through the real math.
+- Removed the legacy magnitude heuristic. A valid on-chain value can be one
+  mote, so inferring “whole CSPR” from a small integer can create a
+  billion-fold display error. Historic demo data must be migrated at its
+  source; the read boundary always divides motes by `1e9`.
 - Added `tests/test_cspr_motes_unit_contract.py`, 6 tests that lock in:
   - `create_escrow` splits gross into net+fee in motes with no unit hop;
   - `/estimate` is scale-invariant and linear;
