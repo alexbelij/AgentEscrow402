@@ -1,19 +1,15 @@
-<!-- GENERATED TEMPLATE
-Purpose: Step-by-step deployment guide for AE402 (contracts, backend, frontend, verification).
-Usage: Review content, remove this header, rename to DEPLOY.md.
-Remove when: After review and rename.
--->
-
 # AE402 — Deployment Guide
 
-Reproducible deploy path for the whole stack: 8 Casper testnet contracts,
-FastAPI backend, React console, and the `verify.sh` proof.
+Reproducible deploy path for the whole stack: the Casper testnet
+contracts under `contracts/` (see `deploy-out/onchain.json` for the
+current authoritative list and hashes), FastAPI backend, React console,
+and the `verify.sh` proof.
 
 ## 0. Prerequisites
 
 | Tool | Version | Purpose |
 |---|---|---|
-| Rust nightly | `nightly-2025-02-01` (pinned in `contracts/rust-toolchain.toml`) | Contract compilation to `wasm32-unknown-unknown`. |
+| Rust nightly | `nightly-2025-01-01` (pinned in `contracts/rust-toolchain.toml` -- confirmed deploy-compatible; newer nightlies have emitted bulk-memory WASM ops that Casper testnet preprocessing rejects, see `docs/DEPLOYMENT_LESSONS.md`) | Contract compilation to `wasm32-unknown-unknown`. |
 | `casper-client` | ≥ 2.0 | On-chain deploys, contract queries. |
 | Node.js | 22.x | Casper JS SDK for `server/casper_tx/` scripts, frontend build. |
 | Python | 3.11 | Backend (`server/`) and SDK (`sdk/`). |
@@ -31,10 +27,12 @@ cd AgentEscrow402/contracts
 cargo build --release --target wasm32-unknown-unknown
 ```
 
-The workspace at `contracts/Cargo.toml` compiles 11 members: 8 stored
-contracts + 5 session WASMs (`pool-funder`, `arbiter-registrar`,
-`batch-funder`, `id-registry-funder`, `test-token` deploy-session).
-Artifacts land in `contracts/target/wasm32-unknown-unknown/release/*.wasm`.
+The workspace at `contracts/Cargo.toml` compiles all stored contracts
+(`escrow`, `escrow-manager`, `insurance-pool`, `vrf-arbiter`,
+`agent-identity-registry`, `test-token`, `multi-asset-escrow`) plus their
+session-WASM installers (`pool-funder`, `arbiter-registrar`,
+`batch-funder`, `id-registry-funder`) and the `tests` crate. Artifacts
+land in `contracts/target/wasm32-unknown-unknown/release/*.wasm`.
 
 The Makefile shortcut compiles only the two most-changed contracts
 (`make contracts`); use the raw `cargo build` above for the full set.
@@ -183,7 +181,7 @@ TEST_TOKEN_CONTRACT_HASH=<hex AETUSD>
 
 # Mode
 SANDBOX=0        # 1 for demo without RPC calls
-AE402_STRICT=0   # 1 forces all-real-or-503; see docs/REAL_VS_SIM.tmp
+AE402_STRICT=0   # 1 forces all-real-or-503; see docs/REAL_VS_SIM.md
 
 # DB (Neon)
 DATABASE_URL=postgres://…
@@ -250,7 +248,7 @@ Run against the deployed API:
 
 `verify.sh` performs five real checks:
 
-1. All 8 contracts exist on Casper testnet (via CSPR.cloud API).
+1. Every contract listed in `deploy-out/onchain.json` exists on Casper testnet (via CSPR.cloud API).
 2. API `/health` returns `status=ok`.
 3. Escrow round-trip (create → list → detail) works.
 4. Frontend serves HTML at `<frontend URL>/`.

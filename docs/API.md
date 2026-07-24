@@ -1,11 +1,3 @@
-<!-- GENERATED TEMPLATE
-Purpose: API reference with curl examples for all 64 REST endpoints, grouped by module.
-Usage: Review content, cross-check against docs/openapi.yaml and docs/API_SDK_MCP.md,
-       decide whether to (a) merge curl examples into docs/API_SDK_MCP.md and delete
-       this file, or (b) remove this header and rename to docs/API.md as a standalone
-       curl-focused companion.
-Remove when: After Viktor reviews and decides on the merge path.
--->
 
 # AE402 REST API — Curl Reference
 
@@ -327,6 +319,21 @@ curl -s -X POST $BASE/admin/unfreeze \
 
 ---
 
+---
+
+## 13. Capability delegation, admin timelock, VC receipts, Telegram bridge (added after 2026-07-18)
+
+These four feature areas were built after this curl reference was
+originally generated and have their own dedicated docs with curl/SDK
+examples rather than being duplicated here:
+
+- Macaroon capability delegation — [`docs/MACAROONS.md`](./MACAROONS.md) (`/macaroons/*`)
+- Timelocked admin changes — [`docs/TIMELOCK_ADMIN.md`](./TIMELOCK_ADMIN.md) (`/timelock/*`)
+- W3C VC 2.0 escrow receipts — [`docs/VC_RECEIPTS.md`](./VC_RECEIPTS.md) (`/vc/*`)
+- Telegram bridge — [`docs/TELEGRAM_BRIDGE.md`](./TELEGRAM_BRIDGE.md) (`/telegram/*`)
+
+---
+
 ## Error Responses
 
 All endpoints return errors as:
@@ -358,9 +365,9 @@ Status codes:
 
 - Narrative & Python SDK / MCP tools: [`docs/API_SDK_MCP.md`](./API_SDK_MCP.md)
 - Machine schema (import into Postman / Insomnia): [`docs/openapi.yaml`](./openapi.yaml)
-- Real-vs-sim disclosure: [`docs/REAL_VS_SIM.tmp`](./REAL_VS_SIM.tmp)
-- Deployment: [`docs/DEPLOY.tmp`](./DEPLOY.tmp)
+- Real-vs-sim disclosure: [`docs/REAL_VS_SIM.md`](./REAL_VS_SIM.md)
+- Deployment: [`docs/DEPLOY.md`](./DEPLOY.md)
 
 ---
 
-*Total endpoints documented: 64. Generated 2026-07-18 against branch `fix/agent-batch-2`.*
+*Core REST surface documented: 64 endpoints across sections 1-12, generated 2026-07-18. Section 13 lists 4 feature areas added later (own docs, not duplicated here). Last reviewed for accuracy 2026-07-24.*

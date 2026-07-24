@@ -4,7 +4,7 @@ import CopyButton from './CopyButton';
 
 // Evidence page — links every deployed contract to its testnet.cspr.live
 // deploy tx and its cspr.cloud contract explorer, so reviewers can verify
-// the "REAL" claims in docs/REAL_VS_SIM.tmp on-chain in one click.
+// the "REAL" claims in docs/REAL_VS_SIM.md on-chain in one click.
 // Data source: /onchain.json (copied from deploy-out/onchain.json at build
 // time). See AE402_AGENT_SPEC.md → A2.
 
@@ -94,7 +94,7 @@ const Evidence: React.FC = () => {
           bytecode was posted on-chain, by whom, and when) and to the CSPR.cloud
           contract explorer (lets you inspect current state, entry points, and
           call history). Cross-reference with{' '}
-          <code className="text-emerald-400">docs/REAL_VS_SIM.tmp</code>.
+          <code className="text-emerald-400">docs/REAL_VS_SIM.md</code>.
         </p>
         <p className="text-xs text-slate-500">
           Snapshot generated at {data.generated_at}
