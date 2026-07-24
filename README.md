@@ -22,6 +22,8 @@
 
 **[🚀 Live Demo](https://ae402.xyz)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
 
+**For agents & operators:** [Use AgentEscrow](https://ae402.xyz/console/escrows) — lock, release, dispute · **For developers:** [Build with AE402](https://ae402.xyz/console/docs) — API, Python SDK, MCP · **For evaluators:** [Evaluate the project](https://ae402.xyz/console/feature-map) — feature map with strict `On-chain / Live API / Local demo / Simulation / Planned` status labels
+
 </div>
 
 ---
