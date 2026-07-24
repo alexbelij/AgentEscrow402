@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { api, DEMO_AGENT_RECEIVER, DEMO_AGENT_SENDER } from '../../lib/api';
 import { csprToMotes, randomHex64 } from '../../lib/format';
+import { CONTRACTS } from '../../lib/manifest.generated';
 import { Cpu, Loader2, Play, RefreshCw, Shield, Shuffle, WalletCards, BadgeCheck, Coins, Layers, Dices } from 'lucide-react';
 import CopyButton from './CopyButton';
 
 // Fallback only — used if the backend /contracts call fails (e.g. offline
 // dev build). The source of truth is the backend Config (env-overridable),
-// so a contract redeploy no longer requires a frontend code change.
+// so a contract redeploy no longer requires a frontend code change. Hashes
+// below are sourced from the generated manifest (deploy-out/onchain.json)
+// rather than duplicated literals, so this list can't drift from reality.
 const CATEGORY_ICONS: Record<string, React.ElementType> = {
   core: Shield,
   identity: BadgeCheck,
@@ -17,49 +20,55 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
 const FALLBACK_CONTRACTS = [
   {
     name: 'Core Escrow',
-    hash: '612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec',
+    hash: CONTRACTS.escrowManagerV9.contractHash,
     role: 'Full escrow lifecycle: create → release / refund / dispute → 3-of-5 arbiter resolve, with release-cap guard and emergency freeze.',
     category: 'core',
   },
   {
     name: 'Escrow Manager',
-    hash: 'bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d',
+    hash: CONTRACTS.batchEscrowManager.contractHash,
     role: 'Batch escrow orchestration: create, release and cancel multiple escrows in a single deploy.',
     category: 'core',
   },
   {
     name: 'Insurance Pool',
-    hash: 'ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4',
+    hash: CONTRACTS.insurancePool.contractHash,
     role: 'Collects insurance premiums on escrow creation, manages claim payouts for disputed escrows.',
     category: 'core',
   },
   {
     name: 'VRF Arbiter',
-    hash: '78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93',
+    hash: CONTRACTS.vrfArbiter.contractHash,
     role: 'On-chain verifiable random arbiter election with staked purses; API falls back to local CSPRNG when unavailable.',
     category: 'core',
   },
   {
     name: 'Agent Identity Registry',
-    hash: '1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae',
+    hash: CONTRACTS.agentIdentityRegistry.contractHash,
     role: 'DID-style agent registration with on-chain staking, reputation tracking and capability delegation.',
     category: 'identity',
   },
   {
     name: 'MultiAssetEscrow',
-    hash: '52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a',
+    hash: CONTRACTS.multiAssetEscrow.contractHash,
     role: 'Contract-custody escrow for CEP-18 fungible tokens: approve → create → release/refund/dispute/resolve, all on-chain.',
     category: 'multi-asset',
   },
   {
     name: 'AEMAT (test token)',
-    hash: '8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5',
+    hash: CONTRACTS.cep18TestTokenAemat.contractHash,
     role: 'CEP-18 fungible test token for multi-asset escrow demos (custody-compatible, uses get_immediate_caller).',
     category: 'token',
   },
   {
+    name: 'AETUSD (test token)',
+    hash: CONTRACTS.cep18TestTokenAetusd.contractHash,
+    role: 'CEP-18 fungible test token used to prefill the contract-hash field for CEP-18 escrow/permit demos.',
+    category: 'token',
+  },
+  {
     name: 'AETNFT (test NFT)',
-    hash: 'c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a',
+    hash: CONTRACTS.cep78TestTokenAetnft.contractHash,
     role: 'CEP-78 enhanced NFT collection for multi-asset escrow NFT demos (Transferable, Public minting, Ordinal IDs).',
     category: 'token',
   },

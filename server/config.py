@@ -41,6 +41,20 @@ class Config:
     multi_asset_escrow_contract_hash: str = ""
     multi_asset_escrow_package_hash: str = ""
     test_token_contract_hash: str = ""
+    # CEP-18 test token used to prefill the "contract hash" field for CEP-18
+    # escrow/permit demos. Previously hardcoded as TEST_CEP18_CONTRACT_HASH
+    # directly in frontend/src/lib/api.ts with no config/manifest wiring.
+    cep18_aetusd_contract_hash: str = ""
+    # CEP-78 test NFT used for multi-asset escrow NFT demos. Previously
+    # hardcoded in three places (frontend/src/components/TrustSignals.tsx,
+    # frontend/src/components/console/Contracts.tsx, and this endpoint) with
+    # no manifest entry to verify it against -- see deploy-out/onchain.json
+    # "cep78_test_token_aetnft" for the verified source of truth.
+    aetnft_contract_hash: str = ""
+    # Was hardcoded directly in the /contracts response below; every other
+    # deployed contract hash here is env-overridable so a redeploy never
+    # requires a code change.
+    agent_identity_contract_hash: str = ""
     vrf_onchain_select_count: int = 3
     allow_hosted_demo_identity: bool = False
     # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
@@ -160,6 +174,21 @@ class Config:
             test_token_contract_hash=os.getenv(
                 "TEST_TOKEN_CONTRACT_HASH",
                 "8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5",
+            ),
+            cep18_aetusd_contract_hash=os.getenv(
+                "CEP18_AETUSD_CONTRACT_HASH",
+                "177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754",
+            ),
+            aetnft_contract_hash=os.getenv(
+                "AETNFT_CONTRACT_HASH",
+                # Verified against CSPR.cloud contract-packages/contracts on
+                # 2026-07-24; see deploy-out/onchain.json
+                # "cep78_test_token_aetnft" for the canonical record.
+                "c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
+            ),
+            agent_identity_contract_hash=os.getenv(
+                "AGENT_IDENTITY_CONTRACT_HASH",
+                "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",

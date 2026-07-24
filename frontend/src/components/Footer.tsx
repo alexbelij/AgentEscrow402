@@ -1,5 +1,6 @@
 import { ExternalLink } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { CONTRACTS } from '../lib/manifest.generated'
 
 const LINKS = [
   { label: 'GitHub', href: 'https://github.com/alexbelij/AgentEscrow402', external: true },
@@ -7,7 +8,7 @@ const LINKS = [
   { label: 'SDK', href: '/console/docs?tab=sdk', external: false },
   { label: 'MCP', href: '/console/docs?tab=mcp', external: false },
   { label: 'Telegram', href: 'https://t.me/AgentEscrow402', external: true },
-  { label: 'Contract', href: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec', external: true },
+  { label: 'Contract', href: CONTRACTS.escrowManagerV9.explorer, external: true },
 ]
 
 export default function Footer() {

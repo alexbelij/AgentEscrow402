@@ -68,6 +68,15 @@
       "version": 3,
       "notes": "Custody-compatible token — uses get_immediate_caller.",
       "explorer": "https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5"
+    },
+    "cep78_test_token_aetnft": {
+      "name": "CEP-78 test NFT (AETNFT)",
+      "contract_hash": "hash-c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
+      "contract_package_hash": "hash-ac38003d1ffe4550aa2ec82cbcd14fc938a078fafc43e111176e7ed6c9a8e85c",
+      "deploy_hash": "e3ed5932db63383d1cc7cc3f5ee56648aa28a84c8e401418f502cb6b8ebcb93d",
+      "version": 1,
+      "notes": "CEP-78 enhanced NFT collection (Transferable, Public minting, Ordinal IDs) used for multi-asset escrow NFT demos. Was previously referenced only as a literal string in frontend/backend code with no manifest entry; re-verified against CSPR.cloud contract-packages/contracts lookup 2026-07-24 before being added here as the canonical source.",
+      "explorer": "https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a"
     }
   },
   "api_url": "https://agentescrow402-api-ywm8.onrender.com",

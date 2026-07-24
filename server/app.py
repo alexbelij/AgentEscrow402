@@ -403,7 +403,7 @@ async def contracts(cfg: Config = Depends(get_config)):
             },
             {
                 "name": "Agent Identity Registry",
-                "hash": "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae",
+                "hash": cfg.agent_identity_contract_hash,
                 "role": (
                     "DID-style agent registration with on-chain staking, reputation tracking and capability delegation."
                 ),
@@ -428,8 +428,17 @@ async def contracts(cfg: Config = Depends(get_config)):
                 "category": "token",
             },
             {
+                "name": "AETUSD (test token)",
+                "hash": cfg.cep18_aetusd_contract_hash,
+                "role": (
+                    "CEP-18 fungible test token used to prefill the contract-hash field "
+                    "for CEP-18 escrow/permit demos."
+                ),
+                "category": "token",
+            },
+            {
                 "name": "AETNFT (test NFT)",
-                "hash": "c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
+                "hash": cfg.aetnft_contract_hash,
                 "role": (
                     "CEP-78 enhanced NFT collection for multi-asset escrow NFT demos "
                     "(Transferable, Public minting, Ordinal IDs)."

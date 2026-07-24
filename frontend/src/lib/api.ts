@@ -1,3 +1,4 @@
+import { CONTRACTS } from './manifest.generated';
 
 // Requests go through the Vercel proxy (/backend/*) to bypass ad-blockers
 // that block direct calls to *.onrender.com hostnames containing "api".
@@ -56,9 +57,11 @@ export const DEMO_AGENT_RECEIVER = 'fedcba9876543210fedcba9876543210fedcba987654
 
 // Contract hash of the CEP-18 test token (AETUSD) this project deploys and controls on
 // casper-test, used to prefill the "Contract hash" field for CEP-18 escrows/permits so users
-// aren't left guessing which hash to paste in. See skills/integrations/casper/SKILL.md for the
-// full deploy history if this token is ever redeployed at a new hash.
-export const TEST_CEP18_CONTRACT_HASH = '177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754';
+// aren't left guessing which hash to paste in. Sourced from the generated manifest
+// (deploy-out/onchain.json is the canonical record) instead of a duplicated literal —
+// see skills/integrations/casper/SKILL.md for the full deploy history if this token is
+// ever redeployed at a new hash.
+export const TEST_CEP18_CONTRACT_HASH = CONTRACTS.cep18TestTokenAetusd.contractHash;
 
 const HEX_64 = /^[0-9a-f]{64}$/i;
 

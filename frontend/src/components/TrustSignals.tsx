@@ -1,7 +1,8 @@
 import { ExternalLink } from 'lucide-react'
+import { CONTRACTS, CONTRACT_COUNT } from '../lib/manifest.generated'
 
 const STATS = [
-  { value: '8', label: 'Deployed Contracts', sub: 'on Casper Testnet' },
+  { value: String(CONTRACT_COUNT), label: 'Deployed Contracts', sub: 'on Casper Testnet' },
   { value: '142+', label: 'On-Chain Transactions', sub: 'create / release / refund / resolve' },
   { value: '490', label: 'Automated Tests', sub: '450 Python + 40 Rust' },
   { value: '62', label: 'API Endpoints', sub: 'OpenAPI-documented' },
@@ -9,48 +10,27 @@ const STATS = [
   { value: '13', label: 'Console Pages', sub: 'all live-wired' },
 ]
 
-const EVIDENCE = [
-  {
-    label: 'Core Escrow contract (v9)',
-    hash: '612cead2…ddd9ec',
-    url: 'https://testnet.cspr.live/contract/612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec',
-  },
-  {
-    label: 'VRF Arbiter contract',
-    hash: '78ae2870…9c93',
-    url: 'https://testnet.cspr.live/contract/78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93',
-  },
-  {
-    label: 'Agent Identity Registry (v2)',
-    hash: '1f29271d…1cae',
-    url: 'https://testnet.cspr.live/contract/1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae',
-  },
-  {
-    label: 'MultiAssetEscrow (CEP-18)',
-    hash: '52db09a1…d12a',
-    url: 'https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a',
-  },
-  {
-    label: 'Escrow Manager (batch)',
-    hash: 'bfa8c02c…675d',
-    url: 'https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d',
-  },
-  {
-    label: 'Insurance Pool',
-    hash: 'ead90738…fff4',
-    url: 'https://testnet.cspr.live/contract/ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4',
-  },
-  {
-    label: 'AEMAT (CEP-18 test token)',
-    hash: '8ba7df6f…00a5',
-    url: 'https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5',
-  },
-  {
-    label: 'AETNFT (CEP-78 test NFT)',
-    hash: 'c2dee0f1…f70a',
-    url: 'https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a',
-  },
+// Hash/URL sourced from the generated manifest (deploy-out/onchain.json) —
+// only the marketing label is customized here, so this list can never drift
+// from the canonical deployed-contract record.
+const truncateHash = (hash: string) => `${hash.slice(0, 8)}…${hash.slice(-4)}`
+
+const EVIDENCE_ORDER: { key: keyof typeof CONTRACTS; label: string }[] = [
+  { key: 'escrowManagerV9', label: 'Core Escrow contract (v9)' },
+  { key: 'vrfArbiter', label: 'VRF Arbiter contract' },
+  { key: 'agentIdentityRegistry', label: 'Agent Identity Registry (v2)' },
+  { key: 'multiAssetEscrow', label: 'MultiAssetEscrow (CEP-18)' },
+  { key: 'batchEscrowManager', label: 'Escrow Manager (batch)' },
+  { key: 'insurancePool', label: 'Insurance Pool' },
+  { key: 'cep18TestTokenAemat', label: 'AEMAT (CEP-18 test token)' },
+  { key: 'cep18TestTokenAetusd', label: 'AETUSD (CEP-18 test token)' },
+  { key: 'cep78TestTokenAetnft', label: 'AETNFT (CEP-78 test NFT)' },
 ]
+
+const EVIDENCE = EVIDENCE_ORDER.map(({ key, label }) => {
+  const c = CONTRACTS[key]
+  return { label, hash: truncateHash(c.contractHash), url: c.explorer }
+})
 
 export default function TrustSignals() {
   return (
