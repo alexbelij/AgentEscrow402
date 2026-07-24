@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AE402 — Offline</title>
+  <meta name="theme-color" content="#0a0a1a" />
+  <meta name="color-scheme" content="dark" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <style>
+    :root { color-scheme: dark; }
+    html, body {
+      margin: 0; padding: 0; min-height: 100%;
+      background: #0a0a1a; color: #e5e7f0;
+      font-family: system-ui, -apple-system, "Segoe UI", Inter, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+    .card {
+      max-width: 480px; width: 100%;
+      background: linear-gradient(180deg, rgba(108,92,231,0.08), rgba(10,10,26,0.6));
+      border: 1px solid rgba(108,92,231,0.35);
+      border-radius: 16px; padding: 2rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .badge {
+      display: inline-block; padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+      color: #cbd0ff; background: rgba(108,92,231,0.15); border: 1px solid rgba(108,92,231,0.4);
+      margin-bottom: 1rem;
+    }
+    h1 { margin: 0 0 0.5rem; font-size: 1.5rem; }
+    p  { margin: 0 0 1rem; color: #b6bdd1; line-height: 1.55; }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; }
+    button, a.btn {
+      appearance: none; border: none; cursor: pointer;
+      padding: 0.7rem 1.1rem; border-radius: 10px; font-weight: 600;
+      background: #6C5CE7; color: white; text-decoration: none;
+      transition: transform 0.05s ease, background 0.15s ease;
+    }
+    button:hover, a.btn:hover { background: #5c4ed6; }
+    button:active, a.btn:active { transform: translateY(1px); }
+    .secondary {
+      background: transparent; color: #cbd0ff;
+      border: 1px solid rgba(108,92,231,0.5);
+    }
+    .secondary:hover { background: rgba(108,92,231,0.12); }
+    .status {
+      margin-top: 1rem; font-size: 13px; color: #8b93ac;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #ff6b6b; box-shadow: 0 0 0 4px rgba(255,107,107,0.15);
+    }
+    .dot.online { background: #4ade80; box-shadow: 0 0 0 4px rgba(74,222,128,0.15); }
+    ul.hint {
+      margin: 1rem 0 0; padding-left: 1.1rem; color: #93a0bd; font-size: 13.5px;
+    }
+    ul.hint li { margin: 0.3rem 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <span class="badge">Offline</span>
+      <h1>You're offline — the console is here.</h1>
+      <p>
+        AE402 works as a Progressive Web App: the app shell is cached on your
+        device, so you can review previously loaded escrows, contracts, and
+        docs even without connectivity. Live actions (creating escrows,
+        broadcasting deploys, streaming events) will resume automatically
+        once you reconnect.
+      </p>
+      <ul class="hint">
+        <li>Previously loaded pages remain viewable.</li>
+        <li>Signed transactions cannot be broadcast until network returns.</li>
+        <li>The live event feed reconnects on its own.</li>
+      </ul>
+      <div class="actions">
+        <button id="retry" type="button">Retry now</button>
+        <a class="btn secondary" href="/console">Open console</a>
+      </div>
+      <div class="status">
+        <span id="dot" class="dot"></span>
+        <span id="net">Checking connectivity…</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var dot = document.getElementById('dot');
+      var net = document.getElementById('net');
+      var retry = document.getElementById('retry');
+      function paint() {
+        if (navigator.onLine) {
+          dot.classList.add('online');
+          net.textContent = 'Back online. Click "Retry now" to reload.';
+        } else {
+          dot.classList.remove('online');
+          net.textContent = 'No network detected.';
+        }
+      }
+      window.addEventListener('online', paint);
+      window.addEventListener('offline', paint);
+      retry.addEventListener('click', function () {
+        // Prefer the console entry — falls back to the last visited page.
+        var target = sessionStorage.getItem('ae402:last-path') || '/console';
+        window.location.href = target;
+      });
+      paint();
+    })();
+  </script>
+</body>
+</html>

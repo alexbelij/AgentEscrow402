@@ -15,6 +15,7 @@ import FAQ from './components/FAQ'
 import Footer from './components/Footer'
 import ScrollToTop from './components/ScrollToTop'
 import NotFound from './components/NotFound'
+import PWAUpdatePrompt from './components/PWAUpdatePrompt'
 import ConsoleLayout from './components/console/ConsoleLayout'
 import Overview from './components/console/Overview'
 import Escrows from './components/console/Escrows'
@@ -105,6 +106,7 @@ export default function App() {
         </Routes>
       </main>
       {!isConsole && <Footer />}
+      <PWAUpdatePrompt />
     </div>
   )
 }
