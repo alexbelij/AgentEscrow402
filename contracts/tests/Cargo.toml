@@ -11,6 +11,7 @@ sha2 = "0.11"
 
 [dev-dependencies]
 proptest = "1"
+ae402-governance-dao = { path = "../ae402-governance-dao" }
 
 [[test]]
 name = "integration_tests"
@@ -35,3 +36,7 @@ path = "src/const_parity_tests.rs"
 [[test]]
 name = "two_key_account_property_tests"
 path = "src/two_key_account_property_tests.rs"
+
+[[test]]
+name = "governance_dao_property_tests"
+path = "src/governance_dao_property_tests.rs"
