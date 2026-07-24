@@ -1,0 +1,6 @@
+*.test.ts
+tsconfig.json
+tsconfig.build.json
+node_modules
+*.log
+.DS_Store

@@ -1,82 +1,191 @@
-# AgentEscrow402 TypeScript SDK (read + verify subset)
+# @ae402/sdk — AgentEscrow402 TypeScript SDK
 
-A minimal, dependency-free TypeScript port of a subset of the Python SDK
-(`sdk/client.py`, `sdk/arbiter_signing.py`): the **read-only** HTTP calls
-(`getEscrow`, `getReputation`, `health`) and the **Ed25519 verification**
-helpers arbiters/observers need to independently check a signed
-`resolve()` vote or an audit-log checkpoint signature, without needing to
-sign or submit transactions themselves.
+A **publishable, zero-dependency** TypeScript SDK for AgentEscrow402:
+the read-only HTTP client, Ed25519 signature verification for arbiter
+votes / cap approvals / insurance claims, and **HMAC-SHA256 webhook
+signature verification** — everything a downstream Node or modern-browser
+agent needs to look up an escrow, verify a signature it was handed, and
+authenticate a webhook delivery.
 
-This intentionally does **not** port the write path (`createEscrow`,
-`release`, `refund`, `dispute`, `resolve`, batch ops, VRF election,
-streaming claim) — those require the full x402 signing flow and stay in
-the Python SDK. If a TypeScript agent needs to *write*, use the Python
-SDK or a future full port; this package covers "look something up" and
-"verify a signature I was handed" use cases from Node/browser code.
+The **write path** (`createEscrow`, `release`, `refund`, `dispute`,
+`resolve`, batch ops, VRF election, streaming claim) stays in the
+Python SDK (`sdk/python/`, see PR #25) — it requires the full x402
+signing flow. This package covers "look something up" and "verify
+something I was handed", which is what most integrators actually need.
 
-## Why no dependencies
+## Install
+
+Once published to npm (see [Publishing](#publishing) — publish itself is
+out of scope for this repo, but the package config is fully wired):
+
+```bash
+npm install @ae402/sdk
+# or
+pnpm add @ae402/sdk
+# or
+yarn add @ae402/sdk
+```
+
+Vendorable use (no npm) is still supported — see [Vendoring](#vendoring).
+
+## Zero dependencies
 
 Ed25519 verification uses Node's built-in `crypto.webcrypto.subtle`
 (`Ed25519` is natively supported since Node 19+, confirmed on Node 24 in
-this repo's environment) — no `@noble/ed25519` or `tweetnacl` needed for
-this subset. HTTP calls use the global `fetch`. This keeps the SDK
-zero-dependency and easy to vendor into any Node or modern-browser
-project.
+this repo's environment). HTTP calls use the global `fetch`. HMAC-SHA256
+webhook verification uses the same `webcrypto.subtle` primitive. This
+keeps the SDK free of `@noble/ed25519`, `tweetnacl`, `axios`, or any
+other third-party runtime dependency.
+
+## Quick start
+
+```ts
+import {
+  AgentEscrow402ReadClient,
+  verifyEd25519Vote,
+  buildResolveMessage,
+  verifyWebhookSignature,
+} from "@ae402/sdk";
+
+// 1. Read-only client
+const client = new AgentEscrow402ReadClient("https://agentescrow402-api-ywm8.onrender.com");
+const escrow = await client.getEscrow("deadbeef...");
+
+// 2. Verify an arbiter vote
+const msg = buildResolveMessage(escrow.service_hash, "beneficiary_pubkey_hex");
+const ok = await verifyEd25519Vote(msg, "arbiter_pubkey_hex", "sig_hex");
+
+// 3. Verify a webhook delivery
+const parsed = await verifyWebhookSignature(
+  rawRequestBody,
+  request.headers["x-ae402-signature"],
+  process.env.AE402_WEBHOOK_SECRET!,
+);
+console.log(parsed.type, parsed.data);
+```
 
 ## Modules
 
-- `types.ts` — `TokenType`, `EscrowStatus`, `EscrowResponse`, and friends,
-  mirroring `sdk/agentescrow402/models.py`.
-- `client.ts` — `AgentEscrow402ReadClient`: `getEscrow`, `getReputation`,
-  `riskScore`, `health`. Read-only, unauthenticated — matches the
-  unauthenticated GET routes in `server/app.py` (no `X-Payment` /
-  `X-402-Auth` header required for these endpoints).
-- `verify.ts` — canonical-message builders (`buildResolveMessage`,
-  `buildCapApprovalMessage`, `buildInsuranceClaimMessage`) and
-  `verifyEd25519Vote` / `countValidVotes` /
-  `countValidCapApprovalVotes` / `countValidInsuranceClaimVotes`, a
-  byte-for-byte TypeScript mirror of `server/arbiter_crypto.py`'s
-  tag-prefixed-hex Ed25519 checks. Checkpoint-signature verification
-  (see `server/audit_log.py`) is out of scope for this port — planned
-  for a follow-up SDK release.
+- **`@ae402/sdk/client`** — `AgentEscrow402ReadClient`: `getEscrow`,
+  `getReputation`, `riskScore`, `health`. Read-only, unauthenticated —
+  matches the unauthenticated GET routes in `server/app.py` (no
+  `X-Payment` / `X-402-Auth` header required for these endpoints).
+- **`@ae402/sdk/verify`** — canonical-message builders
+  (`buildResolveMessage`, `buildCapApprovalMessage`,
+  `buildInsuranceClaimMessage`) and `verifyEd25519Vote`,
+  `countValidVotes`, `countValidCapApprovalVotes`,
+  `countValidInsuranceClaimVotes`, byte-for-byte mirroring
+  `server/arbiter_crypto.py`'s tag-prefixed-hex Ed25519 checks.
+  Checkpoint-signature verification (see `server/audit_log.py`) is
+  planned for a follow-up release.
+- **`@ae402/sdk/webhooks`** — `verifyWebhookSignature` and
+  `signWebhookPayload` for `X-AE402-Signature: t=<ts>,v1=<hex>` headers.
+  Constant-time comparison, configurable ±tolerance (default 300s to
+  reject replays), rolling-secret support (multiple `v1=` entries),
+  forward-compat with a future `v2=` scheme (unknown keys are ignored).
+- **`@ae402/sdk/types`** — `TokenType`, `EscrowStatus`, `EscrowResponse`,
+  `ReputationResponse`, `HealthResponse`, `WebhookEvent`, mirroring
+  `sdk/agentescrow402/models.py`.
+- **`@ae402/sdk/errors`** — `AgentEscrowError` (base), `APIError`,
+  `BadRequestError`, `UnauthorizedError`, `ForbiddenError`,
+  `NotFoundError`, `ConflictError`, and the `errorForStatus` factory
+  the read client uses.
 
-## Usage
+Barrel import (`import { … } from "@ae402/sdk"`) re-exports everything
+above. Sub-path imports are preserved so tree-shaking picks up only
+what you use.
+
+## Webhook signature scheme
+
+The `X-AE402-Signature` header follows the Stripe / GitHub convention:
+
+```
+X-AE402-Signature: t=1752000100,v1=deadbeef…64hex
+```
+
+- `t=` — unix seconds when the server emitted the event.
+- `v1=` — HMAC-SHA256 hex digest of `"{t}.{raw_body}"` using the
+  endpoint's shared secret.
+
+The signed string uses the **raw request body**, not the parsed JSON —
+so a downstream framework MUST expose the raw body to the handler (e.g.
+`express.raw({ type: 'application/json' })`, `fastify`'s
+`rawBody: true`, or Next.js `route.ts` with `req.text()`).
+
+Multiple `v1=` entries in one header are supported for secret rotation:
+sign new deliveries with both the old and new secret for a
+grace-period, verify with either, then retire the old secret. Unknown
+scheme keys (a hypothetical `v2=` in a future SDK release) are silently
+ignored, so old verifier code keeps working against newer senders.
+
+### Server-side implementation
+
+`signWebhookPayload` is provided for tests, mocks, and server-side
+implementations that need to produce the header value:
 
 ```ts
-import { AgentEscrow402ReadClient } from "./client.js";
-import { verifyEd25519Vote, buildResolveMessage } from "./verify.js";
+import { signWebhookPayload } from "@ae402/sdk/webhooks";
 
-const client = new AgentEscrow402ReadClient("https://agentescrow402-api-ywm8.onrender.com");
-const escrow = await client.getEscrow("deadbeef...");
-console.log(escrow.status);
-
-const ok = await verifyEd25519Vote(
-  "01" + "...64-hex-pubkey...",
-  "01" + "...128-hex-sig...",
-  buildResolveMessage(serviceHash, inFavorOf),
-);
+const body = JSON.stringify(eventEnvelope);
+const header = await signWebhookPayload(body, secret);
+await fetch(customerUrl, {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "x-ae402-signature": header,
+  },
+  body,
+});
 ```
 
-## Testing
+## Versioning
 
-Run with Node's built-in test runner (Node 24 supports executing `.ts`
-directly, no build step or ts-node needed):
+`@ae402/sdk` follows [Semantic Versioning](https://semver.org/):
+
+- **Patch** — bug fixes, doc-only changes, non-behavioral refactors.
+- **Minor** — new modules, new exported functions or types, new webhook
+  event names appended to `WebhookEventType` (the union is declared open
+  with `| (string & {})`, so downstream code compiles against unknown
+  event names — treat unknown types as "keep going").
+- **Major** — removed exports, renamed functions, changed signatures,
+  changed HMAC scheme or header name, changed Node engine floor,
+  breaking rename or removal of fields in `EscrowResponse` /
+  `ReputationResponse` / `WebhookEvent`.
+
+See [CHANGELOG.md](./CHANGELOG.md) for the release history.
+
+## Vendoring
+
+If you'd rather vendor the SDK into your app instead of installing from
+npm, the source layout is intentionally flat and dependency-free:
+
+1. Copy `client.ts`, `verify.ts`, `webhooks.ts`, `errors.ts`, `types.ts`
+   into your repo.
+2. Use the shipped `tsconfig.json` as-is (it enables
+   `allowImportingTsExtensions` + `noEmit`, so `.ts` imports work
+   without a build step and Node's built-in type-stripping executes it
+   directly).
+3. Skip the `dist/` build — Node 22+ runs `.ts` directly with
+   `--experimental-strip-types`.
+
+## Build / test
 
 ```bash
-node --test sdk-ts/*.test.ts
+npm run typecheck   # tsc --noEmit
+npm test            # node --test --experimental-strip-types
+npm run build       # emit dist/ (JS + .d.ts)
 ```
 
-## Build model
+The `prepublishOnly` hook runs typecheck + tests + build.
 
-This SDK is **zero-build**: it ships as `.ts` sources meant to be run
-directly under Node 22+'s native type-stripping (`node --test`,
-`node --experimental-strip-types`) or vendored into a downstream
-TypeScript project that already has its own build pipeline.
+## Publishing
 
-`tsconfig.json` is set to `noEmit: true` +
-`allowImportingTsExtensions: true` so the source files' explicit
-`.ts` imports type-check cleanly with `tsc --noEmit`. There is no
-`dist/` output and no `.d.ts` emission from this package itself — if
-you need standalone `.js`/`.d.ts` artifacts (e.g. for a browser
-bundle), compile the sources in a downstream project after
-substituting the `.ts` imports for `.js`.
+`publishConfig.access = "public"` is set. Once the maintainer has npm
+credentials wired in CI (out of scope for this repo — see the AE402
+release runbook), `npm publish` from `sdk-ts/` cuts a release.
+
+**Not shipped in `0.1.0`:**
+
+- Write path — use `@ae402/python-sdk` (`sdk/python/`, PR #25).
+- Checkpoint-signature verification (`server/audit_log.py` mirror) —
+  planned for `0.2.0`.
