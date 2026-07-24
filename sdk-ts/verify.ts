@@ -63,7 +63,7 @@ async function importPubkeyFromHex(pubkeyHex: string): Promise<CryptoKey | null>
     return null;
   }
   try {
-    return await crypto.subtle.importKey("raw", raw, { name: "Ed25519" }, true, ["verify"]);
+    return await crypto.subtle.importKey("raw", raw as BufferSource, { name: "Ed25519" }, true, ["verify"]);
   } catch {
     return null;
   }
@@ -103,7 +103,7 @@ export async function verifyEd25519Vote(
     return false;
   }
   try {
-    return await crypto.subtle.verify({ name: "Ed25519" }, pubkey, sig, message);
+    return await crypto.subtle.verify({ name: "Ed25519" }, pubkey, sig as BufferSource, message as BufferSource);
   } catch {
     return false;
   }
