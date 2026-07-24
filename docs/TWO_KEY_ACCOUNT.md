@@ -52,10 +52,17 @@ ae402:two-key:v1:{action}:{contract_id}:{nonce}:{payload_hash}
 
 - **Action**  — a signature for `freeze` cannot execute `renounce`.
 - **Contract ID** — a signature valid on deployment A won't verify on B,
-  even with the same keys and nonces. The `contract_id` is bound as a
-  named arg at call time; the contract itself does not read its own
-  address, but *any* substituted `contract_id` would break signature
-  verification because it wasn't what the off-chain signer signed.
+  even with the same keys and nonces. `contract_id` is **not** a
+  caller-supplied named arg (an earlier draft of this contract took it
+  that way, which does not actually stop replay — a relayer could just
+  resubmit the same `contract_id` value against a different deployment
+  that happens to share the same cold/hot keypair). Instead, each
+  deployed instance embeds its own package hash into its own named keys
+  at genesis (`self_package_hash`, two-phase `create_contract_package_at_hash`
+  + `add_contract_version`), and every entry point reads it back via
+  `self_contract_id()` to build the message it verifies against. A
+  signature can therefore only ever verify against the one instance the
+  off-chain signer actually intended.
 - **Nonce**  — monotonically consumed per role (cold and hot each have
   their own). Any mismatch reverts with `ERR_NONCE_MISMATCH`.
 - **Payload hash** — a caller-chosen commitment (sha256 recommended) to
@@ -73,7 +80,7 @@ property-test suite exercises injectivity across arbitrary
 | Hot key stolen                                      | Bounded by `hot_spend_cap`; cold rotates + resets hot nonce.    |
 | Cold key stolen                                     | Full compromise. Keep cold offline. Renounce if suspected.      |
 | Replay of `exec` signature                          | Nonce (u64, monotonic) + `payload_hash` binding.                |
-| Replay of cold sig against a different deployment   | `contract_id` bound into signed message.                        |
+| Replay of cold sig against a different deployment   | `contract_id` read from this instance's own named keys, not a caller-supplied arg — bound into signed message. |
 | Reusing an old hot signature after rotation         | `rotate_hot` resets hot nonce to 0, invalidating old bytes.     |
 | Signature substitution across actions               | Action string is part of the signed message.                    |
 | Malicious relayer swaps `contract_id`               | Signature verify fails; tx reverts (`ERR_INVALID_SIGNATURE`).   |

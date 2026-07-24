@@ -46,13 +46,9 @@ HOT_ACTIONS: frozenset[Action] = frozenset({"exec"})
 
 def _validate_action_role(action: Action, role: Role) -> None:
     if role == "cold" and action not in COLD_ACTIONS:
-        raise ValueError(
-            f"action {action!r} is not a cold-key action; expected one of {sorted(COLD_ACTIONS)}"
-        )
+        raise ValueError(f"action {action!r} is not a cold-key action; expected one of {sorted(COLD_ACTIONS)}")
     if role == "hot" and action not in HOT_ACTIONS:
-        raise ValueError(
-            f"action {action!r} is not a hot-key action; expected one of {sorted(HOT_ACTIONS)}"
-        )
+        raise ValueError(f"action {action!r} is not a hot-key action; expected one of {sorted(HOT_ACTIONS)}")
 
 
 def build_signed_message(
@@ -138,9 +134,18 @@ class SignedCall:
     contract_id: str
 
     def named_args(self) -> dict[str, object]:
-        """Named args ready to feed into a Casper deploy builder."""
+        """Named args ready to feed into a Casper deploy builder.
+
+        ``contract_id`` is deliberately NOT included here: the on-chain
+        contract derives it internally from its own named keys (see
+        ``self_contract_id()`` in ``contracts/two-key-account/src/main.rs``)
+        rather than trusting a caller-supplied value, so a signature made
+        for one deployed instance can never be replayed against another
+        instance that happens to share the same cold/hot keypair. It is
+        still needed here, off-chain, only to build the exact message the
+        contract will independently reconstruct for verification.
+        """
         args: dict[str, object] = {
-            "contract_id": self.contract_id,
             "nonce": self.nonce,
             "payload_hash": self.payload_hash,
         }
@@ -175,9 +180,7 @@ def prepare_call(
         inferred_role = "cold"
 
     if inferred_role == "hot" and not state.can_exec():
-        raise RuntimeError(
-            "hot-key exec disallowed: account is frozen or renounced"
-        )
+        raise RuntimeError("hot-key exec disallowed: account is frozen or renounced")
     if inferred_role == "cold" and not state.can_admin():
         raise RuntimeError("cold-key ops disallowed: account is renounced")
 

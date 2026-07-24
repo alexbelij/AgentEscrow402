@@ -31,7 +31,7 @@ use alloc::vec::Vec;
 
 use casper_contract::contract_api::{runtime, storage};
 use casper_contract::unwrap_or_revert::UnwrapOrRevert;
-use casper_types::contracts::NamedKeys;
+use casper_types::contracts::{ContractPackageHash, NamedKeys};
 use casper_types::crypto::{self, PublicKey, Signature};
 use casper_types::{
     ApiError, AsymmetricType, CLType, CLValue, EntityEntryPoint, EntryPointAccess, EntryPointPayment,
@@ -60,6 +60,16 @@ const FROZEN: &str = "frozen";
 const RENOUNCED: &str = "renounced";
 const HOT_SPEND_CAP: &str = "hot_spend_cap";
 const AUDIT_LOG: &str = "audit_log";
+// Self-referential package hash, embedded into this contract's *own*
+// named-key store at genesis (two-phase create: package hash is known
+// before the first version is added — see `call()`). Entry points read
+// this back instead of trusting a caller-supplied identifier, so a
+// signature made for one deployed instance can never be replayed
+// against a different instance that happens to share the same cold/hot
+// keypair. A caller-supplied `contract_id` argument would NOT provide
+// this guarantee — the contract would just be checking a value the
+// caller is free to pick to match whichever signature it is replaying.
+const SELF_PACKAGE_KEY: &str = "self_package_hash";
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -127,6 +137,23 @@ fn ensure_not_frozen() {
     if read_bool_key(FROZEN) {
         runtime::revert(ApiError::User(ERR_FROZEN));
     }
+}
+
+/// Read this contract's own package hash back from its named keys (set once
+/// at genesis in `call()`), and render it as the lowercase hex string used
+/// in signed messages. Never derived from caller input.
+fn self_contract_id() -> String {
+    let key = runtime::get_key(SELF_PACKAGE_KEY).unwrap_or_revert_with(ApiError::User(ERR_MISSING_KEY));
+    let addr = key.into_entity_hash_addr().unwrap_or_revert();
+    let package_hash: ContractPackageHash = addr.into();
+    let bytes: &[u8] = package_hash.as_bytes();
+    let mut s = String::with_capacity(bytes.len() * 2);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    s
 }
 
 /// Deterministic message used for signature verification.
@@ -238,7 +265,6 @@ pub extern "C" fn exec() {
     let nonce: u64 = runtime::get_named_arg("nonce");
     let payload_hash: String = runtime::get_named_arg("payload_hash");
     let amount_motes: u64 = runtime::get_named_arg("amount_motes");
-    let contract_id: String = runtime::get_named_arg("contract_id");
 
     // Hot key must match registered hot key
     let registered_hot = read_string_key(HOT_KEY);
@@ -252,6 +278,9 @@ pub extern "C" fn exec() {
         runtime::revert(ApiError::User(ERR_SPEND_CAP_EXCEEDED));
     }
 
+    // contract_id is read back from this contract's own named keys, never
+    // taken as a caller-supplied argument (see `self_contract_id` doc).
+    let contract_id = self_contract_id();
     let msg = build_signed_message("exec", &contract_id, nonce, &payload_hash);
 
     verify_signature(&hot_pubkey, &hot_signature, &msg);
@@ -356,13 +385,15 @@ fn require_cold_authorized(action: &str) {
     let cold_signature: String = runtime::get_named_arg("cold_signature");
     let nonce: u64 = runtime::get_named_arg("nonce");
     let payload_hash: String = runtime::get_named_arg("payload_hash");
-    let contract_id: String = runtime::get_named_arg("contract_id");
 
     let registered_cold = read_string_key(COLD_KEY);
     if cold_pubkey != registered_cold {
         runtime::revert(ApiError::User(ERR_UNAUTHORIZED));
     }
 
+    // contract_id is read back from this contract's own named keys, never
+    // taken as a caller-supplied argument (see `self_contract_id` doc).
+    let contract_id = self_contract_id();
     let msg = build_signed_message(action, &contract_id, nonce, &payload_hash);
 
     verify_signature(&cold_pubkey, &cold_signature, &msg);
@@ -422,7 +453,6 @@ pub extern "C" fn call() {
             Parameter::new("nonce", CLType::U64),
             Parameter::new("payload_hash", CLType::String),
             Parameter::new("amount_motes", CLType::U64),
-            Parameter::new("contract_id", CLType::String),
         ],
         CLType::Bool,
     ));
@@ -433,7 +463,6 @@ pub extern "C" fn call() {
             Parameter::new("cold_signature", CLType::String),
             Parameter::new("nonce", CLType::U64),
             Parameter::new("payload_hash", CLType::String),
-            Parameter::new("contract_id", CLType::String),
         ]
     };
 
@@ -492,17 +521,23 @@ pub extern "C" fn call() {
         Key::URef(storage::new_uref(0u64)),
     );
 
-    let (contract_hash, _version) = storage::new_contract(
-        entry_points,
-        Some(named_keys),
-        Some("two_key_account_package_hash".to_string()),
-        Some("two_key_account_access_uref".to_string()),
-        None,
-    );
+    // Two-phase create so the package hash is known *before* the first
+    // version exists, and can be embedded into the contract's own named
+    // keys at genesis. Entry points read it back via `self_contract_id()`
+    // — this is what actually makes signatures non-replayable across
+    // separately deployed instances that happen to share a keypair; a
+    // caller-supplied `contract_id` argument could not provide that
+    // guarantee, since the caller is free to choose it to match whichever
+    // signature it is replaying.
+    let (package_hash, access_uref) = storage::create_contract_package_at_hash();
+    named_keys.insert(SELF_PACKAGE_KEY.to_string(), Key::from(package_hash));
 
+    let (contract_hash, _version) =
+        storage::add_contract_version(package_hash, entry_points, named_keys, alloc::collections::BTreeMap::new());
+
+    runtime::put_key("two_key_account_package_hash", package_hash.into());
+    runtime::put_key("two_key_account_access_uref", access_uref.into());
     // Expose contract hash under installer's account for the deploy script
-    // to pick up. Signature messages are bound to a caller-provided
-    // `contract_id` at call time — replay across contracts is prevented
-    // because a signature over one id cannot verify with any other.
+    // to pick up.
     runtime::put_key("two_key_account_contract_hash", contract_hash.into());
 }

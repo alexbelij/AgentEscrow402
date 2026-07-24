@@ -38,12 +38,7 @@ def test_domain_constant():
             "deadbeef" * 4,
             42,
             hashlib.sha256(b"").hexdigest(),
-            (
-                b"ae402:two-key:v1:freeze:"
-                + (b"deadbeef" * 4)
-                + b":42:"
-                + hashlib.sha256(b"").hexdigest().encode()
-            ),
+            (b"ae402:two-key:v1:freeze:" + (b"deadbeef" * 4) + b":42:" + hashlib.sha256(b"").hexdigest().encode()),
         ),
         (
             "rotate_hot",
