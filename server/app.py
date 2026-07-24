@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from server import arbiter_crypto, strict
 from server import db as pgdb
 from server.admin_api import router as admin_router
+from server.timelock_api import router as timelock_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, ArbitrationRecommendation, DisputeEvidence
 from server.casper_client import CasperClient
@@ -311,6 +312,7 @@ app.include_router(identity_router)
 app.include_router(risk_router)
 app.include_router(identity_registry_router)
 app.include_router(admin_router)
+app.include_router(timelock_router)
 
 
 # ---------------------------------------------------------------------------
