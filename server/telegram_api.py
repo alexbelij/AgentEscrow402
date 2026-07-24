@@ -256,7 +256,7 @@ async def subscribe(payload: SubscribeRequest) -> SubscribeResponse:
     return SubscribeResponse(**sub.to_dict())
 
 
-@router.delete("/subscriptions/{sub_id}", status_code=204)
+@router.delete("/subscriptions/{sub_id}", status_code=204, response_model=None)
 async def unsubscribe(sub_id: str = Path(..., min_length=1)) -> None:
     """Remove a subscription by id."""
 

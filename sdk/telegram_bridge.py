@@ -625,9 +625,7 @@ class TelegramBridge:
         async def _send(sub: Subscription) -> str | None:
             async with self._semaphore:
                 try:
-                    await self._client.send_message(
-                        sub.chat_id, text, parse_mode=parse_mode
-                    )
+                    await self._client.send_message(sub.chat_id, text, parse_mode=parse_mode)
                     return sub.sub_id
                 except TelegramAPIError as exc:
                     logger.warning(
@@ -638,9 +636,7 @@ class TelegramBridge:
                     )
                     return None
                 except Exception as exc:  # noqa: BLE001 - keep fan-out safe
-                    logger.exception(
-                        "unexpected telegram delivery error sub=%s: %s", sub.sub_id, exc
-                    )
+                    logger.exception("unexpected telegram delivery error sub=%s: %s", sub.sub_id, exc)
                     return None
 
         results = await asyncio.gather(*(_send(s) for s in matching))

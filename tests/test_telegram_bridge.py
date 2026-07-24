@@ -122,9 +122,7 @@ class TestEventFormatter:
 
     def test_base_url_produces_link(self):
         f = EventFormatter(base_url="https://ae402.example.com/")
-        text, _ = f.format(
-            {"type": "escrow_released", "service_hash": "abc" * 20}
-        )
+        text, _ = f.format({"type": "escrow_released", "service_hash": "abc" * 20})
         assert "[view escrow](https://ae402.example.com/escrows/" in text
 
     def test_no_base_url_no_link(self):
@@ -190,19 +188,11 @@ class TestSubscriptionFilter:
             service_hashes=frozenset({"h1"}),
             receivers=frozenset({"alice"}),
         )
-        assert f.matches(
-            {"type": "escrow_released", "service_hash": "h1", "receiver": "alice"}
-        )
+        assert f.matches({"type": "escrow_released", "service_hash": "h1", "receiver": "alice"})
         # One criterion fails → whole filter fails.
-        assert not f.matches(
-            {"type": "escrow_created", "service_hash": "h1", "receiver": "alice"}
-        )
-        assert not f.matches(
-            {"type": "escrow_released", "service_hash": "h2", "receiver": "alice"}
-        )
-        assert not f.matches(
-            {"type": "escrow_released", "service_hash": "h1", "receiver": "bob"}
-        )
+        assert not f.matches({"type": "escrow_created", "service_hash": "h1", "receiver": "alice"})
+        assert not f.matches({"type": "escrow_released", "service_hash": "h2", "receiver": "alice"})
+        assert not f.matches({"type": "escrow_released", "service_hash": "h1", "receiver": "bob"})
 
     def test_from_dict_accepts_str_and_list(self):
         f = SubscriptionFilter.from_dict(

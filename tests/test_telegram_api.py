@@ -332,6 +332,4 @@ class TestFanout:
 
         _make_app(None)
         # No exception, no crash — the SSE fan-out must stay untouched.
-        asyncio.new_event_loop().run_until_complete(
-            telegram_api.fanout_event({"type": "escrow_released"})
-        )
+        asyncio.new_event_loop().run_until_complete(telegram_api.fanout_event({"type": "escrow_released"}))
