@@ -36,4 +36,11 @@ target-version = ["py311"]
 # (sdk/python/tests/__init__.py), collecting both from one pytest run
 # causes a "No module named 'tests.test_client'" import collision. Run
 # sdk/python's suite separately: `cd sdk/python && pytest`.
-addopts = "--ignore=tests/test_e2e_live.py --ignore=sdk/python"
+#
+# tests/integration/ requires a running local NCTL Casper network
+# (docker-compose.casper-nctl.yml) and is not run in default CI; see
+# .github/workflows/casper-nctl-integration.yml for its own job.
+addopts = "--ignore=tests/test_e2e_live.py --ignore=sdk/python --ignore=tests/integration"
+markers = [
+    "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
+]
