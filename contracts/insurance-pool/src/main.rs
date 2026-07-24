@@ -3,6 +3,9 @@
 
 extern crate alloc;
 
+mod logic;
+use logic::{check_claim_preconditions, ClaimRejection};
+
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
@@ -46,8 +49,6 @@ const ERR_INSUFFICIENT_ARBITER_SIGS: u16 = 8;
 const ERR_ESCROW_ALREADY_CLAIMED: u16 = 9;
 const ERR_INVALID_ESCROW_ID: u16 = 10;
 
-const COOLDOWN_SECONDS: u64 = 86400; // 24 hours
-const MAX_COVERAGE_BPS: u64 = 8000; // 80% of pool balance
 
 /// Dictionary value type for claims: (last_claim_timestamp, total_claims_count, last_escrow_id)
 /// This adheres to the rule of max 3 elements per tuple.
@@ -219,11 +220,16 @@ pub extern "C" fn claim() {
     // cannot stop the same signed claim being replayed later (or by another
     // route). Check before quorum work and mark before the external transfer;
     // Casper reverts atomically if the transfer fails.
+    // Tombstone check stays first and fail-fast, exactly as before the
+    // logic::check_claim_preconditions split: an already-claimed escrow_id
+    // must be rejected before we ever pay for arbiter-signature
+    // verification below, not just before payout.
     let claimed_escrows = get_dict_uref(DICT_CLAIMED_ESCROWS);
     let already_claimed: bool = storage::dictionary_get(claimed_escrows, &escrow_id)
         .unwrap_or_revert()
         .unwrap_or(false);
-    if already_claimed {
+    if let Err(rejection) = check_claim_preconditions(already_claimed, 0, 0, U512::zero(), U512::zero()) {
+        debug_assert!(matches!(rejection, ClaimRejection::AlreadyClaimed));
         runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED));
     }
 
@@ -236,24 +242,22 @@ pub extern "C" fn claim() {
         .unwrap_or((0, 0, String::new())); // Default if no previous claims
 
     let now: u64 = runtime::get_blocktime().into();
-
-    // Check cooldown period
-    if now < claims_record.0.saturating_add(COOLDOWN_SECONDS) {
-        runtime::revert(ApiError::User(ERR_COOLDOWN));
-    }
-
     let contract_purse = get_uref(CONTRACT_PURSE);
     let pool_balance = system::get_purse_balance(contract_purse).unwrap_or_revert();
 
-    // Check if claim amount exceeds maximum coverage (percentage of pool)
-    let max_coverage = (pool_balance.saturating_mul(U512::from(MAX_COVERAGE_BPS))) / U512::from(10000);
-    if amount > max_coverage {
-        runtime::revert(ApiError::User(ERR_MAX_COVERAGE_EXCEEDED));
-    }
-
-    // Check if claim amount exceeds current pool balance
-    if amount > pool_balance {
-        runtime::revert(ApiError::User(ERR_CLAIM_AMOUNT_TOO_LARGE));
+    // Cooldown -> max-coverage-cap -> absolute-balance-cap. `already_claimed`
+    // is passed as `false` here since it was already checked and rejected
+    // above -- see logic::check_claim_preconditions doc comment for why
+    // the tombstone must win over cooldown when both are evaluated
+    // together (the property covered by the host-target tests).
+    if let Err(rejection) = check_claim_preconditions(false, claims_record.0, now, amount, pool_balance) {
+        let err = match rejection {
+            ClaimRejection::AlreadyClaimed => ERR_ESCROW_ALREADY_CLAIMED, // unreachable here
+            ClaimRejection::Cooldown => ERR_COOLDOWN,
+            ClaimRejection::MaxCoverageExceeded => ERR_MAX_COVERAGE_EXCEEDED,
+            ClaimRejection::ClaimAmountTooLarge => ERR_CLAIM_AMOUNT_TOO_LARGE,
+        };
+        runtime::revert(ApiError::User(err));
     }
 
     // Effects before interaction. If the transfer reverts, Casper rolls the

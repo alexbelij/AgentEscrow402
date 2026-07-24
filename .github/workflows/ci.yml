@@ -73,3 +73,5 @@ jobs:
         run: cd contracts && cargo test -p tests
       - name: multi-asset-escrow host-target logic tests
         run: cd contracts && cargo test -p multi-asset-escrow --lib
+      - name: insurance-pool host-target claim-preconditions tests
+        run: cd contracts && cargo test -p insurance-pool --lib
