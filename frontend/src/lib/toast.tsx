@@ -1,9 +1,9 @@
 /**
  * Lightweight, dependency-free toast notifications, styled to match the
  * console. Replaces native `alert()`/`window.confirm()` popups: transient,
- * top-right (below the fixed nav / console top bar, clear of the
- * bottom-right scroll-to-top button), auto-dismiss after a few seconds,
- * dismissible early.
+ * bottom-right — stacked above the scroll-to-top button (see
+ * ScrollToTop.tsx) so it's never covered by it — auto-dismiss after a few
+ * seconds, dismissible early.
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -62,7 +62,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed top-[4.5rem] right-4 z-[100] flex flex-col gap-2 w-[calc(100vw-2rem)] max-w-sm">
+      <div className="fixed bottom-24 right-6 z-[100] flex flex-col gap-2 w-[calc(100vw-2rem)] max-w-sm">
         {items.map((t) => {
           const { icon: Icon, cls } = KIND_STYLES[t.kind]
           return (

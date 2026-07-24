@@ -50,10 +50,15 @@ export async function registerPWA(): Promise<void> {
         // signature/broadcast isn't destroyed by a page swap.
         dispatch('ae402:pwa:need-refresh', {
           activate: async () => {
+            // `updateSW(true)` only posts SKIP_WAITING and *relies* on the
+            // browser firing a `controlling` change event to reload — that
+            // event can be missed/delayed (multiple tabs, timing quirks),
+            // which made the button look like it did nothing. Force the
+            // reload ourselves unconditionally so the click always has a
+            // visible effect.
             try {
               await updateSW(true)
-            } catch {
-              // Fallback: hard reload if messaging the waiting SW fails.
+            } finally {
               window.location.reload()
             }
           },
