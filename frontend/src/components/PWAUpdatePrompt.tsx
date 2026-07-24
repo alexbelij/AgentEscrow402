@@ -39,7 +39,11 @@ export default function PWAUpdatePrompt() {
     <div
       style={{
         position: 'fixed',
-        bottom: '1rem',
+        // Top-right, below the fixed navbar / console top bar and clear of
+        // the bottom-right scroll-to-top button. Sits a bit lower than the
+        // regular toast stack (top-[4.5rem] in lib/toast.tsx) so the two
+        // never visually collide if both are showing at once.
+        top: '8rem',
         right: '1rem',
         zIndex: 9999,
         display: 'flex',
