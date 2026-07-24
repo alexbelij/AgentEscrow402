@@ -52,6 +52,18 @@ from server.models import (
 from server.multi_asset import router as multi_asset_router
 from server.risk_api import router as risk_router
 from server.sandbox import SandboxStore
+from server.telegram_api import (
+    fanout_event as _telegram_fanout,
+)
+from server.telegram_api import (
+    init_bridge as _telegram_init_bridge,
+)
+from server.telegram_api import (
+    router as telegram_router,
+)
+from server.telegram_api import (
+    shutdown_bridge as _telegram_shutdown,
+)
 from server.vrf_election import router as vrf_router
 
 try:
@@ -141,6 +153,16 @@ def _broadcast_event(event: dict[str, Any]) -> None:
             q.put_nowait(event)
         except asyncio.QueueFull:
             pass
+    # Optional fan-out to Telegram subscribers. The helper is a no-op when
+    # the Telegram bridge is not configured (default). Errors inside the
+    # helper are logged, never raised, so the SSE stream is unaffected.
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        # Called from sync context — skip; tests exercise the fan-out
+        # directly via ``await telegram_api.fanout_event``.
+        return
+    loop.create_task(_telegram_fanout(event))
 
 
 # ---------------------------------------------------------------------------
@@ -198,6 +220,11 @@ async def lifespan(application: FastAPI):
             pgdb.save_escrow(EscrowRecord(**s))
         logger.info("Seeded %d demo escrows", len(seeds))
 
+    # Initialise the Telegram bridge once the app is up. When
+    # TELEGRAM_BOT_TOKEN is not set the call returns None and every
+    # ``/telegram/*`` mutation endpoint fails-closed with 503.
+    _telegram_init_bridge()
+
     yield
 
     # Shutdown
@@ -207,6 +234,7 @@ async def lifespan(application: FastAPI):
         _monitor_task.cancel()
     if _casper:
         await _casper.close()
+    await _telegram_shutdown()
 
 
 async def _sync_identity_registry(account_hash: str, completed: int = 0, disputed: int = 0) -> None:
@@ -313,6 +341,7 @@ app.include_router(risk_router)
 app.include_router(identity_registry_router)
 app.include_router(macaroon_router)
 app.include_router(admin_router)
+app.include_router(telegram_router)
 
 
 # ---------------------------------------------------------------------------
