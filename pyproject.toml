@@ -29,4 +29,7 @@ target-version = ["py311"]
 # normal, isolated test failure — this caused two flaky red CI runs in one
 # session even though nothing in the actual codebase was broken. Ignore it
 # in automated CI; run it manually when you want a live-deployment check.
-addopts = "--ignore=tests/test_e2e_live.py"
+addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration"
+markers = [
+    "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
+]

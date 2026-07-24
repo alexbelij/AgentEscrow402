@@ -1,0 +1,104 @@
+name: NCTL integration
+
+# End-to-end escrow lifecycle against a local Casper NCTL network.
+# This is intentionally NOT triggered on every push (NCTL spin-up + block
+# production takes ~2-3 min of runner time) — only on:
+#   * manual dispatch,
+#   * PRs that touch the Casper client, the tx scripts, or the wasm,
+#   * a weekly schedule as a regression tripwire.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "server/casper_client.py"
+      - "server/casper_tx/**"
+      - "tests/integration/**"
+      - "docker-compose.casper-nctl.yml"
+      - ".github/workflows/casper-nctl-integration.yml"
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+
+concurrency:
+  group: nctl-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      casper-nctl:
+        image: makesoftware/casper-nctl:latest
+        options: --name casper-nctl
+        env:
+          PREDEFINED_ACCOUNTS: "true"
+          MINIMUM_ROUND_EXPONENT: "12"
+          MAXIMUM_ROUND_EXPONENT: "14"
+          DEPLOY_DELAY: "5sec"
+        ports:
+          - 11101:11101
+          - 14101:14101
+          - 18101:18101
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio httpx
+
+      - name: Install Node deps
+        run: |
+          npm ci || npm install
+
+      - name: Extract NCTL keys
+        env:
+          NCTL_CONTAINER: casper-nctl
+        run: |
+          # The service container has already started; wait for its assets
+          # tree, then copy out the predefined faucet + user keys.
+          ./scripts/nctl_keys.sh /tmp/nctl-keys
+
+      - name: Wait for first block
+        run: |
+          for i in $(seq 1 30); do
+            H=$(curl -s -X POST -H 'Content-Type: application/json' \
+                -d '{"jsonrpc":"2.0","id":1,"method":"info_get_status","params":[]}' \
+                http://127.0.0.1:11101/rpc \
+              | python -c 'import sys,json;d=json.load(sys.stdin);print(d.get("result",{}).get("last_added_block_info",{}).get("height",0))')
+            echo "  height=$H (try $i/30)"
+            if [ "$H" -gt 0 ]; then exit 0; fi
+            sleep 5
+          done
+          echo "::error::NCTL did not produce a block within 150s" && exit 1
+
+      - name: Run integration tests
+        env:
+          NCTL_KEYS_DIR: /tmp/nctl-keys
+          NCTL_RPC_URL: http://127.0.0.1:11101/rpc
+          NCTL_CHAIN_NAME: casper-net-1
+        run: |
+          pytest tests/integration/ -m casper_net -v \
+            --junitxml=nctl-integration.xml
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nctl-integration-report
+          path: nctl-integration.xml

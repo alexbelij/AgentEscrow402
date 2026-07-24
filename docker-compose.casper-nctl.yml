@@ -1,0 +1,52 @@
+# docker-compose.casper-nctl.yml
+#
+# Local Casper network (NCTL) for AE402 integration tests.
+#
+# Usage:
+#   docker-compose -f docker-compose.casper-nctl.yml up -d
+#   # wait ~30-60s for the network to bootstrap and the first block to be produced
+#   pytest tests/integration/test_casper_nctl_e2e.py -m casper_net -v
+#   docker-compose -f docker-compose.casper-nctl.yml down -v
+#
+# What this provides:
+#   * A local Casper 2.0 network with 5 nodes (only node-1 exposed).
+#   * Predefined faucet + user account keys — see scripts/nctl_keys.sh for
+#     how to pull them into a host directory the tests can read.
+#   * RPC on http://localhost:11101/rpc, REST on 14101, SSE events on 18101.
+#
+# CI use — same image, ports & env are safe to reuse as a GitHub Actions
+# service container; see .github/workflows/casper-nctl-integration.yml.
+
+version: "3.8"
+
+services:
+  casper-nctl:
+    image: makesoftware/casper-nctl:latest
+    container_name: ae402-casper-nctl
+    # NCTL is a single-purpose dev network; use tmpfs for the assets tree so
+    # a `docker-compose down -v` between test runs starts from a clean genesis.
+    tmpfs:
+      - /home/casper/casper-node/utils/nctl/assets
+    ports:
+      - "11101:11101"   # RPC (node-1)
+      - "14101:14101"   # REST (node-1)
+      - "18101:18101"   # SSE events (node-1)
+    environment:
+      # Stable, reproducible faucet + user keys — required so tests can
+      # ship expected account hashes as fixtures.
+      PREDEFINED_ACCOUNTS: "true"
+      # Fast rounds so integration tests don't take forever waiting for
+      # a block. 12/14 = ~4-16s round times.
+      MINIMUM_ROUND_EXPONENT: "12"
+      MAXIMUM_ROUND_EXPONENT: "14"
+      DEPLOY_DELAY: "5sec"
+    healthcheck:
+      # RPC becomes available a few seconds after container start, but the
+      # first block is only produced ~30-60s later. The e2e tests wait
+      # separately for a block via CasperClient — this healthcheck only
+      # confirms the RPC endpoint accepts connections.
+      test: ["CMD-SHELL", "curl -sf -X POST -H 'Content-Type: application/json' -d '{\"jsonrpc\":\"2.0\",\"method\":\"info_get_status\",\"id\":1}' http://127.0.0.1:11101/rpc || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
