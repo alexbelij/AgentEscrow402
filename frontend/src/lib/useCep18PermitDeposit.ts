@@ -15,6 +15,7 @@ import { api, type MultiAssetEscrowRequest, type TransactionHash } from './api'
 import { useSigner, useClickRef } from './signer'
 import { buildPermitMessage, signPermitMessage, buildLiveXPaymentHeader } from './cep18Permit'
 import { PublicKey } from 'casper-js-sdk'
+import { useRole } from './role'
 
 export type Cep18PermitDepositResult =
   | { ok: true; result: TransactionHash }
@@ -24,8 +25,12 @@ export type Cep18PermitDepositResult =
 export function useCep18PermitDeposit() {
   const { isLive, activePublicKey } = useSigner()
   const { clickRef } = useClickRef()
+  const { isObserver, blockedReason } = useRole()
 
   async function run(req: Omit<MultiAssetEscrowRequest, 'permit'>): Promise<Cep18PermitDepositResult> {
+    if (isObserver) {
+      return { ok: false, cancelled: false, error: blockedReason }
+    }
     if (!isLive || !clickRef || !activePublicKey) {
       return { ok: false, cancelled: false, error: 'Wallet not connected' }
     }

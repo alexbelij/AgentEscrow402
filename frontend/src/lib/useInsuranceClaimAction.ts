@@ -16,6 +16,7 @@ import { api, type ClaimInsuranceRequest, type TransactionHash, type ApiResponse
 import { useSigner, useClickRef } from './signer'
 import { sendInsuranceClaimTx } from './liveTx'
 import { PublicKey } from 'casper-js-sdk'
+import { useRole } from './role'
 
 export type InsuranceClaimActionResult =
   | { ok: true; deployHash: string }
@@ -32,6 +33,7 @@ function friendlyNetworkError(rawError: string): string {
 export function useInsuranceClaimAction() {
   const { isLive, activePublicKey } = useSigner()
   const { clickRef } = useClickRef()
+  const { isObserver, blockedReason } = useRole()
 
   async function run(
     escrowHash: string,
@@ -39,6 +41,9 @@ export function useInsuranceClaimAction() {
     amountMotes: number | string,
     insuranceContractHash: string | undefined,
   ): Promise<InsuranceClaimActionResult> {
+    if (isObserver) {
+      return { ok: false, cancelled: false, error: blockedReason }
+    }
     if (isLive) {
       if (!clickRef || !activePublicKey) {
         return { ok: false, cancelled: false, error: 'Wallet not connected' }

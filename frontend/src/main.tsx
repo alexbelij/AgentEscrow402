@@ -5,6 +5,7 @@ import App from './App'
 import { ClickProvider } from './lib/click'
 import { SignerProvider } from './lib/signer'
 import { ToastProvider } from './lib/toast'
+import { RoleProvider } from './lib/role'
 import { registerPWA, trackLastPathForOfflineFallback } from './lib/pwa'
 import './index.css'
 
@@ -20,14 +21,16 @@ if (typeof window !== 'undefined') {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ToastProvider>
-      <ClickProvider>
-        <SignerProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-        </SignerProvider>
-      </ClickProvider>
-    </ToastProvider>
+    <RoleProvider>
+      <ToastProvider>
+        <ClickProvider>
+          <SignerProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </SignerProvider>
+        </ClickProvider>
+      </ToastProvider>
+    </RoleProvider>
   </StrictMode>
 )

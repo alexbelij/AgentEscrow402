@@ -4,6 +4,7 @@ import { api, Agent, Reputation, RegisterIdentityRequest, Identity, AgentCapabil
 import { generateDemoKeypair, signDemoMessage, sha256Hex } from '../../lib/demoSigner';
 import { useToast } from '../../lib/toast';
 import { useSigner } from '../../lib/signer';
+import { useRole } from '../../lib/role';
 import ExplorerLink from './ExplorerLink';
 import EmptyState from './EmptyState';
 import { SkeletonTable } from './Skeleton';
@@ -115,6 +116,7 @@ const Agents: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
   const [onlyMine, setOnlyMine] = useState(false);
   const { activePublicKey } = useSigner();
+  const { isObserver, blockedReason } = useRole();
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
@@ -239,16 +241,18 @@ const Agents: React.FC = () => {
         </div>
         <button
           onClick={() => setIsDelegateModalOpen(true)}
-          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-gray-800 hover:bg-gray-700 border border-[#1e1e2e] text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
-          title="Sign and record a real capability delegation between two demo identities"
+          disabled={isObserver}
+          title={isObserver ? blockedReason : 'Sign and record a real capability delegation between two demo identities'}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-gray-800 hover:bg-gray-700 border border-[#1e1e2e] text-gray-200 font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <KeyRound className="h-5 w-5 mr-2" />
           Delegate Capability
         </button>
         <button
           onClick={() => setIsRegisterModalOpen(true)}
-          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
-          title="Register a DID-style agent identity"
+          disabled={isObserver}
+          title={isObserver ? blockedReason : 'Register a DID-style agent identity'}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <UserPlus className="h-5 w-5 mr-2" />
           Register Agent

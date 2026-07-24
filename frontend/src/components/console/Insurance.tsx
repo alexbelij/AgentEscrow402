@@ -21,6 +21,7 @@ import {
 import EmptyState from './EmptyState';
 import { format } from 'date-fns';
 import { useSigner } from '../../lib/signer';
+import { useRole } from '../../lib/role';
 import { useInsuranceClaimAction } from '../../lib/useInsuranceClaimAction';
 
 // Reusable Modal Component (from Escrows.tsx)
@@ -118,6 +119,7 @@ const Insurance: React.FC = () => {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const { isLive } = useSigner();
+  const { isObserver, blockedReason } = useRole();
   const { run: runInsuranceClaim } = useInsuranceClaimAction();
   const [insuranceContractHash, setInsuranceContractHash] = useState<string | undefined>(undefined);
 
@@ -393,7 +395,9 @@ const Insurance: React.FC = () => {
           <p className="text-gray-400 mb-4">Contribute funds to the insurance pool to earn rewards and support the protocol.</p>
           <button
             onClick={() => setIsDepositModalOpen(true)}
-            className="flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full justify-center"
+            disabled={isObserver}
+            title={isObserver ? blockedReason : undefined}
+            className="flex items-center px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <DollarSign className="h-5 w-5 mr-2" />
             Make a Deposit
@@ -408,7 +412,9 @@ const Insurance: React.FC = () => {
           <p className="text-gray-400 mb-4">If an escrow is disputed or failed, submit a claim for insurance payout.</p>
           <button
             onClick={() => setIsClaimModalOpen(true)}
-            className="flex items-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full justify-center"
+            disabled={isObserver}
+            title={isObserver ? blockedReason : undefined}
+            className="flex items-center px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <AlertTriangle className="h-5 w-5 mr-2" />
             File a Claim

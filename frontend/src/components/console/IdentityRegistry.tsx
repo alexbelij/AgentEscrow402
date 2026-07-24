@@ -8,6 +8,7 @@ import {
 } from '../../lib/api';
 import { randomHex64 } from '../../lib/format';
 import { BadgeCheck, Search, ShieldAlert, TrendingDown, TrendingUp, Loader2 } from 'lucide-react';
+import { useRole } from '../../lib/role';
 
 const LEVELS: VerificationLevel[] = ['UNVERIFIED', 'BASIC', 'ENHANCED', 'FULL'];
 
@@ -19,6 +20,7 @@ const LEVEL_COLOR: Record<VerificationLevel, string> = {
 };
 
 export default function IdentityRegistry() {
+  const { isObserver, blockedReason } = useRole();
   const [accountHash, setAccountHash] = useState(() => randomHex64().slice(0, 16));
   const [displayName, setDisplayName] = useState('Agent Alpha');
   const [registering, setRegistering] = useState(false);
@@ -139,8 +141,9 @@ export default function IdentityRegistry() {
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={register}
-              disabled={registering}
-              className="h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50"
+              disabled={registering || isObserver}
+              title={isObserver ? blockedReason : undefined}
+              className="h-12 inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {registering ? <Loader2 className="w-4 h-4 animate-spin" /> : <BadgeCheck className="w-4 h-4" />}
               Register identity
@@ -196,22 +199,25 @@ export default function IdentityRegistry() {
                   onClick={() =>
                     withBusy('reputation', () => api.updateRegistryReputation(identity.did, dealsCompleted, dealsDisputed))
                   }
-                  disabled={!!busyAction}
-                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50"
+                  disabled={!!busyAction || isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <TrendingUp className="w-3.5 h-3.5" /> Record deals
                 </button>
                 <button
                   onClick={() => withBusy('decay', () => api.applyRegistryDecay(identity.did))}
-                  disabled={!!busyAction}
-                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50"
+                  disabled={!!busyAction || isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <TrendingDown className="w-3.5 h-3.5" /> Apply decay
                 </button>
                 <button
                   onClick={() => withBusy('slash', () => api.slashRegistryIdentity(identity.did, 10, 'console-demo-slash'))}
-                  disabled={!!busyAction}
-                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-red-300 hover:text-red-200 text-sm disabled:opacity-50"
+                  disabled={!!busyAction || isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-red-300 hover:text-red-200 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" /> Slash 10
                 </button>
@@ -221,8 +227,9 @@ export default function IdentityRegistry() {
                     const next = LEVELS[Math.min(idx + 1, LEVELS.length - 1)];
                     withBusy('verify', () => api.verifyRegistryIdentity(identity.did, next));
                   }}
-                  disabled={!!busyAction || identity.verification_level === 'FULL'}
-                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50"
+                  disabled={!!busyAction || identity.verification_level === 'FULL' || isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <BadgeCheck className="w-3.5 h-3.5" /> Advance verification
                 </button>
@@ -234,8 +241,9 @@ export default function IdentityRegistry() {
                       withBusy('capabilities', () => api.updateRegistryCapabilities(identity.did, [...current, cap] as any));
                     }
                   }}
-                  disabled={!!busyAction}
-                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50"
+                  disabled={!!busyAction || isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="h-9 inline-flex items-center justify-center gap-1 rounded-md bg-gray-800 border border-[#1e1e2e] text-gray-200 hover:text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   + Add capability
                 </button>

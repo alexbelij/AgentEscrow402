@@ -20,6 +20,7 @@
 import { api, type CreateEscrowRequest, type TransactionHash, type ApiResponse } from './api'
 import { useSigner, useClickRef } from './signer'
 import { sendCreateEscrowTx, fetchEscrowFunderWasm } from './liveTx'
+import { useRole } from './role'
 
 export type CreateEscrowActionResult =
   | { ok: true; deployHash: string }
@@ -36,12 +37,16 @@ function friendlyNetworkError(rawError: string): string {
 export function useCreateEscrowAction() {
   const { isLive, activePublicKey } = useSigner()
   const { clickRef } = useClickRef()
+  const { isObserver, blockedReason } = useRole()
 
   async function run(
     formData: CreateEscrowRequest,
     contractHash: string | undefined,
     netAmountMotes: number,
   ): Promise<CreateEscrowActionResult> {
+    if (isObserver) {
+      return { ok: false, cancelled: false, error: blockedReason }
+    }
     if (isLive) {
       if (!clickRef || !activePublicKey) {
         return { ok: false, cancelled: false, error: 'Wallet not connected' }

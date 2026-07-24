@@ -86,12 +86,44 @@ export function buildDemoPaymentHeaders(escrowHash?: string, amount = 0, sender 
   };
 }
 
+// Endpoints that use POST for read-only compute (idempotent, no state
+// change). These stay allowed in Observer mode because they never mutate
+// backend state — they only echo back a computed value.
+const OBSERVER_ALLOWED_POST_PREFIXES = ['/compute-hash', '/estimate'];
+
+function isObserverBlocked(url: string, method: string): boolean {
+  if (method === 'GET') return false;
+  if (typeof document === 'undefined') return false;
+  const role = document.documentElement.getAttribute('data-console-role');
+  if (role !== 'observer') return false;
+  // Path is `${BASE_URL}${url}` — test only the url segment we build.
+  for (const p of OBSERVER_ALLOWED_POST_PREFIXES) {
+    if (url.startsWith(p)) return false;
+  }
+  return true;
+}
+
 async function fetcher<T>(
   url: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   body?: object,
   extraHeaders?: HeadersInit
 ): Promise<ApiResponse<T>> {
+  // Belt-and-suspenders defense across every write endpoint: if the console
+  // is in Observer mode, refuse the request before it hits the network.
+  // Individual UI components already disable their action buttons, and the
+  // action hooks (useLifecycleAction, useCreateEscrowAction,
+  // useInsuranceClaimAction, useCep18PermitDeposit) also short-circuit —
+  // this last layer catches raw api.* calls made from anywhere else
+  // (Contracts, AdvancedEscrow, Arbitration, sandbox, etc.).
+  if (isObserverBlocked(url, method)) {
+    return {
+      data: null,
+      error:
+        'Observer mode is read-only. Switch to Driver in the console header to perform this action.',
+      status: 403,
+    };
+  }
   const headers: HeadersInit = { 'Content-Type': 'application/json', ...(extraHeaders || {}) };
   const config: RequestInit = {
     method,

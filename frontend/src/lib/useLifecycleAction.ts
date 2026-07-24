@@ -12,6 +12,7 @@
 import { api, type EscrowActionRequest, type TransactionHash, type ApiResponse } from './api'
 import { useSigner, useClickRef } from './signer'
 import { sendLifecycleTx, type LifecycleEntryPoint } from './liveTx'
+import { useRole } from './role'
 
 export type LifecycleActionResult =
   | { ok: true; deployHash: string }
@@ -37,8 +38,15 @@ function friendlyNetworkError(rawError: string): string {
 export function useLifecycleAction() {
   const { mode, isLive, activePublicKey } = useSigner()
   const { clickRef } = useClickRef()
+  const { isObserver, blockedReason } = useRole()
 
   async function run(entryPoint: LifecycleEntryPoint, serviceHash: string, contractHash: string | undefined, reasonHash?: string): Promise<LifecycleActionResult> {
+    if (isObserver) {
+      // Belt-and-suspenders defense on top of the RoleGate UI: even if a
+      // caller somehow reaches this hook while the console is in Observer
+      // mode, refuse to touch the backend or the wallet.
+      return { ok: false, cancelled: false, error: blockedReason }
+    }
     if (isLive) {
       if (!clickRef || !activePublicKey) {
         return { ok: false, cancelled: false, error: 'Wallet not connected' }

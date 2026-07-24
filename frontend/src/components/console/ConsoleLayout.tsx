@@ -3,6 +3,8 @@ import { useNotifications } from '../../hooks/useNotifications';
 import ErrorBoundary from './ErrorBoundary';
 import BackendWakeOverlay from './BackendWakeOverlay';
 import WalletStatus from './WalletStatus';
+import RoleSwitcher from './RoleSwitcher';
+import { useRole } from '../../lib/role';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import {
   Monitor,
@@ -246,6 +248,7 @@ const ConsoleLayout: React.FC = () => {
   // Subscribes to backend SSE and fires toast on escrow lifecycle events.
   // Mounted only inside /console so the marketing landing stays quiet.
   useNotifications();
+  const { isObserver } = useRole();
   const location = useLocation();
   const pathnames = location.pathname.split('/').filter((x) => x);
   const info = SECTION_INFO[location.pathname];
@@ -396,6 +399,18 @@ const ConsoleLayout: React.FC = () => {
               <Menu className="h-5 w-5" />
             </button>
             <span className="text-sm font-semibold text-gray-200 truncate">{currentPage?.name || 'Console'}</span>
+            <div className="ml-auto"><RoleSwitcher compact /></div>
+          </div>
+          <div className="hidden lg:flex items-center justify-between gap-3 border-b border-ae-border bg-[#0d0d14]/95 px-4 sm:px-6 lg:px-8 py-2">
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Console role</span>
+              <RoleSwitcher />
+              {isObserver && (
+                <span className="text-[11px] text-amber-300/90">
+                  Read-only. Write actions (create/release/refund escrow, register agent, admin ops) are disabled.
+                </span>
+              )}
+            </div>
           </div>
           <WalletStatus />
         </div>

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { api, Escrow, EscrowHistoryEntry, CreateEscrowRequest, EscrowStatus, Estimate } from '../../lib/api';
 import { csprToMotes, randomHex64, formatCspr } from '../../lib/format';
 import { useSigner, useClickRef } from '../../lib/signer';
+import { useRole } from '../../lib/role';
 import { useLifecycleAction } from '../../lib/useLifecycleAction';
 import { useCreateEscrowAction } from '../../lib/useCreateEscrowAction';
 import { useToast } from '../../lib/toast';
@@ -126,6 +127,7 @@ const Select: React.FC<SelectProps> = ({ label, id, options, error, className = 
 const Escrows: React.FC = () => {
   const toast = useToast();
   const { isLive, activePublicKey } = useSigner();
+  const { isObserver, blockedReason } = useRole();
   const { clickRef } = useClickRef();
   const { run: runLifecycleAction } = useLifecycleAction();
   const { run: runCreateEscrowAction } = useCreateEscrowAction();
@@ -460,7 +462,9 @@ const Escrows: React.FC = () => {
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base"
+          disabled={isObserver}
+          title={isObserver ? blockedReason : undefined}
+          className="h-12 shrink-0 flex items-center px-3 sm:px-6 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-200 justify-center text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <PlusCircle className="h-5 w-5 mr-2" />
           Create Escrow
@@ -671,11 +675,14 @@ const Escrows: React.FC = () => {
                   setActionSuccess(null);
                 }}
                 disabled={
+                  isObserver ||
                   !['pending', 'funded'].includes(selectedEscrow.status) ||
                   !canActOnEscrow(selectedEscrow, 'release')
                 }
                 title={
-                  selectedEscrow.status === 'disputed'
+                  isObserver
+                    ? blockedReason
+                    : selectedEscrow.status === 'disputed'
                     ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter quorum resolves it (see the Resolve button below)'
                     : canActOnEscrow(selectedEscrow, 'release')
                     ? undefined
@@ -693,11 +700,14 @@ const Escrows: React.FC = () => {
                   setActionSuccess(null);
                 }}
                 disabled={
+                  isObserver ||
                   !['pending', 'funded'].includes(selectedEscrow.status) ||
                   !canActOnEscrow(selectedEscrow, 'refund')
                 }
                 title={
-                  selectedEscrow.status === 'disputed'
+                  isObserver
+                    ? blockedReason
+                    : selectedEscrow.status === 'disputed'
                     ? 'Escrow is disputed — release/refund are locked on-chain until an arbiter quorum resolves it (see the Resolve button below)'
                     : canActOnEscrow(selectedEscrow, 'refund')
                     ? undefined
@@ -715,11 +725,14 @@ const Escrows: React.FC = () => {
                   setActionSuccess(null);
                 }}
                 disabled={
+                  isObserver ||
                   !['pending', 'funded'].includes(selectedEscrow.status) ||
                   !canActOnEscrow(selectedEscrow, 'dispute')
                 }
                 title={
-                  canActOnEscrow(selectedEscrow, 'dispute')
+                  isObserver
+                    ? blockedReason
+                    : canActOnEscrow(selectedEscrow, 'dispute')
                     ? undefined
                     : `Your active identity (${isLive ? 'connected wallet' : 'demo signer'}) is not this escrow's sender or receiver — the contract would reject this on-chain`
                 }
@@ -730,7 +743,9 @@ const Escrows: React.FC = () => {
               {selectedEscrow.status === 'disputed' && (
                 <button
                   onClick={openResolveModal}
-                  className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
+                  disabled={isObserver}
+                  title={isObserver ? blockedReason : undefined}
+                  className="flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <CheckCircle className="h-5 w-5 mr-2" /> Resolve
                 </button>
