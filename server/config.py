@@ -232,9 +232,7 @@ class Config:
             # None-casper-client / SandboxStore branch on every request --
             # exactly the "green 200, nothing hit testnet" failure strict
             # mode exists to prevent. See tests/test_strict_mode.py.
-            violations.append(
-                "casper_private_key_path is empty (set CASPER_PRIVATE_KEY_PATH or DEPLOYER_KEY_B64)"
-            )
+            violations.append("casper_private_key_path is empty (set CASPER_PRIVATE_KEY_PATH or DEPLOYER_KEY_B64)")
         return violations
 
     def strict_mode_capabilities(self) -> dict[str, object]:
