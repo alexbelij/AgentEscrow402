@@ -29,6 +29,16 @@ jobs:
         run: python -m black --check --line-length 120 .
       - name: Compile check
         run: python -m py_compile server/app.py
+      - name: Contract-audit tool syntax + onchain.json schema
+        # AE-4 Gate 1 lightweight gate. Ensures the audit tool always parses
+        # and `deploy-out/onchain.json` stays a valid contract registry
+        # (each entry has contract_hash + deploy_hash). The heavyweight
+        # rebuild+RPC comparison lives in contract-audit-nightly.yml so PR
+        # CI stays offline and fast.
+        run: |
+          python -m py_compile scripts/audit_contract_artifact.py
+          python scripts/audit_contract_artifact.py --help > /dev/null
+          python -c "import json, sys; d=json.load(open('deploy-out/onchain.json'))['contracts']; missing=[k for k,v in d.items() if not (v.get('contract_hash','').startswith('hash-') and len(v.get('deploy_hash',''))==64)]; sys.exit(f'invalid entries: {missing}' if missing else 0)"
       - name: Run tests
         run: pytest tests/ -v --tb=short
       - name: Coverage
