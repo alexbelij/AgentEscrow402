@@ -40,3 +40,7 @@ path = "src/two_key_account_property_tests.rs"
 [[test]]
 name = "contract_fuzzing"
 path = "src/contract_fuzzing.rs"
+
+[[test]]
+name = "fsm_property_tests"
+path = "src/fsm_property_tests.rs"
