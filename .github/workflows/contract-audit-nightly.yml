@@ -1,0 +1,58 @@
+name: Contract Audit (Nightly)
+
+# AE-4 Gate 1 enforcement job.
+# Rebuilds every WASM in deploy-out/onchain.json from source, fetches the
+# on-chain ModuleBytes via Casper testnet RPC, and diffs exports + baked
+# strings + size. Fails the workflow on any drift.
+#
+# Runs on cron (04:00 UTC daily) and can be triggered on-demand via
+# workflow_dispatch. NOT gated on PRs because it needs the full rust
+# toolchain + wasm32 target + testnet RPC availability (~7-10 min job,
+# occasionally flaky if testnet RPC is degraded). The lightweight
+# structural check in ci.yml catches syntax + schema drift on every PR.
+
+on:
+  schedule:
+    # Daily 04:00 UTC; adjust if RPC has known maintenance windows.
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Specific contract key from onchain.json, or blank for --all'
+        required: false
+        default: ''
+
+jobs:
+  audit-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Set up Rust toolchain (matches contracts/rust-toolchain.toml)
+        run: |
+          if [ -f contracts/rust-toolchain.toml ]; then
+            RUST_VERSION=$(grep '^channel' contracts/rust-toolchain.toml | cut -d'"' -f2)
+            echo "Using rust-toolchain: $RUST_VERSION"
+          else
+            RUST_VERSION="stable"
+          fi
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Add wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Run contract audit --strict --all
+        run: |
+          TARGET="${{ github.event.inputs.target }}"
+          if [ -z "$TARGET" ]; then
+            python scripts/audit_contract_artifact.py --all --strict
+          else
+            python scripts/audit_contract_artifact.py "$TARGET" --strict
+          fi
