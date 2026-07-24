@@ -35,3 +35,7 @@ path = "src/const_parity_tests.rs"
 [[test]]
 name = "two_key_account_property_tests"
 path = "src/two_key_account_property_tests.rs"
+
+[[test]]
+name = "challenge_arbiter_property_tests"
+path = "src/challenge_arbiter_property_tests.rs"
