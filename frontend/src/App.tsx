@@ -32,6 +32,7 @@ import IdentityRegistry from './components/console/IdentityRegistry'
 import UseCases from './components/console/UseCases'
 import Evidence from './components/console/Evidence'
 import FeatureMap from './components/console/FeatureMap'
+import MCPPlayground from './components/console/MCPPlayground'
 
 function Landing() {
   useEffect(() => {
@@ -101,6 +102,7 @@ export default function App() {
             <Route path="identity-registry" element={<IdentityRegistry />} />
             <Route path="evidence" element={<Evidence />} />
             <Route path="feature-map" element={<FeatureMap />} />
+            <Route path="mcp-playground" element={<MCPPlayground />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -30,6 +30,7 @@ from server.identity_registry_api import _registry as _id_registry
 from server.identity_registry_api import router as identity_registry_router
 from server.insurance import router as insurance_router
 from server.macaroon_api import router as macaroon_router
+from server.mcp_playground_api import router as mcp_playground_router
 from server.middleware import (
     _build_signing_payload,
     _check_replay,
@@ -384,6 +385,7 @@ app.include_router(vc_router)
 app.include_router(admin_router)
 app.include_router(timelock_router)
 app.include_router(telegram_router)
+app.include_router(mcp_playground_router)
 
 
 # ---------------------------------------------------------------------------
