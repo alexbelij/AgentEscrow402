@@ -52,6 +52,7 @@ from server.models import (
 from server.multi_asset import router as multi_asset_router
 from server.risk_api import router as risk_router
 from server.sandbox import SandboxStore
+from server.vc_api import router as vc_router
 from server.vrf_election import router as vrf_router
 
 try:
@@ -312,6 +313,7 @@ app.include_router(identity_router)
 app.include_router(risk_router)
 app.include_router(identity_registry_router)
 app.include_router(macaroon_router)
+app.include_router(vc_router)
 app.include_router(admin_router)
 
 
