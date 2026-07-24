@@ -16,6 +16,10 @@ import {
   Info,
   ExternalLink,
   BarChart3,
+  ArrowRight,
+  ClipboardList,
+  Gavel,
+  BadgeCheck,
 } from 'lucide-react';
 import CopyButton from './CopyButton';
 import { SkeletonCard, SkeletonTable } from './Skeleton';
@@ -169,6 +173,54 @@ const Overview: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Guided flow — pure navigation strip that shows the four canonical
+          steps of an agent deal and links each one into the existing
+          console panel that runs it. No new data or API calls; it is a
+          front door for reviewers who don't know where the lifecycle
+          lives yet. */}
+      <section aria-labelledby="overview-guided-flow" className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 id="overview-guided-flow" className="text-sm font-semibold text-gray-100">Walk a deal end-to-end</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Buyer locks funds → delivery evidence → resolve or escalate → receipt & reputation. Each step links to the existing panel that runs it.</p>
+          </div>
+          <Link to="/console/use-cases" className="hidden md:inline-flex items-center gap-1 text-xs text-ae-accent-bright hover:underline shrink-0">
+            See full use-case narratives
+            <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+          </Link>
+        </div>
+        <ol className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2" aria-label="Escrow lifecycle steps">
+          {[
+            { n: 1, title: 'Lock the escrow', desc: 'Buyer locks funds against a service hash', to: '/console/escrows', icon: DollarSign },
+            { n: 2, title: 'Attach evidence', desc: 'Receiver delivers, buyer inspects the bundle', to: '/console/evidence', icon: ClipboardList },
+            { n: 3, title: 'Resolve or escalate', desc: 'Release, refund, or open a dispute for arbitration', to: '/console/arbitration', icon: Gavel },
+            { n: 4, title: 'Receipt & reputation', desc: 'Deal is recorded against both agents’ reputation', to: '/console/identity-registry', icon: BadgeCheck },
+          ].map((step) => {
+            const Icon = step.icon;
+            return (
+              <li key={step.n}>
+                <Link
+                  to={step.to}
+                  className="group flex items-start gap-3 h-full p-3 rounded-md bg-[#0d0d14] border border-[#1e1e2e] hover:border-ae-accent-bright hover:bg-[#12121c] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ae-accent-bright"
+                >
+                  <div className="w-7 h-7 shrink-0 rounded-md bg-ae-accent/15 border border-ae-accent/30 flex items-center justify-center text-xs font-semibold text-ae-accent-bright">
+                    {step.n}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Icon className="w-3.5 h-3.5 text-gray-500 shrink-0" aria-hidden="true" />
+                      <span className="text-sm font-semibold text-gray-100 truncate">{step.title}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">{step.desc}</p>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-ae-accent-bright shrink-0 mt-1" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+
       {/* Health Status */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="bg-[#12121a] border border-[#1e1e2e] rounded-lg p-5 shadow-md">
