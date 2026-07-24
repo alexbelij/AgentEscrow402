@@ -38,6 +38,21 @@ valid token can exercise it, so treat tokens like bearer credentials:
   `test_dropping_caveat_is_detected`, `test_reordering_caveats_detected`,
   `test_appending_caveat_without_re_hmac_detected`).
 
+## Known limitation (not yet fixed)
+
+`POST /macaroons/mint` does not check caller identity today. A macaroon's
+initial caveats are exactly whatever the caller passes in the request body
+(`capability=release`, `escrow_id=...`, `amount<=...`), so anyone who can
+reach the endpoint can mint a token that *claims* any capability string.
+This is safe right now only because this layer is additive: nothing else
+in AE402 yet accepts a verified macaroon as proof of authority for a real
+escrow/insurance action. Before wiring any endpoint to trust a macaroon,
+`mint()` must first confirm the caller already holds the requested
+authority through an existing auth path (agent-identity-registry
+delegation or a session token) and only ever narrow it, never grant
+capabilities the caller doesn't already have. Tracked as a follow-up, not
+a blocker for this additive PR.
+
 ## Endpoints
 
 All endpoints are additive under `/macaroons/*`. When
