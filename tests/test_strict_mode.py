@@ -450,7 +450,6 @@ class TestVrfElectionGuard:
 
     def test_onchain_vrf_still_falls_back_when_strict_disabled(self):
         import server.app as appmod
-        import server.vrf_election as vrf_mod
 
         self._reset()
 

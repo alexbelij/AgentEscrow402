@@ -17,9 +17,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from server import arbiter_crypto
+from server import arbiter_crypto, strict
 from server import db as pgdb
-from server import strict
 from server.admin_api import router as admin_router
 from server.agent_identity import router as identity_router
 from server.ai_arbitration import ArbitrationAgent, ArbitrationRecommendation, DisputeEvidence
