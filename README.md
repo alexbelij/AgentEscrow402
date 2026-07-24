@@ -281,6 +281,21 @@ curl -X POST http://localhost:8000/release \
 
 > **Tip:** Switch to testnet by setting `CASPER_NODE_URL` and `DEPLOYER_KEY_PATH` in `.env`.
 
+### CLI (`ae402`)
+
+Everything the `curl` calls above can be done with a first-class CLI too:
+
+```bash
+pip install -e sdk/python        # or: pip install agentescrow402-sdk
+
+ae402 --api-url http://localhost:8000 health
+ae402 --api-url http://localhost:8000 stats
+ae402 --api-url http://localhost:8000 list-escrows
+ae402 --api-url http://localhost:8000 mcp-tools     # 26 MCP tools schema
+```
+
+Full reference and demo transcripts: [`docs/CLI.md`](docs/CLI.md).
+
 <div align="right"><a href="#readme-top">↑ back to top</a></div>
 
 ---
