@@ -63,7 +63,7 @@ const SECTIONS: FeatureSection[] = [
         value: 'Escrows that hold native CSPR, a CEP-18 fungible token, or a CEP-78 NFT — pay each worker in the asset they actually want.',
         route: '/console/advanced',
         status: 'on-chain',
-        evidence: 'MultiAssetEscrow + AEMAT + AETNFT contracts (deployed on testnet).',
+        evidence: 'MultiAssetEscrow and the listed test-token contracts are deployed on testnet; see Contracts for the canonical manifest-backed inventory.',
       },
       {
         name: 'Streaming payouts',
@@ -102,7 +102,7 @@ const SECTIONS: FeatureSection[] = [
       },
       {
         name: 'CSPRNG fallback arbiter draw',
-        value: 'A deterministic simulator that stands in for the on-chain VRF when the contract is unreachable, so a dispute never hangs.',
+        value: 'A local fallback draw used when the on-chain VRF is unavailable, so a dispute can still be routed without presenting the result as on-chain randomness.',
         route: '/console/arbitration',
         status: 'simulation',
         evidence: 'Backend falls back to a seeded CSPRNG draw and labels the result accordingly.',

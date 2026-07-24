@@ -15,8 +15,8 @@ import React from 'react';
  *                          against the current backend (visible in `Docs`).
  *  - `local-demo`        — works in-process in the hosted console but has
  *                          no persistent on-chain or fully-external backing.
- *  - `simulation`        — runs a deterministic simulator/stub rather than
- *                          a real integration (e.g. VRF CSPRNG fallback).
+ *  - `simulation`        — runs a local fallback/simulator rather than
+ *                          a real external integration (e.g. VRF fallback).
  *  - `planned`           — described in the repo/roadmap but not wired into
  *                          the UI/API yet.
  */
