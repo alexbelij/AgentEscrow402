@@ -41,6 +41,9 @@ dev = [
     "mypy>=1.5",
 ]
 
+[project.scripts]
+ae402 = "agentescrow402_sdk.cli:main"
+
 [project.urls]
 Homepage = "https://ae402.xyz"
 Repository = "https://github.com/alexbelij/AgentEscrow402"

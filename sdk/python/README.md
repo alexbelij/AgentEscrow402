@@ -17,6 +17,16 @@ does not (yet) cover.
 pip install agentescrow402-sdk
 ```
 
+The install also drops the `ae402` command-line client on your PATH — a
+thin JSON-over-stdio wrapper over the SDK. Quick sanity check:
+
+```bash
+ae402 health
+ae402 mcp-tools --names-only
+```
+
+Full CLI docs live in [`docs/CLI.md`](../../docs/CLI.md).
+
 Optional extras:
 
 ```bash
