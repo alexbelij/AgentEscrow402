@@ -81,6 +81,7 @@ def _make_client(args: argparse.Namespace) -> "EscrowClient":
     secret_hex = args.secret_key_hex or os.environ.get("AE402_SECRET_KEY_HEX")
     if secret_hex:
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
         # Accept both "0x..." and bare hex.
         if secret_hex.startswith("0x") or secret_hex.startswith("0X"):
             secret_hex = secret_hex[2:]

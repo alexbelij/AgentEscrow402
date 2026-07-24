@@ -86,9 +86,7 @@ class TestMcpToolCall:
         assert r.status_code == 400
         assert "escrow_id" in r.text
 
-    def test_write_tool_dispatch_reaches_underlying_endpoint(
-        self, client: TestClient
-    ) -> None:
+    def test_write_tool_dispatch_reaches_underlying_endpoint(self, client: TestClient) -> None:
         """create_escrow via the playground reaches POST /escrow with the
         same auth path as a direct HTTP call — no separate bypass path.
 

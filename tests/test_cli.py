@@ -69,10 +69,14 @@ class TestComputeHashLocal:
         code, out, _ = _run(
             [
                 "compute-hash",
-                "--sender", "sender-x",
-                "--receiver", "receiver-y",
-                "--amount", "1000",
-                "--nonce", "nonce-z",
+                "--sender",
+                "sender-x",
+                "--receiver",
+                "receiver-y",
+                "--amount",
+                "1000",
+                "--nonce",
+                "nonce-z",
             ],
             monkeypatch,
         )
@@ -85,10 +89,14 @@ class TestComputeHashLocal:
     def test_repeated_call_same_result(self, monkeypatch: pytest.MonkeyPatch) -> None:
         argv = [
             "compute-hash",
-            "--sender", "aa",
-            "--receiver", "bb",
-            "--amount", "42",
-            "--nonce", "n",
+            "--sender",
+            "aa",
+            "--receiver",
+            "bb",
+            "--amount",
+            "42",
+            "--nonce",
+            "n",
         ]
         _, out_a, _ = _run(argv, monkeypatch)
         _, out_b, _ = _run(argv, monkeypatch)
@@ -121,9 +129,11 @@ class TestArgParsing:
         parser = cli._build_parser()
         args = parser.parse_args(
             [
-                "--api-url", "https://custom.example",
+                "--api-url",
+                "https://custom.example",
                 "--sandbox",
-                "--sender", "test-user",
+                "--sender",
+                "test-user",
                 "health",
             ]
         )
@@ -139,17 +149,14 @@ class TestSecretKeyHexNormalisation:
         # We construct args as if from argparse, then call _make_client.
         # A 32-byte all-zero seed is fine for the client constructor — no
         # network call is made, we just build the object and never use it.
-        args_prefixed = cli._build_parser().parse_args(
-            ["--secret-key-hex", "0x" + "00" * 32, "health"]
-        )
-        args_bare = cli._build_parser().parse_args(
-            ["--secret-key-hex", "00" * 32, "health"]
-        )
+        args_prefixed = cli._build_parser().parse_args(["--secret-key-hex", "0x" + "00" * 32, "health"])
+        args_bare = cli._build_parser().parse_args(["--secret-key-hex", "00" * 32, "health"])
         # Both should build a client without raising.
         c1 = cli._make_client(args_prefixed)
         c2 = cli._make_client(args_bare)
         assert c1.sender == c2.sender  # same seed → same pubkey
         # Not touching the network.
         import asyncio
+
         asyncio.run(c1.close())
         asyncio.run(c2.close())
