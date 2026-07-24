@@ -23,28 +23,17 @@
 
 export const MOTES_PER_CSPR = 1_000_000_000;
 
-/**
- * Threshold used to detect legacy demo rows that were seeded in whole CSPR
- * before the unit contract was enforced. Any incoming `motes` value below
- * this bound is treated as a legacy CSPR figure and up-scaled by 1e9 at
- * the display boundary. Rationale: 1e6 motes = 0.001 CSPR — no realistic
- * on-chain escrow would ever be denominated below that, so a bare `98`
- * or `25000` is unambiguously legacy. Applied only in the *read* path;
- * writes always go through `csprToMotes()` and cannot be legacy-scaled.
+/** Convert a motes value to CSPR at the human-display boundary.
+ *
+ * Every API and on-chain integer is motes, including a valid value of one.
+ * Do not infer a legacy unit from magnitude: a heuristic would display one
+ * real mote as one CSPR (a billion-fold error). Historic demo data must be
+ * migrated at its source, never silently reinterpreted at read time.
  */
-export const LEGACY_CSPR_HEURISTIC_MAX = 1_000_000;
-
-/** Convert a motes value (bigint-safe integer) to CSPR (float). */
 export function motesToCspr(amount: number | string | null | undefined): number {
   if (amount == null) return 0;
   const n = typeof amount === 'string' ? Number(amount) : amount;
   if (!isFinite(n) || n < 0) return 0;
-  // Legacy demo rows: seeded in whole CSPR before the unit contract was
-  // enforced. Treat implausibly small "motes" values as CSPR passthroughs
-  // instead of rendering them as microscopic fractions.
-  if (n > 0 && n < LEGACY_CSPR_HEURISTIC_MAX) {
-    return n;
-  }
   return n / MOTES_PER_CSPR;
 }
 

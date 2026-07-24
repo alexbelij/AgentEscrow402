@@ -205,3 +205,17 @@ class TestUnitContractInvariants:
             cspr = motes / MOTES_PER_CSPR
             back = round(cspr * MOTES_PER_CSPR)
             assert back == motes, f"Non-invertible round-trip for {motes}: /1e9 then *1e9 → {back}"
+
+
+def test_frontend_never_guesses_legacy_cspr_from_a_motes_value() -> None:
+    """A real small on-chain balance must never be displayed as whole CSPR.
+
+    `1` always means one mote on the API/chain boundary. Historic demo data
+    requires an explicit migration or marker; magnitude-based guessing turns
+    legitimate small payments into a billion-fold display error.
+    """
+    from pathlib import Path
+
+    formatter = (Path(__file__).parents[1] / "frontend/src/lib/format.ts").read_text()
+    assert "LEGACY_CSPR_HEURISTIC_MAX" not in formatter
+    assert "return n / MOTES_PER_CSPR;" in formatter
