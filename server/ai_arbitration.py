@@ -22,6 +22,7 @@ import httpx
 from pydantic import BaseModel, Field, field_validator
 
 from server.merkle_provenance import EvidenceLeaf, compute_merkle_root
+from server.redaction import redact_prompt_for_log, redact_text
 
 logger = logging.getLogger(__name__)
 
@@ -431,6 +432,11 @@ class ArbitrationAgent:
             raise ValueError("escrow_amount must be non-negative")
 
         prompt = _build_arbitration_prompt(dispute_id, sender_evidence, receiver_evidence, escrow_amount)
+        logger.debug(
+            "Arbitration prompt built for dispute %s: %s",
+            dispute_id[:16],
+            redact_prompt_for_log(prompt),
+        )
 
         # Try LLM providers in order: Groq → NVIDIA → OpenRouter → heuristic
         verdict: dict[str, Any] | None = None
@@ -480,11 +486,15 @@ class ArbitrationAgent:
         )
         analysis_hash = hashlib.sha256(content.encode()).hexdigest()
 
+        # LLM reasoning can echo evidence descriptions verbatim (which may
+        # contain PII / accidental secrets). Public callers reach reasoning via
+        # /arbitration/history, so redact before we store or return.
+        raw_reasoning = str(verdict["reasoning"])
         result = ArbitrationRecommendation(
             dispute_id=dispute_id,
             recommendation=verdict["recommendation"],
             confidence=verdict["confidence"],
-            reasoning=str(verdict["reasoning"])[:300],
+            reasoning=redact_text(raw_reasoning, max_len=300),
             risk_factors=verdict["risk_factors"],
             suggested_split_pct=round(float(verdict["suggested_split_pct"]), 2),
             analysis_hash=analysis_hash,
