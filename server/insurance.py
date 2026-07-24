@@ -8,7 +8,7 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from server import arbiter_crypto
 from server.casper_client import CasperClient
@@ -65,7 +65,20 @@ _pool_lock = asyncio.Lock()
 class InsuranceDepositRequest(BaseModel):
     """Request to deposit funds into the insurance pool."""
 
-    amount: int = Field(..., gt=0, description="Amount in motes to deposit")
+    # AE-1: accept both `amount_motes` (canonical) and `amount` (legacy alias).
+    # Python attribute stays `.amount` for backward-compat with call sites.
+    model_config = ConfigDict(populate_by_name=True)
+
+    amount: int = Field(
+        ...,
+        gt=0,
+        validation_alias=AliasChoices("amount_motes", "amount"),
+        description=(
+            "Deposit amount in motes (1 CSPR = 1_000_000_000 motes). "
+            "Canonical wire name is `amount_motes`; `amount` is a legacy input "
+            "alias slated for removal in API v2."
+        ),
+    )
 
 
 class InsuranceClaimRequest(BaseModel):

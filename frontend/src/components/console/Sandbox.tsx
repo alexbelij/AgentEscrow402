@@ -128,7 +128,7 @@ const endpoints: EndpointConfig[] = [
     },
     bodyFieldDocs: {
       receiver: { type: 'string (hex public key)', description: 'Casper public key of the agent who will receive funds on release.', required: true },
-      amount: { type: 'integer (motes)', description: 'Escrow amount in motes (1 CSPR = 1,000,000,000 motes).', required: true },
+      amount: { type: 'integer (motes)', description: 'Escrow amount in motes (1 CSPR = 1,000,000,000 motes). Accepts `amount_motes` (canonical) or `amount` (legacy).', required: true },
       service_hash: { type: 'string (64-char hex)', description: 'Unique ID for this escrow; also used to look it up, release, or dispute it.', required: true },
       ttl: { type: 'integer (seconds)', description: 'Time-to-live before the escrow auto-expires and is refundable.', required: false },
     },
@@ -286,7 +286,7 @@ const endpoints: EndpointConfig[] = [
     },
     bodyFieldDocs: {
       receiver: { type: 'string (hex public key)', description: 'Receiver who can claim after full vesting.', required: true },
-      amount: { type: 'integer (motes)', description: 'Total amount to stream.', required: true },
+      amount: { type: 'integer (motes)', description: 'Total amount to stream, in motes. Accepts `amount_motes` (canonical) or `amount` (legacy).', required: true },
       token: { type: '{ type, contract_hash }', description: '"native" for CSPR, or { type: "cep18", contract_hash: "..." } for tokens.', required: true },
       service_hash: { type: 'string (64-char hex)', description: 'Unique hash identifier for this streaming escrow.', required: true },
       start_time: { type: 'integer (unix)', description: 'Vesting start time (unix seconds). Defaults to now.', required: true },
