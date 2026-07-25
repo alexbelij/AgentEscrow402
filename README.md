@@ -24,6 +24,16 @@
 
 **For agents & operators:** [Use AgentEscrow](https://ae402.xyz/console/escrows) — lock, release, dispute · **For developers:** [Build with AE402](https://ae402.xyz/console/docs) — API, Python SDK, MCP · **For evaluators:** [Evaluate the project](https://ae402.xyz/console/feature-map) — feature map with strict `On-chain / Live API / Local demo / Simulation / Planned` status labels
 
+### One-command judge reproducibility
+
+```bash
+git clone https://github.com/alexbelij/AgentEscrow402
+cd AgentEscrow402
+make judge-demo    # boots local Casper 2.0 NCTL + deploys + runs full escrow lifecycle e2e
+```
+
+Boots a local Casper 2.0 network, deploys `escrow_funder.wasm`, and drives create→release + create→refund end-to-end. ~5 minutes on a clean clone. See [`docs/CASPER_PRIMER.md`](docs/CASPER_PRIMER.md) if you're new to Casper, [`docs/MOAT.md`](docs/MOAT.md) for the only-possible-on-Casper argument, and [`TX_MANIFEST.md`](TX_MANIFEST.md) for the live testnet contracts.
+
 </div>
 
 ---
