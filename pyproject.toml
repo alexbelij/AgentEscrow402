@@ -102,4 +102,5 @@ target-version = ["py311"]
 addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration"
 markers = [
     "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
+    "network: integration tests that require live network access (e.g. Sepolia RPC) — skipped offline",
 ]
