@@ -1,0 +1,31 @@
+[package]
+name = "ae402-governance-dao"
+version = "0.1.0"
+edition = "2021"
+
+# Wasm-only host bindings; pulled in only for the actual wasm32 build so
+# std test crates that link against the pure lib don't hit the "duplicate
+# lang item panic_impl" collision between casper-contract's no_std handlers
+# and libstd.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+casper-contract = "5.1"
+
+[dependencies]
+casper-types = { version = "6.0", default-features = false }
+
+[lib]
+name = "ae402_governance_dao"
+path = "src/lib.rs"
+bench = false
+doctest = false
+
+[[bin]]
+name = "ae402-governance-dao"
+path = "src/main.rs"
+bench = false
+doctest = false
+test = false
+
+[profile.release]
+codegen-units = 1
+lto = true

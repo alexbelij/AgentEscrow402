@@ -12,6 +12,7 @@ blake2 = "0.10"
 
 [dev-dependencies]
 proptest = "1"
+ae402-governance-dao = { path = "../ae402-governance-dao" }
 
 [[test]]
 name = "integration_tests"
@@ -56,3 +57,7 @@ path = "src/challenge_arbiter_property_tests.rs"
 [[test]]
 name = "range_proof_registry_property_tests"
 path = "src/range_proof_registry_property_tests.rs"
+
+[[test]]
+name = "governance_dao_property_tests"
+path = "src/governance_dao_property_tests.rs"
