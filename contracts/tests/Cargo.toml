@@ -52,3 +52,7 @@ path = "src/fsm_property_tests.rs"
 [[test]]
 name = "challenge_arbiter_property_tests"
 path = "src/challenge_arbiter_property_tests.rs"
+
+[[test]]
+name = "range_proof_registry_property_tests"
+path = "src/range_proof_registry_property_tests.rs"
