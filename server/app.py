@@ -413,6 +413,10 @@ app.include_router(bridge_htlc_router)  # T3.4-A — deterministic HTLC atomic-s
 from server.agent_sim_api import router as agent_sim_router  # noqa: E402
 app.include_router(agent_sim_router)
 
+# T3.7 — Compliance framework for regulated jurisdictions.
+from server.compliance_api import router as compliance_router  # noqa: E402
+app.include_router(compliance_router)
+
 
 # ---------------------------------------------------------------------------
 # Insurance fee helper
