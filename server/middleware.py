@@ -283,6 +283,7 @@ def compute_service_hash(sender: str, receiver: str, amount: int, nonce: str) ->
 # ---------------------------------------------------------------------------
 
 import inspect as _inspect
+import typing
 import json as _json  # local alias to avoid touching the top-of-file imports
 import os as _os
 from functools import lru_cache, wraps
@@ -378,7 +379,28 @@ def require_signed_envelope(
     )
 
     def decorator(fn: Callable) -> Callable:
+        # Resolve string annotations (this module uses
+        # `from __future__ import annotations`, so raw parameter
+        # annotations are strings) against the *handler's own*
+        # globals. Without this, FastAPI resolves annotations using
+        # this wrapper's module globals (server/middleware.py), which
+        # don't have the handler's request models in scope, and
+        # silently downgrades body-model params to required scalar
+        # query params.
         sig = _inspect.signature(fn)
+        try:
+            resolved_hints = typing.get_type_hints(
+                fn, globalns=getattr(fn, "__globals__", {}), include_extras=True
+            )
+        except Exception:
+            resolved_hints = {}
+        if resolved_hints:
+            sig = sig.replace(
+                parameters=[
+                    p.replace(annotation=resolved_hints.get(p.name, p.annotation))
+                    for p in sig.parameters.values()
+                ]
+            )
         accepts_envelope = "envelope" in sig.parameters
 
         @wraps(fn)
@@ -533,7 +555,28 @@ def verify_signed_envelope_if_present(
     )
 
     def decorator(fn: Callable) -> Callable:
+        # Resolve string annotations (this module uses
+        # `from __future__ import annotations`, so raw parameter
+        # annotations are strings) against the *handler's own*
+        # globals. Without this, FastAPI resolves annotations using
+        # this wrapper's module globals (server/middleware.py), which
+        # don't have the handler's request models in scope, and
+        # silently downgrades body-model params to required scalar
+        # query params.
         sig = _inspect.signature(fn)
+        try:
+            resolved_hints = typing.get_type_hints(
+                fn, globalns=getattr(fn, "__globals__", {}), include_extras=True
+            )
+        except Exception:
+            resolved_hints = {}
+        if resolved_hints:
+            sig = sig.replace(
+                parameters=[
+                    p.replace(annotation=resolved_hints.get(p.name, p.annotation))
+                    for p in sig.parameters.values()
+                ]
+            )
         accepts_envelope = "envelope" in sig.parameters
 
         @wraps(fn)
