@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from server import arbiter_crypto, strict
+from server import arbiter_crypto, batch_guard, strict
 from server import db as pgdb
 from server.admin_api import router as admin_router
 from server.agent_identity import router as identity_router
@@ -394,6 +394,9 @@ app.include_router(mcp_playground_router)
 app.include_router(threshold_router)  # T3.1 — Threshold escrow MPC (Shamir SSS)
 app.include_router(gaming_reward_router)  # T3.2 — Gaming-reward escrow with Merkle proofs
 
+# T3.3 — Deterministic batch cap/quorum guard (dry-run preview endpoint).
+from server.batch_guard_api import router as batch_guard_router  # noqa: E402
+app.include_router(batch_guard_router)
 
 # ---------------------------------------------------------------------------
 # Insurance fee helper
@@ -1126,48 +1129,26 @@ async def batch_release_escrows(
     arbiter_pubkeys/arbiter_signatures) is required for the ENTIRE batch —
     same threshold as single-escrow release.
     """
-    if not req.service_hashes:
-        raise HTTPException(status_code=422, detail="service_hashes must be non-empty")
-    if len(req.service_hashes) > 50:
-        raise HTTPException(status_code=422, detail="batch size exceeds MAX_BATCH_SIZE (50)")
-    if len(req.arbiter_pubkeys) != len(req.arbiter_signatures):
-        raise HTTPException(
-            status_code=422,
-            detail="arbiter_pubkeys and arbiter_signatures must have the same length",
-        )
+    # T3.3: delegate all cap/quorum validation to the deterministic guard
+    # so this route and /escrows/batch-preview can never drift, and the
+    # same logic is trivially transliterable to the on-chain WASM check.
+    from server.batch_guard_api import _load_snapshots  # noqa: PLC0415
 
-    # Pre-validate every escrow: must exist, must be pending, cap/quorum check
-    needs_quorum = False
-    for sh in req.service_hashes:
-        existing = store.get_escrow(sh)
-        if existing is None:
-            raise HTTPException(status_code=404, detail=f"Escrow {sh[:16]}… not found")
-        if existing.status != "pending":
-            raise HTTPException(status_code=422, detail=f"Escrow {sh[:16]}… is {existing.status}, not pending")
-        if existing.amount > cfg.release_cap_motes:
-            needs_quorum = True
-
-    if needs_quorum and cfg.arbiter_pubkeys:
-        # Validate arbiter quorum against ALL above-cap escrows
-        for sh in req.service_hashes:
-            existing = store.get_escrow(sh)
-            if existing and existing.amount > cfg.release_cap_motes:
-                valid_votes = arbiter_crypto.count_valid_cap_approval_votes(
-                    req.arbiter_pubkeys,
-                    req.arbiter_signatures,
-                    cfg.arbiter_pubkeys,
-                    "release",
-                    sh,
-                )
-                if valid_votes < cfg.arbiter_threshold:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=(
-                            f"Escrow {sh[:16]}… exceeds release_cap "
-                            f"({cfg.release_cap_motes} motes); only {valid_votes} "
-                            f"valid arbiter signature(s), need >= {cfg.arbiter_threshold}"
-                        ),
-                    )
+    snapshots = _load_snapshots(store, req.service_hashes)
+    decision = batch_guard.evaluate_batch(
+        action="release",
+        service_hashes=req.service_hashes,
+        snapshots=snapshots,
+        release_cap_motes=cfg.release_cap_motes,
+        arbiter_registered=cfg.arbiter_pubkeys,
+        arbiter_threshold=cfg.arbiter_threshold,
+        arbiter_pubkeys=req.arbiter_pubkeys,
+        arbiter_signatures=req.arbiter_signatures,
+    )
+    if not decision.admit:
+        first = decision.rejections[0]
+        status_code = 404 if first.code == batch_guard.CODE_ESCROW_NOT_FOUND else 422
+        raise HTTPException(status_code=status_code, detail=first.message)
 
     deploy_hash = ""
     if not cfg.sandbox and casper is not None:
@@ -1216,17 +1197,23 @@ async def batch_cancel_escrows(
 
     Full refund to sender. Only pending escrows can be cancelled.
     """
-    if not req.service_hashes:
-        raise HTTPException(status_code=422, detail="service_hashes must be non-empty")
-    if len(req.service_hashes) > 50:
-        raise HTTPException(status_code=422, detail="batch size exceeds MAX_BATCH_SIZE (50)")
+    # T3.3: cancel path uses the same guard, with action="cancel" (quorum
+    # not required — the guard enforces this invariant, not the caller).
+    from server.batch_guard_api import _load_snapshots  # noqa: PLC0415
 
-    for sh in req.service_hashes:
-        existing = store.get_escrow(sh)
-        if existing is None:
-            raise HTTPException(status_code=404, detail=f"Escrow {sh[:16]}… not found")
-        if existing.status != "pending":
-            raise HTTPException(status_code=422, detail=f"Escrow {sh[:16]}… is {existing.status}, not pending")
+    snapshots = _load_snapshots(store, req.service_hashes)
+    decision = batch_guard.evaluate_batch(
+        action="cancel",
+        service_hashes=req.service_hashes,
+        snapshots=snapshots,
+        release_cap_motes=cfg.release_cap_motes,
+        arbiter_registered=cfg.arbiter_pubkeys,
+        arbiter_threshold=cfg.arbiter_threshold,
+    )
+    if not decision.admit:
+        first = decision.rejections[0]
+        status_code = 404 if first.code == batch_guard.CODE_ESCROW_NOT_FOUND else 422
+        raise HTTPException(status_code=status_code, detail=first.message)
 
     deploy_hash = ""
     if not cfg.sandbox and casper is not None:
