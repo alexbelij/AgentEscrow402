@@ -398,6 +398,10 @@ app.include_router(gaming_reward_router)  # T3.2 — Gaming-reward escrow with M
 from server.batch_guard_api import router as batch_guard_router  # noqa: E402
 app.include_router(batch_guard_router)
 
+# W.3 (Tier Wow) — Cross-chain escrow demo (mocked EVM adapter).
+from server.cross_chain_api import router as cross_chain_router  # noqa: E402
+app.include_router(cross_chain_router)
+
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
