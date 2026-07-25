@@ -56,3 +56,37 @@ jobs:
           else
             python scripts/audit_contract_artifact.py "$TARGET" --strict
           fi
+
+  insurance-pool-vm-regression:
+    # AE-2 real on-chain VM regression gate (see
+    # docs/INSURANCE_REPLAY_TESTS.md § AE-2 closure decision, and
+    # docs/DEPLOY.md's insurance-pool deploy-gate). Drives the actual
+    # compiled insurance-pool.wasm through casper-engine-test-support's
+    # LmdbWasmTestBuilder -- a real Casper execution engine instance, not
+    # the host-side mirror in insurance_replay_tests.rs /
+    # insurance_cooldown_replay_e2e_tests.rs (those stay in the fast PR
+    # suite; this one is the heavy real-VM build, nightly only). Proves
+    # the tombstone/replay invariant on the actual bytes that would be
+    # deployed, not a Rust-side re-implementation of the check.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Rust toolchain (matches contracts/rust-toolchain.toml)
+        run: |
+          RUST_VERSION=$(grep '^channel' contracts/rust-toolchain.toml | cut -d'"' -f2)
+          echo "Using rust-toolchain: $RUST_VERSION"
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Add wasm32-unknown-unknown target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Build insurance-pool + pool-funder release wasm
+        working-directory: contracts
+        run: cargo build --release --target wasm32-unknown-unknown -p insurance-pool -p pool-funder
+
+      - name: Run insurance-pool VM regression suite (real Casper execution engine)
+        working-directory: contracts
+        run: cargo test -p tests --test insurance_replay_onchain_vm_tests -- --ignored --test-threads=1

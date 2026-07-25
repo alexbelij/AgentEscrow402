@@ -4,15 +4,24 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# casper-engine-test-support = "7"
-# casper-execution-engine = "7"
-# casper-types = "4"
 sha2 = "0.11"
 blake2 = "0.10"
 
 [dev-dependencies]
 proptest = "1"
 ae402-governance-dao = { path = "../ae402-governance-dao" }
+# Real Casper VM regression harness for the insurance-pool tombstone/replay
+# invariant (pre-mainnet gate — see docs/INSURANCE_REPLAY_TESTS.md § AE-2
+# closure decision). Versions pinned to match the workspace's casper-types
+# 6.x lock (Cargo.lock resolves casper-types 6.1.0); casper-engine-test-support
+# 8.1.1 requires casper-types ^6.0.1 and casper-execution-engine ^8.1.1, so
+# this triple is compatible. Built with the pinned nightly-2025-01-01 toolchain
+# (see ../rust-toolchain.toml — newer nightlies emit bulk-memory wasm ops
+# Casper testnet preprocessing rejects).
+casper-engine-test-support = "8.1.1"
+casper-execution-engine = "8.1.1"
+casper-types = "6.1"
+hex = "0.4"
 
 [[test]]
 name = "integration_tests"
@@ -61,3 +70,7 @@ path = "src/range_proof_registry_property_tests.rs"
 [[test]]
 name = "governance_dao_property_tests"
 path = "src/governance_dao_property_tests.rs"
+
+[[test]]
+name = "insurance_replay_onchain_vm_tests"
+path = "src/insurance_replay_onchain_vm_tests.rs"

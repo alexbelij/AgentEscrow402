@@ -71,3 +71,111 @@ covers the negative-path invariants the testnet run can't cover
 economically (an attacker mid-tx replay isn't observable on testnet
 without a controlled Ed25519 keypair rotation). The testnet regression
 that Victor owns still stands as the E2E complement.
+
+## AE-2 closure decision (2026-07-25)
+
+**Status: closed as-is for the hackathon submission.** Agent2's audit
+(2026-07-24, AE-2) flagged this coverage "Partial" — the CEI/tombstone
+logic and the host-mirror suite above (plus
+`insurance_cooldown_replay_e2e_tests.rs`) are solid, but there is no
+real Casper VM on-chain regression test: `casper-engine-test-support`
+is commented out in `contracts/tests/Cargo.toml`.
+
+**Decision:** sufficient for the hackathon submission, closed as-is.
+
+**Rationale:**
+
+- The invariant under test — does a tombstoned escrow survive a
+  replay attempt — is a pure state-machine transition, fully covered
+  by the host-side mirror (table above).
+- Standing up a real VM harness in the final hours before a hard
+  deadline is a build/toolchain risk this repo has already hit once
+  (nightly pin + bulk-memory-ops, see `docs/DEPLOYMENT_LESSONS.md`),
+  for no visible judge-facing payoff versus the existing suite.
+- This is a deliberate, documented trade-off, not an oversight.
+
+**Not closed — tracked separately as a pre-mainnet gate:** a real
+on-chain Casper VM regression test for this same tombstone/replay
+invariant, compiled from the actual `insurance-pool.wasm` and run
+through `LmdbWasmTestBuilder` (the current API name — `casper-types`
+6.x/`casper-engine-test-support` 8.x renamed the old
+`InMemoryWasmTestBuilder` from earlier SDK generations). This is
+**required** before any redeploy of the insurance-pool contract that
+will hold real funds. See the deploy-gate note in `docs/DEPLOY.md` /
+`docs/OPERATOR_RUNBOOK.md` once that harness lands.
+
+## Real on-chain VM regression suite — landed (2026-07-25)
+
+The pre-mainnet gate above is now closed: `contracts/tests/src/insurance_replay_onchain_vm_tests.rs`
+drives the real, compiled `insurance-pool.wasm` through
+`LmdbWasmTestBuilder` (a genuine Casper execution engine instance, not
+a mirror). Three scenarios, all green:
+
+- **A — happy path**: a valid `claim()` succeeds; pool purse balance
+  drops by exactly the claimed amount.
+- **B — replay (the AE-2 invariant)**: the identical deploy
+  (escrow_id, caller, amount, arbiter signatures) submitted a second
+  time reverts with `ApiError::User(9)` (`ERR_ESCROW_ALREADY_CLAIMED`)
+  inside the real execution engine, and the pool balance is unchanged.
+- **C — cross-escrow replay**: the same arbiter signatures/pubkeys
+  reused against a *different* escrow_id fail message-binding —
+  `ApiError::User(8)` (`ERR_INSUFFICIENT_ARBITER_SIGS`) — before the
+  tombstone dictionary is even touched for that escrow_id.
+
+Marked `#[ignore]` (heavy VM build + genesis); run explicitly or via
+the `insurance-pool-vm-regression` nightly CI job
+(`.github/workflows/contract-audit-nightly.yml`), never in the PR-gate
+`ci.yml`. Deploy-gate line: `docs/DEPLOY.md` § step 3 (Insurance Pool).
+
+### Real production bug this suite caught
+
+Standing up the real-VM suite immediately caught a bug the host-mirror
+suite above structurally could not: **every first-ever `claim()` call
+reverted with `ERR_ESCROW_ALREADY_CLAIMED` (error 9), even for a
+brand-new, never-touched `escrow_id`.**
+
+Root cause: `claim()`'s first (tombstone) precondition check called the
+shared `logic::check_claim_preconditions` with dummy zero arguments —
+`check_claim_preconditions(already_claimed, 0, 0, U512::zero(), U512::zero())`
+— reasoning that with `already_claimed` as the only "live" input, the
+only reachable rejection was `ClaimRejection::AlreadyClaimed`, guarded
+by a `debug_assert!` to enforce that invariant. But
+`check_claim_preconditions`'s cooldown check runs *before* it would
+ever return `Ok(())`: `now < last_claim_timestamp.saturating_add(COOLDOWN_SECONDS)`
+evaluates `0 < 0 + 86_400 = true` whenever `already_claimed = false` —
+so this call returned `Err(Cooldown)`, never `Ok(())`, on literally
+every fresh claim. `debug_assert!` is compiled out entirely in a
+release wasm build (it's a no-op outside debug builds), so the
+mismatch — `Cooldown` reached where only `AlreadyClaimed` was assumed
+possible — was silently swallowed, and the code fell through to
+`runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED))`
+regardless of which rejection actually fired.
+
+The host-mirror suite (`insurance_replay_tests.rs`,
+`logic.rs`'s own unit tests) could not have caught this: they test
+`check_claim_preconditions` directly with meaningful, non-dummy
+arguments, never reproducing the specific `(already_claimed, 0, 0, ...)`
+call shape `claim()`'s wasm entry point actually made. Only driving the
+real compiled entry point through a real execution engine surfaced it.
+
+**Fix** (`contracts/insurance-pool/src/main.rs::claim()`): the
+tombstone check no longer delegates to `check_claim_preconditions` at
+all — it checks `already_claimed` directly:
+
+```rust
+if already_claimed {
+    runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED));
+}
+```
+
+The second, real `check_claim_preconditions` call further down in
+`claim()` (with real `claims_record.0`/`now`/`amount`/`pool_balance`,
+and hardcoded `already_claimed = false` since the tombstone was
+already checked) is unchanged and still correctly handles
+cooldown/coverage/balance rejections.
+
+Separately, the VM test itself needed `ExecuteRequestBuilder::with_block_time`
+set past `COOLDOWN_SECONDS` (genesis blocktime is 0, and a brand-new
+caller's default `last_claim_timestamp` is also 0 — without advancing
+blocktime, a first-ever claim legitimately trips the real cooldown
+check too, which a real chain's non-zero blocktime would never hit).

@@ -66,6 +66,26 @@ casper-client put-deploy \
   --session-path contracts/target/wasm32-unknown-unknown/release/escrow_manager.wasm
 
 # 3. Insurance Pool  (hardened redeploy — the old public-claim variant is superseded)
+#
+# >>> DEPLOY GATE (AE-2, mandatory before this step) <<<
+# insurance-pool holds real pooled funds once deployed. Before running
+# THIS deploy command, the real on-chain VM regression suite must be
+# green:
+#   cd contracts && cargo test -p tests --test insurance_replay_onchain_vm_tests -- --ignored --test-threads=1
+# This drives the actual compiled insurance-pool.wasm through a real
+# Casper execution engine (casper-engine-test-support's
+# LmdbWasmTestBuilder) — not the host-side mirror in
+# insurance_replay_tests.rs — and proves the tombstone/replay invariant
+# holds on the bytes that are about to be deployed. It caught a real
+# production bug on 2026-07-25 (claim() reverted EVERY first-ever claim
+# with the wrong error code, ERR_ESCROW_ALREADY_CLAIMED, due to a
+# debug_assert! that's a no-op in release wasm silently masking a
+# cooldown-check bug — see docs/INSURANCE_REPLAY_TESTS.md § AE-2 for the
+# full root cause). Do not skip this because the host-mirror suite and
+# `cargo test -p tests` (default, non---ignored) are green — those did
+# NOT catch the bug above; only the real-VM suite did. This job also
+# runs nightly in CI (contract-audit-nightly.yml); a red nightly run
+# blocks any redeploy until it's green again.
 casper-client put-deploy \
   --node-address $NODE \
   --chain-name $CHAIN \

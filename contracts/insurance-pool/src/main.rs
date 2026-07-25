@@ -228,8 +228,23 @@ pub extern "C" fn claim() {
     let already_claimed: bool = storage::dictionary_get(claimed_escrows, &escrow_id)
         .unwrap_or_revert()
         .unwrap_or(false);
-    if let Err(rejection) = check_claim_preconditions(already_claimed, 0, 0, U512::zero(), U512::zero()) {
-        debug_assert!(matches!(rejection, ClaimRejection::AlreadyClaimed));
+    // BUGFIX (found via insurance_replay_onchain_vm_tests.rs -- the real-VM
+    // test caught what the host-mirror tests couldn't): this used to call
+    // check_claim_preconditions(already_claimed, 0, 0, U512::zero(), U512::zero())
+    // and rely on a debug_assert! to guarantee the only possible rejection
+    // here was AlreadyClaimed. That's false: passing now=0, last_claim_timestamp=0
+    // makes the COOLDOWN check inside check_claim_preconditions evaluate
+    // `0 < 0.saturating_add(86_400)` = true FIRST for any already_claimed=false
+    // input, so this call returned Err(Cooldown) -- never Ok(()) -- on every
+    // single first-ever claim. The debug_assert! that should have caught the
+    // mismatch is compiled out in the release wasm build (debug_assert! is a
+    // no-op outside debug builds), so it silently fell through to
+    // runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED)) regardless
+    // of which rejection actually fired -- every claim() call reverted with
+    // "already claimed" even on a completely fresh escrow_id. Fix: check the
+    // tombstone directly, with no dependency on check_claim_preconditions'
+    // other (irrelevant, dummy-arg) branches.
+    if already_claimed {
         runtime::revert(ApiError::User(ERR_ESCROW_ALREADY_CLAIMED));
     }
 
