@@ -8,6 +8,7 @@ edition = "2021"
 # casper-execution-engine = "7"
 # casper-types = "4"
 sha2 = "0.11"
+blake2 = "0.10"
 
 [dev-dependencies]
 proptest = "1"
@@ -39,3 +40,11 @@ path = "src/const_parity_tests.rs"
 [[test]]
 name = "two_key_account_property_tests"
 path = "src/two_key_account_property_tests.rs"
+
+[[test]]
+name = "contract_fuzzing"
+path = "src/contract_fuzzing.rs"
+
+[[test]]
+name = "fsm_property_tests"
+path = "src/fsm_property_tests.rs"

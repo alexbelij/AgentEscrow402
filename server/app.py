@@ -6,6 +6,8 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
+import re
 import time
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -37,6 +39,7 @@ from server.middleware import (
     _verify_signature,
     compute_service_hash,
     parse_x402_header,
+    verify_signed_envelope_if_present,
 )
 from server.models import (
     BatchEscrowRequest,
@@ -462,6 +465,189 @@ async def metrics(cfg: Config = Depends(get_config)):
     return Response(content=body, media_type=openmetrics_content_type())
 
 
+# ---------------------------------------------------------------------------
+# GET /ops/health — operator surface (AE-A2)
+#
+# Enriched health for operators and judges evaluating operator UX.
+# Different from /health, which is the LB probe and must stay boolean.
+# ---------------------------------------------------------------------------
+
+
+@app.get("/ops/health", tags=["ops"])
+async def ops_health(cfg: Config = Depends(get_config)):
+    """Deep operator snapshot: dependency status, retry queue depth,
+    circuit-breaker state, active warnings. No secrets in the payload;
+    provider config is reported as boolean + configured model name.
+    """
+    from server.ops_health import build_snapshot
+
+    snap = build_snapshot(
+        started_at=_started_at,
+        build_sha=os.getenv("BUILD_SHA", "dev"),
+        config_version=os.getenv("CONFIG_VERSION", "v3"),
+        mode="sandbox" if cfg.sandbox else "live",
+        strict_mode=cfg.strict_mode_capabilities(),
+    )
+    return snap.as_dict()
+
+
+# ---------------------------------------------------------------------------
+# POST /demo/three-step — guided demo contract (AE-A2)
+#
+# Returns a deterministic 3-step script a UI (or a judge running curl)
+# can replay end-to-end. Deliberately does not execute anything; it's a
+# machine-readable contract that keeps the demo path stable regardless
+# of what the console does.
+# ---------------------------------------------------------------------------
+
+
+class ThreeStepRequest(BaseModel):
+    scenario: str = "happy"  # "happy" | "dispute" | "abstain"
+
+
+class ThreeStepStep(BaseModel):
+    index: int
+    title: str
+    verb: str  # HTTP verb, e.g. "POST"
+    path: str  # e.g. "/escrow"
+    body: dict[str, Any] | None = None
+    expected_status: int
+    verify_link: str | None = None
+
+
+class ThreeStepResponse(BaseModel):
+    scenario: str
+    steps: list[ThreeStepStep]
+    outro: str
+
+
+@app.post("/demo/three-step", response_model=ThreeStepResponse, tags=["demo"])
+async def demo_three_step(req: ThreeStepRequest):
+    """Return the 3-step guided-demo contract for one of the well-known
+    scenarios. Deterministic. Same request → same response.
+    """
+    scenario = req.scenario.strip().lower()
+    if scenario not in ("happy", "dispute", "abstain"):
+        raise HTTPException(status_code=400, detail="scenario must be one of: happy, dispute, abstain")
+
+    if scenario == "happy":
+        return ThreeStepResponse(
+            scenario="happy",
+            steps=[
+                ThreeStepStep(
+                    index=1,
+                    title="Create escrow",
+                    verb="POST",
+                    path="/escrow",
+                    body={"amount_motes": 500_000, "receiver": "<hex64>"},
+                    expected_status=200,
+                    verify_link="/health",
+                ),
+                ThreeStepStep(
+                    index=2,
+                    title="Release funds",
+                    verb="POST",
+                    path="/escrow/{service_hash}/release",
+                    body={"amount_motes": 500_000},
+                    expected_status=200,
+                    verify_link="/escrow/{service_hash}",
+                ),
+                ThreeStepStep(
+                    index=3,
+                    title="Inspect final state",
+                    verb="GET",
+                    path="/escrow/{service_hash}",
+                    body=None,
+                    expected_status=200,
+                    verify_link=None,
+                ),
+            ],
+            outro="Every step emitted a real testnet deploy. Compare hashes with cspr.live.",
+        )
+
+    if scenario == "dispute":
+        return ThreeStepResponse(
+            scenario="dispute",
+            steps=[
+                ThreeStepStep(
+                    index=1,
+                    title="Create escrow + open dispute",
+                    verb="POST",
+                    path="/escrow",
+                    body={"amount_motes": 500_000, "receiver": "<hex64>"},
+                    expected_status=200,
+                    verify_link="/escrow/{service_hash}",
+                ),
+                ThreeStepStep(
+                    index=2,
+                    title="Run LLM arbitration",
+                    verb="POST",
+                    path="/arbitration/analyze",
+                    body={
+                        "dispute_id": "<uuid>",
+                        "sender_evidence": [],
+                        "receiver_evidence": [],
+                        "escrow_amount": 500_000,
+                    },
+                    expected_status=200,
+                    verify_link="/arbitration/history",
+                ),
+                ThreeStepStep(
+                    index=3,
+                    title="Verify evidence Merkle inclusion",
+                    verb="POST",
+                    path="/arbitration/verify-evidence",
+                    body={"leaf": "<hex64>", "siblings": [], "expected_root": "<hex64>"},
+                    expected_status=200,
+                    verify_link=None,
+                ),
+            ],
+            outro="Arbitration commits a Merkle evidence root; anyone can verify inclusion client-side.",
+        )
+
+    # abstain
+    return ThreeStepResponse(
+        scenario="abstain",
+        steps=[
+            ThreeStepStep(
+                index=1,
+                title="Trigger arbitration with weak evidence",
+                verb="POST",
+                path="/arbitration/analyze",
+                body={
+                    "dispute_id": "<uuid>",
+                    "sender_evidence": [],
+                    "receiver_evidence": [],
+                    "escrow_amount": 500_000,
+                    "sender_account": "<hex64>",
+                    "receiver_account": "<hex64>",
+                },
+                expected_status=200,
+                verify_link="/arbitration/history",
+            ),
+            ThreeStepStep(
+                index=2,
+                title="Auto-escalate to VRF panel",
+                verb="GET",
+                path="/arbitration/history",
+                body=None,
+                expected_status=200,
+                verify_link=None,
+            ),
+            ThreeStepStep(
+                index=3,
+                title="Read elected panel and their signatures",
+                verb="GET",
+                path="/arbiter/panel/{dispute_id}",
+                body=None,
+                expected_status=200,
+                verify_link=None,
+            ),
+        ],
+        outro="On abstain/low-confidence the LLM verdict is superseded by a VRF-elected human/agent panel; the escalation rule is one function in server/app.py.",
+    )
+
+
 @app.get("/contracts")
 async def contracts(cfg: Config = Depends(get_config)):
     """Backend-configured deployed contract addresses.
@@ -676,6 +862,7 @@ async def wasm_escrow_funder():
 
 
 @app.post("/escrow", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.deposit")
 async def create_escrow(
     req: EscrowRequest,
     request: Request,
@@ -1069,6 +1256,7 @@ async def batch_cancel_escrows(
 
 
 @app.post("/release", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.release")
 async def release_escrow(
     req: ReleaseRequest,
     request: Request,
@@ -1163,6 +1351,7 @@ async def release_escrow(
 
 
 @app.post("/refund", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.refund")
 async def refund_escrow(
     req: RefundRequest,
     request: Request,
@@ -1218,6 +1407,7 @@ async def refund_escrow(
 
 
 @app.post("/dispute", response_model=EscrowRecord)
+@verify_signed_envelope_if_present(purpose="escrow.dispute")
 async def dispute_escrow(
     req: DisputeRequest,
     request: Request,
@@ -1593,6 +1783,95 @@ async def arbitration_history(limit: int = 20):
     if limit < 1 or limit > 200:
         raise HTTPException(status_code=400, detail="limit must be between 1 and 200")
     return list(reversed(_arbitration_agent._history[-limit:]))
+
+
+# ---------------------------------------------------------------------------
+# POST /arbitration/verify-evidence — UI "verify" button (AE-A2)
+#
+# Verifies that a specific evidence leaf was in the batch that produced a
+# published `evidence_root`. Does NOT need to trust the server: the caller
+# supplies (leaf_hash, siblings[], expected_root); we fold the proof and
+# report whether the running hash equals the root. Same math as the TS
+# port on the RWA-Sentinel side, so a UI-side verifier can be swapped in
+# and produce byte-identical results.
+# ---------------------------------------------------------------------------
+
+
+class VerifyEvidenceStep(BaseModel):
+    hash: str
+    position: str  # "left" | "right"
+
+
+class VerifyEvidenceRequest(BaseModel):
+    leaf: str          # already-hashed leaf (sha256 hex, 64 chars)
+    siblings: list[VerifyEvidenceStep]
+    expected_root: str  # sha256 hex, 64 chars
+
+
+class VerifyEvidenceResponse(BaseModel):
+    valid: bool
+    computed_root: str
+    expected_root: str
+    steps: int
+    reason: str | None = None
+
+
+_HEX64 = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+@app.post(
+    "/arbitration/verify-evidence",
+    response_model=VerifyEvidenceResponse,
+    tags=["arbitration"],
+)
+async def arbitration_verify_evidence(req: VerifyEvidenceRequest):
+    """Verify an evidence Merkle inclusion proof against a published root.
+
+    This is the "UI verify button" surface (AE-A2). A judge or auditor
+    can independently reproduce the check with any language that has
+    sha256 — the endpoint is a convenience, not a source of trust.
+    """
+    from server.merkle_provenance import (  # local import: avoids cycle
+        MerkleInclusionProof,
+        ProofStep,
+        verify_inclusion_proof,
+    )
+
+    if not _HEX64.match(req.leaf):
+        raise HTTPException(status_code=400, detail="leaf must be a 64-char sha256 hex string")
+    if not _HEX64.match(req.expected_root):
+        raise HTTPException(status_code=400, detail="expected_root must be a 64-char sha256 hex string")
+    for i, step in enumerate(req.siblings):
+        if not _HEX64.match(step.hash):
+            raise HTTPException(status_code=400, detail=f"siblings[{i}].hash must be a 64-char sha256 hex string")
+        if step.position not in ("left", "right"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"siblings[{i}].position must be 'left' or 'right'",
+            )
+
+    proof = MerkleInclusionProof(
+        leaf=req.leaf,
+        siblings=[ProofStep(hash=s.hash, position=s.position) for s in req.siblings],
+    )
+    # Reproduce the folded root for the UI to display alongside expected.
+    running = req.leaf
+    for step in proof.siblings:
+        h = hashlib.sha256()
+        if step.position == "left":
+            h.update((step.hash + running).encode("utf-8"))
+        else:
+            h.update((running + step.hash).encode("utf-8"))
+        running = h.hexdigest()
+
+    valid = verify_inclusion_proof(proof, req.expected_root)
+    return VerifyEvidenceResponse(
+        valid=valid,
+        computed_root=running,
+        expected_root=req.expected_root,
+        steps=len(req.siblings),
+        reason=None if valid else "computed_root != expected_root",
+    )
 
 
 @app.get("/escrow/{service_hash}", response_model=EscrowRecord)

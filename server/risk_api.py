@@ -18,6 +18,20 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from server.regime_shift import (
+    RegimeShiftBenchmark,
+    benchmark_stream,
+    cusum_stream,
+    page_hinkley_stream,
+)
+from server.risk_premium import (
+    DEFAULT_ALPHA0,
+    DEFAULT_BETA0,
+    DEFAULT_CI_LEVEL,
+    RiskPremiumRequest,
+    RiskPremiumResponse,
+    compute_premium,
+)
 from server.risk_scoring import (
     RiskEngine,
     TransactionFeatures,
@@ -301,3 +315,178 @@ async def get_risk_dashboard() -> RiskDashboard:
         model_trained_at=_last_trained,
         training_samples=len(engine.model.trees),
     )
+
+
+# ---------------------------------------------------------------------------
+# Regime-shift detectors (CUSUM & Page-Hinkley)
+# ---------------------------------------------------------------------------
+
+
+class RegimeShiftRequest(BaseModel):
+    """Input for /risk/regime-shift/* endpoints.
+
+    ``values`` — the stream to analyse (e.g. per-hour dispute rate,
+    counterparty volume, oracle latency). Typically 100-1000 samples.
+    ``mu0``, ``sigma`` — assumed baseline mean/std (CUSUM only).
+    ``cusum_k``, ``cusum_h`` — CUSUM slack and alarm threshold.
+    ``ph_delta``, ``ph_threshold``, ``ph_alpha`` — Page-Hinkley knobs.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    values: list[float]
+    mu0: float = 0.0
+    sigma: float = 1.0
+    cusum_k: float = 0.5
+    cusum_h: float = 5.0
+    ph_delta: float = 0.005
+    ph_threshold: float = 50.0
+    ph_alpha: float = 1.0
+
+
+class RegimeShiftBenchmarkResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    n_samples: int
+    first_cusum_alarm_idx: int | None
+    first_page_hinkley_alarm_idx: int | None
+    agreement_ratio: float  # fraction of samples where both detectors agree
+    trajectory: list[RegimeShiftBenchmark]
+
+
+@router.post("/regime-shift/cusum")
+async def regime_shift_cusum(req: RegimeShiftRequest) -> dict[str, Any]:
+    """Run CUSUM over the supplied stream. Returns per-step results and the
+    index of the first alarm (if any)."""
+    if len(req.values) > 10000:
+        raise HTTPException(status_code=413, detail="stream too long (max 10000 samples)")
+    if len(req.values) == 0:
+        raise HTTPException(status_code=400, detail="empty stream")
+    try:
+        results = cusum_stream(
+            req.values, mu0=req.mu0, sigma=req.sigma, k=req.cusum_k, h=req.cusum_h
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    first_alarm = next(
+        (i for i, r in enumerate(results) if r.alarm_upper or r.alarm_lower), None
+    )
+    return {
+        "n_samples": len(results),
+        "first_alarm_idx": first_alarm,
+        "first_alarm_direction": (results[first_alarm].direction if first_alarm is not None else None),
+        "results": results,
+    }
+
+
+@router.post("/regime-shift/page-hinkley")
+async def regime_shift_page_hinkley(req: RegimeShiftRequest) -> dict[str, Any]:
+    """Run Page-Hinkley over the supplied stream."""
+    if len(req.values) > 10000:
+        raise HTTPException(status_code=413, detail="stream too long (max 10000 samples)")
+    if len(req.values) == 0:
+        raise HTTPException(status_code=400, detail="empty stream")
+    try:
+        results = page_hinkley_stream(
+            req.values,
+            delta=req.ph_delta,
+            threshold=req.ph_threshold,
+            alpha=req.ph_alpha,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    first_alarm = next((i for i, r in enumerate(results) if r.alarm), None)
+    return {
+        "n_samples": len(results),
+        "first_alarm_idx": first_alarm,
+        "results": results,
+    }
+
+
+@router.post("/regime-shift/benchmark", response_model=RegimeShiftBenchmarkResponse)
+async def regime_shift_benchmark(req: RegimeShiftRequest) -> RegimeShiftBenchmarkResponse:
+    """Side-by-side CUSUM vs Page-Hinkley on the same stream.
+
+    Useful for operator dashboards — shows which detector fired first,
+    how often they agree, and lets ops pick the right knob for the
+    signal at hand.
+    """
+    if len(req.values) > 10000:
+        raise HTTPException(status_code=413, detail="stream too long (max 10000 samples)")
+    if len(req.values) == 0:
+        raise HTTPException(status_code=400, detail="empty stream")
+    try:
+        trajectory = benchmark_stream(
+            req.values,
+            mu0=req.mu0,
+            sigma=req.sigma,
+            cusum_k=req.cusum_k,
+            cusum_h=req.cusum_h,
+            ph_delta=req.ph_delta,
+            ph_threshold=req.ph_threshold,
+            ph_alpha=req.ph_alpha,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    first_c = next(
+        (i for i, r in enumerate(trajectory) if r.cusum.alarm_upper or r.cusum.alarm_lower),
+        None,
+    )
+    first_p = next((i for i, r in enumerate(trajectory) if r.page_hinkley.alarm), None)
+    agree = sum(1 for r in trajectory if r.detectors_agree) / len(trajectory)
+    return RegimeShiftBenchmarkResponse(
+        n_samples=len(trajectory),
+        first_cusum_alarm_idx=first_c,
+        first_page_hinkley_alarm_idx=first_p,
+        agreement_ratio=round(agree, 4),
+        trajectory=trajectory,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Beta-Binomial risk premium
+# ---------------------------------------------------------------------------
+
+
+@router.post("/premium", response_model=RiskPremiumResponse)
+async def risk_premium(req: RiskPremiumRequest) -> RiskPremiumResponse:
+    """Compute the Beta-Binomial risk premium for an agent given their
+    observed (successes, disputes) history.
+
+    Returns posterior parameters, credible interval on the dispute
+    probability, and the recommended premium in basis points (UCB-driven,
+    capped at 25%). A ``should_refuse: true`` result means the escrow
+    should decline the counterparty entirely — the UCB implies the raw
+    premium would exceed the safety ceiling.
+    """
+    try:
+        return compute_premium(
+            successes=req.successes,
+            disputes=req.disputes,
+            alpha0=req.alpha0,
+            beta0=req.beta0,
+            ci_level=req.ci_level,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+class PremiumBatchRequest(BaseModel):
+    items: list[RiskPremiumRequest]
+
+
+@router.post("/premium/batch")
+async def risk_premium_batch(req: PremiumBatchRequest) -> list[RiskPremiumResponse]:
+    """Batch variant — computes premium for a list of counterparties in one call."""
+    if len(req.items) > 500:
+        raise HTTPException(status_code=413, detail="batch too large (max 500)")
+    return [
+        compute_premium(
+            successes=r.successes,
+            disputes=r.disputes,
+            alpha0=r.alpha0,
+            beta0=r.beta0,
+            ci_level=r.ci_level,
+        )
+        for r in req.items
+    ]
