@@ -21,7 +21,7 @@
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
 > 🟢 **TESTNET LIVE:** 349 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 8 contracts, cross-contract calls
-> 📊 63 API endpoints · 26 MCP tools · 1591 Python + 40 Rust tests (property-based)
+> 📊 63 API endpoints · 26 MCP tools · 1591 Python + 233 Rust tests (property-based)
 > 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
 > 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
 
@@ -713,11 +713,11 @@ ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # l
 | Suite | Framework | Count | Coverage |
 |---|---|---|---|
 | Server (Python) | pytest + Hypothesis | 1591 | 70%+ |
-| Contracts (Rust) | cargo test + proptest | 40 | property-based |
+| Contracts (Rust) | cargo test + proptest | 233 | property-based |
 | Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
 | Frontend build | Vite + tsc --noEmit | — | type-checked |
 
-**Current status: 1591/1591 Python + 40/40 Rust tests passing** (3 additional Python tests are
+**Current status: 1591/1591 Python + 233/233 Rust tests passing** (3 additional Python tests are
 `network`-marked live-Sepolia integration checks, deselected by default so CI doesn't spend real
 gas — see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md)).
 Includes Hypothesis/proptest property-based invariant tests for fee/insurance/TTL/quorum/reputation
