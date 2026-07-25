@@ -20,6 +20,11 @@
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
+> 🟢 **TESTNET LIVE:** 349 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 8 contracts, cross-contract calls
+> 📊 63 API endpoints · 26 MCP tools · 1591 Python + 40 Rust tests (property-based)
+> 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
+> 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
+
 **[🚀 Live Demo](https://ae402.xyz)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
 
 **For agents & operators:** [Use AgentEscrow](https://ae402.xyz/console/escrows) — lock, release, dispute · **For developers:** [Build with AE402](https://ae402.xyz/console/docs) — API, Python SDK, MCP · **For evaluators:** [Evaluate the project](https://ae402.xyz/console/feature-map) — feature map with strict `On-chain / Live API / Local demo / Simulation / Planned` status labels
