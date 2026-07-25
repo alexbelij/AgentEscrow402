@@ -63,31 +63,6 @@ cargo test -p tests
 # agent_identity_registry_property_tests: N passed
 ```
 
-## AE-2 closure decision (hackathon submission, 2026-07-25)
-
-Agent2's 2026-07-24 audit (`AE402_FINAL_TASKS_V2_new.md` → AE-2) flagged
-this item "Partial": CEI/tombstone logic and this host-mirror suite are
-solid, but a genuine Casper VM on-chain regression test (via
-`casper-engine-test-support`) does not exist — the deps are commented
-out in `contracts/tests/Cargo.toml`.
-
-**Decision: sufficient for the hackathon submission, closed as-is.**
-
-Rationale:
-- The invariant under test (does the tombstone survive a replay
-  attempt?) is a pure state-machine transition, fully captured by the
-  host-side mirror above plus `insurance_cooldown_replay_e2e_tests.rs`.
-- Building and wiring a real VM harness in the final hours before a
-  hard hackathon deadline carries build/toolchain risk (this repo has
-  already hit nightly/bulk-memory-ops gotchas — see
-  `contracts/rust-toolchain.toml`) with no visible upside for judges.
-- This is a scoped, documented trade-off, not an oversight.
-
-**Not closed for mainnet.** A real on-chain Casper VM regression test
-for this exact replay invariant is a hard, non-optional gate before any
-redeploy of `insurance-pool` that will hold real funds. Spec for that
-follow-up work: `docs/AE2_MAINNET_ONCHAIN_TEST_TZ.md`.
-
 ## Where it lives on the plan
 
 `AE402_FINAL_TASKS_V2.md` → P0 Gate 1 → "Odra/Casper testnet regression"
