@@ -30,6 +30,7 @@ from server.escrow_fsm import InvalidTransitionError
 from server.event_monitor import EventMonitor
 from server.identity_registry_api import _registry as _id_registry
 from server.identity_registry_api import router as identity_registry_router
+from server.intent_chain_api import router as intent_chain_router
 from server.insurance import router as insurance_router
 from server.macaroon_api import router as macaroon_router
 from server.mcp_playground_api import router as mcp_playground_router
@@ -419,6 +420,8 @@ app.include_router(agent_sim_router)
 from server.compliance_api import router as compliance_router  # noqa: E402
 app.include_router(compliance_router)
 
+# AE-M1 — multi-hop A2A choreography (chain_escrow / attest_hop).
+app.include_router(intent_chain_router)
 
 # ---------------------------------------------------------------------------
 # Insurance fee helper

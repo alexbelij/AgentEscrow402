@@ -123,6 +123,13 @@ _ALLOWED_ATTR_KEYS: frozenset[str] = frozenset(
         "prompt_length",  # length, not content
         "fixture_id",
         "scenario",
+        # AE-M1: multi-hop A2A choreography attributes. Note: the intent id
+        # itself is never stored raw here -- it goes through `actor_id`
+        # (see intent_chain.attest_hop), which the redaction pipeline
+        # hashes via `_hash_id` before persistence, same as every other
+        # actor/subject reference in this module.
+        "hop_index",
+        "hop_count",
     }
 )
 
@@ -187,6 +194,11 @@ ALLOWED_EVENT_TYPES: frozenset[str] = frozenset(
         "escalation_triggered",
         "hitl_dispatched",
         "receipt_committed",
+        # AE-M1: multi-hop A2A choreography (intent_chain.py). One event
+        # per hop, in hop order; compute_chain_root() over the resulting
+        # event_ids is exposed to callers as `chain_root_hash`.
+        "intent_declared",
+        "hop_attested",
     }
 )
 
