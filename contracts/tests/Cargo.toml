@@ -48,3 +48,7 @@ path = "src/contract_fuzzing.rs"
 [[test]]
 name = "fsm_property_tests"
 path = "src/fsm_property_tests.rs"
+
+[[test]]
+name = "challenge_arbiter_property_tests"
+path = "src/challenge_arbiter_property_tests.rs"
