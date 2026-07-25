@@ -112,7 +112,7 @@ def _deploy_fresh_htlc(w3, acct):
             raise
     else:
         raise RuntimeError("deploy broadcast failed after retries")
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
     assert receipt.status == 1, "fresh HTLC deploy reverted"
     return w3.eth.contract(address=receipt.contractAddress, abi=abi)
 
@@ -151,23 +151,38 @@ def test_lock_then_claim_happy_path(w3, acct):
 
 
 def test_forged_preimage_rejected_on_chain(w3, acct):
-    """A second HTLC leg (fresh contract) locked, then claim attempted
-    with the WRONG preimage must revert on-chain — proves the Solidity
-    guard is live, not just the Python mock's guard."""
-    fresh = _deploy_fresh_htlc(w3, acct)
+    """On a LOCKED HTLC leg on live Sepolia, an attempt to claim with the
+    WRONG preimage must revert on-chain (Solidity's `PreimageMismatch`
+    error). Proves the Solidity guard is live — not just the Python
+    mock's guard.
 
-    real_preimage = f"correct-secret-{int(time.time())}".encode()
-    hashlock_hex = evm.sha256_hashlock(real_preimage)
-    timelock = int(time.time()) + 300
-    amount_wei = w3.to_wei(0.0001, "ether")
+    Uses the recorded HTLC only if it happens to be LOCKED with a
+    hashlock we can't guess; otherwise deploys a fresh instance and
+    locks it just to test the reject path."""
+    contract = evm.get_contract(w3)
+    status = evm.evm_status(contract)
+    if status["status"] == "LOCKED":
+        target = contract
+    else:
+        # Need a LOCKED contract to try forged-claim against. Deploy +
+        # lock a fresh one — this costs gas but is the only way if the
+        # recorded contract is CLAIMED/REFUNDED/EMPTY.
+        target = _deploy_fresh_htlc(w3, acct)
+        real_preimage = f"correct-secret-{int(time.time())}".encode()
+        hashlock_hex = evm.sha256_hashlock(real_preimage)
+        timelock = int(time.time()) + 300
+        amount_wei = w3.to_wei(0.0001, "ether")
+        lock_result = evm.evm_lock(w3, acct, target, hashlock_hex, timelock, amount_wei)
+        assert lock_result.ok
 
-    lock_result = evm.evm_lock(w3, acct, fresh, hashlock_hex, timelock, amount_wei)
-    assert lock_result.ok
+    # Wrong preimage — gas-estimation preflight (eth_call) will surface
+    # the on-chain revert as ContractCustomError(PreimageMismatch),
+    # which our adapter wraps as EvmAdapterError.
+    with pytest.raises(evm.EvmAdapterError) as excinfo:
+        evm.evm_claim(w3, acct, target, b"wrong-secret-entirely-not-preimage")
+    assert "PreimageMismatch" in str(excinfo.value) or "0x6f43bb63" in str(excinfo.value), (
+        f"expected PreimageMismatch revert, got: {excinfo.value}"
+    )
 
-    # The wrong preimage will fail gas-estimation (would revert with
-    # PreimageMismatch), which our adapter surfaces as EvmAdapterError.
-    with pytest.raises(evm.EvmAdapterError):
-        evm.evm_claim(w3, acct, fresh, b"wrong-secret-entirely")
-
-    status = evm.evm_status(fresh)
-    assert status["status"] == "LOCKED", "forged preimage must NOT change state off LOCKED"
+    status_after = evm.evm_status(target)
+    assert status_after["status"] == "LOCKED", "forged preimage must NOT change state off LOCKED"

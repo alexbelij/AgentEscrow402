@@ -231,7 +231,7 @@ def _send(w3: Web3, acct: Account, fn, value_wei: int = 0) -> TxResult:
             raise EvmAdapterError(f"broadcast failed: {e}") from e
     else:
         raise EvmAdapterError(f"broadcast failed after retries: {last_err}") from last_err
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+    receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=300)
     return TxResult(
         tx_hash=tx_hash.hex(),
         status=receipt.status,
