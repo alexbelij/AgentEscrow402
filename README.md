@@ -268,6 +268,20 @@ curl http://localhost:8000/health
 # {"status":"ok","sandbox":true,"db":"disconnected",...}
 ```
 
+**Or with Docker (equally < 5 minutes, no local Python needed):**
+```bash
+git clone https://github.com/alexbelij/AgentEscrow402.git
+cd AgentEscrow402
+cp .env.example .env
+docker compose up --build
+```
+
+**Verify:**
+```bash
+curl http://localhost:8000/health
+# {"status":"ok","sandbox":true,"db":"disconnected",...}
+```
+
 ### Create your first escrow
 
 ```bash

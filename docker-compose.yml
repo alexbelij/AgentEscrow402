@@ -1,3 +1,12 @@
+# docker-compose.yml — one-command sandbox demo, no Casper node required.
+#
+# Usage (fresh clone, nothing else needed):
+#   cp .env.example .env
+#   docker compose up --build
+#   curl http://localhost:8000/health
+#
+# .env is gitignored; env_file: .env below requires the cp step above or
+# `docker compose up` fails immediately with "env file .env not found".
 version: "3.8"
 services:
   api:
@@ -8,3 +17,9 @@ services:
     environment:
       - SANDBOX=true
       - PORT=8000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s

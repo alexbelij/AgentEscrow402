@@ -44,6 +44,40 @@ jobs:
       - name: Coverage
         run: pytest tests/ --cov=server --cov-report=term-missing --cov-fail-under=70
 
+  docker-compose-smoke:
+    # Defence-checklist gate: prove `docker compose up` on a genuinely fresh
+    # checkout actually boots and serves /health. This is the exact path a
+    # judge follows from the README's "Or with Docker" quickstart -- it was
+    # never verified end-to-end before 2026-07-25 (docker-compose.yml existed
+    # but was undocumented and untested; `env_file: .env` silently assumed a
+    # .env that a fresh clone does not have). Keep this job fast/offline;
+    # it must not depend on CASPER_NODE_URL or any live network.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: cp .env.example .env (exactly what the README quickstart says)
+        run: cp .env.example .env
+      - name: docker compose up --build (detached)
+        run: docker compose up --build -d
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health; then echo; echo "healthy after ${i}s"; exit 0; fi
+            sleep 1
+          done
+          echo "never became healthy" >&2
+          docker compose logs
+          exit 1
+      - name: Smoke assertions on /health payload
+        run: |
+          curl -sf http://localhost:8000/health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d['status']=='ok', d; assert d['sandbox'] is True, d; print('OK:', d)"
+      - name: docker compose logs (always, for debugging)
+        if: always()
+        run: docker compose logs
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
   frontend:
     runs-on: ubuntu-latest
     steps:
