@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from server import arbiter_crypto, batch_guard, strict
+from server import arbiter_crypto, batch_guard, confidential_escrow, strict
 from server import db as pgdb
 from server.admin_api import router as admin_router
 from server.agent_identity import router as identity_router
@@ -52,6 +52,8 @@ from server.models import (
     ReleaseRequest,
     ReputationRecord,
     ResolveRequest,
+    RevealAmountRequest,
+    RevealAmountResponse,
 )
 from server.multi_asset import router as multi_asset_router
 from server.risk_api import router as risk_router
@@ -917,6 +919,21 @@ async def create_escrow(
         cfg.insurance_fee_bps,
     )
 
+    # W.2: fail BEFORE creating anything if a confidential escrow's net
+    # amount cannot be sealed (e.g. exceeds confidential_escrow.ESCROW_RANGE_BITS).
+    # Checked here, ahead of both the sandbox and live-chain branches below,
+    # so a client that got a 422 never has to wonder whether an escrow with
+    # its plaintext amount silently exists anyway.
+    if req.confidential and net_amount >= (1 << confidential_escrow.ESCROW_RANGE_BITS):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"cannot seal confidential amount: net amount {net_amount} does not fit in "
+                f"{confidential_escrow.ESCROW_RANGE_BITS} bits "
+                f"(max {(1 << confidential_escrow.ESCROW_RANGE_BITS) - 1}); escrow was not created"
+            ),
+        )
+
     if cfg.sandbox or casper is None:
         try:
             record = store.create_escrow(
@@ -949,6 +966,11 @@ async def create_escrow(
                     logger.info("ML-KEM encryption applied to escrow %s", req.service_hash[:16])
                 except Exception as mlkem_exc:
                     logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
+            # W.2: opt-in confidential-amount escrow. Sealed AFTER the store
+            # write above (which needs the real net_amount for FSM/reputation
+            # bookkeeping) — this only affects what crosses the wire from here.
+            if req.confidential:
+                result_dict = _seal_confidential_response(result_dict, net_amount, req.service_hash, store)
             return result_dict
         except ValueError as exc:
             logger.warning("create_escrow validation failed: %s", exc)
@@ -1021,7 +1043,44 @@ async def create_escrow(
             logger.info("ML-KEM encryption applied to live escrow %s", req.service_hash[:16])
         except Exception as mlkem_exc:
             logger.warning("ML-KEM encryption failed (non-fatal): %s", mlkem_exc)
+    # W.2: opt-in confidential-amount escrow (see sandbox branch above for
+    # rationale — identical treatment here for the live-chain path).
+    if req.confidential:
+        result_dict = _seal_confidential_response(result_dict, net_amount, req.service_hash, store)
     return result_dict
+
+
+def _seal_confidential_response(
+    result_dict: dict, amount: int, service_hash: str, store: SandboxStore
+) -> dict:
+    """W.2: commit+prove `amount`, persist the seal privately, redact the wire dict.
+
+    Shared by both the sandbox and live-chain branches of `create_escrow` so
+    the confidential-amount behavior (and its failure mode) is identical
+    regardless of which mode created the escrow. Also stamps
+    `confidential`/`commitment`/`range_proof_bits` onto the in-memory store
+    record so a later `GET /escrow/{service_hash}` reflects the same
+    redaction instead of leaking the plaintext amount back out.
+    """
+    try:
+        sealed = confidential_escrow.seal_amount(amount, service_hash)
+    except confidential_escrow.ConfidentialEscrowError as exc:
+        # Surface as a client error — the caller asked for confidentiality on
+        # an amount this demo's range proof cannot cover (see
+        # confidential_escrow.ESCROW_RANGE_BITS); the escrow itself was
+        # already created above, so this only affects presentation, but we
+        # still refuse to silently return a confidential=True record with no
+        # commitment.
+        raise HTTPException(status_code=422, detail=f"cannot seal confidential amount: {exc}") from exc
+    confidential_escrow.store_seal(service_hash, sealed)
+    if service_hash in store._escrows:
+        store._escrows[service_hash]["confidential"] = True
+        store._escrows[service_hash]["commitment"] = sealed["commitment"]
+        store._escrows[service_hash]["range_proof_bits"] = sealed["range_proof_bits"]
+    result_dict["confidential"] = True
+    result_dict["commitment"] = sealed["commitment"]
+    result_dict["range_proof_bits"] = sealed["range_proof_bits"]
+    return confidential_escrow.redact_amount_field(result_dict)
 
 
 @app.post("/escrows/batch", response_model=BatchEscrowResponse)
@@ -1352,7 +1411,7 @@ async def release_escrow(
                 "ts": int(time.time()),
             }
         )
-        return record
+        return _redact_confidential_record(record)
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except PermissionError as exc:
@@ -1408,7 +1467,7 @@ async def refund_escrow(
         record = store.refund_escrow(req.service_hash, caller, deploy_hash)
         pgdb.update_escrow_status(req.service_hash, record.status, deploy_hash)
         _broadcast_event({"type": "escrow_refunded", "service_hash": req.service_hash, "ts": int(time.time())})
-        return record
+        return _redact_confidential_record(record)
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except PermissionError as exc:
@@ -1484,7 +1543,7 @@ async def dispute_escrow(
         # that follow AE402_AGENT_SPEC.md (batch-2 A5) fire on the same event
         # without breaking existing consumers of `escrow_disputed`.
         _broadcast_event({"type": "dispute_opened", "service_hash": req.service_hash, "ts": int(time.time())})
-        return record
+        return _redact_confidential_record(record)
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except ValueError as exc:
@@ -1617,7 +1676,7 @@ async def resolve_escrow(
         # batch-2 A5). Kept as an additional broadcast so any consumer still
         # subscribed to the older `escrow_resolved` name keeps working.
         _broadcast_event({"type": "arbitration_complete", "service_hash": req.service_hash, "ts": int(time.time())})
-        return record
+        return _redact_confidential_record(record)
     except KeyError:
         raise HTTPException(status_code=404, detail="Escrow not found")
     except ValueError as exc:
@@ -1894,12 +1953,61 @@ async def get_escrow(
 ):
     record = store.get_escrow(service_hash)
     if record is not None:
-        return record
+        return _redact_confidential_record(record)
     if casper:
         record = await casper.get_escrow(service_hash)
         if record:
-            return record
+            return _redact_confidential_record(record)
     raise HTTPException(status_code=404, detail="Escrow not found")
+
+
+def _redact_confidential_record(record: EscrowRecord) -> EscrowRecord:
+    """W.2: re-redact `amount` on every GET, not just the create response.
+
+    `EscrowRecord.amount` in the sandbox store's dict is always the real
+    ledger amount (needed for FSM/reputation math); `confidential_escrow`
+    only redacts outbound API dicts, so any read path that skips it would
+    leak the plaintext amount right back out. This is the single choke
+    point every GET-style read of an `EscrowRecord` goes through.
+    """
+    if not record.confidential:
+        return record
+    return record.model_copy(update={"amount": confidential_escrow.REDACTED_AMOUNT})
+
+
+@app.post("/escrow/{service_hash}/reveal", response_model=RevealAmountResponse)
+async def reveal_confidential_amount(
+    service_hash: str,
+    req: RevealAmountRequest,
+    store: SandboxStore = Depends(get_sandbox),
+):
+    """W.2: disclose the plaintext amount of a confidential escrow.
+
+    Cryptographic gate, not an authorization system: this endpoint proves
+    the caller holds the blinding factor that opens the stored commitment to
+    the server's private ledger amount (Pedersen binding makes forging a
+    different opening computationally infeasible), and discloses the amount
+    only on success. It does not check that the caller is the escrow's
+    sender/receiver/an arbiter — in this demo, possession of the blinding
+    (handed out once, at creation, and never logged) IS the access control.
+    A production build would pair this with the same identity checks that
+    gate release/refund/dispute.
+    """
+    record = store.get_escrow(service_hash)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if not record.confidential:
+        raise HTTPException(status_code=400, detail="Escrow was not created with confidential=true")
+    if record.commitment is None:
+        # Should be unreachable given how _seal_confidential_response writes
+        # both fields together, but fail loudly rather than silently if the
+        # store is ever corrupted or hand-edited.
+        raise HTTPException(status_code=500, detail="confidential escrow missing its commitment")
+    try:
+        result = confidential_escrow.reveal(record.amount, req.blinding, record.commitment)
+    except confidential_escrow.ConfidentialEscrowError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    return RevealAmountResponse(service_hash=service_hash, amount=result["amount"], verified=result["verified"])
 
 
 @app.get("/reputation/{agent}", response_model=ReputationRecord)

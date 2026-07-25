@@ -1,6 +1,11 @@
 # Zero-knowledge amount privacy (Tier Wow — W.2) — Confidential-Amount Escrows
 
-**Status:** implemented, opt-in demo/audit surface. Not yet on the primary escrow write path.
+**Status:** implemented. Both the standalone `/zk/*` demo/audit surface
+(below) AND the primary escrow lifecycle (`POST /escrow`, `GET
+/escrow/{service_hash}`, `POST /release|/refund|/dispute|/resolve`, plus a new
+`POST /escrow/{service_hash}/reveal`) support confidential amounts — see
+"Escrow lifecycle integration" below. This closes the "Future work #1" item
+that originally shipped with this doc.
 
 ## How this differs from the Range-Proof Fraud Registry
 
@@ -128,6 +133,96 @@ in a batch, then verify the aggregate against a public cap.
 Verifies the commitment opens to `(amount, blinding)`. Used by an
 authorized receiver/auditor to confirm a disclosed amount matches.
 
+## Escrow lifecycle integration
+
+`server/confidential_escrow.py` bridges this primitive into the escrow
+create/read/reveal path — `docs/tier3/` conventions aside, this is filed
+here (not a separate doc) because it is additive behavior on the same
+primitive, not a new one.
+
+### Opting in: `POST /escrow`
+
+Add `"confidential": true` to the existing `EscrowRequest` body:
+
+```json
+{
+  "receiver": "<64-hex account hash>",
+  "amount": 50000000000,
+  "service_hash": "<64-hex>",
+  "confidential": true
+}
+```
+
+The server still computes the net amount (after the insurance fee) exactly
+as for a plaintext escrow — real fund movement in this demo requires it,
+and there is no on-chain amount-hiding contract (see Non-goals). What
+changes is presentation: the response (and every subsequent `GET
+/escrow/{service_hash}`, and the `EscrowRecord` returned by
+`/release`, `/refund`, `/dispute`, `/resolve`) carries:
+
+```json
+{
+  "amount": -1,
+  "confidential": true,
+  "commitment": "<33-byte compressed secp256k1 point, hex>",
+  "range_proof_bits": 48,
+  "...": "..."
+}
+```
+
+`amount: -1` is a sentinel (`EscrowRequest.amount` already enforces `gt=0`,
+so `-1` cannot collide with any real amount) — `confidential_escrow.REDACTED_AMOUNT`.
+
+The range proof is bound to the escrow's own `service_hash` as its
+Fiat-Shamir transcript, so it cannot be replayed as a valid proof for a
+different escrow.
+
+### Bit width: 48, not 64
+
+The standalone `/zk/*` surface defaults to the full `AMOUNT_BITS = 64`. The
+escrow lifecycle uses a narrower default,
+`confidential_escrow.ESCROW_RANGE_BITS = 48` (max ≈ 281,474 CSPR at
+1e9 motes/CSPR), because proving/verifying cost is ~linear in bit count and
+this path runs synchronously inside the create/reveal HTTP handlers —
+measured ~0.7-1.1s at 48 bits vs ~1.4-2s at 64 bits on the hackathon pod (see
+the perf table above; costs are higher there than in this doc's original
+measurement, likely CPU-dependent — rerun `pytest -m slow` on your own
+hardware if you need current numbers). A request whose *net* amount (after
+the insurance fee) doesn't fit in 48 bits gets a `422` **before** anything is
+created — there is no partial state where the client sees an error but a
+plaintext escrow silently exists anyway.
+
+### Disclosure: `POST /escrow/{service_hash}/reveal`
+
+```json
+{ "blinding": "<32-byte hex, returned once at creation>" }
+```
+
+```json
+{ "service_hash": "...", "amount": 49000000000, "verified": true }
+```
+
+This is the one legitimate disclosure path. It is a **cryptographic** gate,
+not an **authorization** system: the endpoint proves the caller holds the
+blinding factor that opens the stored commitment to the server's private
+ledger amount (Pedersen's binding property makes forging a different
+opening computationally infeasible) and discloses the amount only on
+success (`403` otherwise). It does not itself check that the caller is the
+escrow's sender/receiver/an arbiter — in this demo, possession of the
+blinding (handed out once, at creation, never logged, never persisted
+anywhere `blinding` could leak back into an API response) *is* the access
+control. A production build would pair this with the same identity checks
+that already gate release/refund/dispute.
+
+### Where the private seal lives
+
+`confidential_escrow._confidential_ledger` — a small module-level dict,
+keyed by `service_hash`, holding `{commitment, range_proof, range_proof_bits,
+blinding}`. Deliberately **not** part of `EscrowRecord` or
+`SandboxStore._escrows` (those flow into API responses and best-effort
+Postgres) — `blinding` must never appear in either. Like `SandboxStore`
+itself, this is process-local and sandbox/demo-mode only.
+
 ## Wire format
 
 ```json
@@ -173,16 +268,34 @@ authorized receiver/auditor to confirm a disclosed amount matches.
 - `tests/test_zk_amount_api.py` — 8 API tests: generators endpoint,
   prove/verify round-trip, transcript negative case, open commitment,
   aggregate, out-of-range rejection.
+- `tests/test_confidential_escrow.py` — 29 unit tests: `seal_amount`
+  shape/binding/out-of-range, `redact_amount_field` no-op vs. redact,
+  `reveal` success/wrong-blinding/wrong-amount/malformed-input,
+  `verify_seal` valid/wrong-transcript/wrong-bits/tampered, the private
+  ledger store, and 3 slow tests at the real `ESCROW_RANGE_BITS=48` default.
+- `tests/test_confidential_escrow_api.py` — 12 API tests: create with
+  `confidential=true` redacts `amount`, plain escrows unaffected, seal
+  persisted privately, over-cap amount rejected with no escrow created,
+  `GET` re-redacts, `reveal` success/wrong-blinding (403)/non-confidential
+  (400)/nonexistent (404)/malformed-blinding (422), and confidentiality
+  surviving a `/release` FSM transition.
 
-Total: 41 tests, all green.
+Total: 82 tests, all green.
 
 ## Future work
 
-1. **Wire into escrow create/release path** as an opt-in
-   `use_confidential_amount: true` flag on `EscrowRequest`. Server would
-   verify the range proof at create-time, store the commitment, and only
-   reveal the amount at release/refund time (with sender's opening).
+1. ~~Wire into escrow create/release path~~ — **done**, see "Escrow
+   lifecycle integration" above.
 2. **Bulletproof upgrade** — O(log n) proof size (~700B) for a public
    audit endpoint that verifies many proofs per second.
 3. **On-chain verification** in the escrow contract (requires porting
    the point arithmetic to Rust and a WASM contract redeploy).
+4. **Authorization on `/reveal`** — today it is a pure cryptographic gate
+   (whoever holds the blinding can disclose); pairing it with the same
+   sender/receiver/arbiter identity checks that already gate
+   release/refund/dispute would close the gap noted above.
+5. **Async proof generation** — `seal_amount`/`reveal` currently run
+   synchronously inside the request handler (~0.7-1.1s at the default 48
+   bits on this hardware). Fine for a demo; a production build would move
+   this to a threadpool (`fastapi.concurrency.run_in_threadpool`) so a slow
+   proof can't hold up the event loop for other requests.

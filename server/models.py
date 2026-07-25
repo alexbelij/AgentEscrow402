@@ -65,6 +65,23 @@ class EscrowRequest(BaseModel):
     # matches the real on-chain sender. Required whenever `wallet_tx_hash`
     # is set; ignored otherwise (identity comes from `_extract_sender`).
     sender_public_key_hex: str | None = Field(default=None, min_length=1, max_length=140)
+    # W.2: opt-in confidential-amount escrow. When true, the server still
+    # needs `amount` for real fund movement / insurance-fee accounting (this
+    # is not on-chain amount-hiding — see docs/ZK_AMOUNT_PRIVACY.md Non-goals)
+    # but the create response and all subsequent GETs redact the plaintext
+    # `amount` field, exposing only a Pedersen commitment + range proof.
+    # Reveal requires the caller to supply the blinding factor they hold
+    # privately (POST /escrows/{service_hash}/reveal) — the server never
+    # persists or logs the blinding.
+    confidential: bool = Field(
+        default=False,
+        description=(
+            "Opt-in zero-knowledge amount privacy (Tier Wow W.2). When true, "
+            "amount is hidden behind a Pedersen commitment + range proof in "
+            "every API response; use POST /escrows/{service_hash}/reveal with "
+            "the blinding factor to disclose it."
+        ),
+    )
 
 
 class EscrowRecord(BaseModel):
@@ -85,6 +102,14 @@ class EscrowRecord(BaseModel):
     mlkem_ciphertext: str | None = None
     mlkem_decap_key: str | None = None
     mlkem_algorithm: str | None = None
+    # W.2: present only when the escrow was created with confidential=True.
+    # `amount` above is redacted (set to -1, a value no real amount can take
+    # since amount > 0 is enforced) in every response for such escrows —
+    # the real amount lives only in the server's private store, needed for
+    # actual fund movement, never returned over the wire.
+    confidential: bool = False
+    commitment: str | None = None
+    range_proof_bits: int | None = None
 
 
 class BatchEscrowItem(BaseModel):
@@ -159,6 +184,30 @@ class ResolveRequest(BaseModel):
     # account-hash. arbiter_pubkeys[i] must correspond to arbiter_signatures[i].
     arbiter_pubkeys: list[str]
     arbiter_signatures: list[str]
+
+
+class RevealAmountRequest(BaseModel):
+    """W.2: disclose the plaintext amount of a confidential escrow.
+
+    The caller must supply the blinding factor they hold privately (received
+    out-of-band when the escrow was created with `confidential: true`). The
+    server never persists or logs this value beyond the request lifetime of
+    this call.
+    """
+
+    blinding: str = Field(
+        ...,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+        description="32-byte blinding factor, hex, as returned at escrow creation.",
+    )
+
+
+class RevealAmountResponse(BaseModel):
+    service_hash: str
+    amount: int
+    verified: bool
 
 
 # ---------------------------------------------------------------------------
