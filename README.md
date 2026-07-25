@@ -98,6 +98,7 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 | **Sybil-resistant agent identity** | ✅ DID registry, staking + slashing | ❌ None | — |
 | **Post-quantum metadata confidentiality** | ✅ ML-KEM-768 hybrid encryption | ❌ None | — |
 | **Confidential/private amounts (ZK)** | ✅ Two complementary layers — [on-chain fraud-dispute range proofs](docs/RANGE_PROOFS.md) + [off-chain confidential-amount escrows](docs/ZK_AMOUNT_PRIVACY.md) | ❌ None | ❌ None |
+| **Multi-hop A2A choreography** | ✅ Chained agent-to-agent escrows (A→B→C→...) under one auditable `parent_intent_id`, tamper-evident `chain_root_hash` — see [API reference](#-api-reference) | ❌ None | ❌ None |
 | **Production maturity / ecosystem adoption** | ⚠️ Hackathon-stage, testnet only | ✅ Live, mainnet, adopted by real facilitators | ✅ Universally understood |
 
 See [what's real vs. simulated](#-what-is-real-vs-simulated) for exactly which of these are live
@@ -533,10 +534,10 @@ Security status: latest changed code was reviewed through NVIDIA API and no conc
 
 Base URL (production): `https://agentescrow402-api-ywm8.onrender.com`
 
-Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml)
+Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml) (hand-curated snapshot) or `GET /openapi.json` on any running instance (always exact — generated live from the FastAPI app, e.g. `curl https://agentescrow402-api-ywm8.onrender.com/openapi.json | jq '.paths | keys | length'`).
 
 <details>
-<summary><kbd>All 62 endpoints — click to expand</kbd></summary>
+<summary><kbd>All 66 endpoints — click to expand</kbd></summary>
 
 | Method | Path | Description |
 |---|---|---|
@@ -575,6 +576,11 @@ Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml)
 | **Atomic swap (HTLC)** | | |
 | `POST` | `/escrow/atomic-swap/commit` | Commit SHA-256 hash-lock |
 | `POST` | `/escrow/atomic-swap/reveal` | Reveal preimage to release funds |
+| **Multi-hop A2A choreography** | | |
+| `POST` | `/intents` | Declare a planned agent-to-agent chain (`agent_path`) |
+| `GET` | `/intents/{id}` | Full choreography state + `chain_root_hash` |
+| `POST` | `/intents/{id}/hops` | Register a hop's escrow `service_hash`, in order |
+| `POST` | `/intents/{id}/hops/{n}/attest` | Attest a released hop into the chain root |
 | **AI arbitration** | | |
 | `POST` | `/arbitration/analyze` | AI-assisted dispute evidence analysis |
 | `GET` | `/arbitration/history` | Recent arbitration recommendations |

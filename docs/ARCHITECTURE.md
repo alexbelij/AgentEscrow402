@@ -3,7 +3,7 @@
 ## System Overview
 
 AE402 is a full-stack payment infrastructure for autonomous AI agents on the Casper blockchain.
-The system comprises **8 smart contracts**, a **FastAPI backend** (62 endpoints), a **React
+The system comprises **8 smart contracts**, a **FastAPI backend** (66 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
 frontend** (12 console pages), a **Python SDK** with **LangChain** and **MCP** (26 tools)
 integrations, and on-chain evidence of 349+ real testnet transactions.
 
@@ -211,7 +211,7 @@ this by creating + funding purses natively inside the VM:
 
 ## Backend (Python, `server/`)
 
-FastAPI application with 62 endpoints across 8 route files. Runs in two modes:
+FastAPI application with 66 endpoints across 19 route files (see `GET /openapi.json` for the exact, live count -- the module map below lists the highest-route-count files, not every route file). Runs in two modes:
 - **Live mode** (`SANDBOX=false`): all operations hit the real Casper testnet via `CasperClient`
 - **Sandbox mode** (`SANDBOX=true`): in-memory simulation via `SandboxStore` for zero-cost demos
 
@@ -219,7 +219,7 @@ FastAPI application with 62 endpoints across 8 route files. Runs in two modes:
 
 ```mermaid
 graph LR
-    subgraph Routes [Route files — 62 endpoints]
+    subgraph Routes [Route files — 66 endpoints total, highest-count files shown]
         app[app.py<br/>22 routes]
         multi[multi_asset.py<br/>11 routes]
         idr[identity_registry_api.py<br/>10 routes]
@@ -340,7 +340,7 @@ and dispute operations are standard `ContractCallBuilder` calls.
 ## SDK & Integrations (`sdk/`)
 
 ### Python SDK (`sdk/client.py`)
-Typed Python client wrapping all 62 API endpoints. Handles authentication, x402 headers,
+Typed Python client wrapping the AE402 API endpoints (see `GET /openapi.json` for the exact, live count). Handles authentication, x402 headers,
 error mapping, and response parsing.
 
 ### LangChain Tool (`sdk/langchain_tool.py`)
@@ -651,7 +651,7 @@ AgentEscrow402/
 │   ├── id-registry-funder/     # Session WASM: identity stake funding
 │   ├── arbiter-registrar/      # Session WASM: VRF arbiter registration
 │   └── tests/                  # 40 Rust tests (unit + property-based)
-├── server/                     # FastAPI backend (62 endpoints)
+├── server/                     # FastAPI backend (66 endpoints)
 │   ├── app.py                  # Core routes (22)
 │   ├── multi_asset.py          # Multi-asset/streaming/HTLC (11)
 │   ├── identity_registry_api.py# Identity registry (10)
@@ -676,7 +676,7 @@ AgentEscrow402/
 │   └── arbiter_signing.py      # Ed25519 signing helpers
 ├── tests/                      # 450 Python tests
 ├── docs/                       # Documentation
-│   ├── openapi.yaml            # Full OpenAPI spec (62 paths)
+│   ├── openapi.yaml            # OpenAPI spec snapshot (curated; GET /openapi.json is always exact)
 │   ├── SDK.md                  # SDK documentation
 │   ├── evidence/               # On-chain tx proofs
 │   ├── screenshots/            # UI screenshots
