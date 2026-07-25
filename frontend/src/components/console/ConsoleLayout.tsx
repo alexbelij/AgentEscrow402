@@ -28,6 +28,7 @@ import {
   BookOpen,
   Compass,
   Terminal,
+  Store,
 } from 'lucide-react';
 
 interface NavItem {
@@ -63,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: 'Arbitration', path: '/console/arbitration', icon: Gavel },
       { name: 'Identity Registry', path: '/console/identity-registry', icon: BadgeCheck },
+      { name: 'Marketplace', path: '/console/marketplace', icon: Store },
       { name: 'Agents', path: '/console/agents', icon: Users },
       { name: 'Evidence', path: '/console/evidence', icon: FileText },
     ],
@@ -153,6 +155,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   '/console/identity-registry': {
     title: 'Identity Registry',
     desc: 'A DID reputation/staking layer (real backend, in-memory in this sandbox): register a did:casper:<account> identity, record completed/disputed deals to build cumulative reputation, apply time-based reputation decay, slash stake for bad behavior, advance verification level, and search agents by capability/reputation/verification. Separate from the public-key identity + capability delegation registry on the Agents page.',
+    source: 'live',
+  },
+  '/console/marketplace': {
+    title: 'Agent Discovery Marketplace',
+    desc: 'Browse every agent registered in the identity registry as a discovery-first card grid: filter by capability, minimum reputation and verification level, free-text search, and sort by whichever dimension matters for picking a counterparty. Reads the same live /identity-registry backend as Identity Registry — this page is for finding an agent to work with, not for registering or testing one.',
     source: 'live',
   },
   '/console/agent-demo': {

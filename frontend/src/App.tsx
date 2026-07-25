@@ -29,6 +29,7 @@ import Docs from './components/console/Docs'
 import AdvancedEscrow from './components/console/AdvancedEscrow'
 import Arbitration from './components/console/Arbitration'
 import IdentityRegistry from './components/console/IdentityRegistry'
+import Marketplace from './components/console/Marketplace'
 import UseCases from './components/console/UseCases'
 import Evidence from './components/console/Evidence'
 import FeatureMap from './components/console/FeatureMap'
@@ -100,6 +101,7 @@ export default function App() {
             <Route path="advanced" element={<AdvancedEscrow />} />
             <Route path="arbitration" element={<Arbitration />} />
             <Route path="identity-registry" element={<IdentityRegistry />} />
+            <Route path="marketplace" element={<Marketplace />} />
             <Route path="evidence" element={<Evidence />} />
             <Route path="feature-map" element={<FeatureMap />} />
             <Route path="mcp-playground" element={<MCPPlayground />} />
