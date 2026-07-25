@@ -92,13 +92,17 @@ def _deploy_fresh_htlc(w3, acct):
 
     HTLC = w3.eth.contract(abi=abi, bytecode=bytecode)
     nonce = w3.eth.get_transaction_count(acct.address, "pending")
-    base_gas_price = max(w3.eth.gas_price, w3.to_wei(5, "gwei"))
+    # Adaptive floor: 1.5x current gas price, min 1 gwei. Sepolia gas is
+    # currently ~1 gwei; a hard 5-gwei floor forces 5x overpay and
+    # exhausts the test wallet faster than needed.
+    current_gas = w3.eth.gas_price
+    base_gas_price = max(int(current_gas * 3 // 2), w3.to_wei(1, "gwei"))
     tx = HTLC.constructor(acct.address).build_transaction(
         {"from": acct.address, "nonce": nonce, "gasPrice": base_gas_price, "chainId": evm.CHAIN_ID}
     )
     tx["gas"] = w3.eth.estimate_gas(tx)
     gas_price = base_gas_price
-    for _ in range(3):
+    for _ in range(5):
         tx["gasPrice"] = gas_price
         signed = acct.sign_transaction(tx)
         try:
@@ -108,6 +112,9 @@ def _deploy_fresh_htlc(w3, acct):
             m = str(e).lower()
             if "underpriced" in m or "replacement" in m or "already known" in m:
                 gas_price = int(gas_price * 2)
+                continue
+            if "nonce too low" in m or "nonce too high" in m:
+                tx["nonce"] = w3.eth.get_transaction_count(acct.address, "pending")
                 continue
             raise
     else:

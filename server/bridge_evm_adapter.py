@@ -216,7 +216,7 @@ def _send(w3: Web3, acct: Account, fn, value_wei: int = 0) -> TxResult:
     # Doubling on each retry converges fast.
     gas_price = base_gas_price
     last_err = None
-    for attempt in range(3):
+    for attempt in range(5):
         tx["gasPrice"] = gas_price
         signed = acct.sign_transaction(tx)
         try:
@@ -227,6 +227,12 @@ def _send(w3: Web3, acct: Account, fn, value_wei: int = 0) -> TxResult:
             last_err = e
             if "underpriced" in msg or "replacement" in msg or "already known" in msg:
                 gas_price = int(gas_price * 2)
+                continue
+            if "nonce too low" in msg or "nonce too high" in msg:
+                # mempool advanced between our nonce fetch and broadcast
+                # (a prior tx of ours mined, or another node saw a newer
+                # nonce first) — refetch and re-sign with same content.
+                tx["nonce"] = w3.eth.get_transaction_count(acct.address, "pending")
                 continue
             raise EvmAdapterError(f"broadcast failed: {e}") from e
     else:
