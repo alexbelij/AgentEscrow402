@@ -7,7 +7,36 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
-## [Unreleased]
+## [Unreleased] — Hackathon Submission Block (2026-07-19 → 2026-07-25)
+
+Submission-grade hardening across contracts, evidence, and judge-facing surfaces. All items below either landed on `main` or are on-branch in an open PR with tests green.
+
+### Added — New contracts (post-hackathon block, on-branch)
+
+- **Challenge Arbiter with commit-reveal + bond/slash** ([PR #55](https://github.com/alexbelij/AgentEscrow402/pull/55), `feat/ae402-challenge-arbiter`). Two-phase arbiter selection: submit `commit(H(seed))`, reveal `seed`, run VRF-weighted quorum. Bonds slashed on no-reveal, malicious reveal (mismatched hash), or losing minority in ternary arbitration. 45 Rust property tests + 31 Python parity tests. ~160 KB WASM. Threat model: `docs/CHALLENGE_ARBITER.md`.
+- **Range Proof Registry** ([PR #62](https://github.com/alexbelij/AgentEscrow402/pull/62), `feat/ae402-range-proofs`). Threshold-attested amount-range proofs using mod-exp on a 3072-bit safe prime — no ZK-precompile dependency. Pedersen commitments; verifier accepts (proof, commitment, range) tuple; 3-of-5 attester quorum. 34 Rust property tests + 42 Python parity tests. ~180 KB WASM. Design + verifier calibration: `docs/RANGE_PROOFS.md`.
+- **Governance DAO with AE402 action layer** ([PR #63](https://github.com/alexbelij/AgentEscrow402/pull/63), `feat/ae402-governance-dao`). Ported voting/quorum/delegation primitives from RWA-Sentinel under Apache-2.0 (see `contracts/ae402-governance-dao/PROVENANCE.md`), replaced action layer with 6 AE402-specific actions (`ADJUST_FEE_BPS`, `ROTATE_ARBITER_SET`, `UPDATE_INSURANCE_POOL_PARAMS`, `UPDATE_TIMELOCK_DELAY`, `UPDATE_RANGE_PROOF_PARAMS`, `PAUSE_PROTOCOL`) with cross-contract execution via `exec_log`. 30% quorum, 7-day voting, veto path, late-finalization. 49 Rust property tests + 58 Python (51 parity + 7 lifecycle). 159 KB WASM. Full threat model: `docs/GOVERNANCE.md`.
+
+### Added — Judge-facing surfaces (Tier 1 pre-submission)
+
+- **`BACKLOG.md`** — single-source-of-truth tracker for all remaining work (Tier 1/2/3/Wow), consolidated from pre-hackathon tails, ROADMAP, drop-list, dangling branches, and 6-persona consensus.
+- **`TX_MANIFEST.md`** — canonical registry: 9 live production contracts + 3 post-hackathon contracts, all package/contract/deploy hashes, explorer links, 369+ testnet activity deploys pointed to via bulk logs, 3 verification recipes, and a regeneration procedure.
+
+### Test coverage snapshot (submission block)
+
+- **Rust:** 119 tests passing (property + unit + integration).
+- **Python:** 1067 tests passing.
+- **Regressions from the submission block:** 0.
+- **New tests added by the submission block:** 107 (49 governance property + 51 governance parity + 7 governance lifecycle in this batch alone; earlier batches added 42 range-proof parity + 34 range-proof property + 31 challenge-arbiter parity + 45 challenge-arbiter property).
+
+### Fixed / verified
+
+- **500-on-existing-PR gotcha logged (dev workflow):** GitHub `POST /pulls` occasionally returns `500` after the PR was already created server-side; subsequent create returns `422 "already exists"`. Root-cause noted in `docs/LESSONS.md`; before retry always `GET /pulls?head=…`.
+- **Ambient PAT auth precedence:** classic PAT works over Basic auth (`https://<user>:<token>@github.com/…`) rather than `Bearer`; documented in `sdk/README.md` deployment section.
+
+---
+
+## [Previous unreleased entries] — up to 2026-07-19
 
 *Delivered the console/backend work the 1.1.0 entry below prematurely claimed as shipped.*
 
