@@ -1,6 +1,24 @@
-# Zero-knowledge amount privacy (Tier Wow — W.2)
+# Zero-knowledge amount privacy (Tier Wow — W.2) — Confidential-Amount Escrows
 
 **Status:** implemented, opt-in demo/audit surface. Not yet on the primary escrow write path.
+
+## How this differs from the Range-Proof Fraud Registry
+
+AE402 also ships [docs/RANGE_PROOFS.md](RANGE_PROOFS.md), an **on-chain**,
+arbiter-attested range-proof registry. Both use a Pedersen commitment +
+range proof, so it's worth being explicit that these are two independent,
+complementary layers, not a duplicate:
+
+- **This doc (W.2)** hides the amount **by default, from everyone**,
+  verified non-interactively by anyone off-chain (Fiat-Shamir, no
+  arbiters needed), on secp256k1. It's a transactional-privacy primitive.
+- **The registry** hides the amount **on-chain**, verified by a k-of-n
+  **arbiter committee** on a 2048-bit group, producing an on-chain,
+  disputable attestation a fraud/insurance flow can act on. It's a
+  dispute-evidence primitive.
+
+See the full comparison table in
+[docs/RANGE_PROOFS.md](RANGE_PROOFS.md#how-this-differs-from-confidential-amount-escrows-w2).
 
 ## What it is
 

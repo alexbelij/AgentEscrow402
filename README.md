@@ -15,7 +15,7 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
 [![Contracts](https://img.shields.io/badge/contracts-8_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
-[![Tests](https://img.shields.io/badge/tests-490_passing-22c55e.svg?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-1591_passing-22c55e.svg?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-live-0ea5e9.svg?style=flat-square)](docs/API_SDK_MCP.md)
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
@@ -92,6 +92,7 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 | **AI-assisted dispute triage** | ✅ Evidence scoring feeds the arbiter vote | ❌ None | ❌ None |
 | **Sybil-resistant agent identity** | ✅ DID registry, staking + slashing | ❌ None | — |
 | **Post-quantum metadata confidentiality** | ✅ ML-KEM-768 hybrid encryption | ❌ None | — |
+| **Confidential/private amounts (ZK)** | ✅ Two complementary layers — [on-chain fraud-dispute range proofs](docs/RANGE_PROOFS.md) + [off-chain confidential-amount escrows](docs/ZK_AMOUNT_PRIVACY.md) | ❌ None | ❌ None |
 | **Production maturity / ecosystem adoption** | ⚠️ Hackathon-stage, testnet only | ✅ Live, mainnet, adopted by real facilitators | ✅ Universally understood |
 
 See [what's real vs. simulated](#-what-is-real-vs-simulated) for exactly which of these are live
@@ -331,7 +332,15 @@ version 9, updated 2026-07-07):
 | VRF-assisted arbiter election (`/vrf/elect`) | ✅ **Real on-chain election** | Submits `select_arbiters` to the deployed `vrf-arbiter` contract, waits for finalization, and reads the result back; falls back to a reputation-weighted local CSPRNG only when the contract is unavailable/unconfigured or every on-chain candidate for a draw is a dispute party — see [VRF-assisted arbiter election](#vrf-assisted-arbiter-election) below |
 | Payment streaming (`/escrow/stream`) | ⚠️ **API-level simulation** | Streamed/remaining amount computed from wall-clock time in the backend; not an on-chain per-tick release yet |
 | Hosted console demo-signer | ⚠️ **Explicit, labelled bypass** | One fixed public demo identity + signature, gated by `ALLOW_HOSTED_DEMO_IDENTITY`, so browser visitors without a wallet can try the console — never used in the signature-verification code path for real requests |
-| TEE-attested proofs, on-chain ZK-KYC, cross-chain bridge | ❌ **Not implemented** | Roadmap ideas only — would need real TEE hardware or a ZK circuit; out of scope for the hackathon deadline, see [ROADMAP.md](ROADMAP.md) |
+| Range-proof fraud registry (`register_commitment`/`attest`/`finalize`/`open`/`mark_fraud`) | ✅ **Real on-chain, separate contract** | Pedersen commitment + arbiter-attested range verification anchored on Casper WASM; hides the settled amount, proves it's inside a declared `[min, max]`, disputable post-settlement; see [docs/RANGE_PROOFS.md](docs/RANGE_PROOFS.md) |
+| Confidential-amount escrows (`/zk/*`, Pedersen + bit-decomposition range proof) | ⚠️ **Real crypto, opt-in API layer** | secp256k1 Pedersen commitments + Chaum-Pedersen OR range proofs, homomorphic aggregation for batch-cap conservation; not yet wired into the on-chain settlement path (tracked as future work) — see [docs/ZK_AMOUNT_PRIVACY.md](docs/ZK_AMOUNT_PRIVACY.md) and [how it differs from the range-proof registry](docs/RANGE_PROOFS.md#how-this-differs-from-confidential-amount-escrows-w2) |
+| Threshold escrow release (Shamir SSS, `/threshold/*`) | ✅ **Real crypto, API layer** | n-of-m release-secret reconstruction, information-theoretic below threshold; see [docs/tier3/T3.1-threshold-mpc.md](docs/tier3/T3.1-threshold-mpc.md) |
+| Gaming-reward Merkle escrow (`/gaming/*`) | ✅ **Real crypto, API layer** | Merkle-root commit + O(log n) inclusion-proof claims, solvency-guarded; see [docs/tier3/T3.2-gaming-reward.md](docs/tier3/T3.2-gaming-reward.md) |
+| Batch cap / arbiter-quorum guard oracle (`/escrows/batch-preview`) | ✅ **Real logic, API layer** | Pure deterministic extraction of the on-chain guard's policy for dry-run preview and future WASM diff-testing; see [docs/tier3/T3.3-batch-cap-quorum-guard.md](docs/tier3/T3.3-batch-cap-quorum-guard.md) |
+| Cross-chain escrow demo (`/crosschain/*`) | ⚠️ **API-level simulation** | Casper-side `create()`/EVM-triggered `release()` against a mocked `ChainAdapter`; double-spend-safe registry, real logic, mocked transport — see [docs/CROSS_CHAIN_DEMO.md](docs/CROSS_CHAIN_DEMO.md) |
+| HTLC atomic-swap bridge, deterministic mock (T3.4-A) | ⚠️ **API-level simulation** | Same commit/reveal state machine as the real bridge below, driven by a deterministic in-memory oracle instead of a live chain; see [docs/tier3/T3.4-A-bridge-htlc-mock.md](docs/tier3/T3.4-A-bridge-htlc-mock.md) |
+| HTLC atomic-swap bridge, real EVM (T3.4-B) | ✅ **Real on-chain, Sepolia testnet** | `contracts/HTLC.sol` deployed and verified at `0xF9d55d029280741162488a4ae8517716Eb80A910` (Sepolia, chain id 11155111); see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md) |
+| TEE-attested proofs, on-chain ZK-KYC | ❌ **Not implemented** | Roadmap ideas only — would need real TEE hardware or a ZK circuit; out of scope for the hackathon deadline, see [ROADMAP.md](ROADMAP.md) |
 
 ### VRF-assisted arbiter election
 
@@ -689,7 +698,7 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-uv run --active python -m pytest -q          # 450 tests (server logic, x402, identity, risk, multi-asset)
+uv run --active python -m pytest -q          # 1591 tests (server logic, x402, identity, risk, multi-asset, ZK privacy, MPC, cross-chain, EVM bridge)
 cargo test --manifest-path contracts/escrow/Cargo.toml   # 40 tests (escrow, HTLC, arbitration)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
@@ -698,17 +707,19 @@ ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # l
 
 | Suite | Framework | Count | Coverage |
 |---|---|---|---|
-| Server (Python) | pytest + Hypothesis | 450 | 70%+ |
+| Server (Python) | pytest + Hypothesis | 1591 | 70%+ |
 | Contracts (Rust) | cargo test + proptest | 40 | property-based |
 | Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
 | Frontend build | Vite + tsc --noEmit | — | type-checked |
 
-**Current status: 450/450 Python + 40/40 Rust tests passing** (incl. Hypothesis/proptest
-property-based invariant tests added for fee/insurance/TTL/quorum/reputation logic). (One test,
-`test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake tied to
-in-memory identity-registry state sharing between test files — not a production code bug, tracked
-in [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md).) NVIDIA API-assisted security review
-reported no concrete HIGH blockers for the latest console/Neon/contract patch.
+**Current status: 1591/1591 Python + 40/40 Rust tests passing** (3 additional Python tests are
+`network`-marked live-Sepolia integration checks, deselected by default so CI doesn't spend real
+gas — see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md)).
+Includes Hypothesis/proptest property-based invariant tests for fee/insurance/TTL/quorum/reputation
+logic. (One test, `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake
+tied to in-memory identity-registry state sharing between test files — not a production code bug,
+tracked in [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md).) NVIDIA API-assisted security
+review reported no concrete HIGH blockers for the latest console/Neon/contract patch.
 
 ### Verified on-chain (this is not simulated — real testnet transactions)
 
@@ -795,6 +806,10 @@ called once from the FastAPI `lifespan` and never blocks the event path.
 | [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md) | Real testnet gas costs per escrow entry point |
 | [docs/AGENT_IDENTITY_REGISTRY.md](docs/AGENT_IDENTITY_REGISTRY.md) | On-chain DID/stake/reputation registry contract (ID-1), separate from the escrow contracts |
 | [docs/STATUS_AND_ROADMAP.md](docs/STATUS_AND_ROADMAP.md) | Architecture decisions, roadmap, and production status |
+| [docs/RANGE_PROOFS.md](docs/RANGE_PROOFS.md) | On-chain, arbiter-attested range-proof fraud registry — hides settlement amounts, proves them in-range, disputable |
+| [docs/ZK_AMOUNT_PRIVACY.md](docs/ZK_AMOUNT_PRIVACY.md) | Off-chain confidential-amount escrows (Pedersen + range proof) — transactional amount privacy, opt-in API layer |
+| [docs/CROSS_CHAIN_DEMO.md](docs/CROSS_CHAIN_DEMO.md) | Cross-chain escrow demo: Casper-side create, EVM-triggered release, mocked adapter |
+| [docs/tier3/](docs/tier3/) | Tier 3 / Tier Wow feature specs: threshold MPC, gaming-reward Merkle escrow, batch-cap guard, HTLC bridge (mock + real Sepolia deploy) |
 | [ROADMAP.md](ROADMAP.md) | Shipped vs. planned, phase by phase |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Dev setup, PR conventions |

@@ -1,6 +1,30 @@
-# Range Proofs on Amounts
+# Range Proofs on Amounts — Fraud-Dispute Registry
 
 **Status:** shipped in `contracts/range-proof-registry/` + `sdk/range_proof.py` on branch `feat/ae402-range-proofs`.
+
+## How this differs from Confidential-Amount Escrows (W.2)
+
+AE402 ships **two** amount-privacy primitives. They look similar (both use
+Pedersen commitments and a range proof) but solve different problems for
+different audiences, and both are real, independent, shipped features —
+not a duplicate:
+
+| | **This doc: Range-Proof Fraud Registry** | [ZK_AMOUNT_PRIVACY.md](ZK_AMOUNT_PRIVACY.md): Confidential-Amount Escrows |
+|---|---|---|
+| Question it answers | "Is the on-chain-anchored settlement amount inside a *pre-agreed legal range*, provably, so an arbiter can attest and a fraud claim can be adjudicated later?" | "Can two agents settle without *anyone* — including our own server — ever seeing the exact amount?" |
+| Where it lives | **On-chain**, Casper WASM contract (`contracts/range-proof-registry/`) | **Off-chain**, server API (`/zk/*`), not yet wired into settlement |
+| Verifier | A committee of **arbiters** (k-of-n, attested with Ed25519 signatures) — trust model is "not everyone colludes" | **Anyone**, non-interactively (Fiat-Shamir NIZK) — trust model is "just math" |
+| Group / curve | 2048-bit safe-prime multiplicative group (Casper WASM has no EC pairings) | secp256k1 (matches the existing Ed25519/ECDSA stack) |
+| Primary use case | Dispute evidence: prove a settled amount was in-range without revealing it, with an on-chain audit trail an insurance pool or arbiter-slash mechanism can act on | Transactional privacy: hide the amount from public observers/competitors on a per-escrow basis, with homomorphic aggregation for batch-cap checks |
+| Maturity here | On-chain, WASM-deployed, wired into the arbiter/insurance flow | API-level demo/audit surface; on-chain settlement wiring is a documented follow-up |
+
+**Why keep both:** a production agent-payments platform needs *both*
+"prove this was fair after the fact" (dispute resolution — this doc) and
+"don't leak this to anyone by default" (transactional privacy — the other
+doc). They are complementary layers of the same privacy story, not
+redundant systems, and each ships independently so either can evolve
+(e.g. Bulletproofs for the API layer, or Casper native pairings for the
+registry) without touching the other.
 
 ## Why this exists
 
