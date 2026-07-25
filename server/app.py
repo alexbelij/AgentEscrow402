@@ -406,6 +406,9 @@ app.include_router(cross_chain_router)
 from server.zk_amount_api import router as zk_amount_router  # noqa: E402
 app.include_router(zk_amount_router)
 
+from server.bridge_htlc_api import router as bridge_htlc_router  # noqa: E402
+app.include_router(bridge_htlc_router)  # T3.4-A — deterministic HTLC atomic-swap bridge (mock)
+
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
