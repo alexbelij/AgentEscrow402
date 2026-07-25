@@ -402,6 +402,10 @@ app.include_router(batch_guard_router)
 from server.cross_chain_api import router as cross_chain_router  # noqa: E402
 app.include_router(cross_chain_router)
 
+# W.2 (Tier Wow) — Zero-knowledge amount privacy (opt-in demo/audit surface).
+from server.zk_amount_api import router as zk_amount_router  # noqa: E402
+app.include_router(zk_amount_router)
+
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
