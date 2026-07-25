@@ -23,7 +23,8 @@ Or point at the live testnet deployment with `--api-url https://…`.
 | 03 | `03_batch_escrows.py` | Create N escrows, bulk release via `batch_release`. |
 | 04 | `04_streaming_escrow.py` | Time-vested claims: create a streaming escrow, poll `claim_stream` at intervals. |
 | 05 | `05_htlc_atomic_swap.py` | Hash Time-Locked Contract swap: sha256(preimage) commitment, receiver claims by revealing preimage. |
-| 06 | `escrow_agent.py` | Full autonomous buyer + seller agent lifecycle (existing full-scenario demo). |
+| 06 | `06_insurance_claim.py` | Insurance-pool fallback: dispute → arbitration abstain → cooldown → pool claim → tombstone replay-reject. |
+| — | `escrow_agent.py` | Full autonomous buyer + seller agent lifecycle (existing full-scenario demo). |
 
 `quickstart.py` is a symlink to `01_quickstart_happy_path.py` for
 backwards compatibility with the previous docs.
