@@ -68,6 +68,7 @@ from server.telegram_api import (
 from server.telegram_api import (
     shutdown_bridge as _telegram_shutdown,
 )
+from server.threshold_api import router as threshold_router
 from server.timelock_api import router as timelock_router
 from server.vc_api import router as vc_router
 from server.vrf_election import router as vrf_router
@@ -389,6 +390,7 @@ app.include_router(admin_router)
 app.include_router(timelock_router)
 app.include_router(telegram_router)
 app.include_router(mcp_playground_router)
+app.include_router(threshold_router)  # T3.1 — Threshold escrow MPC (Shamir SSS)
 
 
 # ---------------------------------------------------------------------------
