@@ -409,6 +409,11 @@ app.include_router(zk_amount_router)
 from server.bridge_htlc_api import router as bridge_htlc_router  # noqa: E402
 app.include_router(bridge_htlc_router)  # T3.4-A — deterministic HTLC atomic-swap bridge (mock)
 
+# T3.5 — Agent-vs-Agent simulation framework (testing tool).
+from server.agent_sim_api import router as agent_sim_router  # noqa: E402
+app.include_router(agent_sim_router)
+
+
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
