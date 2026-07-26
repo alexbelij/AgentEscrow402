@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 casper-contract = "5.1"
-casper-types = "6.0"
+casper-types = "7.0"
 
 [[bin]]
 name = "batch-funder"

@@ -20,7 +20,7 @@ ae402-governance-dao = { path = "../ae402-governance-dao" }
 # Casper testnet preprocessing rejects).
 casper-engine-test-support = "8.1.1"
 casper-execution-engine = "8.1.1"
-casper-types = "6.1"
+casper-types = "7.0"
 hex = "0.4"
 
 [[test]]
