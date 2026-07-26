@@ -177,7 +177,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/docs': {
     title: 'API / SDK / MCP Documentation',
-    desc: 'Complete reference for all 62 REST API endpoints, the Python SDK with code examples, LangChain integration, and the 26-tool MCP server for AI agent interoperability.',
+    desc: 'Complete reference for all 140 REST API endpoints, the Python SDK with code examples, LangChain integration, and the 26-tool MCP server for AI agent interoperability.',
     source: 'tool',
   },
   '/console/evidence': {

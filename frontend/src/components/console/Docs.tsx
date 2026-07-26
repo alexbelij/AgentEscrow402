@@ -294,7 +294,7 @@ export default function Docs() {
   };
 
   const tabs = [
-    { id: 'api' as const, label: 'REST API', icon: Server, count: '62 endpoints' },
+    { id: 'api' as const, label: 'REST API', icon: Server, count: '140 endpoints' },
     { id: 'sdk' as const, label: 'Python SDK', icon: Code2, count: 'client + LangChain' },
     { id: 'mcp' as const, label: 'MCP Server', icon: Terminal, count: '26 tools' },
   ];
