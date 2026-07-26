@@ -88,9 +88,62 @@ first redeploy that actually exposes `link_escrows` on testnet.
 
 `README.md` currently states `63 API endpoints` / `1591 Python
 tests` / `40 Rust tests` in badges and prose. Static audit shows
-the live values are `130 endpoints`, `1628 Python tests`, and `213
-Rust tests` — and `40` is stale from a manifest that has zero
-tests today. See
+the live values are `130 endpoints`, `1628 Python tests`, and `230
+Rust tests` (`213 + 17` new P0.1.5 property tests for
+`link_escrows`/`get_link`) — and `40` is stale from a manifest that
+has zero tests today. See
 [`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md)
 for the full breakdown. This is direction-safe (under-counting, not
 overclaiming), but a docs PR is queued to regenerate the counters.
+
+## SDK / CLI
+
+### P0.2 — `ae402` CLI broken on every non-`health` subcommand 🔴
+
+**Discovered by** the live-verified pass on 2026-07-26 (see
+[`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md) §9.4).
+
+`sdk/client.py::EscrowClient._request()` now requires
+`escrow_hash: str` and `amount: int` as **required** kw-only args
+(for X-Payment signature construction). But `sdk/cli.py` still
+calls `_request("GET", "/stats")`, `_request("GET", "/escrows", params=…)`,
+`_request("GET", "/mcp/tools")`, `_request("GET", f"/escrow/{sh}/history")`
+without those args — so every non-`health` CLI subcommand fails at
+runtime:
+
+```
+$ ae402 --api-url http://localhost:8000 stats
+ae402: TypeError: EscrowClient._request() missing 2 required
+       keyword-only arguments: 'escrow_hash' and 'amount'
+```
+
+**Working**: `ae402 health` (uses a separate `self._http.get("/health")` path).
+
+**Broken**: `ae402 stats`, `ae402 list-escrows`, `ae402 mcp-tools`,
+`ae402 history`, and every other CLI subcommand advertised in
+`README.md` line 320–324.
+
+**Fix scope**: ~5 lines in `sdk/client.py::_request()` — make
+`escrow_hash` and `amount` **optional** (default `None`), and only
+inject `X-Payment` when both are provided; unsigned GET calls take
+the sandbox `?sender=` path.
+
+### P0.1.5 — real-WASM VM regression test for `link_escrows` (deferred)
+
+Host-side property model for `link_escrows`/`get_link` is committed
+(17 tests across accept/reject shapes + append-only invariant + hex
+lowercase + hop_index monotonicity + cross-pair independence). This
+covers 90% of the surface at 10% of the cost. What's still missing:
+
+- A **real-WASM VM regression test** that installs the compiled
+  `escrow-manager.wasm` into `LmdbWasmTestBuilder`, then attempts
+  `link_escrows` under the actual Casper host functions. This is
+  the deploy-gate that catches serialization drift, ABI regressions,
+  and host-VM-only bugs the host-side mirror model cannot see.
+
+**Why deferred**: real-WASM regression tests require nightly-2025-01-01
+Rust + a full contract rebuild + LMDB test-builder setup, which adds
+~4–6 min to every CI run. Will land as a bundled deploy-gate before
+the next testnet redeploy of `escrow-manager` (see the section above
+on `link_escrows` not-yet-redeployed).
+

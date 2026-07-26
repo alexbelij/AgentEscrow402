@@ -1,10 +1,14 @@
 # Fresh-clone verify — Codespaces runbook
 
-**⚠️ NOT LIVE-VERIFIED — this file describes the sequence to execute in GitHub Codespaces (or any environment with Docker) to close the defence checklist. Static audit → [`README_STATIC_AUDIT.md`](README_STATIC_AUDIT.md).**
+**✅ LIVE-VERIFIED on 2026-07-26.** Both defence paths (Docker + Python) now have proof:
+- **Docker path** — continuously verified by the CI job [`docker-compose-smoke`](https://github.com/alexbelij/AgentEscrow402/actions/workflows/ci.yml) on every push. Last green: sha `a2387cd`, 2026-07-26T01:23:52Z, healthy after 3s.
+- **Python path** — executed manually in-pod on 2026-07-26T08:22Z: fresh clone → venv → `pip install` (10s) → uvicorn (1s) → all 4 README curls HTTP 200. See [`README_STATIC_AUDIT.md`](README_STATIC_AUDIT.md) §9 for full evidence.
+
+This runbook remains useful for reviewers who want to reproduce either path themselves.
 
 ## Why
 
-`README.md` has ~11 explicit "runnable / verifiable" claims. Static tree-walking (grep, curl, `python -c`) proves 9 of them. Two require a real Docker daemon: `docker compose up` and `make judge-demo`. Codespaces gives you both in a browser tab.
+`README.md` has ~11 explicit "runnable / verifiable" claims. Static tree-walking (grep, curl, `python -c`) proves 9 of them. Two require a real Docker daemon: `docker compose up` and `make judge-demo`. The Docker CI job proves the compose path continuously; this runbook lets you re-run either path by hand.
 
 ## Prereqs
 
@@ -49,7 +53,7 @@ Expected:
 - `/stats` → some pending/released counts (in-memory sandbox seed data)
 - `/escrows` → non-empty JSON list
 
-Log noise `Neon unavailable: No module named 'psycopg_pool'` is expected in sandbox and is **not** a failure — but if a judge sees it, note that a docs-fix PR is queued to gate it (see `README_STATIC_AUDIT.md` §5).
+*(Earlier note about `Neon unavailable: No module named 'psycopg_pool'` was retracted after the live pass — `psycopg-pool==3.3.1` **is** in `requirements.txt`, so on a properly installed venv the warning does not fire. See [`README_STATIC_AUDIT.md`](README_STATIC_AUDIT.md) §9.6-L3.)*
 
 ### Step 3 — Docker compose (fresh-clone claim)
 
