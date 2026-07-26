@@ -154,7 +154,7 @@ All 4 curl examples from `README.md` §Quickstart executed against the fresh uvi
 | 4 | `POST /release` | 200 | ✅ `{"status":"released", ...}` — status transition `pending → released` verified |
 | 5 | `GET /escrow/{svc}` after release | 200 | ✅ `status=released` — persisted state confirmed |
 
-**Minor doc-precision finding (nonblocking)**: README's example uses `"receiver":"agent-B"` (a friendly string) but the Pydantic validator requires `^(account-hash-)?[0-9a-fA-F]{64}$`. A verbatim copy-paste of the README curl gets HTTP 422 `String should match pattern`. **Fix candidate**: replace the placeholder with a real 64-hex example or add a `<64-hex receiver>` note above the block. Not a code bug — the pattern is intentionally strict.
+**Minor doc-precision finding (nonblocking)** — ✅ **FIXED** (this branch): README's example previously used `"receiver":"agent-B"` (a friendly string) but the Pydantic validator requires `^(account-hash-)?[0-9a-fA-F]{64}$`. A verbatim copy-paste of the README curl got HTTP 422 `String should match pattern`. **Resolution**: replaced with `<receiver-account-hash-64-hex>` placeholder — consistent with the `<64-hex>` `service_hash` placeholder already used two lines below. Not a code bug — the pattern is intentionally strict.
 
 ### 9.3 API smoke suite — `pytest tests/test_api.py` on fresh clone
 
@@ -214,7 +214,7 @@ This is precisely the check the original static-audit deferred to Codespaces —
 | # | Severity | Finding | Fix location | Blocks defence? |
 |---|---|---|---|---|
 | L1 | P0 | CLI regression: every non-`health` `ae402` subcommand fails with `TypeError: EscrowClient._request() missing 2 required keyword-only arguments` | ✅ FIXED — `_request()` args defaulted, `params=` forwarded, `mcp-call` typo fixed, 5 regression tests added | Was YES → resolved this commit |
-| L2 | P2 | README `POST /escrow` example uses placeholder `"receiver":"agent-B"` which fails the 64-hex Pydantic regex → HTTP 422 on verbatim copy-paste | `README.md` §Quickstart — swap in a real 64-hex example or add a `<placeholder>` note | No — cosmetic |
+| L2 | P2 | README `POST /escrow` example used placeholder `"receiver":"agent-B"` which failed the 64-hex Pydantic regex → HTTP 422 on verbatim copy-paste — ✅ **FIXED** in this branch (swapped for `<receiver-account-hash-64-hex>` placeholder) | `README.md` §Quickstart | — |
 | L3 | P3 | (retracted) The earlier `Neon unavailable: No module named 'psycopg_pool'` I noted in the initial static audit was from an environment where `pip install` had not yet completed. On the fresh clone after `pip install -r requirements.txt`, `psycopg_pool==3.3.1` **is** installed and the warning does not fire. Retained here as a false-positive for audit history. | — | No |
 
 **No overclaims.** Every substantive claim in README works end-to-end after fresh clone. The CLI regression (L1) is the only defence-blocking finding.

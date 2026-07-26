@@ -289,7 +289,7 @@ curl http://localhost:8000/health
 curl -X POST http://localhost:8000/escrow \
   -H "Content-Type: application/json" \
   -H "X-Payment: x402-v1;<service_hash>;5000000;<sender>;<timestamp>;<nonce>;<signature>" \
-  -d '{"receiver":"agent-B","amount":5000000,"service_hash":"<64-hex>","ttl":300}'
+  -d '{"receiver":"<receiver-account-hash-64-hex>","amount":5000000,"service_hash":"<64-hex>","ttl":300}'
 # {"service_hash":"<64-hex>","status":"pending",...}
 ```
 
