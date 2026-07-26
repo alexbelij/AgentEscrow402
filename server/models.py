@@ -110,6 +110,11 @@ class EscrowRecord(BaseModel):
     confidential: bool = False
     commitment: str | None = None
     range_proof_bits: int | None = None
+    # T2.12 / C11: block height at which the escrow was funded. Populated on
+    # create; consumed by flash_guard.check_block_delay. Zero when unknown
+    # (sandbox / test bootstrap). Kept optional/int-defaulted so every
+    # existing caller (SDK, console) that does not set it keeps working.
+    funded_block: int = 0
 
 
 class BatchEscrowItem(BaseModel):

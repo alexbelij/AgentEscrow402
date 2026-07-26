@@ -50,7 +50,10 @@
 ### Phase 2 — Advanced features
 
 - [ ] Threshold escrow via MPC (Shamir Secret Sharing, n-of-m release)
-- [ ] Flash loan protection (min_hold_period + block_delay checks)
+- [x] Flash loan protection (min_hold_period + block_delay checks) — both
+      halves wired into `/release`, `/refund`, `/dispute` (opt-in via
+      `FLASH_GUARD_ENABLED`; block-delay half skips when funded_block or
+      chain-tip is unknown so sandbox / offline runs are never punished)
 - [ ] Gaming-reward escrow type with Merkle proof of results
 - [ ] Agent-vs-Agent simulation testing framework
 - [ ] Fuzz testing for smart contracts (cargo fuzz)

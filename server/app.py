@@ -425,6 +425,69 @@ app.include_router(compliance_router)
 # ---------------------------------------------------------------------------
 
 
+def _current_block_height() -> int:
+    """Best-effort current block height for flash_guard block-delay checks.
+
+    Returns 0 when the height is not known (sandbox, CI, offline demo).
+    A 0 return signals check_block_delay to be skipped, so an unknown
+    chain-tip never turns into a false rejection. In non-sandbox setups
+    this reads the height cached by `event_monitor` (updated per poll).
+    """
+    try:
+        from server.event_monitor import get_last_block_height  # local import: avoid cycle
+
+        h = int(get_last_block_height() or 0)
+        return h if h >= 0 else 0
+    except Exception:
+        return 0
+
+
+def _enforce_flash_guard(escrow: EscrowRecord, *, action: str) -> None:
+    """Run the T2.12 / C11 flash-loan guard on an escrow lifecycle action.
+
+    Consults BOTH halves of the guard:
+
+      * hold-period      — always evaluated against `escrow.created_at`.
+      * block-delay      — evaluated only when both funded_block and the
+                            current chain-tip block height are known
+                            (> 0). Unknown height skips this half so
+                            sandbox / CI runs never fail spuriously.
+
+    Raises HTTP 422 with a stable, machine-parseable detail string on
+    rejection. The `action` label is included in the detail so client
+    telemetry can distinguish which lifecycle edge tripped the guard.
+    """
+    now_ts = int(time.time())
+    hold = flash_guard.check_hold_period(escrow.created_at, now_ts)
+
+    funded_block = getattr(escrow, "funded_block", 0) or 0
+    current_block = _current_block_height()
+    if funded_block > 0 and current_block > 0:
+        delay = flash_guard.check_block_delay(funded_block, current_block)
+    else:
+        # Unknown block context — treat block-delay half as satisfied.
+        delay = flash_guard.GuardCheck(passed=True, reason="ok")
+
+    if hold.blocked and delay.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"flash guard ({action}): {hold.reason}; {delay.reason} "
+                f"(need +{hold.remaining_seconds}s, +{delay.remaining_blocks} blocks)"
+            ),
+        )
+    if hold.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=f"flash guard ({action}): {hold.reason} (need +{hold.remaining_seconds}s)",
+        )
+    if delay.blocked:
+        raise HTTPException(
+            status_code=422,
+            detail=f"flash guard ({action}): {delay.reason} (need +{delay.remaining_blocks} blocks)",
+        )
+
+
 def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
     """Split amount into net + insurance fee.
 
@@ -1371,24 +1434,14 @@ async def release_escrow(
                 ),
             )
 
-    # T2.12: flash-loan protection. Rejects a release that lands inside the
-    # minimum hold window since the escrow was funded (existing.created_at),
-    # closing the fund-then-immediately-release attack window a flash-loan
-    # -funded caller would use. Off by default (FLASH_GUARD_ENABLED=false)
-    # so the sandbox/demo happy-path keeps working unmodified.
-    #
-    # Only the wall-clock hold-period half of flash_guard is wired here.
-    # The block-height-delay half (flash_guard.check_block_delay) needs a
-    # funded_block recorded on the escrow record and a live chain_get_block
-    # read — not tracked today, tracked as a follow-up alongside on-chain
-    # migration (same status as batch_guard's WASM port).
+    # T2.12 / C11: flash-loan protection on release. Both halves — wall-clock
+    # hold-period AND block-height delay — are consulted when the guard is
+    # on. The block-delay half is skipped when funded_block is 0 (unknown,
+    # e.g. sandbox tests without a live chain feed) so we do not punish
+    # callers who never had a block context. Off by default so the
+    # existing sandbox happy-path keeps working unmodified.
     if cfg.flash_guard_enabled:
-        guard_result = flash_guard.check_hold_period(existing.created_at, int(time.time()))
-        if guard_result.blocked:
-            raise HTTPException(
-                status_code=422,
-                detail=f"{guard_result.reason} (need +{guard_result.remaining_seconds}s)",
-            )
+        _enforce_flash_guard(existing, action="release")
 
     deploy_hash = ""
 
@@ -1448,6 +1501,23 @@ async def refund_escrow(
     store: SandboxStore = Depends(get_sandbox),
     casper: CasperClient | None = Depends(get_casper),
 ):
+    # C11: flash-loan protection on refund too. A flash-loan-funded
+    # attacker can equally exploit an instant fund-then-refund cycle
+    # (e.g. to grief a receiver by cancelling a just-funded escrow
+    # before any oracle can react). We evaluate the guard BEFORE the
+    # on-chain refund attempt so we do not burn gas on a call the
+    # server will reject anyway.
+    if cfg.flash_guard_enabled:
+        _pre_check = store.get_escrow(req.service_hash)
+        if _pre_check is not None:
+            # If the TTL has already elapsed we let the caller through:
+            # a legitimate refund of an expired escrow must never be
+            # blocked by the flash guard — that would trap funds.
+            _now = int(time.time())
+            _expired = _now > _pre_check.created_at + _pre_check.ttl
+            if not _expired:
+                _enforce_flash_guard(_pre_check, action="refund")
+
     deploy_hash = ""
 
     if not cfg.sandbox and casper is not None:
@@ -1507,6 +1577,13 @@ async def dispute_escrow(
     escrow = store.get_escrow(req.service_hash)
     if escrow is None:
         raise HTTPException(status_code=404, detail="Escrow not found")
+
+    # C11: flash-loan protection on dispute. This is the highest-value
+    # window to guard: opening a dispute freezes funds AND typically
+    # kicks off arbitration bond escrow — an attacker with flash-loan
+    # capital could otherwise open+withdraw+drain in a single block.
+    if cfg.flash_guard_enabled:
+        _enforce_flash_guard(escrow, action="dispute")
 
     deploy_hash = ""
 
