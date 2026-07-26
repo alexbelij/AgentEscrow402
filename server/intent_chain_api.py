@@ -63,12 +63,12 @@ class DeclareIntentRequest(BaseModel):
 
 
 class ChainEscrowRequest(BaseModel):
-    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     hop_index: int = Field(..., ge=0)
 
 
 class AttestHopRequest(BaseModel):
-    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    service_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
 
 
 class HopView(BaseModel):

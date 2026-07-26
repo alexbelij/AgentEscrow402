@@ -32,6 +32,9 @@ const ERROR_INVALID_AMOUNT: u16 = 10;
 const ERROR_INVALID_ACCOUNT_HASH: u16 = 11;
 const ERROR_INPUT_MISMATCH: u16 = 12;
 const ERROR_BATCH_LIMIT_EXCEEDED: u16 = 13;
+const ERROR_LINK_ALREADY_EXISTS: u16 = 14;
+const ERROR_LINK_INVALID_HASH: u16 = 15;
+const ERROR_LINK_NOT_FOUND: u16 = 16;
 
 // Storage keys
 const INSTALLER_KEY: &str = "installer";
@@ -40,6 +43,7 @@ const FEE_BPS_KEY: &str = "fee_bps";
 const CONTRACT_PURSE_KEY: &str = "contract_purse"; // Main purse for holding escrow funds
 const FEE_PURSE_KEY: &str = "fee_purse"; // Purse for collecting fees
 const ALL_ESCROW_KEYS: &str = "all_escrow_keys"; // List of all service_hashes for listing
+const LINKS_DICT: &str = "links_dict"; // Multi-hop A2A choreography chain-linkage (append-only)
 
 // Status constants
 const STATUS_PENDING: u64 = 0;
@@ -86,6 +90,40 @@ fn check_installer() {
 
 fn get_escrows_dict_uref() -> URef {
     get_dict_uref(ESCROWS_DICT)
+}
+
+fn get_links_dict_uref() -> URef {
+    get_dict_uref(LINKS_DICT)
+}
+
+/// Compose the storage key for a chain-link record.
+///
+/// Format: `"{parent_service_hash}|{child_service_hash}"`. Both halves are
+/// 64-hex service_hashes, so the `|` separator can never appear inside them —
+/// unambiguous, deterministic, byte-for-byte reproducible off-chain.
+fn link_dict_key(parent_service_hash: &str, child_service_hash: &str) -> String {
+    let mut key = String::with_capacity(parent_service_hash.len() + 1 + child_service_hash.len());
+    key.push_str(parent_service_hash);
+    key.push('|');
+    key.push_str(child_service_hash);
+    key
+}
+
+/// Validate that a hash string is exactly 64 lowercase hex chars.
+/// Used to lock down `link_escrows` inputs to canonical form — matches the
+/// backend's `pattern=r"^[0-9a-fA-F]{64}$"` (we normalize to lowercase on-chain
+/// to avoid case-collision keys).
+fn is_64_lower_hex(s: &str) -> bool {
+    if s.len() != 64 {
+        return false;
+    }
+    for c in s.chars() {
+        match c {
+            '0'..='9' | 'a'..='f' => {}
+            _ => return false,
+        }
+    }
+    true
 }
 
 fn get_contract_purse_uref() -> URef {
@@ -376,6 +414,105 @@ pub extern "C" fn list_escrows() {
     runtime::ret(CLValue::from_t(result_escrows).unwrap_or_revert());
 }
 
+/// Multi-hop A2A choreography: register that `child_service_hash` follows
+/// `parent_service_hash` at position `hop_index` in an intent chain whose
+/// full attestation root (folded off-chain by `audit_trace.compute_chain_root`)
+/// is `chain_root_hash`.
+///
+/// SEMANTICS:
+///   - Append-only. Once a `(parent, child)` link is written it is immutable.
+///     Re-linking the same pair reverts (`ERROR_LINK_ALREADY_EXISTS`).
+///   - Zero fund movement. This entry point never touches any purse, never
+///     mutates any escrow record, and cannot affect release/cancel/batch
+///     lifecycle in any way.
+///   - Trustless. Once written, the record is on-chain and any observer can
+///     recompute `chain_root_hash` off-chain from the ordered attestation
+///     event_ids and compare to the on-chain value. If the chain root written
+///     on-chain doesn't match the recomputed one, the intent has been tampered
+///     with — no need to trust the backend.
+///
+/// INPUT VALIDATION:
+///   - `parent_service_hash`, `child_service_hash`, `chain_root_hash`: each
+///     must be exactly 64 lowercase hex chars. Any other form reverts
+///     `ERROR_LINK_INVALID_HASH`.
+///   - `parent_service_hash != child_service_hash` (a hop cannot link to
+///     itself).
+///
+/// STORAGE:
+///   Dict key: `"{parent}|{child}"`
+///   Record: `(chain_root_hash: String, hop_index: u64, (linked_at_blocktime: u64,
+///            linker_account: String))` — 3-tuple with a 2-tuple tail; Casper
+///   CLTyped is only implemented for tuples of arity ≤3, so the timestamp +
+///   linker are packed into a trailing 2-tuple.
+#[no_mangle]
+pub extern "C" fn link_escrows() {
+    let parent_service_hash: String = runtime::get_named_arg("parent_service_hash");
+    let child_service_hash: String = runtime::get_named_arg("child_service_hash");
+    let chain_root_hash: String = runtime::get_named_arg("chain_root_hash");
+    let hop_index: u64 = runtime::get_named_arg("hop_index");
+
+    // Validate all three hashes are canonical 64-lower-hex.
+    if !is_64_lower_hex(&parent_service_hash)
+        || !is_64_lower_hex(&child_service_hash)
+        || !is_64_lower_hex(&chain_root_hash)
+    {
+        runtime::revert(ApiError::User(ERROR_LINK_INVALID_HASH));
+    }
+
+    // A hop cannot link to itself — that would break chain-root reconstruction.
+    if parent_service_hash == child_service_hash {
+        runtime::revert(ApiError::User(ERROR_LINK_INVALID_HASH));
+    }
+
+    let dict_uref = get_links_dict_uref();
+    let key = link_dict_key(&parent_service_hash, &child_service_hash);
+
+    // Append-only: duplicate (parent, child) linkage is a caller bug, not
+    // a valid state transition. Reject rather than silently overwrite —
+    // the whole point of "on-chain source of truth" is that a link, once
+    // written, cannot be rewritten.
+    let existing: Option<(String, u64, (u64, String))> =
+        storage::dictionary_get(dict_uref, &key).unwrap_or_revert();
+    if existing.is_some() {
+        runtime::revert(ApiError::User(ERROR_LINK_ALREADY_EXISTS));
+    }
+
+    let linked_at: u64 = runtime::get_blocktime().into();
+    let linker = runtime::get_caller().to_string();
+    let record: (String, u64, (u64, String)) =
+        (chain_root_hash, hop_index, (linked_at, linker));
+
+    storage::dictionary_put(dict_uref, &key, record);
+}
+
+/// Read the on-chain chain-linkage record for `(parent_service_hash,
+/// child_service_hash)`. Returns `(chain_root_hash, hop_index, linked_at,
+/// linker_account)`. Reverts `ERROR_LINK_NOT_FOUND` if the pair was never
+/// linked.
+///
+/// This is the trustless read path — a judge/auditor/verifier can query
+/// this directly against the deployed contract, compare `chain_root_hash`
+/// with the value recomputed off-chain from the ordered attestation
+/// event_ids, and independently confirm the choreography.
+#[no_mangle]
+pub extern "C" fn get_link() {
+    let parent_service_hash: String = runtime::get_named_arg("parent_service_hash");
+    let child_service_hash: String = runtime::get_named_arg("child_service_hash");
+
+    if !is_64_lower_hex(&parent_service_hash) || !is_64_lower_hex(&child_service_hash) {
+        runtime::revert(ApiError::User(ERROR_LINK_INVALID_HASH));
+    }
+
+    let dict_uref = get_links_dict_uref();
+    let key = link_dict_key(&parent_service_hash, &child_service_hash);
+
+    let record: (String, u64, (u64, String)) = storage::dictionary_get(dict_uref, &key)
+        .unwrap_or_revert()
+        .unwrap_or_revert_with(ApiError::User(ERROR_LINK_NOT_FOUND));
+
+    runtime::ret(CLValue::from_t(record).unwrap_or_revert());
+}
+
 #[no_mangle]
 pub extern "C" fn set_fee() {
     check_installer();
@@ -446,6 +583,32 @@ fn get_entry_points() -> EntryPoints {
         "set_fee",
         vec![Parameter::new("new_fee_bps", CLType::U64)],
         CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "link_escrows",
+        vec![
+            Parameter::new("parent_service_hash", CLType::String),
+            Parameter::new("child_service_hash", CLType::String),
+            Parameter::new("chain_root_hash", CLType::String),
+            Parameter::new("hop_index", CLType::U64),
+        ],
+        CLType::Unit,
+        EntryPointAccess::Public,
+        EntryPointType::Called,
+        EntryPointPayment::Caller,
+    ));
+
+    entry_points.add_entry_point(EntityEntryPoint::new(
+        "get_link",
+        vec![
+            Parameter::new("parent_service_hash", CLType::String),
+            Parameter::new("child_service_hash", CLType::String),
+        ],
+        CLType::Any,
         EntryPointAccess::Public,
         EntryPointType::Called,
         EntryPointPayment::Caller,
