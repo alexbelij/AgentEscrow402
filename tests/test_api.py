@@ -460,6 +460,58 @@ class TestReleaseEndpoint:
         )
         assert resp.status_code == 404
 
+    def test_release_blocked_by_flash_guard_when_enabled(self, sandbox_store):
+        # T2.12: with the guard on, a release attempted immediately after
+        # funding must be rejected — this is the exact fund-then-release
+        # window a flash-loan-funded attacker would exploit.
+        cfg = Config(sandbox=True, flash_guard_enabled=True)
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[get_sandbox] = lambda: sandbox_store
+        c = TestClient(app)
+        h = _hash("flash-guard-block")
+        c.post(
+            "/escrow",
+            json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+            params={"sender": "alice"},
+        )
+        resp = c.post("/release", json={"service_hash": h}, params={"sender": "alice"})
+        assert resp.status_code == 422
+        assert "flash guard" in resp.json()["detail"]
+        assert "hold period not met" in resp.json()["detail"]
+
+    def test_release_allowed_by_flash_guard_after_hold_period(self, sandbox_store):
+        # Same guard, but the escrow's created_at is back-dated past the
+        # hold window -- release must go through normally.
+        cfg = Config(sandbox=True, flash_guard_enabled=True)
+        app.dependency_overrides[get_config] = lambda: cfg
+        app.dependency_overrides[get_sandbox] = lambda: sandbox_store
+        c = TestClient(app)
+        h = _hash("flash-guard-pass")
+        c.post(
+            "/escrow",
+            json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+            params={"sender": "alice"},
+        )
+        rec = sandbox_store.get_escrow(h)
+        rec.created_at -= 301  # push funding time past MIN_HOLD_PERIOD_SECS
+        sandbox_store._escrows[h]["created_at"] = rec.created_at
+        resp = c.post("/release", json={"service_hash": h}, params={"sender": "alice"})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "released"
+
+    def test_release_flash_guard_disabled_by_default(self, client):
+        # Default Config() has flash_guard_enabled=False -- the existing
+        # instant create->release happy path (test_release above) must
+        # keep working unmodified for anyone not opting in.
+        h = _hash("flash-guard-default-off")
+        client.post(
+            "/escrow",
+            json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
+            params={"sender": "alice"},
+        )
+        resp = client.post("/release", json={"service_hash": h}, params={"sender": "alice"})
+        assert resp.status_code == 200
+
 
 class TestRefundEndpoint:
     def test_refund(self, client):

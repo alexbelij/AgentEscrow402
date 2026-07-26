@@ -70,6 +70,13 @@ class Config:
     # reveal; the contract's own on-chain value is authoritative. Keep in
     # sync if set_release_cap() is ever called to change the on-chain cap.
     release_cap_motes: int = 1_000_000_000_000
+    # T2.12 flash-loan protection (server/flash_guard.py). Off by default so
+    # the sandbox/demo path (instant create->release in one script run)
+    # keeps working out of the box; set FLASH_GUARD_ENABLED=true for any
+    # environment that faces real counterparties. See flash_guard.py for
+    # why this is enforced server-side today, with an on-chain port
+    # tracked as follow-up (same pattern as batch_guard.py / T3.3).
+    flash_guard_enabled: bool = False
     # Shared secret required (via X-Admin-Key header) to reach the
     # installer-only admin routes (configure_fee/set_release_cap/
     # set_arbiters/emergency_freeze). Empty by default => those routes are
@@ -211,6 +218,7 @@ class Config:
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
+            flash_guard_enabled=os.getenv("FLASH_GUARD_ENABLED", "false").lower() == "true",
             arbiter_pubkeys=tuple(p.strip() for p in os.getenv("ARBITER_PUBKEYS", "").split(",") if p.strip()),
             arbiter_threshold=int(os.getenv("ARBITER_THRESHOLD", "3")),
             release_cap_motes=int(os.getenv("RELEASE_CAP_MOTES", "1000000000000")),

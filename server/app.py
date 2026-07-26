@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from server import arbiter_crypto, batch_guard, confidential_escrow, strict
+from server import arbiter_crypto, batch_guard, confidential_escrow, flash_guard, strict
 from server import db as pgdb
 from server.admin_api import router as admin_router
 from server.agent_identity import router as identity_router
@@ -1369,6 +1369,25 @@ async def release_escrow(
                     f"only {valid_votes} valid arbiter cap-approval signature(s), "
                     f"need >= {cfg.arbiter_threshold}"
                 ),
+            )
+
+    # T2.12: flash-loan protection. Rejects a release that lands inside the
+    # minimum hold window since the escrow was funded (existing.created_at),
+    # closing the fund-then-immediately-release attack window a flash-loan
+    # -funded caller would use. Off by default (FLASH_GUARD_ENABLED=false)
+    # so the sandbox/demo happy-path keeps working unmodified.
+    #
+    # Only the wall-clock hold-period half of flash_guard is wired here.
+    # The block-height-delay half (flash_guard.check_block_delay) needs a
+    # funded_block recorded on the escrow record and a live chain_get_block
+    # read — not tracked today, tracked as a follow-up alongside on-chain
+    # migration (same status as batch_guard's WASM port).
+    if cfg.flash_guard_enabled:
+        guard_result = flash_guard.check_hold_period(existing.created_at, int(time.time()))
+        if guard_result.blocked:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{guard_result.reason} (need +{guard_result.remaining_seconds}s)",
             )
 
     deploy_hash = ""
