@@ -10,9 +10,11 @@ Usage:
     python3 scripts/demo_data/register_demo_agents.py
     python3 scripts/demo_data/register_demo_agents.py --base-url http://localhost:8000
 """
+
 from __future__ import annotations
 
 import argparse
+
 import httpx
 
 DEFAULT_BASE_URL = "https://agentescrow402-api-ywm8.onrender.com"
@@ -22,8 +24,18 @@ AGENTS = [
         "account_hash": "account-hash-9f1a3c2e0000000000000000000000000000000000000000000000000000",
         "display_name": "DataMiner-7 (research agent)",
         "capabilities": [
-            {"name": "data-extraction", "version": "2.1", "description": "Structured web data extraction", "verified": True},
-            {"name": "report-writing", "version": "1.0", "description": "Long-form research report generation", "verified": False},
+            {
+                "name": "data-extraction",
+                "version": "2.1",
+                "description": "Structured web data extraction",
+                "verified": True,
+            },
+            {
+                "name": "report-writing",
+                "version": "1.0",
+                "description": "Long-form research report generation",
+                "verified": False,
+            },
         ],
         "verify_level": "ENHANCED",
         "reputation": {"completed": 14, "disputed": 1},
@@ -32,7 +44,12 @@ AGENTS = [
         "account_hash": "account-hash-b7d2e40100000000000000000000000000000000000000000000000000",
         "display_name": "CodeReview-Prime",
         "capabilities": [
-            {"name": "code-review", "version": "3.0", "description": "Automated PR review + static analysis", "verified": True},
+            {
+                "name": "code-review",
+                "version": "3.0",
+                "description": "Automated PR review + static analysis",
+                "verified": True,
+            },
         ],
         "verify_level": "FULL",
         "reputation": {"completed": 28, "disputed": 0},
@@ -41,8 +58,18 @@ AGENTS = [
         "account_hash": "account-hash-4e6f9a2200000000000000000000000000000000000000000000000000",
         "display_name": "TranslateBot-EU",
         "capabilities": [
-            {"name": "translation", "version": "1.4", "description": "Multi-language document translation", "verified": True},
-            {"name": "localization-qa", "version": "1.0", "description": "Localization quality assurance", "verified": False},
+            {
+                "name": "translation",
+                "version": "1.4",
+                "description": "Multi-language document translation",
+                "verified": True,
+            },
+            {
+                "name": "localization-qa",
+                "version": "1.0",
+                "description": "Localization quality assurance",
+                "verified": False,
+            },
         ],
         "verify_level": "BASIC",
         "reputation": {"completed": 6, "disputed": 2},
@@ -51,7 +78,12 @@ AGENTS = [
         "account_hash": "account-hash-1c8b5d3300000000000000000000000000000000000000000000000000",
         "display_name": "ImageGen-Atelier",
         "capabilities": [
-            {"name": "image-generation", "version": "2.0", "description": "Diffusion-based image generation", "verified": True},
+            {
+                "name": "image-generation",
+                "version": "2.0",
+                "description": "Diffusion-based image generation",
+                "verified": True,
+            },
         ],
         "verify_level": "ENHANCED",
         "reputation": {"completed": 9, "disputed": 0},
@@ -60,8 +92,18 @@ AGENTS = [
         "account_hash": "account-hash-af03e75400000000000000000000000000000000000000000000000000",
         "display_name": "AuditChain-Sentinel",
         "capabilities": [
-            {"name": "smart-contract-audit", "version": "1.2", "description": "Automated smart contract vulnerability scanning", "verified": True},
-            {"name": "compliance-check", "version": "1.0", "description": "Jurisdiction/KYC compliance screening", "verified": True},
+            {
+                "name": "smart-contract-audit",
+                "version": "1.2",
+                "description": "Automated smart contract vulnerability scanning",
+                "verified": True,
+            },
+            {
+                "name": "compliance-check",
+                "version": "1.0",
+                "description": "Jurisdiction/KYC compliance screening",
+                "verified": True,
+            },
         ],
         "verify_level": "FULL",
         "reputation": {"completed": 22, "disputed": 1},

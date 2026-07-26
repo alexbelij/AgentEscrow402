@@ -99,7 +99,7 @@ def _swap(
 
 
 def _run(relayer: BridgeRelayer) -> None:
-    asyncio.get_event_loop_policy()  # noqa: touch to ensure loop is available
+    asyncio.get_event_loop_policy()  # touch to ensure loop is available
     loop = asyncio.new_event_loop()
     try:
         loop.run_until_complete(relayer.tick())
