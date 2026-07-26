@@ -74,3 +74,7 @@ path = "src/governance_dao_property_tests.rs"
 [[test]]
 name = "insurance_replay_onchain_vm_tests"
 path = "src/insurance_replay_onchain_vm_tests.rs"
+
+[[test]]
+name = "link_escrows_property_tests"
+path = "src/link_escrows_property_tests.rs"

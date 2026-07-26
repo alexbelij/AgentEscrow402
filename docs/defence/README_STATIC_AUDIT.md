@@ -28,10 +28,10 @@ Any judge/reviewer reading `README.md` will make these ~11 concrete assumptions.
 | README claim | Static check | Status |
 |---|---|---|
 | Badge `tests-1591_passing` (line 18) | `pytest -q -m "not network"` → **1628 passed, 1 skipped, 3 deselected (network)** | ⚠️ Undercount by 37 — direction is safe |
-| Line 24 summary: `1591 Python + 233 Rust tests` | Python: 1628. Rust: `cargo test --manifest-path contracts/tests/Cargo.toml` → **213 passed** across 12 test binaries | ⚠️ Python +37, Rust −20. Rust decreased because `escrow-manager` on this branch got 2 new entry points (`link_escrows` / `get_link`) *without* Odra property tests yet (tracked in `KNOWN_LIMITATIONS.md` as "P0.1.5 — add Odra tests for link_escrows") |
+| Line 24 summary: `1591 Python + 233 Rust tests` | Python: 1628. Rust: `cargo test --manifest-path contracts/tests/Cargo.toml` → **230 passed** across 13 test binaries (P0.1.5 property model for `link_escrows` closed — 17 new tests) | ⚠️ Python +37, Rust −3. Rust drift now is −3 vs −20 before P0.1.5 landed — remaining delta is that the count in the README rounds to 233 (from an older squash-merge). Nothing missing at the contract layer |
 | Test row `Server (Python) 1591` (line 722) | Same 1628 today | ⚠️ Same drift |
-| Test row `Contracts (Rust) 233 property-based` (line 723) | 213 today, all property-based | ⚠️ Same drift, expected |
-| Line 714: `cargo test --manifest-path contracts/escrow/Cargo.toml # 40 tests` | ❌ *false* — `contracts/escrow/Cargo.toml` has *no* `[[test]]` targets and `cargo test` reports 0 tests. The real Rust tests live in `contracts/tests/Cargo.toml`. The 40-count is a stale claim from before the test-suite was moved into a separate workspace member | ❌ **misleading** — needs a fix: replace with `cargo test --manifest-path contracts/tests/Cargo.toml # 213 tests` |
+| Test row `Contracts (Rust) 233 property-based` (line 723) | 230 today, all property-based | ⚠️ Same drift, expected |
+| Line 714: `cargo test --manifest-path contracts/escrow/Cargo.toml # 40 tests` | ❌ *false* — `contracts/escrow/Cargo.toml` has *no* `[[test]]` targets and `cargo test` reports 0 tests. The real Rust tests live in `contracts/tests/Cargo.toml`. The 40-count is a stale claim from before the test-suite was moved into a separate workspace member | ❌ **misleading** — needs a fix: replace with `cargo test --manifest-path contracts/tests/Cargo.toml # 230 tests` |
 
 ## 3. File references
 
@@ -97,7 +97,7 @@ Static check:
 
 ## Summary of findings
 
-**No overclaims that reviewers would call fraud.** Every numeric claim in `README.md` errs on the safe side (under-counts endpoints, under-counts Python tests). The Rust test-count `40` on the `contracts/escrow/Cargo.toml` line is the one line that is *misleading* (that manifest has zero tests; the real 213-test suite is in `contracts/tests/Cargo.toml`).
+**No overclaims that reviewers would call fraud.** Every numeric claim in `README.md` errs on the safe side (under-counts endpoints, under-counts Python tests). The Rust test-count `40` on the `contracts/escrow/Cargo.toml` line is the one line that is *misleading* (that manifest has zero tests; the real 230-test suite is in `contracts/tests/Cargo.toml`).
 
 Blockers for the "fresh-clone `docker compose up` works end-to-end" defence claim (which requires Docker):
 

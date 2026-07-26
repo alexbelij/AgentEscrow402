@@ -69,10 +69,20 @@ against the deployed manager contract hash
 will revert on `link_escrows` (unknown entry point).
 
 Odra property/FSM tests for `link_escrows` — tracked as **P0.1.5**
-— are also pending. The `escrow-manager` module currently has no
-`contracts/tests/src/*_test.rs` coverage (this was already the case
-before this branch); adding them alongside the redeploy is the
-right bundling.
+— are now covered by
+`contracts/tests/src/link_escrows_property_tests.rs` (17 tests: 12
+proptest properties + 5 concrete regressions, all green). This is
+the *host-side* property model in the same style as
+`fsm_property_tests.rs` / `two_key_account_property_tests.rs` — it
+mirrors `link_escrows`'s input validator and append-only guard
+line-for-line against the contract source (with anchor comments
+pointing at `main.rs` line ranges).
+
+The *real-WASM VM* regression test for `link_escrows` (compile
+`escrow-manager.wasm`, drive through `LmdbWasmTestBuilder`, like
+`insurance_replay_onchain_vm_tests.rs`) is still pending — tracked
+as **P0.1.6** — and belongs bundled with the deploy-gate before the
+first redeploy that actually exposes `link_escrows` on testnet.
 
 ### README stale counters (docs bug, not code bug)
 
