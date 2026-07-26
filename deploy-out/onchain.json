@@ -13,11 +13,15 @@
     },
     "batch_escrow_manager": {
       "name": "Escrow Manager",
-      "contract_hash": "hash-bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
-      "contract_package_hash": "hash-cdc9924e260bd3a62789a610aae0c351760393b335ebb15a85d89e1df6a3f323",
-      "deploy_hash": "704768b711e6831bcd769280678d45326e2835063ccb08fa033b5228fa38db30",
-      "version": 1,
-      "explorer": "https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d"
+      "contract_hash": "hash-c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
+      "contract_package_hash": "hash-1b93d536947da31ed80d6b57a5db74c718b6cf08f33e5b0bdd893d27f481dd0c",
+      "deploy_hash": "1b600ef544752ba07e66de2be724ab660bcfb18fde83e440a6697a501ced3bce",
+      "version": 11,
+      "explorer": "https://testnet.cspr.live/contract/c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
+      "v11_note": "2026-07-26 v11 redeploy: adds link_escrows(parent_service_hash, child_service_hash, chain_root_hash, hop_index) and get_link(parent_service_hash, child_service_hash) entrypoints for on-chain multi-hop A2A intent linking (P0.1). Superset of v1 batch ops (batch_cancel, batch_release, create_batch, list_escrows, set_fee). Previous v1 (bfa8c02c...) still live but frozen; new integrations point at v11.",
+      "previous_v1_contract_hash": "hash-bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
+      "previous_v1_package_hash": "hash-cdc9924e260bd3a62789a610aae0c351760393b335ebb15a85d89e1df6a3f323",
+      "previous_v1_deploy_hash": "704768b711e6831bcd769280678d45326e2835063ccb08fa033b5228fa38db30"
     },
     "insurance_pool": {
       "name": "Insurance Pool",

@@ -32,11 +32,11 @@ export const CONTRACTS: Record<string, ManifestContract> = {
   batchEscrowManager: {
     key: "batch_escrow_manager",
     name: "Escrow Manager",
-    contractHash: "bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
-    contractPackageHash: "cdc9924e260bd3a62789a610aae0c351760393b335ebb15a85d89e1df6a3f323",
-    deployHash: "704768b711e6831bcd769280678d45326e2835063ccb08fa033b5228fa38db30",
-    version: 1,
-    explorer: "https://testnet.cspr.live/contract/bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
+    contractHash: "c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
+    contractPackageHash: "1b93d536947da31ed80d6b57a5db74c718b6cf08f33e5b0bdd893d27f481dd0c",
+    deployHash: "1b600ef544752ba07e66de2be724ab660bcfb18fde83e440a6697a501ced3bce",
+    version: 11,
+    explorer: "https://testnet.cspr.live/contract/c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
   },
   insurancePool: {
     key: "insurance_pool",

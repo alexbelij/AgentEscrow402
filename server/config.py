@@ -148,7 +148,16 @@ class Config:
             # (previously hardcoded in frontend/src/components/console/Contracts.tsx).
             manager_contract_hash=os.getenv(
                 "MANAGER_CONTRACT_HASH",
-                "bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d",
+                # 2026-07-26 redeploy (v11): adds link_escrows / get_link
+                # entry points for on-chain multi-hop A2A intent linking.
+                # Deployer: alexbelij (account-hash 74c96cd0...07a8), Casper
+                # testnet block 8633133, deploy hash
+                # 1b600ef544752ba07e66de2be724ab660bcfb18fde83e440a6697a501ced3bce.
+                # New package hash:
+                # 1b93d536947da31ed80d6b57a5db74c718b6cf08f33e5b0bdd893d27f481dd0c.
+                # Previous v1 (bfa8c02c...) still lives on-chain but is
+                # frozen — new integrations should point at v11.
+                "c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
             ),
             insurance_contract_hash=os.getenv(
                 "INSURANCE_CONTRACT_HASH",
