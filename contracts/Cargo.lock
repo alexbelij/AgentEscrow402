@@ -331,6 +331,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "casper-htlc"
+version = "0.1.0"
+dependencies = [
+ "casper-contract",
+ "casper-types 6.1.0",
+ "sha2 0.11.0",
+]
+
+[[package]]
 name = "casper-storage"
 version = "2.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
