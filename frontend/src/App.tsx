@@ -34,6 +34,7 @@ import UseCases from './components/console/UseCases'
 import Evidence from './components/console/Evidence'
 import FeatureMap from './components/console/FeatureMap'
 import MCPPlayground from './components/console/MCPPlayground'
+import Operator from './components/console/Operator'
 
 function Landing() {
   useEffect(() => {
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="evidence" element={<Evidence />} />
             <Route path="feature-map" element={<FeatureMap />} />
             <Route path="mcp-playground" element={<MCPPlayground />} />
+            <Route path="operator" element={<Operator />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
