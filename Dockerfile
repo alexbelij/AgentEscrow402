@@ -4,17 +4,20 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    apt-get clean && rm -rf /var/lib/apt/lists/* && \
+    npm install -g npm@12
 
 WORKDIR /app
 
-# Python deps
+# Python deps (upgrade pip first to silence 24.0→26.x notice + get latest resolver)
+RUN pip install --no-cache-dir --upgrade pip
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Node.js deps for Casper tx scripts
+# --no-fund/--no-audit silence promotional noise; --omit=dev keeps image small
 COPY server/casper_tx/package.json server/casper_tx/
-RUN cd server/casper_tx && npm install --omit=dev
+RUN cd server/casper_tx && npm install --omit=dev --no-fund --no-audit
 
 # App source
 COPY server/ server/
