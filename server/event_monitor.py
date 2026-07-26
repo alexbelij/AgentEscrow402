@@ -10,6 +10,24 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+# C11: last-known chain-tip block height, published by whatever EventMonitor
+# instance is running. Read by flash_guard integration in server/app.py via
+# get_last_block_height(); 0 means "unknown", in which case the block-delay
+# half of flash_guard is skipped. Written from a single background task,
+# read by request handlers — int assignment is atomic in CPython so we do
+# not need an explicit lock.
+_LAST_KNOWN_BLOCK_HEIGHT: int = 0
+
+
+def get_last_block_height() -> int:
+    """Return the last block height observed by any EventMonitor.
+
+    Returns 0 when the monitor has not observed any block yet (fresh
+    process, sandbox mode, or offline test suite). Callers must treat 0
+    as "unknown" and skip block-based checks accordingly.
+    """
+    return _LAST_KNOWN_BLOCK_HEIGHT
+
 
 class EventMonitor:
     """Monitors Casper contract events via SSE with polling fallback."""
@@ -77,6 +95,11 @@ class EventMonitor:
         header = block.get("header", {})
         height = header.get("height", 0)
 
+        # C11: publish the observed tip so flash_guard's block-delay half
+        # can consult it from request handlers without a monitor reference.
+        global _LAST_KNOWN_BLOCK_HEIGHT
+        if height > _LAST_KNOWN_BLOCK_HEIGHT:
+            _LAST_KNOWN_BLOCK_HEIGHT = height
         if height <= self._last_block_height:
             return
 

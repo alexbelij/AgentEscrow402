@@ -18,7 +18,15 @@ class SandboxStore:
         self._reputation: dict[str, dict[str, int]] = {}
         self._lock = asyncio.Lock()
 
-    def create_escrow(self, sender: str, receiver: str, amount: int, service_hash: str, ttl: int) -> EscrowRecord:
+    def create_escrow(
+        self,
+        sender: str,
+        receiver: str,
+        amount: int,
+        service_hash: str,
+        ttl: int,
+        funded_block: int = 0,
+    ) -> EscrowRecord:
         if service_hash in self._escrows:
             raise ValueError(f"Escrow {service_hash} already exists")
         now = int(time.time())
@@ -30,6 +38,11 @@ class SandboxStore:
             "status": "pending",
             "created_at": now,
             "ttl": ttl,
+            # C11: block-height at funding time. 0 = unknown (sandbox
+            # without a live block feed). Consumers must treat 0 as
+            # "skip block-delay half of flash_guard" to avoid punishing
+            # tests / demo runs that never had a block context.
+            "funded_block": funded_block,
         }
         self._escrows[service_hash] = record
         return EscrowRecord(**record)
