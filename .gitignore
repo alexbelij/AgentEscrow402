@@ -43,3 +43,7 @@ graphify-out/
 
 # judge demo runtime artifact (see server/judge_scenario_demo.py)
 judge_demo_output.json
+# C12/C16: cargo-fuzz output — never commit corpus or artifacts.
+contracts/fuzz/target/
+contracts/fuzz/corpus/
+contracts/fuzz/artifacts/
