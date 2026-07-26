@@ -14,14 +14,14 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg?style=flat-square)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
-[![Contracts](https://img.shields.io/badge/contracts-8_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
-[![Tests](https://img.shields.io/badge/tests-1591_passing-22c55e.svg?style=flat-square)](#-testing)
+[![Contracts](https://img.shields.io/badge/contracts-9_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
+[![Tests](https://img.shields.io/badge/tests-2081_passing-22c55e.svg?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-live-0ea5e9.svg?style=flat-square)](docs/API_SDK_MCP.md)
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
-> 🟢 **TESTNET LIVE:** 349 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 8 contracts, cross-contract calls
-> 📊 63 API endpoints · 26 MCP tools · 1591 Python + 233 Rust tests (property-based)
+> 🟢 **TESTNET LIVE:** 369 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 9 contracts live on `casper-test` (13 total in `main`, 4 code-complete pending deploy — see [TX_MANIFEST.md](TX_MANIFEST.md)), cross-contract calls
+> 📊 140 API endpoints · 26 MCP tools · 2081 Python + 250 Rust tests (property-based)
 > 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
 > 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
 
@@ -537,7 +537,7 @@ Base URL (production): `https://agentescrow402-api-ywm8.onrender.com`
 Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml) (hand-curated snapshot) or `GET /openapi.json` on any running instance (always exact — generated live from the FastAPI app, e.g. `curl https://agentescrow402-api-ywm8.onrender.com/openapi.json | jq '.paths | keys | length'`).
 
 <details>
-<summary><kbd>All 66 endpoints — click to expand</kbd></summary>
+<summary><kbd>Key endpoints — click to expand (140 total ops across all routers; see <code>GET /openapi.json</code> for the full live list)</kbd></summary>
 
 | Method | Path | Description |
 |---|---|---|
@@ -703,7 +703,7 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 
 | Casper primitive / integration | Used | Where |
 |---|:---:|---|
-| Casper Network (testnet deploys) | ✅ | 8 contracts live on `casper-test` |
+| Casper Network (testnet deploys) | ✅ | 9 contracts live on `casper-test` (13 total in `main`, 4 code-complete pending deploy) |
 | Casper Smart Contracts (Rust → WASM) | ✅ | [`contracts/escrow`](contracts/escrow) — CEP-88 escrow, HTLC, arbitration |
 | Native CSPR transfers | ✅ | Escrow lifecycle (create, release, refund) |
 | CEP-18 fungible tokens | ✅ | Multi-asset escrow support |
@@ -724,8 +724,8 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-uv run --active python -m pytest -q          # 1591 tests (server logic, x402, identity, risk, multi-asset, ZK privacy, MPC, cross-chain, EVM bridge)
-cargo test --manifest-path contracts/escrow/Cargo.toml   # 40 tests (escrow, HTLC, arbitration)
+uv run --active python -m pytest -q          # 2081 tests (server logic, x402, identity, risk, multi-asset, ZK privacy, MPC, cross-chain, EVM bridge)
+cargo test -p tests -p multi-asset-escrow --lib -p insurance-pool --lib   # 250 tests (property-based, matches CI exactly)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
 
@@ -733,14 +733,15 @@ ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # l
 
 | Suite | Framework | Count | Coverage |
 |---|---|---|---|
-| Server (Python) | pytest + Hypothesis | 1591 | 70%+ |
-| Contracts (Rust) | cargo test + proptest | 233 | property-based |
+| Server (Python) | pytest + Hypothesis | 2081 | 70%+ |
+| Contracts (Rust) | cargo test + proptest | 250 | property-based |
 | Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
 | Frontend build | Vite + tsc --noEmit | — | type-checked |
 
-**Current status: 1591/1591 Python + 233/233 Rust tests passing** (3 additional Python tests are
-`network`-marked live-Sepolia integration checks, deselected by default so CI doesn't spend real
-gas — see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md)).
+**Current status: 2081/2081 Python (2 skipped) + 250/250 Rust tests passing** (3 additional Rust
+tests are on-chain-VM-only checks marked `#[ignore]` by default, and a further handful of Python
+tests are `network`-marked live-Sepolia integration checks, deselected by default so CI doesn't
+spend real gas — see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md)).
 Includes Hypothesis/proptest property-based invariant tests for fee/insurance/TTL/quorum/reputation
 logic. (One test, `test_delegate_expired_timestamp_rejected`, has an occasional cross-module flake
 tied to in-memory identity-registry state sharing between test files — not a production code bug,
@@ -762,15 +763,18 @@ review reported no concrete HIGH blockers for the latest console/Neon/contract p
 All hashes are independently verifiable on [testnet.cspr.live](https://testnet.cspr.live) or via
 `https://api.testnet.cspr.cloud/deploys/{hash}`.
 
-**Bulk on-chain volume:** beyond the curated flows above, **349/349** additional deploys were
+**Bulk on-chain volume:** beyond the curated flows above, **359/359** additional deploys were
 submitted and confirmed on testnet with **zero failures** (same escrow contract as above) —
-not just `create_escrow` spam, but the full escrow lifecycle: 173 `create_escrow`, 166
+not just `create_escrow` spam, but the full escrow lifecycle: 178 `create_escrow`, 171
 `release`, 4 sender-initiated `refund`, and 3 full `dispute` → 3-of-5 arbiter-multisig
 `resolve` cycles (signed live with the same `demo/test-arbiter-keys/` used by
 [`examples/escrow_agent.py`](examples/escrow_agent.py), confirming the arbiter set survived
-the v8→v9 in-place contract upgrade). 20 of the 349 (10 `create`/`release` pairs) use the
+the v8→v9 in-place contract upgrade). 30 of the 359 (15 `create`/`release` pairs) use the
 10 pre-generated `agent_01`..`agent_10` accounts as the counterparty receiver, so the log
 also demonstrates multi-agent-wallet participation, not just a single sender/receiver pair.
+(Plus a separate 10-deploy identity-registry bulk log — see
+[docs/evidence/agent_identity_registry_tx_log.jsonl](docs/evidence/agent_identity_registry_tx_log.jsonl)
+— for a combined **369** total bulk-evidence deploys.)
 Full deploy-hash-by-deploy-hash log:
 [docs/evidence/bulk_escrow_tx_log.jsonl](docs/evidence/bulk_escrow_tx_log.jsonl).
 

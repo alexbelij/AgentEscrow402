@@ -84,17 +84,32 @@ The *real-WASM VM* regression test for `link_escrows` (compile
 as **P0.1.6** — and belongs bundled with the deploy-gate before the
 first redeploy that actually exposes `link_escrows` on testnet.
 
-### README stale counters (docs bug, not code bug)
+### README stale counters — RESOLVED 2026-07-26
 
-`README.md` currently states `63 API endpoints` / `1591 Python
-tests` / `40 Rust tests` in badges and prose. Static audit shows
-the live values are `130 endpoints`, `1628 Python tests`, and `230
-Rust tests` (`213 + 17` new P0.1.5 property tests for
-`link_escrows`/`get_link`) — and `40` is stale from a manifest that
-has zero tests today. See
-[`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md)
-for the full breakdown. This is direction-safe (under-counting, not
-overclaiming), but a docs PR is queued to regenerate the counters.
+`README.md` previously stated `63 API endpoints` / `1591 Python
+tests` / `233 Rust tests` in badges and prose, undercounting/overcounting
+against the actual `main` HEAD at the time. Re-verified against
+`main`@`768cfe7` (2026-07-26) and corrected in `README.md`,
+`TX_MANIFEST.md`, and `docs/STATUS_AND_ROADMAP.md`:
+
+- **140 API endpoints** — counted from the live production
+  `GET /openapi.json` (`agentescrow402-api-ywm8.onrender.com`), matches
+  local route-decorator grep of `server/*.py`.
+- **2081 Python tests passing, 2 skipped** — `uv run python -m pytest -q`.
+- **250 Rust tests passing, 3 ignored** — sum of the exact 3 CI-scoped
+  commands (`cargo test -p tests`, `-p multi-asset-escrow --lib`,
+  `-p insurance-pool --lib`); no other contract package has a `lib`
+  test target, so this is the complete count. Whole-workspace
+  `cargo test --release` still cannot run directly (pre-existing
+  `casper-contract`/`std` feature-unification conflict, unrelated to
+  the fix here) — CI and this count both work around it per-package.
+- **9 contracts live on `casper-test`, 13 total in `main`** (4 more —
+  Challenge Arbiter, Range Proof Registry, Governance DAO, Two-Key
+  Account — are code-complete and tested but not yet redeployed;
+  tracked in `TX_MANIFEST.md` section 2).
+
+See [`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md)
+for the prior audit that first flagged this drift.
 
 ## SDK / CLI
 

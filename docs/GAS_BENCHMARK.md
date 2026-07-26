@@ -8,7 +8,7 @@ or local-node estimates.
 
 ## Methodology
 
-- Sampled a subset of confirmed deploy hashes per entry point from the 349-entry bulk-tx log
+- Sampled a subset of confirmed deploy hashes per entry point from the 359-entry bulk-tx log
   (`create`: 12 of 173, `release`: 12 of 166, `refund`: all 4, `dispute`: all 3, `resolve`:
   all 3 — the last three groups only have that many real on-chain occurrences so far).
 - Pulled each deploy's execution result from `GET /deploys/{hash}` on the CSPR.cloud testnet

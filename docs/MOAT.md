@@ -52,7 +52,7 @@
 
 ## 5. Investor summary
 
-- **Moat class:** *stack composition*, not a single point of magic. Each of the three primitives above is defensible; combined into an escrow product with 349+ real testnet deploys, 26 MCP tools, W3C VC 2.0 receipts, and 3 audited contract versions, the reproduction cost approaches "rebuild a chain-native protocol from scratch". Estimate: 6–9 months of a 2–3 person contract-and-crypto team to replicate on a comparable L1, longer if the target chain lacks first-class VRF (which is most non-Casper L1s in 2026).
+- **Moat class:** *stack composition*, not a single point of magic. Each of the three primitives above is defensible; combined into an escrow product with 369+ real testnet deploys, 26 MCP tools, W3C VC 2.0 receipts, and 3 audited contract versions, the reproduction cost approaches "rebuild a chain-native protocol from scratch". Estimate: 6–9 months of a 2–3 person contract-and-crypto team to replicate on a comparable L1, longer if the target chain lacks first-class VRF (which is most non-Casper L1s in 2026).
 - **Switching cost for users:** an agent that integrates AE402 signs escrow lifecycle events with a keypair whose reputation accrues in `agent-identity-registry`. Moving to a competing escrow layer means losing accumulated on-chain reputation — the same lock-in dynamic that made Uber-driver ratings sticky.
 - **Regulatory posture:** amount-hiding is a *build-toward*, not a *ship-with*. That's deliberate — jurisdictions increasingly require selective disclosure, and range-proof-with-attester-quorum lands us in the compliance-friendly middle ground rather than the fully-private extreme.
 

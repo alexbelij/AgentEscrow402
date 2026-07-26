@@ -44,11 +44,18 @@ New contracts landed on-branch, awaiting merge into `main` and (re)deploy to tes
 | 10 | **Challenge Arbiter (commit-reveal + bond/slash)** | `feat/ae402-challenge-arbiter` | [#55](https://github.com/alexbelij/AgentEscrow402/pull/55) | ~160 KB | code merged locally, testnet deploy `TBA` |
 | 11 | **Range Proof Registry (mod-exp on 3072-bit prime, threshold-attested)** | `feat/ae402-range-proofs` | [#62](https://github.com/alexbelij/AgentEscrow402/pull/62) | ~180 KB | code + tests green, testnet deploy `TBA` |
 | 12 | **Governance DAO (ported RWA-S primitives + AE402 action layer)** | `feat/ae402-governance-dao` | [#63](https://github.com/alexbelij/AgentEscrow402/pull/63) | 159 KB | code + tests green, testnet deploy `TBA` |
+| 13 | **Two-Key Account (cold/hot key AA-style account)** | merged to `main` 2026-07-24 | — | — | code + tests green, testnet deploy `TBA` — see [docs/TWO_KEY_ACCOUNT.md](docs/TWO_KEY_ACCOUNT.md) |
 
 **Test coverage for post-hackathon block:**
-- Challenge Arbiter: 45 Rust property tests + 31 Python parity tests
-- Range Proof Registry: 34 Rust property tests + 42 Python parity tests
+- Challenge Arbiter: 26 Rust property tests + 31 Python parity tests
+- Range Proof Registry: 32 Rust property tests + 42 Python parity tests
 - Governance DAO: 49 Rust property tests + 58 Python (51 parity + 7 lifecycle)
+- Two-Key Account: 14 Rust property tests
+
+*(Rust counts verified 2026-07-26 by running the exact package-scoped `cargo test` commands CI
+uses; workspace-wide `cargo test --release` is not runnable due to an unrelated
+`casper-contract`/`std` feature-unification conflict across the whole workspace — CI and this
+manifest both test per-package instead.)*
 
 ---
 

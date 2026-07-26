@@ -143,7 +143,7 @@ even a passing payload can't change the deterministic score.
 ## FAQ
 
 **Q: Is this on-chain?**
-Yes for Casper Testnet (349 deploys and counting — see
+Yes for Casper Testnet (369 deploys and counting — see
 [cspr.live](https://testnet.cspr.live)). The EVM leg of the bridge
 runs on Sepolia; mainnet requires an explicit safety flag.
 

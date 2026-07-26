@@ -1,10 +1,10 @@
 # Status & Roadmap
 
-*Last verified: 2026-07-07 — contract v9 (`612cead2…ddd9ec`), 450/450 tests, 349 real testnet transactions.*
+*Last verified: 2026-07-26 — contract v10 (`07527a37…739ef1`), 2081/2081 Python + 250/250 Rust tests, 369 real testnet transactions.*
 
 ## ✅ Delivered
 
-### Smart Contract (8 contracts deployed on Casper Testnet)
+### Smart Contract (9 contracts deployed on Casper Testnet; 13 total in `main`, 4 pending deploy)
 
 | Contract | Status |
 |---|---|
@@ -33,9 +33,9 @@
 
 ### Testing & CI
 
-- 450 tests (450 Python + 40 Rust, incl. Hypothesis + proptest property-based invariants).
+- 2081 Python + 250 Rust tests (incl. Hypothesis + proptest property-based invariants).
 - GitHub Actions CI: lint, type-check, build, coverage ≥70%.
-- 349 real testnet transactions as on-chain evidence.
+- 369 real testnet transactions as on-chain evidence.
 
 ### SDK & Integrations
 

@@ -5,7 +5,7 @@
 AE402 is a full-stack payment infrastructure for autonomous AI agents on the Casper blockchain.
 The system comprises **8 smart contracts**, a **FastAPI backend** (66 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
 frontend** (12 console pages), a **Python SDK** with **LangChain** and **MCP** (26 tools)
-integrations, and on-chain evidence of 349+ real testnet transactions.
+integrations, and on-chain evidence of 369+ real testnet transactions.
 
 ```mermaid
 graph TB
