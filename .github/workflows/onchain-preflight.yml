@@ -1,0 +1,52 @@
+name: on-chain preflight
+
+# Blocks a merge when a contract-touching file lands without a matching
+# preflight pass. Fast (~5 s) and deterministic — no network, no wallet.
+
+on:
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "server/casper_tx/**"
+      - "deploy-out/**"
+      - "scripts/onchain_preflight.py"
+      - ".github/workflows/onchain-preflight.yml"
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - "server/casper_tx/**"
+      - "deploy-out/**"
+      - "scripts/onchain_preflight.py"
+  workflow_dispatch:
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run preflight
+        run: |
+          python scripts/onchain_preflight.py --verbose
+        # Exit 0 on all-pass, 1 on any check fail. That IS the gate.
+
+      - name: Emit machine-readable report
+        if: always()
+        run: |
+          python scripts/onchain_preflight.py --json > onchain_preflight.json || true
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onchain-preflight-report
+          path: onchain_preflight.json
+          retention-days: 14
