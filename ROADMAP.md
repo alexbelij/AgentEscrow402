@@ -8,7 +8,7 @@
 
 ## Current State (Hackathon submission)
 
-- [x] **9 smart contracts deployed on Casper testnet (13 total in `main`, 4 code-complete pending deploy)** — Core Escrow (v10), Escrow Manager,
+- [x] **10 smart contracts deployed on Casper testnet (14 total in `main`, 4 code-complete pending deploy)** — Core Escrow (v10), Escrow Manager,
       Insurance Pool (hardened), VRF Arbiter, Agent Identity Registry (v2), MultiAssetEscrow,
       AETUSD + AEMAT test tokens; Challenge Arbiter, Range Proof Registry, Governance DAO,
       Two-Key Account are code-complete but not yet deployed — see `TX_MANIFEST.md`

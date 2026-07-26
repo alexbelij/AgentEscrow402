@@ -3,8 +3,8 @@
 ## System Overview
 
 AE402 is a full-stack payment infrastructure for autonomous AI agents on the Casper blockchain.
-The system comprises **9 smart contracts live on testnet (13 total in `main`, 4 code-complete pending deploy)**, a **FastAPI backend** (140 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
-frontend** (12 console pages), a **Python SDK** with **LangChain** and **MCP** (26 tools)
+The system comprises **10 smart contracts live on testnet (14 total in `main`, 4 code-complete pending deploy)**, a **FastAPI backend** (140 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
+frontend** (19 console pages), a **Python SDK** with **LangChain** and **MCP** (26 tools)
 integrations, and on-chain evidence of 369+ real testnet transactions.
 
 ```mermaid
@@ -41,7 +41,7 @@ graph TB
     API --> DB
     API --> SB
 
-    subgraph Casper [Casper Testnet — 10 contracts live (13 total)]
+    subgraph Casper [Casper Testnet — 10 contracts live (14 total)]
         ESC[Core Escrow<br/>14 entry points]
         MGR[Escrow Manager<br/>5 entry points]
         INSC[Insurance Pool<br/>7 entry points]
@@ -668,7 +668,7 @@ AgentEscrow402/
 │   └── casper_tx/              # Node.js deploy scripts
 ├── frontend/src/               # React + TypeScript + Tailwind
 │   ├── components/             # Landing page components
-│   └── components/console/     # 12 console pages
+│   └── components/console/     # 19 console pages
 ├── sdk/                        # Python SDK + integrations
 │   ├── client.py               # Typed API client
 │   ├── langchain_tool.py       # LangChain tool
