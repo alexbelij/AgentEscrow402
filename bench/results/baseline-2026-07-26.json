@@ -1,0 +1,58 @@
+{
+  "commit": "a2387cd",
+  "concurrency": 16,
+  "iterations": 1000,
+  "profile": "normal",
+  "python": "3.11.2",
+  "scenarios": [
+    {
+      "error_samples": [],
+      "errors": 0,
+      "max_ms": 95.73,
+      "name": "GET  /health",
+      "ok": 1000,
+      "p50_ms": 20.19,
+      "p95_ms": 40.48,
+      "p99_ms": 58.13,
+      "rps": 697.3,
+      "total_seconds": 1.434
+    },
+    {
+      "error_samples": [],
+      "errors": 0,
+      "max_ms": 63.2,
+      "name": "GET  /stats",
+      "ok": 1000,
+      "p50_ms": 22.1,
+      "p95_ms": 36.09,
+      "p99_ms": 49.47,
+      "rps": 670.1,
+      "total_seconds": 1.492
+    },
+    {
+      "error_samples": [],
+      "errors": 0,
+      "max_ms": 58.56,
+      "name": "GET  /metrics",
+      "ok": 1000,
+      "p50_ms": 20.25,
+      "p95_ms": 36.07,
+      "p99_ms": 49.16,
+      "rps": 734.2,
+      "total_seconds": 1.362
+    },
+    {
+      "error_samples": [],
+      "errors": 0,
+      "max_ms": 82.74,
+      "name": "POST /escrow",
+      "ok": 1000,
+      "p50_ms": 34.7,
+      "p95_ms": 51.72,
+      "p99_ms": 69.41,
+      "rps": 438.3,
+      "total_seconds": 2.281
+    }
+  ],
+  "timestamp": "2026-07-26T10:41:36Z"
+}
