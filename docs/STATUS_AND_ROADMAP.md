@@ -4,7 +4,7 @@
 
 ## ✅ Delivered
 
-### Smart Contract (9 contracts deployed on Casper Testnet; 13 total in `main`, 4 pending deploy)
+### Smart Contract (10 contracts deployed on Casper Testnet; 13 total in `main`, 3 pending deploy)
 
 | Contract | Status |
 |---|---|

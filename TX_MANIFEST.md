@@ -26,6 +26,7 @@ All contracts below are the **currently live** versions serving the hosted conso
 | 7 | **CEP-18 Test Token (AETUSD)** | `ea6465021cf2c72b672f7a4fbb4039bb84764a800d279e957847bdff8e38f805` | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | 3 | [live](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 | 8 | **CEP-18 Test Token (AEMAT)** | `5caa324c3073a8b9fc05076a01e9d4d658cb08a1b4839fa0aa93dac39213e3fd` | `2e319caa09768162144fed4c53f0259ef733ffd97e56a107064026022ac0377b` | 4 | [live](https://testnet.cspr.live/contract/2e319caa09768162144fed4c53f0259ef733ffd97e56a107064026022ac0377b) |
 | 9 | **CEP-78 Test NFT (AETNFT)** | `ac38003d1ffe4550aa2ec82cbcd14fc938a078fafc43e111176e7ed6c9a8e85c` | `c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a` | 1 | [live](https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a) |
+| 10 | **Casper HTLC (bridge Casper leg, ROADMAP L85)** | `93f970abd3b13061c0c80986e3c5323ea30b9f2b099f5d12ef785e09b6b2a542` | `5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435` | 1 | [live](https://testnet.cspr.live/contract/5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435) |
 
 **Key notes:**
 - **Package hash is stable across upgrades** — use it to track a contract across versions (all in-place upgrades preserve the package hash; only contract_hash / deploy_hash / version bump).
@@ -41,10 +42,10 @@ New contracts landed on-branch, awaiting merge into `main` and (re)deploy to tes
 
 | # | Contract | Branch | PR | WASM size | Status |
 |---|----------|--------|----|-----------|--------|
-| 10 | **Challenge Arbiter (commit-reveal + bond/slash)** | `feat/ae402-challenge-arbiter` | [#55](https://github.com/alexbelij/AgentEscrow402/pull/55) | ~160 KB | code merged locally, testnet deploy `TBA` |
-| 11 | **Range Proof Registry (mod-exp on 3072-bit prime, threshold-attested)** | `feat/ae402-range-proofs` | [#62](https://github.com/alexbelij/AgentEscrow402/pull/62) | ~180 KB | code + tests green, testnet deploy `TBA` |
-| 12 | **Governance DAO (ported RWA-S primitives + AE402 action layer)** | `feat/ae402-governance-dao` | [#63](https://github.com/alexbelij/AgentEscrow402/pull/63) | 159 KB | code + tests green, testnet deploy `TBA` |
-| 13 | **Two-Key Account (cold/hot key AA-style account)** | merged to `main` 2026-07-24 | — | — | code + tests green, testnet deploy `TBA` — see [docs/TWO_KEY_ACCOUNT.md](docs/TWO_KEY_ACCOUNT.md) |
+| 11 | **Challenge Arbiter (commit-reveal + bond/slash)** | `feat/ae402-challenge-arbiter` | [#55](https://github.com/alexbelij/AgentEscrow402/pull/55) | ~160 KB | code merged locally, testnet deploy `TBA` |
+| 12 | **Range Proof Registry (mod-exp on 3072-bit prime, threshold-attested)** | `feat/ae402-range-proofs` | [#62](https://github.com/alexbelij/AgentEscrow402/pull/62) | ~180 KB | code + tests green, testnet deploy `TBA` |
+| 13 | **Governance DAO (ported RWA-S primitives + AE402 action layer)** | `feat/ae402-governance-dao` | [#63](https://github.com/alexbelij/AgentEscrow402/pull/63) | 159 KB | code + tests green, testnet deploy `TBA` |
+| 14 | **Two-Key Account (cold/hot key AA-style account)** | merged to `main` 2026-07-24 | — | — | code + tests green, testnet deploy `TBA` — see [docs/TWO_KEY_ACCOUNT.md](docs/TWO_KEY_ACCOUNT.md) |
 
 **Test coverage for post-hackathon block:**
 - Challenge Arbiter: 26 Rust property tests + 31 Python parity tests

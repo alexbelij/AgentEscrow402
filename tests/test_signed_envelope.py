@@ -216,7 +216,7 @@ def test_cross_protocol_replay_rejected(domain, keys, payload):
         public_key_bytes=pk,
     )
     other = DomainSeparator(
-        protocol="CasperProver",  # sibling protocol tries to accept AE402 sig
+        protocol="OtherProtocol",  # sibling protocol tries to accept AE402 sig
         version=domain.version,
         chain_id=domain.chain_id,
         purpose=domain.purpose,

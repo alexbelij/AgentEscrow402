@@ -14,13 +14,13 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-22c55e.svg?style=flat-square)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
-[![Contracts](https://img.shields.io/badge/contracts-9_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
+[![Contracts](https://img.shields.io/badge/contracts-10_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
 [![Tests](https://img.shields.io/badge/tests-2081_passing-22c55e.svg?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-live-0ea5e9.svg?style=flat-square)](docs/API_SDK_MCP.md)
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
-> 🟢 **TESTNET LIVE:** 369 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 9 contracts live on `casper-test` (13 total in `main`, 4 code-complete pending deploy — see [TX_MANIFEST.md](TX_MANIFEST.md)), cross-contract calls
+> 🟢 **TESTNET LIVE:** 369 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 10 contracts live on `casper-test` (13 total in `main`, 3 code-complete pending deploy — see [TX_MANIFEST.md](TX_MANIFEST.md)), cross-contract calls
 > 📊 140 API endpoints · 26 MCP tools · 2081 Python + 250 Rust tests (property-based)
 > 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
 > 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
@@ -703,7 +703,7 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 
 | Casper primitive / integration | Used | Where |
 |---|:---:|---|
-| Casper Network (testnet deploys) | ✅ | 9 contracts live on `casper-test` (13 total in `main`, 4 code-complete pending deploy) |
+| Casper Network (testnet deploys) | ✅ | 10 contracts live on `casper-test` (13 total in `main`, 3 code-complete pending deploy) |
 | Casper Smart Contracts (Rust → WASM) | ✅ | [`contracts/escrow`](contracts/escrow) — CEP-88 escrow, HTLC, arbitration |
 | Native CSPR transfers | ✅ | Escrow lifecycle (create, release, refund) |
 | CEP-18 fungible tokens | ✅ | Multi-asset escrow support |

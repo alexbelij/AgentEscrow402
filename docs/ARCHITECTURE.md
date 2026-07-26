@@ -41,7 +41,7 @@ graph TB
     API --> DB
     API --> SB
 
-    subgraph Casper [Casper Testnet — 9 contracts live (13 total)]
+    subgraph Casper [Casper Testnet — 10 contracts live (13 total)]
         ESC[Core Escrow<br/>14 entry points]
         MGR[Escrow Manager<br/>5 entry points]
         INSC[Insurance Pool<br/>7 entry points]
@@ -313,7 +313,7 @@ graph TB
         ESC_P[Escrows<br/>List + detail + lifecycle]
         AGT[Agents<br/>Agent cards + registration]
         ARBI[Arbitration<br/>Dispute + VRF election + arbiter register]
-        CON[Contracts<br/>9 contracts + live actions]
+        CON[Contracts<br/>10 contracts + live actions]
         INS_P[Insurance<br/>Pool stats + deposit + claim]
         ID[Identity Registry<br/>DID agents + stake + capabilities]
         RISK_P[Risk<br/>Risk heatmap + scoring]
