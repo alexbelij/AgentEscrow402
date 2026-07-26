@@ -43,6 +43,9 @@ class SandboxStore:
             # "skip block-delay half of flash_guard" to avoid punishing
             # tests / demo runs that never had a block context.
             "funded_block": funded_block,
+            # C14: gaming-reward escrow — default is a regular standard escrow.
+            "escrow_type": "standard",
+            "gaming_result_root": "",
         }
         self._escrows[service_hash] = record
         return EscrowRecord(**record)

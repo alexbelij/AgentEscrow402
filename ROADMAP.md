@@ -54,7 +54,13 @@
       halves wired into `/release`, `/refund`, `/dispute` (opt-in via
       `FLASH_GUARD_ENABLED`; block-delay half skips when funded_block or
       chain-tip is unknown so sandbox / offline runs are never punished)
-- [ ] Gaming-reward escrow type with Merkle proof of results
+- [x] Gaming-reward escrow type with Merkle proof of results — pure-Python
+      Merkle helper (`server/gaming_merkle.py`) with domain-separated leaves
+      and canonical-ordered pair-hashing so proofs are direction-bit-free.
+      New endpoint `/escrow/{h}/gaming-arm` commits a result root to the
+      escrow row; `/release` on a gaming-armed escrow requires a valid
+      inclusion proof for the caller's `receiver_pubkey`. Backward-
+      compatible (unarmed = standard escrow, no gate).
 - [ ] Agent-vs-Agent simulation testing framework
 - [x] Fuzz testing (cargo fuzz) — 5 libFuzzer targets over pure-Rust stubs
       (flash_guard × 3, escrow_types, threshold_config) + smoke CI job.
