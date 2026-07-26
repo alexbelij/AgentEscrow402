@@ -1,4 +1,4 @@
-.PHONY: run test lint format contracts clean judge-demo judge-demo-check judge-demo-keep
+.PHONY: run test lint format contracts clean judge-demo judge-demo-check judge-demo-keep judge-lite judge-lite-check judge-lite-keep
 
 run:
 	uvicorn server.app:app --host 0.0.0.0 --port 8000 --reload
@@ -40,3 +40,19 @@ judge-demo-keep:
 
 judge-demo-check:
 	./scripts/judge_demo.sh --check
+
+# --- Judge / auditor lite (Python only, ~60 s) -----------------------------
+# Complements judge-demo: boots the sandbox backend + runs 5 CLI checks,
+# no Docker, no NCTL, no testnet secrets required.
+#
+#   make judge-lite         # full 60-s pass: boot sandbox → 5 CLI checks → tear down
+#   make judge-lite-keep    # leave uvicorn running on 127.0.0.1:<port> for inspection
+#   make judge-lite-check   # preflight only (Python 3.11+, requirements)
+judge-lite:
+	./scripts/judge_lite.sh
+
+judge-lite-keep:
+	./scripts/judge_lite.sh --keep
+
+judge-lite-check:
+	./scripts/judge_lite.sh --check

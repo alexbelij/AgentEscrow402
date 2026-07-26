@@ -159,6 +159,46 @@ async def _cmd_get_history(args: argparse.Namespace) -> None:
         await client.close()
 
 
+async def _cmd_replay(args: argparse.Namespace) -> None:
+    """Replay an escrow's lifecycle by combining /escrow/{h} and /escrow/{h}/history.
+
+    Design: read-only, no server-side state change, no signatures. The point
+    is to give a judge/operator a single command that reconstructs the full
+    trajectory of an escrow (creation, transitions, terminal state) from
+    what the backend already exposes. Output is deterministic JSON on
+    stdout — pipe-friendly.
+    """
+    client = _make_client(args)
+    try:
+        escrow = await client.get_escrow(args.service_hash)
+        history = await client._request(  # noqa: SLF001
+            "GET", f"/escrow/{args.service_hash}/history"
+        )
+        events = history.get("events", []) if isinstance(history, dict) else []
+        # Enrich each event with a delta_seconds from the create event, so
+        # a reader can see the shape of the lifecycle at a glance.
+        base_ts = events[0]["ts"] if events else None
+        for ev in events:
+            if base_ts is not None and isinstance(ev.get("ts"), (int, float)):
+                ev["delta_seconds"] = ev["ts"] - base_ts
+        replay = {
+            "service_hash": args.service_hash,
+            "current_state": escrow.get("status") if isinstance(escrow, dict) else None,
+            "amount": escrow.get("amount") if isinstance(escrow, dict) else None,
+            "receiver": escrow.get("receiver") if isinstance(escrow, dict) else None,
+            "sender": escrow.get("sender") if isinstance(escrow, dict) else None,
+            "events": events,
+            "terminal": (
+                events[-1]["action"] in ("released", "refunded", "expired", "disputed")
+                if events
+                else False
+            ),
+        }
+        _emit(replay)
+    finally:
+        await client.close()
+
+
 async def _cmd_create_escrow(args: argparse.Namespace) -> None:
     client = _make_client(args)
     try:
@@ -301,6 +341,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sp = sub.add_parser("get-history", help="Lifecycle history for an escrow")
     sp.add_argument("--service-hash", required=True)
     sp.set_defaults(func=_cmd_get_history)
+
+    # replay
+    sp = sub.add_parser(
+        "replay",
+        help="Reconstruct an escrow's full lifecycle from server-side history",
+    )
+    sp.add_argument("--service-hash", required=True)
+    sp.set_defaults(func=_cmd_replay)
 
     # create-escrow
     sp = sub.add_parser("create-escrow", help="Create a new escrow (x402-signed)")

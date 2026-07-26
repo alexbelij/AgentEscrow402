@@ -230,6 +230,127 @@ class TestReadOnlyCommandsAgainstMockedBackend:
         assert kw["json"] == {"arguments": {"msg": "hi"}}
 
 
+class TestReplayCommand:
+    """C1 — `ae402 replay <hash>` combines /escrow/{h} and /escrow/{h}/history
+    into a single deterministic view. It's read-only, unsigned, and does two
+    GETs (not one), so the router must dispatch responses by URL, not by call
+    order.
+    """
+
+    def _install_url_router(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        routes: dict[str, dict],
+    ) -> list[tuple[str, str, dict]]:
+        import httpx
+
+        calls: list[tuple[str, str, dict]] = []
+
+        async def fake_request(self, method, url, *, json=None, params=None, headers=None, **_kw):  # noqa: ANN001, A002
+            calls.append((method, url, {"params": params, "json": json}))
+            # Match by path suffix so query strings don't break routing.
+            for suffix, payload in routes.items():
+                if url.endswith(suffix) or url.split("?")[0].endswith(suffix):
+                    req = httpx.Request(method, url, json=json, params=params, headers=headers)
+                    return httpx.Response(200, json=payload, request=req)
+            raise AssertionError(f"Unrouted URL in test mock: {url}")
+
+        monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
+        return calls
+
+    def test_replay_combines_escrow_and_history(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        h = "ab" * 32
+        escrow_payload = {
+            "service_hash": h,
+            "status": "released",
+            "amount": 1_000_000,
+            "receiver": "12" * 32,
+            "sender": "agent-A",
+        }
+        history_payload = {
+            "service_hash": h,
+            "events": [
+                {"action": "created", "ts": 1_700_000_000, "by": "agent-A", "amount": 1_000_000},
+                {"action": "released", "ts": 1_700_000_060, "by": "agent-A"},
+            ],
+        }
+        calls = self._install_url_router(
+            monkeypatch,
+            {
+                f"/escrow/{h}": escrow_payload,
+                f"/escrow/{h}/history": history_payload,
+            },
+        )
+
+        code = cli.main([
+            "--api-url", "http://mock.local",
+            "--sandbox", "--sender", "agent",
+            "replay", "--service-hash", h,
+        ])
+        assert code == 0, capsys.readouterr()
+
+        # Both endpoints must be hit exactly once each.
+        urls = sorted(u for _, u, _ in calls)
+        assert len(calls) == 2, f"expected 2 GETs, got {len(calls)}: {urls}"
+        assert any(u.endswith(f"/escrow/{h}") for _, u, _ in calls)
+        assert any(u.endswith(f"/escrow/{h}/history") for _, u, _ in calls)
+        assert all(m == "GET" for m, _, _ in calls)
+
+        # Parse stdout — the replay JSON should have both escrow fields and
+        # enriched events (with delta_seconds).
+        captured = capsys.readouterr()
+        import json as _json
+
+            # Skip lines before the JSON blob if any (e.g. warnings).
+        stdout = captured.out.strip()
+        # _emit writes indented JSON — find the first "{" and parse from there.
+        start = stdout.find("{")
+        replay = _json.loads(stdout[start:])
+
+        assert replay["service_hash"] == h
+        assert replay["current_state"] == "released"
+        assert replay["amount"] == 1_000_000
+        assert replay["terminal"] is True
+        assert len(replay["events"]) == 2
+        # Event enrichment: delta_seconds from create.
+        assert replay["events"][0]["delta_seconds"] == 0
+        assert replay["events"][1]["delta_seconds"] == 60
+
+    def test_replay_pending_is_not_terminal(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        h = "cd" * 32
+        self._install_url_router(
+            monkeypatch,
+            {
+                f"/escrow/{h}": {"service_hash": h, "status": "pending", "amount": 500},
+                f"/escrow/{h}/history": {
+                    "service_hash": h,
+                    "events": [{"action": "created", "ts": 1_700_000_000, "by": "x", "amount": 500}],
+                },
+            },
+        )
+        code = cli.main([
+            "--api-url", "http://mock.local",
+            "--sandbox", "--sender", "agent",
+            "replay", "--service-hash", h,
+        ])
+        assert code == 0, capsys.readouterr()
+        import json as _json
+
+        stdout = capsys.readouterr().out
+        start = stdout.find("{")
+        replay = _json.loads(stdout[start:])
+        assert replay["current_state"] == "pending"
+        assert replay["terminal"] is False
+
+
 class TestSecretKeyHexNormalisation:
     def test_0x_prefix_stripped(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """--secret-key-hex should accept both 0x-prefixed and bare hex."""
