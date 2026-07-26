@@ -32,16 +32,18 @@ contracts/fuzz/corpus/
 contracts/fuzz/artifacts/
 Thumbs.db
 __pycache__/
-build/
-dist/
-env/
-htmlcov/
-keys/
-landing/
-node_modules/
-target/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
 venv/
-graphify-out/
+node_modules/
+dist/
+build/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+target/
 
 # local test virtualenv (not part of repo)
 .venv-ae/
@@ -54,3 +56,4 @@ judge_demo_output.json
 contracts/fuzz/target/
 contracts/fuzz/corpus/
 contracts/fuzz/artifacts/
+.env.*

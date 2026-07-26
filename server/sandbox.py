@@ -46,6 +46,10 @@ class SandboxStore:
             # C14: gaming-reward escrow — default is a regular standard escrow.
             "escrow_type": "standard",
             "gaming_result_root": "",
+            # C13: threshold-arming stays optional; empty string = no gate.
+            "threshold_commitment_hex": "",
+            "threshold_n": 0,
+            "threshold_m": 0,
         }
         self._escrows[service_hash] = record
         return EscrowRecord(**record)

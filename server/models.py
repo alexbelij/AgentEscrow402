@@ -149,6 +149,16 @@ class EscrowRecord(BaseModel):
     # is not a gaming escrow (default, backward-compatible).
     escrow_type: str = "standard"       # one of: standard | gaming
     gaming_result_root: str = ""        # hex sha256 Merkle root (32 bytes)
+    # C13: threshold-gated release. When set, /release requires the caller
+    # to present >=threshold_n Shamir shares whose reconstructed 32-byte
+    # secret hashes (sha256) to threshold_commitment_hex. Empty string →
+    # threshold gating is disabled (default, backward-compatible).
+    # The escrow row only stores the commitment hash — never the secret
+    # itself and never the shares. Shares are distributed out-of-band to
+    # arbiters / trustees at /escrow/{hash}/threshold-arm time.
+    threshold_commitment_hex: str = ""
+    threshold_n: int = 0
+    threshold_m: int = 0
 
 
 class BatchEscrowItem(BaseModel):
@@ -207,6 +217,12 @@ class ReleaseRequest(BaseModel):
     # non-empty gaming_result_root; ignored otherwise.
     gaming_leaf_hex: str = ""
     gaming_proof_hex: list[str] = Field(default_factory=list)
+    # C13: threshold-shares presented to unlock a threshold-armed escrow.
+    # Each entry is a 68-char hex share (2-byte index + 32-byte value)
+    # matching the format emitted by server/threshold_secret.py::Share.to_hex.
+    # Required (and only inspected) when the escrow row has a non-empty
+    # threshold_commitment_hex; ignored otherwise for backward compatibility.
+    threshold_shares_hex: list[str] = Field(default_factory=list)
 
 
 class RefundRequest(BaseModel):
