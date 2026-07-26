@@ -54,3 +54,33 @@ guard makes double-anchoring safe).
 parent — hop 0 has none, so its on-chain "linkage" is implicit
 (defined by the intent itself). `Hop.on_chain_link_tx_hash` is
 therefore always `None` for hop 0.
+
+### `link_escrows` entry point is not yet redeployed on testnet
+
+As of this branch (`feat/ae402-onchain-link-escrows`), the new
+`link_escrows` / `get_link` entry points on `escrow-manager` are
+added, compile (WASM 174KB), and are tested at the Python + API
+layer via `record_on_chain_link()` and `POST /escrow`'s
+`parent_intent_id` field. The *actual on-chain redeploy* of the
+updated `escrow-manager.wasm` to Casper testnet has been deferred
+until further contract changes accumulate — so any live call today
+against the deployed manager contract hash
+(`bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d`)
+will revert on `link_escrows` (unknown entry point).
+
+Odra property/FSM tests for `link_escrows` — tracked as **P0.1.5**
+— are also pending. The `escrow-manager` module currently has no
+`contracts/tests/src/*_test.rs` coverage (this was already the case
+before this branch); adding them alongside the redeploy is the
+right bundling.
+
+### README stale counters (docs bug, not code bug)
+
+`README.md` currently states `63 API endpoints` / `1591 Python
+tests` / `40 Rust tests` in badges and prose. Static audit shows
+the live values are `130 endpoints`, `1628 Python tests`, and `213
+Rust tests` — and `40` is stale from a manifest that has zero
+tests today. See
+[`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md)
+for the full breakdown. This is direction-safe (under-counting, not
+overclaiming), but a docs PR is queued to regenerate the counters.
