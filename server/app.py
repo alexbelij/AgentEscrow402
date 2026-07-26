@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -622,7 +623,7 @@ async def root():
 async def health(cfg: Config = Depends(get_config)):
     contract_hash = cfg.contract_hash or ""
     connected = pgdb.is_connected()
-    return HealthResponse(
+    resp = HealthResponse(
         sandbox=cfg.sandbox,
         chain=cfg.casper_chain_name,
         contract_hash=contract_hash,
@@ -631,6 +632,106 @@ async def health(cfg: Config = Depends(get_config)):
         mode="sandbox" if cfg.sandbox else "live",
         strict_mode=cfg.strict_mode_capabilities(),
     )
+    # AE-D9 / AE-D7: cross-check /health.contract_hash ↔ deploy-out/onchain.json.
+    # Attach a `manifest_sanity` advisory block: does the manifest's escrow_manager_v9
+    # match what the app is configured against? Judges get an at-a-glance signal;
+    # a mismatch is a fail-loud red flag that a redeploy happened without env-sync.
+    try:
+        payload = resp.model_dump()
+    except AttributeError:
+        payload = resp.dict()  # type: ignore[attr-defined]
+    payload["manifest_sanity"] = _manifest_sanity_snapshot(contract_hash)
+    return JSONResponse(content=jsonable_encoder(payload))
+
+
+_MANIFEST_CACHE: dict[str, object] = {"path": None, "mtime": 0.0, "data": None}
+
+
+def _manifest_sanity_snapshot(env_hash: str) -> dict[str, object]:
+    """Read deploy-out/onchain.json (cached by mtime) and compare its
+    escrow_manager_v9 contract_hash with the running app's `AE402_CONTRACT_HASH`.
+
+    Returns a small dict: {status, manifest_path, expected, actual, note?}
+    where status is "ok", "mismatch", "manifest_missing", or "env_missing".
+    Non-fatal — designed for judges to see whether the app is aligned with
+    the checked-in manifest, not to gate the LB probe.
+    """
+    import json as _json
+    from pathlib import Path as _Path
+
+    def _resolve_env(h: str) -> str:
+        return (h or "").strip().lower().removeprefix("hash-")
+
+    env_norm = _resolve_env(env_hash)
+    # Manifest is a checked-in artifact next to the repo root, deploy-out/.
+    # In containerised deploy, the file may not be shipped — that's fine, we
+    # just report `manifest_missing` (docs-only surface, not a failure).
+    candidates = [
+        _Path(__file__).resolve().parent.parent / "deploy-out" / "onchain.json",
+        _Path("deploy-out/onchain.json"),
+    ]
+    manifest_path: _Path | None = None
+    for c in candidates:
+        if c.exists():
+            manifest_path = c
+            break
+    if manifest_path is None:
+        return {
+            "status": "manifest_missing",
+            "manifest_path": None,
+            "expected": None,
+            "actual": env_norm or None,
+            "note": "deploy-out/onchain.json not shipped with this deployment",
+        }
+    try:
+        st = manifest_path.stat()
+        if (
+            _MANIFEST_CACHE.get("path") == str(manifest_path)
+            and _MANIFEST_CACHE.get("mtime") == st.st_mtime
+            and _MANIFEST_CACHE.get("data") is not None
+        ):
+            data = _MANIFEST_CACHE["data"]
+        else:
+            with manifest_path.open() as fh:
+                data = _json.load(fh)
+            _MANIFEST_CACHE.update(
+                path=str(manifest_path), mtime=st.st_mtime, data=data
+            )
+    except (OSError, _json.JSONDecodeError) as exc:  # pragma: no cover — unreadable manifest
+        return {
+            "status": "manifest_unreadable",
+            "manifest_path": str(manifest_path),
+            "expected": None,
+            "actual": env_norm or None,
+            "note": f"could not parse manifest: {exc}",
+        }
+    expected_raw = (
+        (data.get("contracts", {}).get("escrow_manager_v9") or {}).get("contract_hash")
+        or ""
+    )
+    expected = _resolve_env(expected_raw)
+    if not env_norm:
+        return {
+            "status": "env_missing",
+            "manifest_path": str(manifest_path),
+            "expected": expected or None,
+            "actual": None,
+            "note": "AE402_CONTRACT_HASH not configured on this deployment",
+        }
+    if not expected:
+        return {
+            "status": "manifest_missing_field",
+            "manifest_path": str(manifest_path),
+            "expected": None,
+            "actual": env_norm,
+            "note": "manifest.contracts.escrow_manager_v9.contract_hash absent",
+        }
+    return {
+        "status": "ok" if env_norm == expected else "mismatch",
+        "manifest_path": str(manifest_path),
+        "expected": expected,
+        "actual": env_norm,
+    }
 
 
 @app.get("/metrics", include_in_schema=False)

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CONTRACTS } from '../../lib/manifest.generated';
 import { useNotifications } from '../../hooks/useNotifications';
 import ErrorBoundary from './ErrorBoundary';
 import BackendWakeOverlay from './BackendWakeOverlay';
@@ -129,7 +130,7 @@ const SECTION_INFO: Record<string, SectionInfo> = {
   },
   '/console/insurance': {
     title: 'Insurance Pool',
-    desc: 'A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. The insurance-pool contract is deployed on testnet (ead90738…); on the hosted console, pool accounting is managed server-side.',
+    desc: `A shared pool that pays out on covered disputes; a small fee on each escrow funds it, and premiums scale with counterparty risk. The insurance-pool contract is deployed on testnet (${CONTRACTS.insurancePool?.contractHash?.slice(0, 8) ?? 'n/a'}…); on the hosted console, pool accounting is managed server-side.`,
     source: 'demo',
   },
   '/console/risk': {

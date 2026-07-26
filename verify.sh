@@ -40,16 +40,27 @@ bold "═══ AgentEscrow402 Verification ═══"
 echo ""
 bold "1. On-chain contracts (Casper testnet)"
 
-CONTRACTS=(
-  "612cead2226329fafec492042fd96a999df06d1e88c476913a167f44d3ddd9ec:Core Escrow v9"
-  "bfa8c02cb3ab0f9d7bf03335f324973675200a597162e1e5fa4cb5a77dff675d:Escrow Manager"
-  "ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4:Insurance Pool"
-  "78ae28702deeb2eadec573d95b870f68b928a82a3566e292ff33a9ae2c779c93:VRF Arbiter"
-  "1f29271d986818254d42e5551dd8fbb2e2b7f7295bdfcd6558639584ad311cae:Agent Identity Registry"
-  "52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a:MultiAsset Escrow"
-  "177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754:CEP-18 AETUSD"
-  "8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5:CEP-18 AEMAT"
-)
+# Contracts array is derived from deploy-out/onchain.json — the single source
+# of truth for live on-chain state. Hardcoded hashes would go stale after any
+# redeploy (e.g. the 2026-07-24 Key-fix redeploy which rotated Core Escrow,
+# Agent Identity Registry, MultiAssetEscrow and AEMAT to new contract_hashes
+# under stable contract_package_hashes).
+
+MANIFEST="deploy-out/onchain.json"
+if [ ! -f "$MANIFEST" ]; then
+  red "$MANIFEST missing — cannot derive contract set"
+  exit 1
+fi
+
+CONTRACTS=()
+while IFS= read -r line; do
+  CONTRACTS+=("$line")
+done < <(jq -r '.contracts | to_entries | map(select(.value.contract_hash != null)) | .[] | "\(.value.contract_hash | sub("^hash-"; "")):\(.value.name)"' "$MANIFEST")
+
+if [ ${#CONTRACTS[@]} -eq 0 ]; then
+  red "No contracts with contract_hash found in $MANIFEST"
+  exit 1
+fi
 
 verify_contract() {
   local hash="${1%%:*}"
@@ -208,13 +219,19 @@ echo ""
 bold "5b. Insurance replay guard (on-chain dictionary)"
 
 verify_insurance_replay_guard() {
-  # The redeployed insurance-pool (ead90738…95fff4) MUST expose a
-  # `claimed_escrow_ids` named key — this is the storage that tombstones
-  # every processed escrow_id and blocks replay after cooldown.
-  # Contract source: contracts/insurance-pool/src/main.rs line 24 + call()
-  # entry point. If this key is absent, either the old contract is still
-  # live under a shadow name or the redeploy silently failed.
-  local insurance_hash="ead90738d19ad7fcc88c9e079e12d8cf6d4fd09ddd3daafe565bf4fe4b95fff4"
+  # The insurance-pool contract MUST expose a `claimed_escrow_ids` named key —
+  # this is the storage that tombstones every processed escrow_id and blocks
+  # replay after cooldown. Contract source: contracts/insurance-pool/src/main.rs
+  # line 24 + call() entry point. If this key is absent, either the old
+  # contract is still live under a shadow name or the redeploy silently failed.
+  #
+  # Hash is derived from the manifest so a redeploy is picked up automatically.
+  local insurance_hash
+  insurance_hash=$(jq -r '.contracts.insurance_pool.contract_hash | sub("^hash-"; "")' "$MANIFEST")
+  if [ -z "$insurance_hash" ] || [ "$insurance_hash" = "null" ]; then
+    red "insurance_pool.contract_hash missing from manifest"
+    return 1
+  fi
   local resp
   resp=$(curl -sf "https://node.testnet.casper.network/rpc" \
     -H "Content-Type: application/json" \
