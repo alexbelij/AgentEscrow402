@@ -32,8 +32,6 @@ export const CONTRACTS: Record<string, ManifestContract> = {
   batchEscrowManager: {
     key: "batch_escrow_manager",
     name: "Escrow Manager",
-    // v11 (2026-07-26) — supersets v1 batch ops and adds
-    // link_escrows / get_link for on-chain multi-hop A2A intent linking.
     contractHash: "c423a07f334ae4c5badf7fcfe6c595abc1d7ba07fdfc43a0464525aa416fe4d6",
     contractPackageHash: "1b93d536947da31ed80d6b57a5db74c718b6cf08f33e5b0bdd893d27f481dd0c",
     deployHash: "1b600ef544752ba07e66de2be724ab660bcfb18fde83e440a6697a501ced3bce",
