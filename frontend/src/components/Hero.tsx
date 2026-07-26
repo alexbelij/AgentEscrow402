@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Github } from 'lucide-react'
+import { GithubIcon } from './icons/GithubIcon'
 
 export default function Hero() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -173,7 +173,7 @@ export default function Hero() {
               Inspect live console
             </a>
             <a href="https://github.com/alexbelij/AgentEscrow402" target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-ae-border text-gray-300 text-sm font-medium hover:border-gray-500 hover:text-white transition-colors">
-              <Github className="w-4 h-4" />
+              <GithubIcon className="w-4 h-4" />
               GitHub
             </a>
           </div>

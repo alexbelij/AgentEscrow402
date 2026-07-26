@@ -3,6 +3,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import ErrorBoundary from './ErrorBoundary';
 import BackendWakeOverlay from './BackendWakeOverlay';
 import WalletStatus from './WalletStatus';
+import { GithubIcon } from '../icons/GithubIcon'
 import RoleSwitcher from './RoleSwitcher';
 import { useRole } from '../../lib/role';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
@@ -24,7 +25,6 @@ import {
   Sparkles,
   Menu,
   X,
-  Github,
   BookOpen,
   Compass,
   Terminal,
@@ -387,7 +387,7 @@ const ConsoleLayout: React.FC = () => {
               aria-label="View source on GitHub"
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-100 hover:bg-ae-border/50"
             >
-              <Github className="h-4 w-4" />
+              <GithubIcon className="h-4 w-4" />
             </a>
           </div>
         </div>
