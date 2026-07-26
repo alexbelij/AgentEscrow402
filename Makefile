@@ -56,3 +56,17 @@ judge-lite-keep:
 
 judge-lite-check:
 	./scripts/judge_lite.sh --check
+
+# --- C12: libFuzzer smoke over pure-Rust stubs -----------------------------
+# Each target runs for 30s. See contracts/fuzz/README.md for the target list
+# and how to run longer campaigns.
+fuzz:
+	cd contracts/fuzz && for t in flash_guard_hold_period flash_guard_block_delay \
+	                                flash_guard_both_halves escrow_types_status \
+	                                threshold_config_validate; do \
+	    echo "=== $$t ==="; \
+	    cargo fuzz run "$$t" -- -max_total_time=30 -print_final_stats=1 || exit 1; \
+	done
+
+fuzz-build:
+	cd contracts/fuzz && cargo fuzz build

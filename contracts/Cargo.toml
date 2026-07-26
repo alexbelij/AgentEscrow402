@@ -1,3 +1,6 @@
 [workspace]
-members = ["escrow", "escrow-manager", "insurance-pool", "vrf-arbiter", "tests", "pool-funder", "arbiter-registrar", "batch-funder", "agent-identity-registry", "id-registry-funder", "test-token", "multi-asset-escrow", "two-key-account", "challenge-arbiter", "range-proof-registry", "ae402-governance-dao"]
+members = ["escrow", "escrow-manager", "insurance-pool", "vrf-arbiter", "tests", "pool-funder", "arbiter-registrar", "batch-funder", "agent-identity-registry", "id-registry-funder", "test-token", "multi-asset-escrow", "two-key-account", "challenge-arbiter", "range-proof-registry", "ae402-governance-dao", "stubs"]
+# `fuzz/` is deliberately excluded — it is a std libFuzzer harness, while
+# every workspace member here is a no_std WASM contract crate.
+exclude = ["fuzz"]
 resolver = "2"
