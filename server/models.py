@@ -110,6 +110,14 @@ class EscrowRecord(BaseModel):
     confidential: bool = False
     commitment: str | None = None
     range_proof_bits: int | None = None
+    # C14: gaming-reward escrow.  When escrow_type == "gaming" the row also
+    # carries a Merkle root committing to the tournament / match result
+    # tree.  `/release` on such an escrow demands a Merkle proof that the
+    # requesting receiver appears in the result tree at least once (i.e.
+    # they won at least one payout leaf).  Empty root string = the escrow
+    # is not a gaming escrow (default, backward-compatible).
+    escrow_type: str = "standard"       # one of: standard | gaming
+    gaming_result_root: str = ""        # hex sha256 Merkle root (32 bytes)
 
 
 class BatchEscrowItem(BaseModel):
@@ -162,6 +170,12 @@ class ReleaseRequest(BaseModel):
     # "release:{service_hash}:cap_approval" — see arbiter_crypto.build_cap_approval_message.
     arbiter_pubkeys: list[str] = Field(default_factory=list)
     arbiter_signatures: list[str] = Field(default_factory=list)
+    # C14: gaming-reward escrow — caller presents an inclusion proof that
+    # `receiver_pubkey` is one of the winning leaves in the committed
+    # result tree.  Fields are only inspected when the escrow row has a
+    # non-empty gaming_result_root; ignored otherwise.
+    gaming_leaf_hex: str = ""
+    gaming_proof_hex: list[str] = Field(default_factory=list)
 
 
 class RefundRequest(BaseModel):

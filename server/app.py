@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from server import arbiter_crypto, batch_guard, confidential_escrow, flash_guard, strict
 from server import db as pgdb
@@ -423,6 +423,40 @@ app.include_router(compliance_router)
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
+
+
+def _enforce_gaming_release(escrow: EscrowRecord, req) -> None:
+    """C14: verify that the caller of /release on a gaming escrow presents a
+    valid Merkle inclusion proof against the committed result root.
+
+    Failure modes are all HTTP 422 with a stable, machine-parseable detail
+    string so SDK clients can distinguish them (missing / malformed /
+    unmatched).
+    """
+    from server.gaming_merkle import verify_proof as _verify
+
+    root_hex = str(escrow.gaming_result_root)
+    leaf_hex = str(getattr(req, "gaming_leaf_hex", "") or "")
+    proof_hex = list(getattr(req, "gaming_proof_hex", []) or [])
+
+    if not leaf_hex:
+        raise HTTPException(status_code=422, detail="gaming release: gaming_leaf_hex is required")
+
+    try:
+        root = bytes.fromhex(root_hex)
+        leaf = bytes.fromhex(leaf_hex)
+        siblings = [bytes.fromhex(s) for s in proof_hex]
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"gaming release: malformed hex in root/leaf/proof ({exc})",
+        )
+
+    if not _verify(root, leaf, siblings):
+        raise HTTPException(
+            status_code=422,
+            detail="gaming release: Merkle proof does not verify against committed root",
+        )
 
 
 def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
@@ -1371,6 +1405,13 @@ async def release_escrow(
                 ),
             )
 
+    # C14: gaming-reward escrow.  When a Merkle root has been committed on
+    # the row the caller must present a valid inclusion proof for their
+    # `receiver_pubkey` before /release proceeds.  A row without a root is
+    # a normal ("standard") escrow and bypasses this check.
+    if getattr(existing, "gaming_result_root", ""):
+        _enforce_gaming_release(existing, req)
+
     # T2.12: flash-loan protection. Rejects a release that lands inside the
     # minimum hold window since the escrow was funded (existing.created_at),
     # closing the fund-then-immediately-release attack window a flash-loan
@@ -1437,6 +1478,62 @@ async def release_escrow(
         raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:
         _raise_fsm_or_generic(exc)
+
+
+class GamingArmRequest(BaseModel):
+    """C14: arm an already-created escrow with a gaming result Merkle root.
+
+    The caller — typically the tournament organiser or the game backend —
+    computes the Merkle root off-chain over every payout leaf (leaf value =
+    `receiver_pubkey` bytes, sha256-tagged — see server/gaming_merkle.py)
+    and calls this endpoint with the resulting hex root.  Individual
+    winners then submit inclusion proofs against this root at /release.
+    """
+
+    service_hash: str = Field(..., min_length=64, max_length=64)
+    result_root_hex: str = Field(..., min_length=64, max_length=64)
+
+
+@app.post(
+    "/escrow/{service_hash}/gaming-arm",
+    response_model=EscrowRecord,
+    tags=["gaming"],
+)
+async def gaming_arm(
+    service_hash: str,
+    req: GamingArmRequest,
+    store: SandboxStore = Depends(get_sandbox),
+):
+    """C14: convert a pending standard escrow into a gaming-reward escrow.
+
+    Idempotency: re-arming with the same root is fine (no state change);
+    re-arming with a different root is refused so a race between two
+    organisers cannot silently overwrite the committed result.
+    """
+    if service_hash != req.service_hash:
+        raise HTTPException(status_code=400, detail="path and body service_hash disagree")
+    try:
+        _ = bytes.fromhex(req.result_root_hex)
+    except ValueError:
+        raise HTTPException(status_code=422, detail="result_root_hex must be 64 hex chars")
+
+    escrow = store.get_escrow(service_hash)
+    if escrow is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if escrow.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"gaming-arm only allowed on pending escrows (was {escrow.status})",
+        )
+
+    rec = store._escrows[service_hash]
+    existing_root = rec.get("gaming_result_root", "")
+    if existing_root and existing_root != req.result_root_hex:
+        raise HTTPException(status_code=409, detail="escrow is already gaming-armed with a different root")
+
+    rec["escrow_type"] = "gaming"
+    rec["gaming_result_root"] = req.result_root_hex
+    return EscrowRecord(**rec)
 
 
 @app.post("/refund", response_model=EscrowRecord)

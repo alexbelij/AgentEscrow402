@@ -30,6 +30,9 @@ class SandboxStore:
             "status": "pending",
             "created_at": now,
             "ttl": ttl,
+            # C14: gaming-reward escrow — default is a regular standard escrow.
+            "escrow_type": "standard",
+            "gaming_result_root": "",
         }
         self._escrows[service_hash] = record
         return EscrowRecord(**record)
