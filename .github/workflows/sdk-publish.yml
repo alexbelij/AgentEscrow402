@@ -1,0 +1,189 @@
+name: SDK Publish
+
+# Manual-gated release automation for both SDKs (Python + TypeScript).
+#
+# WHY MANUAL: publishing to PyPI / npm is irreversible (yanks leave stubs).
+# We keep the "build + upload to TestPyPI / dry-run npm publish" path
+# fully automated and gated by a tag push, but the actual PROD publish
+# step is `workflow_dispatch` only (a human clicks the button in the
+# Actions UI after the dry-run artifacts look right).
+#
+# TAG CONVENTIONS:
+#   - Python SDK:      `py-sdk-v<X.Y.Z>` → validates pyproject.toml version match, builds sdist+wheel, uploads to TestPyPI.
+#   - TypeScript SDK:  `ts-sdk-v<X.Y.Z>` → validates sdk-ts/package.json version match, runs `npm publish --dry-run`.
+#
+# Neither tag path publishes to prod on push — that requires the manual
+# workflow_dispatch trigger with `confirm=true`.
+
+on:
+  push:
+    tags:
+      - 'py-sdk-v*'
+      - 'ts-sdk-v*'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which SDK to publish'
+        required: true
+        type: choice
+        options:
+          - python
+          - typescript
+      confirm:
+        description: 'Type "publish" to confirm PROD publish (anything else = dry-run only)'
+        required: true
+        default: 'dry-run'
+        type: string
+
+permissions:
+  contents: read
+  id-token: write   # required for PyPI Trusted Publishing (OIDC)
+
+jobs:
+  python-sdk:
+    name: Python SDK — validate, build, publish
+    if: startsWith(github.ref, 'refs/tags/py-sdk-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'python')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build twine
+
+      - name: Verify version consistency
+        run: |
+          set -euo pipefail
+          PYPROJECT_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "pyproject version: $PYPROJECT_VERSION"
+
+          if [[ "${GITHUB_REF}" == refs/tags/py-sdk-v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/py-sdk-v}"
+            echo "tag version:       $TAG_VERSION"
+            if [[ "$PYPROJECT_VERSION" != "$TAG_VERSION" ]]; then
+              echo "::error::pyproject.toml version ($PYPROJECT_VERSION) does not match tag ($TAG_VERSION)"
+              exit 1
+            fi
+          fi
+
+          # Also check CHANGELOG references this version (informational — non-blocking)
+          if ! grep -qF "$PYPROJECT_VERSION" CHANGELOG.md; then
+            echo "::warning::CHANGELOG.md does not mention version $PYPROJECT_VERSION — please update before publishing to prod"
+          fi
+
+      - name: Build sdist + wheel
+        run: python -m build --sdist --wheel .
+
+      - name: Twine check (metadata sanity)
+        run: twine check dist/*
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-sdk-dist
+          path: dist/*
+          retention-days: 14
+
+      # DRY-RUN path (default): upload to TestPyPI so we can `pip install -i https://test.pypi.org/simple/ agentescrow402==<ver>`
+      # and smoke-test before committing to a prod publish.
+      - name: Publish to TestPyPI (dry-run gate)
+        if: >
+          startsWith(github.ref, 'refs/tags/py-sdk-v') ||
+          (github.event_name == 'workflow_dispatch' && inputs.confirm != 'publish')
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.TEST_PYPI_TOKEN }}
+        run: |
+          if [[ -z "${TWINE_PASSWORD:-}" ]]; then
+            echo "::warning::TEST_PYPI_TOKEN not configured — skipping TestPyPI upload (artifacts still uploaded above)"
+            exit 0
+          fi
+          twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+
+      # PROD publish — manual + confirmation gate + Trusted Publishing (no long-lived token).
+      # Requires configuring the project on PyPI to trust this workflow via OIDC:
+      # https://docs.pypi.org/trusted-publishers/
+      - name: Publish to PyPI (PROD)
+        if: >
+          github.event_name == 'workflow_dispatch' &&
+          inputs.target == 'python' &&
+          inputs.confirm == 'publish'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
+
+  typescript-sdk:
+    name: TypeScript SDK — validate, build, publish
+    if: startsWith(github.ref, 'refs/tags/ts-sdk-v') || (github.event_name == 'workflow_dispatch' && inputs.target == 'typescript')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdk-ts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify version consistency
+        run: |
+          set -euo pipefail
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          echo "package.json version: $PKG_VERSION"
+
+          if [[ "${GITHUB_REF}" == refs/tags/ts-sdk-v* ]]; then
+            TAG_VERSION="${GITHUB_REF#refs/tags/ts-sdk-v}"
+            echo "tag version:          $TAG_VERSION"
+            if [[ "$PKG_VERSION" != "$TAG_VERSION" ]]; then
+              echo "::error::sdk-ts/package.json version ($PKG_VERSION) does not match tag ($TAG_VERSION)"
+              exit 1
+            fi
+          fi
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Tests
+        run: npm test --if-present
+
+      - name: Pack (produces .tgz)
+        run: npm pack
+
+      - name: Upload pack artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ts-sdk-tarball
+          path: sdk-ts/*.tgz
+          retention-days: 14
+
+      - name: npm publish (dry-run gate)
+        if: >
+          startsWith(github.ref, 'refs/tags/ts-sdk-v') ||
+          (github.event_name == 'workflow_dispatch' && inputs.confirm != 'publish')
+        run: npm publish --dry-run --access public
+
+      - name: npm publish (PROD)
+        if: >
+          github.event_name == 'workflow_dispatch' &&
+          inputs.target == 'typescript' &&
+          inputs.confirm == 'publish'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [[ -z "${NODE_AUTH_TOKEN:-}" ]]; then
+            echo "::error::NPM_TOKEN not configured — cannot publish"
+            exit 1
+          fi
+          npm publish --access public
