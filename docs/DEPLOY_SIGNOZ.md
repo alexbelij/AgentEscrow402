@@ -163,7 +163,7 @@ Full revert (revert the merge commit) is only needed if the branch itself is at 
 
 ## §6 What happens after T23
 
-- The SigNoz account (`needed-shepherd.eu2`) is **AE402-only** by explicit user decision (2026-07-23 Quentin, `#pancake-chat`). Do **not** point CasperProver, RWA-Sentinel, or casper_research at this SigNoz tenant. A separate tenant will be created for CP when its own OTel instrumentation is delivered.
+- The SigNoz account (`needed-shepherd.eu2`) is **AE402-only** by explicit user decision (2026-07-23 Quentin, `#pancake-chat`). Keep this tenant scoped to AE402's own OTel instrumentation only.
 - A follow-up ticket may add SigNoz dashboards for AE402 (escrow lifecycle rate, arbitration latency p50/p95/p99, error rate). Those are UI-side, no code changes needed.
 
 ---

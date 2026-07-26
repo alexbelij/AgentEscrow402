@@ -122,7 +122,7 @@ a high-risk AI system for arbitration.
 | Obligation (Art. 8-15, 26) | AE402 implementation |
 |---|---|
 | Risk management system (Art. 9) | `docs/STATUS_AND_ROADMAP.md` + this file; VRF panel escalation for abstain / low-confidence verdicts (AE-A1.4) is an in-loop risk control |
-| Data and data governance (Art. 10) | Prompt-injection & equivocation fixture batteries (CP gate-3 test batteries used in engine); deterministic policy layer applied on top of LLM output |
+| Data and data governance (Art. 10) | Prompt-injection & equivocation fixture batteries exercised in `server/ai_arbitration.py`; deterministic policy layer applied on top of LLM output |
 | Technical documentation (Art. 11) | `docs/STATUS_AND_ROADMAP.md`, `docs/UNITS_CSPR_MOTES.md`, per-endpoint API docs |
 | Record-keeping (Art. 12) | Merkle-rooted evidence set for every arbitration decision (AE-8); `/verify-evidence` endpoint |
 | Transparency to deployers (Art. 13) | `HOW_TO_JUDGE.md` + judge / operator / developer surfaces (AE-A2) — every decision is inspectable |
