@@ -6,7 +6,6 @@ import pytest
 
 from server.panel_sizing import is_odd_panel_size, panel_size_for_amount
 
-
 _ONE_CSPR = 1_000_000_000
 _CAP_10 = 10 * _ONE_CSPR
 _CAP_100 = 100 * _ONE_CSPR

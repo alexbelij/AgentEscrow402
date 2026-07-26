@@ -12,7 +12,6 @@ from server.rep_pricing import (
     price_breakdown,
 )
 
-
 # --- Determinism ---------------------------------------------------------- #
 
 

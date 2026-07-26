@@ -112,8 +112,7 @@ def run() -> int:
     )
     _dump("swap_id", swap.swap_id[:24] + "…")
     _check(
-        swap.casper_leg.status == HTLCStatus.PROPOSED
-        and swap.evm_leg.status == HTLCStatus.PROPOSED,
+        swap.casper_leg.status == HTLCStatus.PROPOSED and swap.evm_leg.status == HTLCStatus.PROPOSED,
         "both legs PROPOSED",
     )
 
@@ -139,8 +138,7 @@ def run() -> int:
 
     _step(6, "Verify atomic swap complete")
     _check(
-        updated.casper_leg.status == HTLCStatus.CLAIMED
-        and updated.evm_leg.status == HTLCStatus.CLAIMED,
+        updated.casper_leg.status == HTLCStatus.CLAIMED and updated.evm_leg.status == HTLCStatus.CLAIMED,
         "both legs CLAIMED — atomic swap complete",
     )
 
@@ -171,8 +169,7 @@ def run() -> int:
     _step(8, "Verify refund terminal state")
     updated2 = reg.get_swap(swap2.swap_id)
     _check(
-        updated2.casper_leg.status == HTLCStatus.REFUNDED
-        and updated2.evm_leg.status == HTLCStatus.REFUNDED,
+        updated2.casper_leg.status == HTLCStatus.REFUNDED and updated2.evm_leg.status == HTLCStatus.REFUNDED,
         "both legs REFUNDED — funds returned to initiators",
     )
 

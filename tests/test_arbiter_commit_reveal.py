@@ -50,12 +50,8 @@ def test_different_salt_gives_different_commit() -> None:
 
 def test_different_arbiter_gives_different_commit() -> None:
     salt = _salt()
-    a = build_commit(
-        verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey()
-    )
-    b = build_commit(
-        verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey()
-    )
+    a = build_commit(verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey())
+    b = build_commit(verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey())
     assert a.commit_hash_hex != b.commit_hash_hex
 
 
@@ -81,20 +77,14 @@ def test_reveal_rejects_wrong_verdict() -> None:
 def test_reveal_rejects_wrong_salt() -> None:
     pk = _pubkey()
     c = build_commit(verdict="claimant", salt_hex=_salt(), arbiter_pubkey_hex=pk)
-    reveal = Reveal(
-        arbiter_pubkey_hex=pk, verdict="claimant", salt_hex=_salt()
-    )
+    reveal = Reveal(arbiter_pubkey_hex=pk, verdict="claimant", salt_hex=_salt())
     assert not verify_reveal(reveal=reveal, expected_commit_hex=c.commit_hash_hex)
 
 
 def test_reveal_rejects_wrong_arbiter() -> None:
     salt = _salt()
-    c = build_commit(
-        verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey()
-    )
-    reveal = Reveal(
-        arbiter_pubkey_hex=_pubkey(), verdict="claimant", salt_hex=salt
-    )
+    c = build_commit(verdict="claimant", salt_hex=salt, arbiter_pubkey_hex=_pubkey())
+    reveal = Reveal(arbiter_pubkey_hex=_pubkey(), verdict="claimant", salt_hex=salt)
     assert not verify_reveal(reveal=reveal, expected_commit_hex=c.commit_hash_hex)
 
 
@@ -110,16 +100,12 @@ def test_reveal_rejects_garbage_expected_hash() -> None:
 
 def test_short_salt_is_rejected() -> None:
     with pytest.raises(CommitRevealError, match="salt must be at least"):
-        build_commit(
-            verdict="claimant", salt_hex="ab" * 8, arbiter_pubkey_hex=_pubkey()
-        )
+        build_commit(verdict="claimant", salt_hex="ab" * 8, arbiter_pubkey_hex=_pubkey())
 
 
 def test_invalid_verdict_is_rejected() -> None:
     with pytest.raises(CommitRevealError, match="invalid verdict"):
-        build_commit(
-            verdict="undecided", salt_hex=_salt(), arbiter_pubkey_hex=_pubkey()
-        )
+        build_commit(verdict="undecided", salt_hex=_salt(), arbiter_pubkey_hex=_pubkey())
 
 
 def test_empty_pubkey_is_rejected() -> None:
@@ -129,9 +115,7 @@ def test_empty_pubkey_is_rejected() -> None:
 
 def test_invalid_hex_is_rejected() -> None:
     with pytest.raises(CommitRevealError):
-        build_commit(
-            verdict="claimant", salt_hex="xyz", arbiter_pubkey_hex=_pubkey()
-        )
+        build_commit(verdict="claimant", salt_hex="xyz", arbiter_pubkey_hex=_pubkey())
 
 
 def test_valid_verdict_abstain() -> None:

@@ -10,14 +10,12 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-import os
 import time
 
 import pytest
 
 from server.bridge_mode import BridgeModeError, is_live_chain, resolve_mode
 from server.bridge_relayer import BridgeRelayer, RelayerConfig
-
 
 # --- I.1 mode selector ---------------------------------------------------- #
 
@@ -154,7 +152,9 @@ def test_relayer_propagates_preimage() -> None:
         calls.append({"kind": "refund", **p})
 
     r = BridgeRelayer(
-        get_swaps=lambda: [swap], claim_fn=claim, refund_fn=refund,
+        get_swaps=lambda: [swap],
+        claim_fn=claim,
+        refund_fn=refund,
         config=RelayerConfig(max_ticks=1),
     )
     _run(r)
@@ -182,7 +182,9 @@ def test_relayer_refunds_on_expiry() -> None:
         calls.append({"kind": "refund", **p})
 
     r = BridgeRelayer(
-        get_swaps=lambda: [swap], claim_fn=claim, refund_fn=refund,
+        get_swaps=lambda: [swap],
+        claim_fn=claim,
+        refund_fn=refund,
         config=RelayerConfig(max_ticks=1),
     )
     _run(r)
@@ -238,7 +240,9 @@ def test_relayer_survives_action_exception() -> None:
         calls.append({"kind": "refund", **p})
 
     r = BridgeRelayer(
-        get_swaps=lambda: swaps, claim_fn=claim, refund_fn=refund,
+        get_swaps=lambda: swaps,
+        claim_fn=claim,
+        refund_fn=refund,
         config=RelayerConfig(max_ticks=1),
     )
     _run(r)

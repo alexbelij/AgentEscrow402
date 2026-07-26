@@ -95,11 +95,11 @@ def scenario(
         assert released == 0, f"[{name}] expected 0 released, got {released}"
 
     if expect_all_disputed:
-        assert dispute_count == num_escrows, (
-            f"[{name}] expected every escrow disputed, got {dispute_count} / {num_escrows}"
-        )
+        assert (
+            dispute_count == num_escrows
+        ), f"[{name}] expected every escrow disputed, got {dispute_count} / {num_escrows}"
 
-    print(f"   ✓ invariants held\n")
+    print("   ✓ invariants held\n")
 
 
 def determinism_probe() -> None:

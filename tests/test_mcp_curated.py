@@ -9,7 +9,6 @@ from server.mcp_curated import (
     is_curated,
 )
 
-
 # --- Shape & determinism ------------------------------------------------- #
 
 
@@ -75,8 +74,7 @@ def test_no_internal_tools_in_curated() -> None:
     """`internal` tools are for tests only; they must not leak into the LLM host."""
     for t in CURATED_TOOLS:
         assert t.status != "internal", (
-            f"{t.name} is `internal` but is in the curated list — "
-            "remove it or promote it to beta/stable first"
+            f"{t.name} is `internal` but is in the curated list — " "remove it or promote it to beta/stable first"
         )
 
 
@@ -88,6 +86,4 @@ def test_stable_tools_have_stable_summaries() -> None:
     """
     for t in CURATED_TOOLS:
         if t.status == "stable":
-            assert 20 <= len(t.summary) <= 200, (
-                f"{t.name}: summary is {len(t.summary)} chars"
-            )
+            assert 20 <= len(t.summary) <= 200, f"{t.name}: summary is {len(t.summary)} chars"

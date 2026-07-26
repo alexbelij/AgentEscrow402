@@ -81,9 +81,7 @@ def _hex_to_bytes(h: str, *, name: str) -> bytes:
         raise CommitRevealError(f"invalid {name} hex: {exc}") from exc
 
 
-def build_commit(
-    *, verdict: str, salt_hex: str, arbiter_pubkey_hex: str
-) -> Commitment:
+def build_commit(*, verdict: str, salt_hex: str, arbiter_pubkey_hex: str) -> Commitment:
     """Compute the commit hash for one arbiter's vote.
 
     Pure: same input → same commit hash, byte-for-byte.
@@ -91,9 +89,7 @@ def build_commit(
     verdict_c = _canonical_verdict(verdict)
     salt = _hex_to_bytes(salt_hex, name="salt")
     if len(salt) < _MIN_SALT_BYTES:
-        raise CommitRevealError(
-            f"salt must be at least {_MIN_SALT_BYTES} bytes; got {len(salt)}"
-        )
+        raise CommitRevealError(f"salt must be at least {_MIN_SALT_BYTES} bytes; got {len(salt)}")
     pk = _hex_to_bytes(arbiter_pubkey_hex, name="arbiter_pubkey")
     if not pk:
         raise CommitRevealError("arbiter_pubkey_hex must not be empty")

@@ -63,43 +63,33 @@ def test_score_symmetric_neutral_case() -> None:
 
 def test_reputation_delta_favours_higher_side() -> None:
     """Claimant with higher rep gets positive score."""
-    v = score_dispute(
-        _base_input(claimant_reputation=90, respondent_reputation=20)
-    )
+    v = score_dispute(_base_input(claimant_reputation=90, respondent_reputation=20))
     assert v.score > 0
     # Reason must be listed
     assert any(name == "reputation_delta" for name, _, _ in v.reasons)
 
 
 def test_evidence_count_favours_more_evidence() -> None:
-    v = score_dispute(
-        _base_input(claimant_evidence_count=5, respondent_evidence_count=1)
-    )
+    v = score_dispute(_base_input(claimant_evidence_count=5, respondent_evidence_count=1))
     assert v.score > 0
     assert any(name == "evidence_count" for name, _, _ in v.reasons)
 
 
 def test_prior_disputes_penalise_respondent() -> None:
     """More prior disputes on the respondent → claimant wins that signal."""
-    v = score_dispute(
-        _base_input(claimant_prior_disputes=0, respondent_prior_disputes=5)
-    )
+    v = score_dispute(_base_input(claimant_prior_disputes=0, respondent_prior_disputes=5))
     assert v.score > 0
 
 
 def test_prior_disputes_penalise_claimant() -> None:
     """More prior disputes on the claimant → respondent wins that signal."""
-    v = score_dispute(
-        _base_input(claimant_prior_disputes=5, respondent_prior_disputes=0)
-    )
+    v = score_dispute(_base_input(claimant_prior_disputes=5, respondent_prior_disputes=0))
     assert v.score < 0
 
 
 def test_provenance_verified_gives_big_boost() -> None:
     """Verified Merkle provenance is a strong claimant signal."""
-    v = score_dispute(
-        _base_input(claimant_evidence_count=1, evidence_provenance_verified=True)
-    )
+    v = score_dispute(_base_input(claimant_evidence_count=1, evidence_provenance_verified=True))
     assert v.score >= 20
     assert any(name == "provenance_verified" for name, _, _ in v.reasons)
 
@@ -121,9 +111,7 @@ def test_ultra_fast_dispute_is_penalised() -> None:
 
 def test_ultra_late_dispute_is_penalised() -> None:
     """Dispute >30 days after escrow reads as shopping."""
-    v = score_dispute(
-        _base_input(time_to_dispute_seconds=60 * 24 * 3600)
-    )
+    v = score_dispute(_base_input(time_to_dispute_seconds=60 * 24 * 3600))
     assert any(name == "timeline" and delta < 0 for name, delta, _ in v.reasons)
 
 

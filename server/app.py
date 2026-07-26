@@ -450,12 +450,16 @@ app.include_router(intent_chain_router)
 # ---------------------------------------------------------------------------
 # Reputation-based insurance pricing (E.3) — pure demo endpoint
 # ---------------------------------------------------------------------------
-from server.rep_pricing import price_breakdown as _rep_price_breakdown  # noqa: E402
 from server.dispute_ai import (  # noqa: E402
     RubricInput as _RubricInput,
+)
+from server.dispute_ai import (
     narrate_verdict as _narrate_verdict,
+)
+from server.dispute_ai import (
     score_dispute as _score_dispute,
 )
+from server.rep_pricing import price_breakdown as _rep_price_breakdown  # noqa: E402
 
 
 class _PricingRequest(BaseModel):
@@ -509,9 +513,7 @@ async def dispute_rubric(req: _DisputeRubricRequest) -> dict[str, Any]:
         "score": v.score,
         "label": v.label,
         "needs_arbiter_panel": v.needs_arbiter_panel,
-        "reasons": [
-            {"signal": n, "delta": d, "note": note} for (n, d, note) in v.reasons
-        ],
+        "reasons": [{"signal": n, "delta": d, "note": note} for (n, d, note) in v.reasons],
         "narrative": _narrate_verdict(v),
     }
 

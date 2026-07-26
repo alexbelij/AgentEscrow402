@@ -34,7 +34,6 @@ os.environ.setdefault("AE402_DEMO_MODE", "1")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-
 # --- ANSI helpers --------------------------------------------------------- #
 G = "\033[32m"
 R = "\033[31m"
@@ -85,10 +84,7 @@ def run_demo() -> int:
             fail_count += 1
 
     _box(" AE402 · Insurance Showcase (E.1)")
-    print(
-        f"{D}  premium = amount × base_bps × reputation-multiplier. "
-        f"same nonce twice → 401 by design.{X}"
-    )
+    print(f"{D}  premium = amount × base_bps × reputation-multiplier. " f"same nonce twice → 401 by design.{X}")
 
     good_rep_agent = "a" * 64
     weak_rep_agent = "b" * 64
@@ -152,8 +148,7 @@ def run_demo() -> int:
     # An empty-quorum claim MUST NOT settle silently — proves arbiter
     # quorum enforcement per A1 fix.
     _check(
-        r.status_code != 202
-        or (isinstance(r.json(), dict) and r.json().get("settled", False) is False),
+        r.status_code != 202 or (isinstance(r.json(), dict) and r.json().get("settled", False) is False),
         "Empty-quorum claim did not silently settle (A1 arbiter fix)",
     )
 
@@ -177,10 +172,7 @@ def run_demo() -> int:
         print(f"{R}Regression detected in Insurance Showcase.{X}")
         return 1
     print(f"{G}All showcase steps passed.{X}")
-    print(
-        f"{D}  Interactive UI: /console/insurance-demo — reproduces this "
-        f"flow with visual timeline.{X}"
-    )
+    print(f"{D}  Interactive UI: /console/insurance-demo — reproduces this " f"flow with visual timeline.{X}")
     return 0
 
 

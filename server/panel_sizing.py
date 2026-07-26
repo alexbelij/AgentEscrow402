@@ -25,7 +25,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 # CSPR in motes.
 _ONE_CSPR = 1_000_000_000
 _CAP_10_CSPR = 10 * _ONE_CSPR

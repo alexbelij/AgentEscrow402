@@ -132,9 +132,7 @@ def score_dispute(inp: RubricInput) -> RubricVerdict:
         score += rep_signal
 
     # 2) Evidence count — bounded, symmetric.
-    ev_delta = _clamp(
-        inp.claimant_evidence_count - inp.respondent_evidence_count, -10, 10
-    )
+    ev_delta = _clamp(inp.claimant_evidence_count - inp.respondent_evidence_count, -10, 10)
     ev_signal = int(ev_delta * _W_EVIDENCE / 10)
     if ev_signal:
         reasons.append(
@@ -148,17 +146,14 @@ def score_dispute(inp: RubricInput) -> RubricVerdict:
         score += ev_signal
 
     # 3) Prior disputes — more priors → less credibility.
-    pd_delta = _clamp(
-        inp.respondent_prior_disputes - inp.claimant_prior_disputes, -20, 20
-    )
+    pd_delta = _clamp(inp.respondent_prior_disputes - inp.claimant_prior_disputes, -20, 20)
     pd_signal = int(pd_delta * _W_PRIOR_DISPUTES / 20)
     if pd_signal:
         reasons.append(
             (
                 "prior_disputes",
                 pd_signal,
-                f"claimant priors {inp.claimant_prior_disputes} vs respondent "
-                f"{inp.respondent_prior_disputes}",
+                f"claimant priors {inp.claimant_prior_disputes} vs respondent " f"{inp.respondent_prior_disputes}",
             )
         )
         score += pd_signal
@@ -171,9 +166,7 @@ def score_dispute(inp: RubricInput) -> RubricVerdict:
         reasons.append(("timeline", -_W_TIMELINE // 2, "dispute opened <60s after escrow"))
         score += -_W_TIMELINE // 2
     elif t > 30 * 24 * 3600:
-        reasons.append(
-            ("timeline", -_W_TIMELINE // 2, "dispute opened >30 days after escrow")
-        )
+        reasons.append(("timeline", -_W_TIMELINE // 2, "dispute opened >30 days after escrow"))
         score += -_W_TIMELINE // 2
 
     # 5) Provenance verified — big positive for the claimant if the
@@ -214,14 +207,10 @@ def score_dispute(inp: RubricInput) -> RubricVerdict:
     # Arbiter panel is always required for above-cap or replay-flagged
     # disputes — that's a safety property, not a rubric decision.
     needs_panel = (
-        inp.x402_replay_flagged
-        or inp.escrow_amount_motes >= 10_000_000_000  # 10 CSPR cap
-        or label == "insufficient"
+        inp.x402_replay_flagged or inp.escrow_amount_motes >= 10_000_000_000 or label == "insufficient"  # 10 CSPR cap
     )
 
-    return RubricVerdict(
-        score=score, label=label, reasons=reasons, needs_arbiter_panel=needs_panel
-    )
+    return RubricVerdict(score=score, label=label, reasons=reasons, needs_arbiter_panel=needs_panel)
 
 
 def _clamp(v: int, lo: int, hi: int) -> int:

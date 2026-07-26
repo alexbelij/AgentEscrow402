@@ -62,10 +62,7 @@ def resolve_mode(*, mode: str | None = None) -> ResolvedMode:
             source = "default"
 
     if chosen not in _VALID_MODES:
-        raise BridgeModeError(
-            f"unknown AE402_BRIDGE_MODE={chosen!r}; expected one of "
-            f"{list(_VALID_MODES)!r}"
-        )
+        raise BridgeModeError(f"unknown AE402_BRIDGE_MODE={chosen!r}; expected one of " f"{list(_VALID_MODES)!r}")
 
     if chosen == "mainnet" and os.environ.get("AE402_BRIDGE_ALLOW_MAINNET") != "1":
         raise BridgeModeError(

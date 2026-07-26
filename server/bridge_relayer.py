@@ -104,16 +104,11 @@ class BridgeRelayer:
             except Exception as exc:  # never crash the loop
                 self.stats.errors += 1
                 logger.exception("relayer tick failed: %s", exc)
-            if (
-                self._cfg.max_ticks is not None
-                and self.stats.ticks >= self._cfg.max_ticks
-            ):
+            if self._cfg.max_ticks is not None and self.stats.ticks >= self._cfg.max_ticks:
                 self.stop()
                 break
             try:
-                await asyncio.wait_for(
-                    self._stop.wait(), timeout=self._cfg.poll_interval_s
-                )
+                await asyncio.wait_for(self._stop.wait(), timeout=self._cfg.poll_interval_s)
             except asyncio.TimeoutError:
                 pass
 
@@ -135,9 +130,7 @@ class BridgeRelayer:
                 await self._process(s)
             except Exception as exc:
                 self.stats.errors += 1
-                logger.exception(
-                    "relayer failed on swap %s: %s", s.get("swap_id"), exc
-                )
+                logger.exception("relayer failed on swap %s: %s", s.get("swap_id"), exc)
 
     async def _process(self, swap: dict[str, Any]) -> None:
         state = swap.get("state") or {}
