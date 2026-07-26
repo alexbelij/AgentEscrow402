@@ -323,7 +323,8 @@ components:
           type: string
         panel_election:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Panel Election
         provider:
@@ -583,6 +584,7 @@ components:
           title: Code
           type: string
         detail:
+          additionalProperties: true
           title: Detail
           type: object
         message:
@@ -1035,6 +1037,7 @@ components:
           type: integer
         escrows:
           items:
+            additionalProperties: true
             type: object
           title: Escrows
           type: array
@@ -1241,6 +1244,7 @@ components:
     EscrowResponse:
       properties:
         escrow:
+          additionalProperties: true
           title: Escrow
           type: object
       required:
@@ -1338,8 +1342,7 @@ components:
           title: Prior Volume Today Motes
           type: integer
         verification_level:
-          allOf:
-          - $ref: '#/components/schemas/VerificationLevel'
+          $ref: '#/components/schemas/VerificationLevel'
           default: UNVERIFIED
       required:
       - country_code
@@ -1445,6 +1448,7 @@ components:
           title: Status
           type: string
         strict_mode:
+          additionalProperties: true
           default: {}
           title: Strict Mode
           type: object
@@ -1663,7 +1667,8 @@ components:
           type: string
         extra_claims:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Extra Claims
         issuance_ts:
@@ -1692,9 +1697,11 @@ components:
     IssueResponse:
       properties:
         credential:
+          additionalProperties: true
           title: Credential
           type: object
         summary:
+          additionalProperties: true
           title: Summary
           type: object
       required:
@@ -1971,8 +1978,7 @@ components:
           title: Service Hash
           type: string
         token:
-          allOf:
-          - $ref: '#/components/schemas/TokenIdentifier'
+          $ref: '#/components/schemas/TokenIdentifier'
           description: Details of the token being escrowed
         ttl:
           default: 300
@@ -2262,6 +2268,7 @@ components:
           title: Prove Ms
           type: number
         range_proof:
+          additionalProperties: true
           title: Range Proof
           type: object
       required:
@@ -2279,6 +2286,7 @@ components:
           title: Action Type
           type: string
         params:
+          additionalProperties: true
           title: Params
           type: object
       required:
@@ -2980,8 +2988,7 @@ components:
           title: Start Time
           type: integer
         token:
-          allOf:
-          - $ref: '#/components/schemas/TokenIdentifier'
+          $ref: '#/components/schemas/TokenIdentifier'
           description: Details of the token being streamed
       required:
       - receiver
@@ -3208,7 +3215,8 @@ components:
       properties:
         body:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Body
         expected_status:
@@ -3367,6 +3375,7 @@ components:
     ToolCallRequest:
       properties:
         arguments:
+          additionalProperties: true
           title: Arguments
           type: object
       title: ToolCallRequest
@@ -3387,6 +3396,11 @@ components:
       type: object
     ValidationError:
       properties:
+        ctx:
+          title: Context
+          type: object
+        input:
+          title: Input
         loc:
           items:
             anyOf:
@@ -3661,6 +3675,7 @@ components:
           title: Discharges
           type: array
         facts:
+          additionalProperties: true
           title: Facts
           type: object
         now:
@@ -3731,6 +3746,7 @@ components:
     server__vc_api__VerifyRequest:
       properties:
         credential:
+          additionalProperties: true
           title: Credential
           type: object
         expected_issuer:
@@ -3757,7 +3773,8 @@ components:
           title: Error Type
         summary:
           anyOf:
-          - type: object
+          - additionalProperties: true
+            type: object
           - type: 'null'
           title: Summary
         valid:
@@ -3773,6 +3790,7 @@ components:
           title: Commitment
           type: string
         range_proof:
+          additionalProperties: true
           title: Range Proof
           type: object
         transcript:
@@ -4892,6 +4910,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Cep18 Permit Nonce Escrow Cep18 Permit Nonce Get
                 type: object
           description: Successful Response
@@ -4950,6 +4969,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Dispute Multi Asset Escrow Escrow Multi Asset  Service Hash  Dispute Post
                 type: object
           description: Successful Response
@@ -4979,6 +4999,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Refund Multi Asset Escrow Escrow Multi Asset  Service Hash  Refund Post
                 type: object
           description: Successful Response
@@ -5014,6 +5035,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Release Multi Asset Escrow Escrow Multi Asset  Service Hash  Release Post
                 type: object
           description: Successful Response
@@ -5049,6 +5071,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Resolve Multi Asset Escrow Escrow Multi Asset  Service Hash  Resolve Post
                 type: object
           description: Successful Response
@@ -5263,6 +5286,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Claim Streamed Escrow Escrow  Service Hash  Stream Claim Post
                 type: object
           description: Successful Response
@@ -5821,10 +5845,8 @@ paths:
         name: min_verification
         required: false
         schema:
-          allOf:
-          - $ref: '#/components/schemas/VerificationLevel'
+          $ref: '#/components/schemas/VerificationLevel'
           default: UNVERIFIED
-          title: Min Verification
       responses:
         '200':
           content:
@@ -5852,6 +5874,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Registry Statistics Identity Registry Stats Summary Get
                 type: object
           description: Successful Response
@@ -6522,6 +6545,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Policy Macaroons Policy Get
                 type: object
           description: Successful Response
@@ -6567,6 +6591,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response List Tools Mcp Tools Get
                 type: object
           description: Successful Response
@@ -6880,6 +6905,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Regime Shift Cusum Risk Regime Shift Cusum Post
                 type: object
           description: Successful Response
@@ -6907,6 +6933,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Regime Shift Page Hinkley Risk Regime Shift Page Hinkley Post
                 type: object
           description: Successful Response
@@ -7017,6 +7044,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Status Telegram Status Get
                 type: object
           description: Successful Response
@@ -7065,6 +7093,7 @@ paths:
               schema:
                 additionalProperties:
                   items:
+                    additionalProperties: true
                     type: object
                   type: array
                 title: Response List Subscriptions Telegram Subscriptions Get
@@ -7117,6 +7146,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Test Send Telegram Test Post
                 type: object
           description: Successful Response
@@ -7156,6 +7186,7 @@ paths:
         content:
           application/json:
             schema:
+              additionalProperties: true
               title: Update
               type: object
         required: true
@@ -7164,6 +7195,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Webhook Telegram Webhook  Secret  Post
                 type: object
           description: Successful Response
@@ -7256,6 +7288,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response List Actions Timelock Actions Get
                 type: object
           description: Successful Response
@@ -7291,6 +7324,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Action Timelock Actions  Action Id  Get
                 type: object
           description: Successful Response
@@ -7334,6 +7368,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Cancel Action Timelock Cancel  Action Id  Post
                 type: object
           description: Successful Response
@@ -7369,6 +7404,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Execute Action Timelock Execute  Action Id  Post
                 type: object
           description: Successful Response
@@ -7404,6 +7440,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Queue Action Timelock Queue Post
                 type: object
           description: Successful Response
@@ -7438,6 +7475,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Renounce Admin Timelock Renounce Post
                 type: object
           description: Successful Response
@@ -7467,6 +7505,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Get Status Timelock Status Get
                 type: object
           description: Successful Response
@@ -7715,6 +7754,7 @@ paths:
           content:
             application/json:
               schema:
+                additionalProperties: true
                 title: Response Generators Zk Generators Get
                 type: object
           description: Successful Response
