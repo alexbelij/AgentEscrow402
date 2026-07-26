@@ -1085,6 +1085,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "htlc-funder"
+version = "0.1.0"
+dependencies = [
+ "casper-contract",
+ "casper-types 6.1.0",
+]
+
+[[package]]
 name = "humantime"
 version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

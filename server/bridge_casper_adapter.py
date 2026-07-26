@@ -129,7 +129,7 @@ def _run_lifecycle(env: Dict[str, str]) -> DeployResult:
         env=full_env,
         capture_output=True,
         text=True,
-        timeout=180,
+        timeout=300,
     )
     if completed.returncode != 0:
         raise CasperAdapterError(
