@@ -107,7 +107,7 @@ export default function Hero() {
           </div>
 
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold mb-5">
-            Live on Casper Testnet · 8 contracts · 349 on-chain transactions
+            Live on Casper Testnet · 10 contracts · 369+ on-chain transactions
           </div>
 
           <h1 className="text-4xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-[1.2] mb-5 tracking-tight">
@@ -181,9 +181,9 @@ export default function Hero() {
           {/* Stats row */}
           <div className="flex gap-6 sm:gap-8 flex-wrap">
             {[
-              { val: '8', label: 'Smart Contracts' },
-              { val: '349', label: 'Testnet Txns' },
-              { val: '490', label: 'Tests Passing' },
+              { val: '10', label: 'Smart Contracts' },
+              { val: '369+', label: 'Testnet Txns' },
+              { val: '2331', label: 'Tests Passing' },
               { val: '26', label: 'MCP Tools' },
             ].map((s, i) => (
               <div key={i} className="text-center">
