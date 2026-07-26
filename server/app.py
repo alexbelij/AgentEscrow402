@@ -446,6 +446,76 @@ app.include_router(compliance_router)
 # AE-M1 — multi-hop A2A choreography (chain_escrow / attest_hop).
 app.include_router(intent_chain_router)
 
+
+# ---------------------------------------------------------------------------
+# Reputation-based insurance pricing (E.3) — pure demo endpoint
+# ---------------------------------------------------------------------------
+from server.rep_pricing import price_breakdown as _rep_price_breakdown  # noqa: E402
+from server.dispute_ai import (  # noqa: E402
+    RubricInput as _RubricInput,
+    narrate_verdict as _narrate_verdict,
+    score_dispute as _score_dispute,
+)
+
+
+class _PricingRequest(BaseModel):
+    escrow_amount_motes: int = Field(..., gt=0)
+    reputation: int = Field(..., ge=0, le=100)
+
+
+@app.post("/pricing/insurance-fee", tags=["pricing"])
+async def pricing_insurance_fee(req: _PricingRequest) -> dict[str, Any]:
+    """Reputation-based insurance premium calculator (E.3).
+
+    Pure function. Same (amount, reputation) always returns the same
+    fee, deterministically. See `server/rep_pricing.py` for the math.
+    """
+    b = _rep_price_breakdown(req.escrow_amount_motes, req.reputation)
+    return {
+        "escrow_amount_motes": req.escrow_amount_motes,
+        "reputation": req.reputation,
+        "fee_motes": b.fee,
+        "base_fee_motes": b.base_fee,
+        "adjusted_fee_motes": b.adjusted_fee,
+        "tier": b.tier,
+        "multiplier": b.multiplier,
+    }
+
+
+class _DisputeRubricRequest(BaseModel):
+    escrow_amount_motes: int = Field(..., gt=0)
+    time_to_dispute_seconds: int = Field(..., ge=0)
+    claimant_reputation: int = Field(..., ge=0, le=100)
+    respondent_reputation: int = Field(..., ge=0, le=100)
+    claimant_evidence_count: int = Field(0, ge=0)
+    respondent_evidence_count: int = Field(0, ge=0)
+    claimant_prior_disputes: int = Field(0, ge=0)
+    respondent_prior_disputes: int = Field(0, ge=0)
+    evidence_provenance_verified: bool = False
+    x402_replay_flagged: bool = False
+
+
+@app.post("/dispute/rubric", tags=["dispute"])
+async def dispute_rubric(req: _DisputeRubricRequest) -> dict[str, Any]:
+    """Deterministic dispute rubric (E.2) with advisory narrative.
+
+    Never binding — the arbiter panel makes the final decision. This
+    endpoint exists so judges/UI can preview the rubric verdict without
+    committing anything on-chain.
+    """
+    inp = _RubricInput(**req.model_dump())
+    v = _score_dispute(inp)
+    return {
+        "score": v.score,
+        "label": v.label,
+        "needs_arbiter_panel": v.needs_arbiter_panel,
+        "reasons": [
+            {"signal": n, "delta": d, "note": note} for (n, d, note) in v.reasons
+        ],
+        "narrative": _narrate_verdict(v),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
