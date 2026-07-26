@@ -7,14 +7,75 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [Unreleased] — Final-Round Hardening (2026-07-26)
+
+Continuation of the submission block below: the four post-hackathon contracts
+from the 07-25 batch were merged and the 10th contract (Casper HTLC bridge)
+went live, plus a wide judge-facing and reliability pass. Summarized by theme
+(137 commits) rather than commit-by-commit — see `git log` for the full diff.
+
+### Added — Contracts & new capabilities
+
+- **Casper HTLC bridge (ROADMAP L85)** — 10th live testnet contract. Hash-time-locked
+  atomic swap between the Casper leg and an EVM (Sepolia) leg, sha256 hashlock shared
+  on both sides so no adapter re-hashing is needed. `docs/CROSS_CHAIN_DEMO.md`.
+- **Two-Key Account** (`f995927`, hardened `c708f4d`, merged 2026-07-24) — cold/hot
+  key account-abstraction-style account so a compromised hot key alone can't drain
+  funds. 14 Rust property tests. Code-complete, not yet deployed to testnet — see
+  `docs/TWO_KEY_ACCOUNT.md`. *(This entry was previously missing from the changelog
+  entirely — added 2026-07-27.)*
+- **Zero-knowledge amount privacy (W.2)** — opt-in Pedersen commitment + 48-bit range
+  proof on `POST /escrow`; every subsequent read redacts the amount unless revealed
+  via the blinding factor. 41 new tests.
+- **Compliance & travel-rule framework (T3.7)** — deterministic jurisdiction checks
+  and KYC tiering from the Agent Identity Registry, inline on escrow creation.
+- **Threshold escrow / Shamir MPC (T3.1)** — split a release secret into m-of-n
+  shares; below-threshold coalitions learn nothing. `/threshold/*` router, 37 tests.
+- **Gaming-reward escrow (T3.2)** — Merkle-root reward commitments with O(log N)
+  inclusion-proof claims. `/gaming/*` router, 44 tests.
+- **Multi-hop A2A choreography (AE-M1)** — chain an escrow across N agent hops with
+  a verifiable hash-chain of attestations. `/intents` router, 28 tests.
+- **Agent discovery marketplace UI (T3.6)** and **Agent-vs-Agent simulation
+  framework (T3.5)** — new console/testing surfaces.
+- **FlashGuard (T2.12)** fully wired onto release/refund/dispute with a block-delay
+  half; **on-chain preflight** WASM validator + CI gate (C5); **cargo-fuzz** smoke
+  over pure-Rust stubs, one overflow bug found and fixed (C12).
+
+### Added — Judge-facing & operational
+
+- **Judge-lite reproducibility CLI** (C1) — 60-second Python-only replay.
+- **Observability foundation** (C2) — request-latency histograms, JSON logs, Grafana
+  dashboard.
+- **Agentic-slice end-to-end tests + `demo/agent_flow.py`** (C3).
+- **SDK release automation** — publish workflow + PR version gate + runbook.
+- **OpenAPI drift gate** — deterministic regeneration + CI enforcement.
+- Numbers reconciled across README/ARCHITECTURE/ROADMAP/API docs to the current
+  10 live + 4 pending contracts, 140 endpoints, 2331 tests, 369+ testnet deploys,
+  19 console pages; `sitemap.xml` fixed from 13 to 19 pages; stale CP/CasperProver
+  mentions removed from AE402 docs.
+
+### Fixed
+
+- Dockerfile was missing `COPY docs/ docs/` — the deployed API's `/mcp/tools`
+  endpoint silently returned an empty tool list in production (found live on
+  ae402.xyz's MCP Playground: "0 tools" / "vunknown").
+- Write-path Casper RPC calls (escrow create/release/etc., via Node subprocess)
+  had no fallback across `self._rpc_endpoints` — unlike reads. A write hitting a
+  rejecting primary endpoint failed outright with no retry. Fixed in
+  `server/casper_client.py` (`_run_node_script_with_fallback`), 2026-07-27.
+- CI gates (black formatting, SBOM regeneration guard, dependency resolution)
+  fixed after drifting since earlier merges.
+
+---
+
 ## [Unreleased] — Hackathon Submission Block (2026-07-19 → 2026-07-25)
 
 Submission-grade hardening across contracts, evidence, and judge-facing surfaces. All items below either landed on `main` or are on-branch in an open PR with tests green.
 
 ### Added — New contracts (post-hackathon block, on-branch)
 
-- **Challenge Arbiter with commit-reveal + bond/slash** ([PR #55](https://github.com/alexbelij/AgentEscrow402/pull/55), `feat/ae402-challenge-arbiter`). Two-phase arbiter selection: submit `commit(H(seed))`, reveal `seed`, run VRF-weighted quorum. Bonds slashed on no-reveal, malicious reveal (mismatched hash), or losing minority in ternary arbitration. 45 Rust property tests + 31 Python parity tests. ~160 KB WASM. Threat model: `docs/CHALLENGE_ARBITER.md`.
-- **Range Proof Registry** ([PR #62](https://github.com/alexbelij/AgentEscrow402/pull/62), `feat/ae402-range-proofs`). Threshold-attested amount-range proofs using mod-exp on a 3072-bit safe prime — no ZK-precompile dependency. Pedersen commitments; verifier accepts (proof, commitment, range) tuple; 3-of-5 attester quorum. 34 Rust property tests + 42 Python parity tests. ~180 KB WASM. Design + verifier calibration: `docs/RANGE_PROOFS.md`.
+- **Challenge Arbiter with commit-reveal + bond/slash** ([PR #55](https://github.com/alexbelij/AgentEscrow402/pull/55), `feat/ae402-challenge-arbiter`). Two-phase arbiter selection: submit `commit(H(seed))`, reveal `seed`, run VRF-weighted quorum. Bonds slashed on no-reveal, malicious reveal (mismatched hash), or losing minority in ternary arbitration. 26 Rust property tests + 31 Python parity tests. ~160 KB WASM. Threat model: `docs/CHALLENGE_ARBITER.md`.
+- **Range Proof Registry** ([PR #62](https://github.com/alexbelij/AgentEscrow402/pull/62), `feat/ae402-range-proofs`). Threshold-attested amount-range proofs using mod-exp on a 3072-bit safe prime — no ZK-precompile dependency. Pedersen commitments; verifier accepts (proof, commitment, range) tuple; 3-of-5 attester quorum. 32 Rust property tests + 42 Python parity tests. ~180 KB WASM. Design + verifier calibration: `docs/RANGE_PROOFS.md`.
 - **Governance DAO with AE402 action layer** ([PR #63](https://github.com/alexbelij/AgentEscrow402/pull/63), `feat/ae402-governance-dao`). Ported voting/quorum/delegation primitives from RWA-Sentinel under Apache-2.0 (see `contracts/ae402-governance-dao/PROVENANCE.md`), replaced action layer with 6 AE402-specific actions (`ADJUST_FEE_BPS`, `ROTATE_ARBITER_SET`, `UPDATE_INSURANCE_POOL_PARAMS`, `UPDATE_TIMELOCK_DELAY`, `UPDATE_RANGE_PROOF_PARAMS`, `PAUSE_PROTOCOL`) with cross-contract execution via `exec_log`. 30% quorum, 7-day voting, veto path, late-finalization. 49 Rust property tests + 58 Python (51 parity + 7 lifecycle). 159 KB WASM. Full threat model: `docs/GOVERNANCE.md`.
 
 ### Added — Multi-hop A2A choreography (AE-M1)
@@ -31,7 +92,7 @@ Submission-grade hardening across contracts, evidence, and judge-facing surfaces
 - **Rust:** 119 tests passing (property + unit + integration).
 - **Python:** 1067 tests passing.
 - **Regressions from the submission block:** 0.
-- **New tests added by the submission block:** 107 (49 governance property + 51 governance parity + 7 governance lifecycle in this batch alone; earlier batches added 42 range-proof parity + 34 range-proof property + 31 challenge-arbiter parity + 45 challenge-arbiter property).
+- **New tests added by the submission block:** 107 (49 governance property + 51 governance parity + 7 governance lifecycle in this batch alone; earlier batches added 42 range-proof parity + 32 range-proof property + 31 challenge-arbiter parity + 26 challenge-arbiter property). *(Corrected 2026-07-27: the Rust property-test counts for Challenge Arbiter and Range Proof Registry were originally recorded as 45 and 34 respectively — those were stale/aspirational figures from when the PRs were opened. `TX_MANIFEST.md`'s 26 / 32 are the ones verified by actually running the package-scoped `cargo test` commands, confirmed again here by a static count of `#[test]`/`#[proptest]` attributes in `contracts/tests/src/{challenge_arbiter,range_proof_registry}_property_tests.rs`.)*
 
 ### Fixed / verified
 

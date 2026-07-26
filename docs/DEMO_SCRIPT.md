@@ -140,6 +140,31 @@ even a passing payload can't change the deterministic score.
 
 ---
 
+## 7 · New this round: ZK privacy, compliance, threshold escrow, gaming rewards, multi-hop (1 min)
+
+**Story:** five capabilities added after the Tier-1 baseline, each with a
+real REST surface and its own test suite (no showcase script yet —
+run the tests directly as the executable proof):
+
+```bash
+pytest tests/test_confidential_escrow.py tests/test_confidential_escrow_api.py -q   # ZK amount privacy
+pytest tests/test_threshold_secret.py tests/test_threshold_api.py -q               # Shamir threshold escrow
+pytest tests/test_gaming_reward.py tests/test_gaming_reward_api.py -q              # Merkle gaming-reward escrow
+pytest tests/test_intent_chain.py tests/test_intent_chain_api.py -q                # multi-hop A2A choreography
+```
+
+Live API surfaces: `/escrow` with `confidential: true` + `/escrow/{hash}/reveal`
+(ZK), `/threshold/*` (Shamir MPC), `/gaming/*` (Merkle rewards), `/intents`
+(multi-hop chaining) — see `docs/openapi.yaml` for full request/response
+shapes. Console coverage: `/console/feature-map` → "New this round" section
+links each one to `/console/sandbox` for a live call.
+
+Compliance/travel-rule checks run inline on `/escrow` creation (jurisdiction +
+KYC-tier gate from the Agent Identity Registry) — no separate demo call, see
+`docs/COMPLIANCE.md`.
+
+---
+
 ## FAQ
 
 **Q: Is this on-chain?**
