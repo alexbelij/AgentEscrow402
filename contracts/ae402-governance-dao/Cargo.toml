@@ -11,7 +11,7 @@ edition = "2021"
 casper-contract = "5.1"
 
 [dependencies]
-casper-types = { version = "6.0", default-features = false }
+casper-types = { version = "7.0", default-features = false }
 
 [lib]
 name = "ae402_governance_dao"
