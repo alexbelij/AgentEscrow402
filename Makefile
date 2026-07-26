@@ -1,4 +1,4 @@
-.PHONY: run test lint format contracts clean judge-demo judge-demo-check judge-demo-keep judge-lite judge-lite-check judge-lite-keep
+.PHONY: run test lint lint-fix format check contracts clean judge-demo judge-demo-check judge-demo-keep judge-lite judge-lite-check judge-lite-keep
 
 run:
 	uvicorn server.app:app --host 0.0.0.0 --port 8000 --reload
@@ -6,12 +6,24 @@ run:
 test:
 	pytest -v
 
+# Mirrors CI lint-and-test job's Ruff + Black gates exactly, so a green
+# `make lint` locally guarantees a green CI lint gate. Black runs first
+# because a formatter miss is the more common failure mode.
 lint:
-	ruff check .
+	python -m black --check --line-length 120 .
+	python -m ruff check .
 
-format:
-	black .
-	ruff check . --fix
+# Local auto-fix pass -- safe to run before committing; both tools are
+# deterministic and only touch style, never semantics.
+lint-fix:
+	python -m black --line-length 120 .
+	python -m ruff check . --fix
+
+# Legacy alias kept for muscle memory. Prefer `make lint-fix`.
+format: lint-fix
+
+# Full pre-push gate: lint + tests. Matches the CI job's shape.
+check: lint test
 
 contracts:
 	cd contracts/escrow && cargo build --release --target wasm32-unknown-unknown
