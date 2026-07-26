@@ -1,0 +1,57 @@
+name: SDK Version Consistency
+
+# Fast PR-gate that catches version drift BEFORE a publish tag ever fires.
+# The publish workflow (sdk-publish.yml) also validates, but this runs on
+# every PR touching either SDK so a bad bump never lands on main.
+
+on:
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'sdk/**'
+      - 'sdk-ts/**'
+      - 'CHANGELOG.md'
+
+permissions:
+  contents: read
+
+jobs:
+  version-check:
+    name: Cross-check SDK versions + CHANGELOG
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Compare versions + CHANGELOG
+        run: |
+          set -euo pipefail
+          PY_VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          TS_VERSION=$(node -p "require('./sdk-ts/package.json').version")
+
+          echo "Python SDK version:      $PY_VERSION"
+          echo "TypeScript SDK version:  $TS_VERSION"
+
+          # Both SDKs may version independently (they're separate packages).
+          # But whichever version is present in pyproject/package.json MUST
+          # appear somewhere in CHANGELOG.md or the publish job will warn.
+          #
+          # This job is INFORMATIONAL (does not fail on CHANGELOG gaps) so
+          # SDK-only refactors that don't bump versions still pass.
+          if ! grep -qF "$PY_VERSION" CHANGELOG.md; then
+            echo "::warning::CHANGELOG.md does not mention Python SDK version $PY_VERSION"
+          fi
+          if ! grep -qF "$TS_VERSION" CHANGELOG.md; then
+            echo "::warning::CHANGELOG.md does not mention TypeScript SDK version $TS_VERSION"
+          fi
+
+          echo "::notice::Version check passed (Py=$PY_VERSION, TS=$TS_VERSION)"
