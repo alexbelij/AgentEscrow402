@@ -3486,6 +3486,77 @@ components:
       - position
       title: VerifyEvidenceStep
       type: object
+    _DisputeRubricRequest:
+      properties:
+        claimant_evidence_count:
+          default: 0
+          minimum: 0.0
+          title: Claimant Evidence Count
+          type: integer
+        claimant_prior_disputes:
+          default: 0
+          minimum: 0.0
+          title: Claimant Prior Disputes
+          type: integer
+        claimant_reputation:
+          maximum: 100.0
+          minimum: 0.0
+          title: Claimant Reputation
+          type: integer
+        escrow_amount_motes:
+          exclusiveMinimum: 0.0
+          title: Escrow Amount Motes
+          type: integer
+        evidence_provenance_verified:
+          default: false
+          title: Evidence Provenance Verified
+          type: boolean
+        respondent_evidence_count:
+          default: 0
+          minimum: 0.0
+          title: Respondent Evidence Count
+          type: integer
+        respondent_prior_disputes:
+          default: 0
+          minimum: 0.0
+          title: Respondent Prior Disputes
+          type: integer
+        respondent_reputation:
+          maximum: 100.0
+          minimum: 0.0
+          title: Respondent Reputation
+          type: integer
+        time_to_dispute_seconds:
+          minimum: 0.0
+          title: Time To Dispute Seconds
+          type: integer
+        x402_replay_flagged:
+          default: false
+          title: X402 Replay Flagged
+          type: boolean
+      required:
+      - escrow_amount_motes
+      - time_to_dispute_seconds
+      - claimant_reputation
+      - respondent_reputation
+      title: _DisputeRubricRequest
+      type: object
+    _PricingRequest:
+      properties:
+        escrow_amount_motes:
+          exclusiveMinimum: 0.0
+          title: Escrow Amount Motes
+          type: integer
+        reputation:
+          maximum: 100.0
+          minimum: 0.0
+          title: Reputation
+          type: integer
+      required:
+      - escrow_amount_motes
+      - reputation
+      title: _PricingRequest
+      type: object
     server__agent_identity__AgentIdentity:
       description: Details of an agent's registered identity.
       properties:
@@ -4765,6 +4836,41 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Dispute Escrow
+  /dispute/rubric:
+    post:
+      description: 'Deterministic dispute rubric (E.2) with advisory narrative.
+
+
+        Never binding — the arbiter panel makes the final decision. This
+
+        endpoint exists so judges/UI can preview the rubric verdict without
+
+        committing anything on-chain.'
+      operationId: dispute_rubric_dispute_rubric_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/_DisputeRubricRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                title: Response Dispute Rubric Dispute Rubric Post
+                type: object
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Dispute Rubric
+      tags:
+      - dispute
   /escrow:
     post:
       operationId: create_escrow_escrow_post
@@ -6648,6 +6754,39 @@ paths:
       summary: Ops Health
       tags:
       - ops
+  /pricing/insurance-fee:
+    post:
+      description: 'Reputation-based insurance premium calculator (E.3).
+
+
+        Pure function. Same (amount, reputation) always returns the same
+
+        fee, deterministically. See `server/rep_pricing.py` for the math.'
+      operationId: pricing_insurance_fee_pricing_insurance_fee_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/_PricingRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                additionalProperties: true
+                title: Response Pricing Insurance Fee Pricing Insurance Fee Post
+                type: object
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Pricing Insurance Fee
+      tags:
+      - pricing
   /refund:
     post:
       operationId: refund_escrow_refund_post
