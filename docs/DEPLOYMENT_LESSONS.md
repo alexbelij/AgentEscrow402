@@ -92,7 +92,7 @@ The error was silent about the cause; from the outside it looked like a corrupt 
 
 `storage::new_dictionary(name)` requires that the deployer's account **does not already own a named key with that exact name**. It doesn't merge, it doesn't reuse — it rejects.
 
-The `alexbelij` account, from the earlier deploy, still held named keys `stakes`, `slashed_proofs`, `claimed_escrow_ids`, etc. So any re-`new_dictionary` call from that account was doomed. The named keys aren't automatically cleaned up between contract versions.
+The `alexbelij` account, from an earlier deploy, still held a named key `claimed_escrow_ids`, etc. So any re-`new_dictionary` call from that account was doomed. The named keys aren't automatically cleaned up between contract versions.
 
 ### How to detect this before wasting CSPR
 
@@ -107,7 +107,7 @@ casper-client get-account-info \
 # Check the "named_keys" array for collisions with your planned dictionary names
 ```
 
-If any collision exists, **switch to a clean wallet** for this deploy. That's what happened for the CP stake-slashing redeploy on 2026-07-18: `anna-stolbovskaja` had the collision → deploy shifted to `defi_mock_owner` (verified clean via `state_get_account_info` first) → success at `1ad1b3d9…983d52`.
+If any collision exists, **switch to a clean wallet** for this deploy — verify it's clean via `state_get_account_info` first before submitting.
 
 ### Applying this to AE402 next time
 
@@ -117,7 +117,7 @@ If any collision exists, **switch to a clean wallet** for this deploy. That's wh
   2. Rename the dictionaries in the new contract version (breaks existing state readers — not recommended).
   3. Add cleanup logic in the contract itself before `new_dictionary` — non-trivial and error-prone.
 
-Option 1 is what the CP redeploy proved works.
+Option 1 (fresh wallet) is the approach the insurance-pool hardened redeploy proved works.
 
 ---
 
