@@ -1,6 +1,6 @@
 {
   "network": "casper-test",
-  "generated_at": "2026-07-24T13:00:00Z",
+  "generated_at": "2026-07-26T19:40:00Z",
   "contracts": {
     "escrow_manager_v9": {
       "name": "Core Escrow",
@@ -81,9 +81,21 @@
       "version": 1,
       "notes": "CEP-78 enhanced NFT collection (Transferable, Public minting, Ordinal IDs) used for multi-asset escrow NFT demos. Was previously referenced only as a literal string in frontend/backend code with no manifest entry; re-verified against CSPR.cloud contract-packages/contracts lookup 2026-07-24 before being added here as the canonical source.",
       "explorer": "https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a"
+    },
+    "casper_htlc": {
+      "name": "Casper HTLC (bridge Casper leg)",
+      "contract_hash": "hash-5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435",
+      "contract_package_hash": "hash-93f970abd3b13061c0c80986e3c5323ea30b9f2b099f5d12ef785e09b6b2a542",
+      "contract_wasm_hash": "contract-wasm-f5d0d0577e86c79ad93aa23ec158451247710ffcfb888c1b0fea52fa046d2a23",
+      "deploy_hash": "2bf2e6732c0c2c2ec833e92cebd07b51f0e4626e33553e9315c0f26e31e854e7",
+      "version": 1,
+      "deployed_at": "2026-07-26",
+      "entry_points": ["lock", "claim", "refund", "get_status"],
+      "notes": "ROADMAP L85 (multi-chain bridge, production). Byte-for-byte mirror of contracts/HTLC.sol (EVM leg on Sepolia) and server/bridge_htlc.py (deterministic mock). sha256 hashlock (not blake2b) so the same (preimage, hashlock) pair works on both legs of an atomic swap without adapter re-hashing. State machine EMPTY \u2192 LOCKED \u2192 CLAIMED | REFUNDED. Timelock in milliseconds to match Solidity+Python legs. Checks-Effects-Interactions ordering throughout. Deployer PEM: team.ae402_alexbelij_deployer_pem.",
+      "explorer": "https://testnet.cspr.live/contract/5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435"
     }
   },
   "api_url": "https://agentescrow402-api-ywm8.onrender.com",
   "frontend_url": "https://ae402.xyz",
-  "source_ref": "Key-fix redeploy (agent-identity-registry, escrow/Core Escrow, multi-asset-escrow, test-token/AEMAT) verified via casper-client + query_global_state 2026-07-24; insurance-pool and other tokens unchanged from CSPR.cloud API verified 2026-07-17"
+  "source_ref": "2026-07-26 casper_htlc (L85 Casper leg) added, verified via state_get_entity RPC. 2026-07-24 Key-fix redeploy (agent-identity-registry, escrow/Core Escrow, multi-asset-escrow, test-token/AEMAT) verified via casper-client + query_global_state; insurance-pool and other tokens unchanged from CSPR.cloud API verified 2026-07-17"
 }

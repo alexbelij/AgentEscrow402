@@ -5,7 +5,7 @@
 
 
 export const NETWORK = "casper-test";
-export const MANIFEST_GENERATED_AT = "2026-07-24T13:00:00Z";
+export const MANIFEST_GENERATED_AT = "2026-07-26T19:40:00Z";
 export const API_URL = "https://agentescrow402-api-ywm8.onrender.com";
 export const FRONTEND_URL = "https://ae402.xyz";
 
@@ -100,6 +100,15 @@ export const CONTRACTS: Record<string, ManifestContract> = {
     deployHash: "e3ed5932db63383d1cc7cc3f5ee56648aa28a84c8e401418f502cb6b8ebcb93d",
     version: 1,
     explorer: "https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a",
+  },
+  casperHtlc: {
+    key: "casper_htlc",
+    name: "Casper HTLC (bridge Casper leg)",
+    contractHash: "5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435",
+    contractPackageHash: "93f970abd3b13061c0c80986e3c5323ea30b9f2b099f5d12ef785e09b6b2a542",
+    deployHash: "2bf2e6732c0c2c2ec833e92cebd07b51f0e4626e33553e9315c0f26e31e854e7",
+    version: 1,
+    explorer: "https://testnet.cspr.live/contract/5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435",
   },
 };
 
