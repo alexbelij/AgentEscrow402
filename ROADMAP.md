@@ -49,7 +49,13 @@
 
 ### Phase 2 — Advanced features
 
-- [ ] Threshold escrow via MPC (Shamir Secret Sharing, n-of-m release)
+- [x] Threshold escrow via MPC (Shamir Secret Sharing, n-of-m release) —
+      T3.1 delivered the SSS split/reconstruct primitives; C13 wires them
+      into the escrow lifecycle: `POST /escrow/{h}/threshold-arm` stores
+      the sha256 commitment on the row (server never sees the secret or
+      shares between calls), and `/release` refuses to proceed unless the
+      caller presents >= n shares that reconstruct the committed secret.
+      Backward-compatible (unarmed escrows behave as before).
 - [ ] Flash loan protection (min_hold_period + block_delay checks)
 - [ ] Gaming-reward escrow type with Merkle proof of results
 - [ ] Agent-vs-Agent simulation testing framework

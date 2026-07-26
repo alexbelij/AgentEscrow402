@@ -110,6 +110,16 @@ class EscrowRecord(BaseModel):
     confidential: bool = False
     commitment: str | None = None
     range_proof_bits: int | None = None
+    # C13: threshold-gated release. When set, /release requires the caller
+    # to present >=threshold_n Shamir shares whose reconstructed 32-byte
+    # secret hashes (sha256) to threshold_commitment_hex. Empty string →
+    # threshold gating is disabled (default, backward-compatible).
+    # The escrow row only stores the commitment hash — never the secret
+    # itself and never the shares. Shares are distributed out-of-band to
+    # arbiters / trustees at /escrow/{hash}/threshold-arm time.
+    threshold_commitment_hex: str = ""
+    threshold_n: int = 0
+    threshold_m: int = 0
 
 
 class BatchEscrowItem(BaseModel):
@@ -162,6 +172,12 @@ class ReleaseRequest(BaseModel):
     # "release:{service_hash}:cap_approval" — see arbiter_crypto.build_cap_approval_message.
     arbiter_pubkeys: list[str] = Field(default_factory=list)
     arbiter_signatures: list[str] = Field(default_factory=list)
+    # C13: threshold-shares presented to unlock a threshold-armed escrow.
+    # Each entry is a 68-char hex share (2-byte index + 32-byte value)
+    # matching the format emitted by server/threshold_secret.py::Share.to_hex.
+    # Required (and only inspected) when the escrow row has a non-empty
+    # threshold_commitment_hex; ignored otherwise for backward compatibility.
+    threshold_shares_hex: list[str] = Field(default_factory=list)
 
 
 class RefundRequest(BaseModel):

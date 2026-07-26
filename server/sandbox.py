@@ -30,6 +30,10 @@ class SandboxStore:
             "status": "pending",
             "created_at": now,
             "ttl": ttl,
+            # C13: threshold-arming stays optional; empty string = no gate.
+            "threshold_commitment_hex": "",
+            "threshold_n": 0,
+            "threshold_m": 0,
         }
         self._escrows[service_hash] = record
         return EscrowRecord(**record)

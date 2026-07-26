@@ -17,7 +17,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from server import arbiter_crypto, batch_guard, confidential_escrow, flash_guard, strict
 from server import db as pgdb
@@ -423,6 +423,59 @@ app.include_router(compliance_router)
 # ---------------------------------------------------------------------------
 # Insurance fee helper
 # ---------------------------------------------------------------------------
+
+
+def _enforce_threshold_release(escrow: EscrowRecord, shares_hex: list[str]) -> None:
+    """Verify a threshold-armed escrow (C13) is being released legitimately.
+
+    Reconstructs the 32-byte secret from the presented shares (min
+    threshold_n needed), computes sha256, and compares against the
+    commitment stored on the escrow row. Any mismatch — wrong shares,
+    wrong count, malformed hex — raises HTTP 422 without touching state.
+
+    Rationale: the on-row commitment is public information (returned in
+    every /escrow-info response), so knowing the commitment gives an
+    attacker nothing. To pass this check they must possess a threshold
+    number of the out-of-band-distributed shares.
+    """
+    import hashlib as _hashlib
+
+    from server.threshold_secret import Share as _Share, reconstruct_secret as _reconstruct
+
+    n = int(getattr(escrow, "threshold_n", 0) or 0)
+    commitment = str(getattr(escrow, "threshold_commitment_hex", "") or "")
+
+    if n <= 0 or not commitment:
+        # Not actually armed — caller shouldn't have reached this helper.
+        return
+    if len(shares_hex) < n:
+        raise HTTPException(
+            status_code=422,
+            detail=f"threshold release: need >= {n} shares, got {len(shares_hex)}",
+        )
+
+    try:
+        shares = [_Share.from_hex(h) for h in shares_hex[:n]]
+        secret = _reconstruct(shares)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"threshold release: malformed share ({exc})",
+        )
+
+    computed = _hashlib.sha256(secret).hexdigest()
+    if not hmac_compare(computed, commitment):
+        raise HTTPException(
+            status_code=422,
+            detail="threshold release: reconstructed secret does not match commitment",
+        )
+
+
+def hmac_compare(a: str, b: str) -> bool:
+    """Constant-time hex-string comparison. Prevents timing side-channels
+    on the threshold-commitment check above."""
+    import hmac as _hmac
+    return _hmac.compare_digest(a.encode(), b.encode())
 
 
 def _apply_insurance_fee(amount: int, fee_bps: int) -> tuple[int, int]:
@@ -1371,6 +1424,14 @@ async def release_escrow(
                 ),
             )
 
+    # C13: threshold-share gate. A previously-armed escrow (T3.1 wire) must
+    # be released with >= threshold_n Shamir shares whose reconstructed
+    # 32-byte secret hashes (sha256) to the commitment stored on the row.
+    # The server never holds the secret or the shares between calls — only
+    # the commitment — so a database leak alone cannot forge a release.
+    if getattr(existing, "threshold_commitment_hex", "") :
+        _enforce_threshold_release(existing, req.threshold_shares_hex)
+
     # T2.12: flash-loan protection. Rejects a release that lands inside the
     # minimum hold window since the escrow was funded (existing.created_at),
     # closing the fund-then-immediately-release attack window a flash-loan
@@ -1437,6 +1498,96 @@ async def release_escrow(
         raise HTTPException(status_code=403, detail=str(exc))
     except ValueError as exc:
         _raise_fsm_or_generic(exc)
+
+
+class ThresholdArmRequest(BaseModel):
+    """C13: arm an already-created escrow with a Shamir n-of-m release gate.
+
+    The caller (typically the sender) chooses n and m, calls this endpoint,
+    and receives back the shares in the response — exactly once. The server
+    stores only the sha256 commitment; the shares are the caller's problem
+    to distribute over independent channels.
+
+    Idempotency: arming an already-armed escrow is refused (409). Change of
+    parameters requires a fresh escrow.
+    """
+
+    service_hash: str = Field(..., min_length=64, max_length=64)
+    threshold: int = Field(..., ge=2, le=255, description="Shares needed to release (n)")
+    total: int = Field(..., ge=2, le=255, description="Total shares generated (m)")
+
+
+class ThresholdArmResponse(BaseModel):
+    service_hash: str
+    threshold_commitment_hex: str
+    threshold_n: int
+    threshold_m: int
+    shares_hex: list[str]
+    warning: str = (
+        "These shares are shown ONCE and never stored server-side. "
+        "Distribute them over independent channels to independent holders "
+        "immediately; losing more than (m - n) of them makes the escrow "
+        "un-releasable."
+    )
+
+
+@app.post(
+    "/escrow/{service_hash}/threshold-arm",
+    response_model=ThresholdArmResponse,
+    tags=["threshold"],
+)
+async def threshold_arm(
+    service_hash: str,
+    req: ThresholdArmRequest,
+    store: SandboxStore = Depends(get_sandbox),
+):
+    """C13: gate a pending escrow's /release behind an n-of-m Shamir bundle.
+
+    Deterministic effect on state: computes commitment = sha256(secret) and
+    writes {threshold_commitment_hex, threshold_n, threshold_m} onto the
+    escrow row. Shares are returned in the response only — they are never
+    logged, never persisted, and cannot be recovered from the server.
+    """
+    if service_hash != req.service_hash:
+        raise HTTPException(status_code=400, detail="path and body service_hash disagree")
+    if req.threshold > req.total:
+        raise HTTPException(status_code=422, detail="threshold must be <= total")
+
+    escrow = store.get_escrow(service_hash)
+    if escrow is None:
+        raise HTTPException(status_code=404, detail="Escrow not found")
+    if escrow.status != "pending":
+        raise HTTPException(
+            status_code=409,
+            detail=f"threshold-arm only allowed on pending escrows (was {escrow.status})",
+        )
+    if getattr(escrow, "threshold_commitment_hex", ""):
+        raise HTTPException(status_code=409, detail="escrow is already threshold-armed")
+
+    # Build the SSS bundle. The 32-byte secret only lives on this call frame;
+    # we hash it into a commitment and discard everything else.
+    import hashlib as _hashlib
+    import os as _os
+
+    from server.threshold_secret import split_secret as _split
+
+    secret = _os.urandom(32)
+    shares = _split(secret, req.threshold, req.total)
+    commitment = _hashlib.sha256(secret).hexdigest()
+
+    # Persist commitment on the row.
+    rec = store._escrows[service_hash]
+    rec["threshold_commitment_hex"] = commitment
+    rec["threshold_n"] = req.threshold
+    rec["threshold_m"] = req.total
+
+    return ThresholdArmResponse(
+        service_hash=service_hash,
+        threshold_commitment_hex=commitment,
+        threshold_n=req.threshold,
+        threshold_m=req.total,
+        shares_hex=[s.to_hex() for s in shares],
+    )
 
 
 @app.post("/refund", response_model=EscrowRecord)
