@@ -129,21 +129,39 @@ class EscrowClient:
         method: str,
         path: str,
         *,
-        escrow_hash: str,
-        amount: int,
+        escrow_hash: str = "",
+        amount: int = 0,
         json_body: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        headers = {}
-        params = None
+        """Low-level request helper.
+
+        For x402-protected routes (``POST /escrow``, ``/release``, ``/refund``,
+        ``/dispute``) pass ``escrow_hash`` + ``amount`` — they get bound into
+        the Ed25519-signed ``X-Payment`` header (signed mode) or the
+        ``?sender=`` sandbox param.
+
+        For read-only routes (``GET /stats``, ``/escrows``, ``/mcp/tools``,
+        ``/escrow/{hash}/history``) omit them — those endpoints don't call
+        ``_extract_sender``/``require_payment``, so no auth material is
+        needed. In signed mode we still attach a zero-bound signature so
+        the client sends *some* provenance; sandbox mode still attaches
+        ``?sender=`` for logging.
+
+        ``params`` are merged into the query string (used e.g. by ``GET
+        /escrows?status=pending``).
+        """
+        headers: dict[str, str] = {}
+        merged_params: dict[str, Any] = dict(params) if params else {}
         if self._private_key is not None:
             headers["X-Payment"] = self._sign(escrow_hash, amount, method, path)
-        elif self._sandbox:
-            params = {"sender": self._sender}
+        elif self._sandbox and self._sender:
+            merged_params.setdefault("sender", self._sender)
         resp = await self._http.request(
             method,
             f"{self._base}{path}",
             json=json_body,
-            params=params,
+            params=merged_params or None,
             headers=headers,
         )
         resp.raise_for_status()

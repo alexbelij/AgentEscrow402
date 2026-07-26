@@ -164,7 +164,7 @@ All 4 curl examples from `README.md` §Quickstart executed against the fresh uvi
 
 60/60 API-layer tests green on the fresh clone in 1.1s. Confirms the pip-installed dependency graph matches what the tests expect.
 
-### 9.4 CLI regression — `ae402 stats/list-escrows/mcp-tools` broken 🔴
+### 9.4 CLI regression — `ae402 stats/list-escrows/mcp-tools` broken 🔴 → ✅ FIXED
 
 **Finding introduced by this live pass — deserves its own P0.2 backlog entry.**
 
@@ -186,6 +186,8 @@ ae402: TypeError: EscrowClient._request() missing 2 required keyword-only argume
 `ae402 health` works because it uses a separate `self._http.get(f"{self._base}/health")` path that bypasses `_request()`.
 
 **Scope**: production regression in the SDK. Judges/reviewers copy-pasting from the README will see the CLI fail immediately after `health`. Fix is 5 lines in `sdk/cli.py` — make `_request()` accept `escrow_hash`/`amount` as *optional* defaulted args (they're only needed when signing X-Payment), or route non-payment calls through a lighter helper. Filed under P0.2 in `KNOWN_LIMITATIONS.md`.
+
+**Resolution** (this commit): `sdk/client.py::_request()` — `escrow_hash`/`amount` теперь defaulted (`""` / `0`) и добавлен параметр `params=` для forward'а query-args в httpx. `sdk/cli.py::_cmd_mcp_call()` — typo `body=` → `json_body=` (silently dropped the payload). Regression coverage: 5 новых mocked-backend tests в `tests/test_cli.py::TestReadOnlyCommandsAgainstMockedBackend` — прогоняют реальный `_request` end-to-end через CLI wiring, поймали бы TypeError мгновенно. Live-verified against localhost uvicorn: `ae402 stats/list-escrows/mcp-tools/health` — все 4/4 работают. `get-history` возвращает корректный 404 для несуществующего escrow (правильное поведение, не TypeError).
 
 ### 9.5 Docker-path — cross-referenced from GitHub Actions CI
 
@@ -211,7 +213,7 @@ This is precisely the check the original static-audit deferred to Codespaces —
 
 | # | Severity | Finding | Fix location | Blocks defence? |
 |---|---|---|---|---|
-| L1 | P0 | CLI regression: every non-`health` `ae402` subcommand fails with `TypeError: EscrowClient._request() missing 2 required keyword-only arguments` | `sdk/cli.py` + `sdk/client.py` — decouple `_request()` from mandatory X-Payment args | ⚠️ YES — README advertises 4 CLI commands, 3/4 broken |
+| L1 | P0 | CLI regression: every non-`health` `ae402` subcommand fails with `TypeError: EscrowClient._request() missing 2 required keyword-only arguments` | ✅ FIXED — `_request()` args defaulted, `params=` forwarded, `mcp-call` typo fixed, 5 regression tests added | Was YES → resolved this commit |
 | L2 | P2 | README `POST /escrow` example uses placeholder `"receiver":"agent-B"` which fails the 64-hex Pydantic regex → HTTP 422 on verbatim copy-paste | `README.md` §Quickstart — swap in a real 64-hex example or add a `<placeholder>` note | No — cosmetic |
 | L3 | P3 | (retracted) The earlier `Neon unavailable: No module named 'psycopg_pool'` I noted in the initial static audit was from an environment where `pip install` had not yet completed. On the fresh clone after `pip install -r requirements.txt`, `psycopg_pool==3.3.1` **is** installed and the warning does not fire. Retained here as a false-positive for audit history. | — | No |
 

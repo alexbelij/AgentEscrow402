@@ -254,7 +254,7 @@ async def _cmd_mcp_call(args: argparse.Namespace) -> None:
         r = await client._request(  # noqa: SLF001
             "POST",
             f"/mcp/tools/{args.tool}/call",
-            body={"arguments": arguments},
+            json_body={"arguments": arguments},
         )
         _emit(r)
     finally:
