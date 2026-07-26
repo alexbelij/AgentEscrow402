@@ -67,7 +67,13 @@
       escrow row; `/release` on a gaming-armed escrow requires a valid
       inclusion proof for the caller's `receiver_pubkey`. Backward-
       compatible (unarmed = standard escrow, no gate).
-- [ ] Agent-vs-Agent simulation testing framework
+- [x] Agent-vs-Agent simulation testing framework —
+      deterministic multi-agent simulator drives the real FSM and
+      arbiter through scripted strategies (honest / withholding /
+      dispute-spam / flaky-network); reproducible under a fixed seed.
+      See [`server/agent_sim.py`](server/agent_sim.py) +
+      [`demo/agent_vs_agent_showcase.py`](demo/agent_vs_agent_showcase.py)
+      (7 adversarial scenarios + determinism probe).
 - [x] Fuzz testing (cargo fuzz) — 5 libFuzzer targets over pure-Rust stubs
       (flash_guard × 3, escrow_types, threshold_config) + smoke CI job.
       First run already found an overflow panic in
