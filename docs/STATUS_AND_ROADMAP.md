@@ -1,6 +1,6 @@
 # Status & Roadmap
 
-*Last verified: 2026-07-26 — contract v10 (`07527a37…739ef1`), 2081/2081 Python + 250/250 Rust tests, 369 real testnet transactions.*
+*Last verified: 2026-07-26 — contract v10 (`07527a37…739ef1`), 2085/2085 Python + 250/250 Rust tests, 369 real testnet transactions.*
 
 ## ✅ Delivered
 
@@ -33,7 +33,7 @@
 
 ### Testing & CI
 
-- 2081 Python + 250 Rust tests (incl. Hypothesis + proptest property-based invariants).
+- 2085 Python + 250 Rust tests (incl. Hypothesis + proptest property-based invariants).
 - GitHub Actions CI: lint, type-check, build, coverage ≥70%.
 - 369 real testnet transactions as on-chain evidence.
 

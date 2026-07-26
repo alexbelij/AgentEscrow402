@@ -34,7 +34,7 @@ const REASONS = [
   {
     icon: Zap,
     title: 'Production-Ready Stack',
-    desc: '10 deployed contracts, 140 API endpoints, 2331 tests, 369+ real testnet transactions. Not a demo — a working system with evidence to prove it.',
+    desc: '10 deployed contracts, 140 API endpoints, 2335 tests, 369+ real testnet transactions. Not a demo — a working system with evidence to prove it.',
     highlight: 'Deployed, tested, verified on-chain.',
   },
 ]

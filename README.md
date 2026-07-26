@@ -15,13 +15,13 @@
 [![Live Demo](https://img.shields.io/badge/Live_Demo-ae402.xyz-6366f1.svg?style=flat-square)](https://ae402.xyz)
 [![Hackathon](https://img.shields.io/badge/Casper_Agentic_Buildathon-2026-FF6B35.svg?style=flat-square)](https://dorahacks.io/)
 [![Contracts](https://img.shields.io/badge/contracts-10_deployed-6C5CE7.svg?style=flat-square)](#-smart-contract)
-[![Tests](https://img.shields.io/badge/tests-2331_passing-22c55e.svg?style=flat-square)](#-testing)
+[![Tests](https://img.shields.io/badge/tests-2335_passing-22c55e.svg?style=flat-square)](#-testing)
 [![API](https://img.shields.io/badge/API-live-0ea5e9.svg?style=flat-square)](docs/API_SDK_MCP.md)
 
 [![Try it — ae402.xyz](https://img.shields.io/badge/%E2%96%B6%20Try_it_now-ae402.xyz%2Fconsole-22c55e?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik04IDV2MTRsMTEtN3oiLz48L3N2Zz4=)](https://ae402.xyz/console)
 
 > 🟢 **TESTNET LIVE:** 369 confirmed on-chain deploys across escrow / HTLC / multi-asset / streaming · 10 contracts live on `casper-test` (14 total in `main`, 4 code-complete pending deploy — see [TX_MANIFEST.md](TX_MANIFEST.md)), cross-contract calls
-> 📊 140 API endpoints · 26 MCP tools · 2081 Python + 250 Rust tests (property-based)
+> 📊 140 API endpoints · 26 MCP tools · 2085 Python + 250 Rust tests (property-based)
 > 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
 > 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
 
@@ -724,7 +724,7 @@ server needed to browse) → [docs/mcp_tools_schema.json](docs/mcp_tools_schema.
 ```bash
 python -m compileall -q server
 npm --prefix frontend run build
-uv run --active python -m pytest -q          # 2081 tests (server logic, x402, identity, risk, multi-asset, ZK privacy, MPC, cross-chain, EVM bridge)
+uv run --active python -m pytest -q          # 2085 tests (server logic, x402, identity, risk, multi-asset, ZK privacy, MPC, cross-chain, EVM bridge)
 cargo test -p tests -p multi-asset-escrow --lib -p insurance-pool --lib   # 250 tests (property-based, matches CI exactly)
 ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # live smoke: health/stats/escrow create+release/risk/VRF/insurance
 ```
@@ -733,12 +733,12 @@ ALLOW_HOSTED_DEMO_IDENTITY=true uv run python tests/test_business_logic.py   # l
 
 | Suite | Framework | Count | Coverage |
 |---|---|---|---|
-| Server (Python) | pytest + Hypothesis | 2081 | 70%+ |
+| Server (Python) | pytest + Hypothesis | 2085 | 70%+ |
 | Contracts (Rust) | cargo test + proptest | 250 | property-based |
 | Live smoke (business logic) | pytest + real testnet | 12 | health, escrow, risk, VRF, insurance |
 | Frontend build | Vite + tsc --noEmit | — | type-checked |
 
-**Current status: 2081/2081 Python (2 skipped) + 250/250 Rust tests passing** (3 additional Rust
+**Current status: 2085/2085 Python (1 skipped) + 250/250 Rust tests passing** (3 additional Rust
 tests are on-chain-VM-only checks marked `#[ignore]` by default, and a further handful of Python
 tests are `network`-marked live-Sepolia integration checks, deselected by default so CI doesn't
 spend real gas — see [docs/tier3/T3.4-B-bridge-evm-sepolia.md](docs/tier3/T3.4-B-bridge-evm-sepolia.md)).

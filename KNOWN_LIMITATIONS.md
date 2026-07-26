@@ -98,7 +98,7 @@ against the actual `main` HEAD at the time. Re-verified against
 - **140 API endpoints** — counted from the live production
   `GET /openapi.json` (`agentescrow402-api-ywm8.onrender.com`), matches
   local route-decorator grep of `server/*.py`.
-- **2081 Python tests passing, 2 skipped** — `uv run python -m pytest -q`.
+- **2085 Python tests passing, 1 skipped** — `uv run python -m pytest -q`.
 - **250 Rust tests passing, 3 ignored** — sum of the exact 3 CI-scoped
   commands (`cargo test -p tests`, `-p multi-asset-escrow --lib`,
   `-p insurance-pool --lib`); no other contract package has a `lib`

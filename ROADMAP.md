@@ -31,7 +31,7 @@
       (`POST /escrow/{hash}/stream-claim` triggers real `release()` when 100% vested)
 - [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
 - [x] Post-quantum ML-KEM metadata encryption
-- [x] **2081 Python + 250 Rust automated tests** (2331 total, incl. Hypothesis/proptest property-based
+- [x] **2085 Python + 250 Rust automated tests** (2335 total, incl. Hypothesis/proptest property-based
       invariant tests); see [Testing](README.md#-testing)
 - [x] CI/CD via GitHub Actions
 - [x] Property-based testing — 9 proptest + 3 Hypothesis invariant checks

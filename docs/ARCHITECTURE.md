@@ -674,7 +674,7 @@ AgentEscrow402/
 │   ├── langchain_tool.py       # LangChain tool
 │   ├── mcp_server.py           # 26 MCP tools
 │   └── arbiter_signing.py      # Ed25519 signing helpers
-├── tests/                      # 2081 Python tests
+├── tests/                      # 2085 Python tests
 ├── docs/                       # Documentation
 │   ├── openapi.yaml            # OpenAPI spec snapshot (curated; GET /openapi.json is always exact)
 │   ├── SDK.md                  # SDK documentation

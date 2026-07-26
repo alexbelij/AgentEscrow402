@@ -183,7 +183,7 @@ export default function Hero() {
             {[
               { val: '10', label: 'Smart Contracts' },
               { val: '369+', label: 'Testnet Txns' },
-              { val: '2331', label: 'Tests Passing' },
+              { val: '2335', label: 'Tests Passing' },
               { val: '26', label: 'MCP Tools' },
             ].map((s, i) => (
               <div key={i} className="text-center">

@@ -4,7 +4,7 @@ import { CONTRACTS, CONTRACT_COUNT } from '../lib/manifest.generated'
 const STATS = [
   { value: String(CONTRACT_COUNT), label: 'Deployed Contracts', sub: 'on Casper Testnet' },
   { value: '369+', label: 'On-Chain Transactions', sub: 'create / release / refund / resolve' },
-  { value: '2331', label: 'Automated Tests', sub: '2081 Python + 250 Rust' },
+  { value: '2335', label: 'Automated Tests', sub: '2085 Python + 250 Rust' },
   { value: '140', label: 'API Endpoints', sub: 'OpenAPI-documented' },
   { value: '26', label: 'MCP Tools', sub: 'for LLM tool-calling' },
   { value: '19', label: 'Console Pages', sub: 'all live-wired' },
