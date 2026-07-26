@@ -42,7 +42,26 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --tb=short
       - name: Coverage
-        run: pytest tests/ --cov=server --cov-report=term-missing --cov-fail-under=70
+        # Floor bumped 70 -> 72 in BATCH K polish (2026-07-26). Every new
+        # module added since has landed with dedicated tests, so the
+        # coverage headroom is real, not a mirage.
+        run: pytest tests/ --cov=server --cov-report=term-missing --cov-fail-under=72
+      - name: Coverage summary artifact
+        # Emit an aggregate line the ops-report cron can pick up
+        # without re-running the whole suite.
+        run: |
+          pytest tests/ --cov=server --cov-report=json:coverage.json -q > /dev/null || true
+          python - <<'PY'
+          import json,sys
+          try:
+              d = json.load(open('coverage.json'))
+              t = d.get('totals',{})
+              print(f"coverage_pct: {t.get('percent_covered', 0):.2f}")
+              print(f"lines_covered: {t.get('covered_lines', 0)}")
+              print(f"lines_missing: {t.get('missing_lines', 0)}")
+          except Exception as exc:
+              print(f"coverage summary skipped: {exc}")
+          PY
 
   docker-compose-smoke:
     # Defence-checklist gate: prove `docker compose up` on a genuinely fresh
