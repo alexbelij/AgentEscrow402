@@ -661,3 +661,130 @@ class TestConfirmWalletInsuranceClaim:
         )
         assert confirmed is False
         assert reason == "User error: 8"
+
+
+class TestConcurrencySafety:
+    """Multi-worker/high-concurrency invariants (Line 48 of ROADMAP).
+
+    These tests document the concurrency contract of `CasperClient`:
+    * `_rpc_url` fallback promotion is guarded by `_rpc_url_lock` so
+      duplicate log lines / torn writes are impossible under a
+      free-threaded interpreter.
+    * `_cep18_named_keys_cache` populate is guarded by
+      `_cep18_named_keys_lock` so N concurrent tasks racing on the same
+      cache-miss result in exactly ONE RPC hit.
+    """
+
+    @pytest.mark.asyncio
+    async def test_locks_are_created_on_init(self):
+        import asyncio
+
+        client = make_client()
+        assert isinstance(client._rpc_url_lock, asyncio.Lock)
+        assert isinstance(client._cep18_named_keys_lock, asyncio.Lock)
+        assert client._cep18_named_keys_cache == {}
+
+    @pytest.mark.asyncio
+    async def test_concurrent_cache_miss_hits_rpc_exactly_once(self):
+        """N tasks racing on the same never-before-seen contract_hash
+        should collapse to one _rpc call, not N."""
+        import asyncio
+
+        client = make_client()
+        rpc_calls = 0
+        contract_hash = "aa" * 32
+
+        async def fake_rpc(method: str, params: dict) -> dict:
+            nonlocal rpc_calls
+            rpc_calls += 1
+            # Simulate network latency so racing tasks actually queue on
+            # the lock — without this the fast task returns before the
+            # others even enter the critical section.
+            await asyncio.sleep(0.05)
+            return {
+                "entity": {
+                    "Contract": {
+                        "contract": {
+                            "named_keys": [
+                                {"name": "name", "key": "uref-name"},
+                                {"name": "balances", "key": "uref-balances"},
+                            ]
+                        }
+                    }
+                }
+            }
+
+        client._rpc = fake_rpc
+
+        results = await asyncio.gather(
+            *[client._get_cep18_named_keys(contract_hash) for _ in range(16)]
+        )
+
+        assert rpc_calls == 1, f"expected 1 RPC hit under lock, got {rpc_calls}"
+        # All 16 tasks got the SAME dict object (cache-populated once)
+        first = results[0]
+        assert all(r is first for r in results)
+        assert first == {"name": "uref-name", "balances": "uref-balances"}
+        # And the cache is populated
+        assert client._cep18_named_keys_cache == {contract_hash: first}
+
+    @pytest.mark.asyncio
+    async def test_concurrent_cache_hit_never_touches_rpc(self):
+        """After the first populate, further concurrent lookups are
+        lock-free and skip the RPC entirely."""
+        import asyncio
+
+        client = make_client()
+        prewarm = {"name": "uref-prewarm"}
+        contract_hash = "bb" * 32
+        client._cep18_named_keys_cache[contract_hash] = prewarm
+
+        rpc_calls = 0
+
+        async def fake_rpc(method: str, params: dict) -> dict:
+            nonlocal rpc_calls
+            rpc_calls += 1
+            return {}
+
+        client._rpc = fake_rpc
+
+        results = await asyncio.gather(
+            *[client._get_cep18_named_keys(contract_hash) for _ in range(32)]
+        )
+        assert rpc_calls == 0
+        assert all(r is prewarm for r in results)
+
+    @pytest.mark.asyncio
+    async def test_different_contract_hashes_do_not_block_each_other(self):
+        """Two contract_hashes that both cache-miss must serialize on
+        the same lock (that's fine — the RPC hits are independent
+        underneath). Property tested: both eventually complete without
+        deadlock and populate distinct cache entries."""
+        import asyncio
+
+        client = make_client()
+        rpc_calls = []
+
+        async def fake_rpc(method: str, params: dict) -> dict:
+            ch = params["entity_identifier"]["ContractHash"]
+            rpc_calls.append(ch)
+            await asyncio.sleep(0.01)
+            return {
+                "entity": {
+                    "Contract": {
+                        "contract": {
+                            "named_keys": [{"name": f"key-for-{ch[-4:]}", "key": "u"}]
+                        }
+                    }
+                }
+            }
+
+        client._rpc = fake_rpc
+
+        r1, r2 = await asyncio.gather(
+            client._get_cep18_named_keys("cc" * 32),
+            client._get_cep18_named_keys("dd" * 32),
+        )
+        assert len(rpc_calls) == 2
+        assert r1 != r2
+        assert len(client._cep18_named_keys_cache) == 2

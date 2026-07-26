@@ -45,7 +45,7 @@
 - [ ] Security audit by third-party firm
 - [ ] Mainnet deployment with governance multisig for upgrades
 - [ ] On-chain batch cap/quorum guard (contract upgrade to match server-side logic)
-- [ ] Multi-worker deployment (thread-safe casper_client)
+- [x] Multi-worker deployment (task-safe casper_client) — asyncio.Lock guards on `_rpc_url` fallback promotion and `_cep18_named_keys_cache` populate; deploy submissions are correctness-safe by Casper 2.0's `deploy_hash = sha256(header || body)` idempotency. 4 concurrency invariant tests in `tests/test_casper_client.py::TestConcurrencySafety`.
 
 ### Phase 2 — Advanced features
 

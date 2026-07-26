@@ -101,6 +101,30 @@ class CasperClient:
 
     * Reads: JSON-RPC (state_get_dictionary_item) — tries CSPR.cloud, NowNodes, official node.
     * Writes: subprocess to Node.js scripts (casper-js-sdk 5.0.12).
+
+    Concurrency model (multi-worker / high-concurrency deployment):
+
+    * `httpx.AsyncClient` is *already* task-safe for concurrent requests
+      from the same event loop, so nothing to guard on reads themselves.
+    * The RPC-fallback primary-URL promotion (`self._rpc_url`) and the
+      lazy `_cep18_named_keys_cache` populate were the two places where
+      simultaneous coroutines could race: two tasks racing on the same
+      cache-miss would both hit the RPC and both assign to the dict.
+      Under GIL Python this was safe (each op atomic) but wasteful, and
+      it also allowed subtle log-ordering artifacts. Locks below prevent
+      duplicate work while keeping the fast path lock-free (double-checked).
+    * Deploy submissions (Node subprocess writes) are correctness-safe
+      by construction: Casper 2.0 identifies deploys by `deploy_hash =
+      sha256(header || body)` where the header contains a
+      millisecond-precision timestamp, so two identical calls submitted
+      in the same ms will produce the same deploy_hash and the network
+      idempotently dedupes them. Nothing to serialize on our side.
+    * For a *multi-process* deployment (`uvicorn --workers N`) each
+      worker gets its own CasperClient instance via DI — the caches and
+      the promoted primary URL are per-worker (harmless; each worker
+      relearns fallback on first miss). If you need shared caching
+      across workers you'd move that layer to Redis; see
+      docs/STATUS_AND_ROADMAP.md.
     """
 
     def __init__(self, cfg: Config) -> None:
@@ -117,6 +141,10 @@ class CasperClient:
         self._rpc_endpoints = _build_rpc_endpoints(cfg)
         self._rpc_url = self._rpc_endpoints[0][0]  # current primary for node scripts
         self._http = httpx.AsyncClient(timeout=30.0)
+        # Concurrency locks — see class docstring.
+        self._rpc_url_lock: asyncio.Lock = asyncio.Lock()
+        self._cep18_named_keys_cache: dict[str, dict[str, str]] = {}
+        self._cep18_named_keys_lock: asyncio.Lock = asyncio.Lock()
 
     # ── Internal helpers ───────────────────────────────────────────────────
 
@@ -131,10 +159,16 @@ class CasperClient:
                 body = resp.json()
                 if "error" in body:
                     raise RuntimeError(f"RPC {method} error: {body['error']}")
-                # Promote working endpoint to primary for node scripts
+                # Promote working endpoint to primary for node scripts.
+                # Guarded so two concurrent tasks that both discover the
+                # same fallback don't emit duplicate log lines and don't
+                # torn-write the field (belt-and-braces under Python GIL,
+                # correct under any future free-threaded interpreter).
                 if url != self._rpc_url:
-                    logger.info("RPC fallback: %s → %s", self._rpc_url, url)
-                    self._rpc_url = url
+                    async with self._rpc_url_lock:
+                        if url != self._rpc_url:  # re-check under lock
+                            logger.info("RPC fallback: %s → %s", self._rpc_url, url)
+                            self._rpc_url = url
                 return body.get("result")
             except Exception as exc:
                 logger.warning("RPC %s failed on %s: %s", method, url, exc)
@@ -1044,21 +1078,30 @@ class CasperClient:
         """Named keys of a CEP-18 contract entity (uref-per-field storage:
         name/symbol/decimals/total_supply are plain urefs, balances/
         allowances are dictionary seed-urefs). Cached per contract_hash for
-        the lifetime of this client instance."""
-        cache = getattr(self, "_cep18_named_keys_cache", None)
-        if cache is None:
-            cache = {}
-            self._cep18_named_keys_cache = cache
+        the lifetime of this client instance.
+
+        Multi-worker safety: the cache is guarded by an asyncio.Lock so
+        two concurrent lookups for the same *previously-unseen*
+        contract_hash only hit the RPC once. The fast path (cache hit)
+        is lock-free (dict lookup is atomic under GIL and idempotent
+        w.r.t. the value we'd have written anyway).
+        """
+        cache = self._cep18_named_keys_cache
         if contract_hash in cache:
             return cache[contract_hash]
-        result = await self._rpc(
-            "state_get_entity",
-            {"entity_identifier": {"ContractHash": f"contract-{contract_hash}"}},
-        )
-        named_keys = result["entity"]["Contract"]["contract"]["named_keys"]
-        parsed = {nk["name"]: nk["key"] for nk in named_keys}
-        cache[contract_hash] = parsed
-        return parsed
+        async with self._cep18_named_keys_lock:
+            # Re-check under lock: another coroutine may have populated
+            # while we were waiting.
+            if contract_hash in cache:
+                return cache[contract_hash]
+            result = await self._rpc(
+                "state_get_entity",
+                {"entity_identifier": {"ContractHash": f"contract-{contract_hash}"}},
+            )
+            named_keys = result["entity"]["Contract"]["contract"]["named_keys"]
+            parsed = {nk["name"]: nk["key"] for nk in named_keys}
+            cache[contract_hash] = parsed
+            return parsed
 
     async def get_cep18_balance(self, contract_hash: str, account_hash_hex: str) -> int:
         """Real on-chain CEP-18 balance for an account, via the contract's

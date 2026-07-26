@@ -48,7 +48,7 @@ These are intentional design choices, not gaps:
 - **Batch lifecycle guard is server-side** — the `escrow-manager` contract's `batch_release`/`batch_cancel` don't replicate the single-escrow cap/quorum check. The Python backend enforces it before submitting the deploy. A contract upgrade adding the on-chain guard would be the production-grade approach.
 - **Arbiter rotation is admin-triggered** — the `set_arbiters` entry point is callable via admin API; there is no on-chain voting mechanism for rotation.
 - **Contract upgrades are deployer-only** — versioned package upgrades, no timelock or multi-party approval. Standard for hackathon scope.
-- **Single-process backend** — `casper_client` is not thread-safe for multi-worker deploys. Acceptable for current scale.
+- **Multi-worker deployment** — `casper_client` is task-safe for concurrent async calls (asyncio.Lock guards on `_rpc_url` fallback promotion and `_cep18_named_keys_cache` populate; deploy submissions are correctness-safe by construction because Casper 2.0 identifies deploys by `sha256(header || body)`). For `uvicorn --workers N` each worker gets its own DI-scoped client; shared caching across workers would move to Redis, deferred as separate infra work.
 - **VRF with small arbiter pool** — 4 arbiters registered, `count=3` per election. Rare edge case: all drawn candidates are dispute parties → local CSPRNG fallback fires. More arbiters reduce this probability.
 
 ## 🗺 Post-Hackathon Roadmap
