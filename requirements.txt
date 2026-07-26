@@ -7,6 +7,6 @@ psycopg-pool==3.3.*
 cryptography>=43.0
 # OpenTelemetry observability — see server/telemetry.py + docker-compose.signoz.yml
 opentelemetry-api==1.44.*
-opentelemetry-sdk==1.28.*
+opentelemetry-sdk==1.44.*
 opentelemetry-exporter-otlp==1.28.*
 opentelemetry-instrumentation-fastapi==0.49b2
