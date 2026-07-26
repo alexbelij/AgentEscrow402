@@ -59,7 +59,13 @@
 
 - [ ] Multi-chain escrow bridge (Casper ↔ EVM chains)
 - [ ] Agent discovery marketplace UI
-- [ ] Formal verification (TLA+ specification for state machine invariants)
+- [x] Formal verification (TLA+ specification for state machine invariants) —
+      `docs/formal/AE402Escrow.tla` models the escrow FSM. TLC proves 5
+      safety invariants (valid-transition, no-double-release, no-refund-
+      after-release, tombstoned-no-replay, amount-conservation) and 1
+      liveness property (pending eventually terminal) over 27k distinct
+      states in ~5s. CI job `.github/workflows/tla.yml` guards drift
+      between the model and `server/app.py`.
 - [ ] Compliance framework for regulated jurisdictions
 
 ## Prepared Infrastructure

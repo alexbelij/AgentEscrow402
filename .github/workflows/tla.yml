@@ -1,0 +1,62 @@
+name: tla-formal-check
+
+# C16: model-check the TLA+ escrow spec on every push touching either the
+# spec itself or the FSM code it mirrors. Cheap (~5s of TLC runtime) and
+# catches any drift where a new edge is added to server/app.py without a
+# corresponding entry in ValidTransitions in the model.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/formal/**"
+      - "server/app.py"
+      - ".github/workflows/tla.yml"
+  pull_request:
+    paths:
+      - "docs/formal/**"
+      - "server/app.py"
+      - ".github/workflows/tla.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: tla-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tlc:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Cache TLA+ toolbox jar
+        id: cache-tla
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/tla
+          key: tla-tools-latest-v1
+
+      - name: Download TLA+ toolbox
+        if: steps.cache-tla.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.cache/tla
+          curl -sL -o ~/.cache/tla/tla2tools.jar \
+            https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar
+
+      - name: Run TLC
+        working-directory: docs/formal
+        run: |
+          set -euo pipefail
+          java -cp ~/.cache/tla/tla2tools.jar tlc2.TLC \
+              -config AE402Escrow.cfg AE402Escrow.tla \
+              | tee tlc.log
+          # TLC exits 0 even on invariant violation \u2014 assert the success
+          # phrase is in the output before we call this green.
+          grep -q "Model checking completed. No error has been found." tlc.log

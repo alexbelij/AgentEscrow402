@@ -40,3 +40,8 @@ graphify-out/
 .venv-ae/
 .venv-ae2/
 .venv-lint/
+
+# C12/C16: cargo-fuzz output — never commit corpus or artifacts.
+contracts/fuzz/target/
+contracts/fuzz/corpus/
+contracts/fuzz/artifacts/

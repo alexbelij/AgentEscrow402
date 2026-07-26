@@ -40,3 +40,16 @@ judge-demo-keep:
 
 judge-demo-check:
 	./scripts/judge_demo.sh --check
+
+# --- C16: TLA+ formal spec ------------------------------------------------
+# Downloads the TLA+ toolbox to /tmp on first run then model-checks the
+# escrow FSM (docs/formal/AE402Escrow.tla). Requires a JDK on PATH.
+tla-check:
+	@if [ ! -f /tmp/tla2tools.jar ]; then \
+	    echo '>>> downloading TLA+ toolbox'; \
+	    curl -sL -o /tmp/tla2tools.jar \
+	      https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar; \
+	fi
+	cd docs/formal && java -cp /tmp/tla2tools.jar tlc2.TLC \
+	    -config AE402Escrow.cfg AE402Escrow.tla | tee /tmp/tlc.log; \
+	grep -q "Model checking completed. No error has been found." /tmp/tlc.log
