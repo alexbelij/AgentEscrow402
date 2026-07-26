@@ -109,9 +109,15 @@ struct Arbiters {
 
 impl Arbiters {
     fn generate(n: usize) -> Self {
+        // Deterministic ed25519 keypairs — casper_types v7 exposes
+        // `ed25519_from_bytes` but no in-crate RNG generator, so we seed
+        // ourselves from `getrandom` (already a transitive dep) to keep
+        // the test hermetic and byte-reproducible per-run.
         let keys = (0..n)
             .map(|_| {
-                let sk = SecretKey::generate_ed25519().expect("ed25519 keygen");
+                let mut seed = [0u8; 32];
+                getrandom::getrandom(&mut seed).expect("seed rng");
+                let sk = SecretKey::ed25519_from_bytes(seed).expect("ed25519 from bytes");
                 let pk = PublicKey::from(&sk);
                 (sk, pk)
             })

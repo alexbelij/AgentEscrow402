@@ -112,7 +112,11 @@ target-version = ["py311"]
 # the real Casper testnet RPC fallback chain -- excluded from the default
 # run for the same reason (no network dependency for CI/local dev). Run
 # them explicitly with `pytest -m testnet tests/test_testnet_integration.py`.
-addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration -m 'not testnet'"
+# `network` gates live-internet tests (e.g. bridge_evm_adapter’s Sepolia
+# integration harness under tests/test_bridge_evm_sepolia_integration.py).
+# CI has no funded EVM wallet / stable Sepolia RPC — opt into them locally
+# with `pytest -m network`.
+addopts = "--ignore=tests/test_e2e_live.py --ignore=tests/integration -m 'not testnet and not network'"
 markers = [
     "casper_net: integration tests that require a running NCTL Casper network (see docker-compose.casper-nctl.yml)",
     "network: integration tests that require live network access (e.g. Sepolia RPC) — skipped offline",

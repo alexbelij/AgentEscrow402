@@ -19,9 +19,14 @@ import time
 from pathlib import Path
 
 import pytest
-from eth_account import Account
 
-from server import bridge_evm_adapter as evm
+# The whole file is a real-network integration harness — collection must not
+# fail on CI runners without the EVM deps. `importorskip` gates collection so
+# the fast unit suite stays green even without `eth-account`/`web3` installed.
+Account = pytest.importorskip("eth_account").Account
+pytest.importorskip("web3")
+
+from server import bridge_evm_adapter as evm  # noqa: E402
 
 VAULT_PATH = Path.home() / ".vault" / "vault.json"
 

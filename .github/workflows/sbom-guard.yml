@@ -43,10 +43,13 @@ jobs:
           npm install --global '@cyclonedx/cyclonedx-npm@^2'
 
       - name: Regenerate Python SBOM (requirements.txt)
+        # cyclonedx-py 5.x renamed --output-file/--output-format to -o/--of;
+        # we pin the flag names we actually use so both 4.x and 5.x install
+        # cleanly (see sbom-guard install step: `cyclonedx-bom>=4,<5`).
         run: |
           cyclonedx-py requirements requirements.txt \
-            --output-file /tmp/regen-python-sbom.json \
-            --output-format JSON
+            -o /tmp/regen-python-sbom.json \
+            --of JSON
 
       - name: Install frontend deps + regenerate frontend SBOM
         working-directory: frontend
