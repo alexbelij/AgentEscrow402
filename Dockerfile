@@ -22,6 +22,10 @@ RUN cd server/casper_tx && npm install --omit=dev --no-fund --no-audit
 # App source
 COPY server/ server/
 COPY sdk/ sdk/
+# docs/mcp_tools_schema.json is read at runtime by
+# server/mcp_playground_api.py (console MCP Playground catalogue) — without
+# this the deployed API silently falls back to an empty tool list.
+COPY docs/ docs/
 
 ENV PORT=10000
 EXPOSE 10000
