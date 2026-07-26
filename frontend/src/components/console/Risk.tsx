@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api, DEMO_AGENT_RECEIVER } from '../../lib/api';
 import { formatCspr } from '../../lib/format';
 import { AlertTriangle, Brain, Gauge, Loader2, RefreshCw, ShieldCheck, TrendingUp } from 'lucide-react';
+import RegimeShiftWidget from './RegimeShiftWidget';
 
 type RiskAgent = {
   agent: string;
@@ -189,6 +190,8 @@ const Risk: React.FC = () => {
         <ActionCard title="Insurance pricing" text="Feed this score into premium-quote so risky jobs pay more into the pool." />
         <ActionCard title="Arbitration routing" text="Route anomalies to VRF-selected arbiters or require stronger evidence up front." />
       </div>
+
+      <RegimeShiftWidget />
     </div>
   );
 };
