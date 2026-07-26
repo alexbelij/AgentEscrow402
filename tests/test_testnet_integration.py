@@ -84,9 +84,7 @@ class TestTestnetInsurancePoolQuery:
     """Read-only queries against the live-deployed insurance-pool contract."""
 
     @pytest.mark.asyncio
-    async def test_query_claims_dict_for_unknown_claimant_returns_none_or_empty(
-        self, live_client: CasperClient
-    ):
+    async def test_query_claims_dict_for_unknown_claimant_returns_none_or_empty(self, live_client: CasperClient):
         """A claimant with no prior claims should not blow up the query path --
         it should come back None (dictionary key absent) rather than raise."""
         raw = await _skip_if_unreachable(

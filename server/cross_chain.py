@@ -78,10 +78,10 @@ import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Dict, List, Optional, Protocol
 
-
 # ---------------------------------------------------------------------------
 # Chain identity
 # ---------------------------------------------------------------------------
+
 
 class ChainId(str, enum.Enum):
     """Supported blockchain targets for cross-chain operations.
@@ -100,6 +100,7 @@ class ChainId(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # Remote tx result
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class RemoteTxResult:
@@ -132,6 +133,7 @@ class RemoteTxResult:
 # Adapter protocol
 # ---------------------------------------------------------------------------
 
+
 class ChainAdapter(Protocol):
     """Abstraction for verifying transactions on remote chains.
 
@@ -162,6 +164,7 @@ class CrossChainError(Exception):
 # ---------------------------------------------------------------------------
 # Mocked EVM adapter
 # ---------------------------------------------------------------------------
+
 
 class MockEVMAdapter:
     """In-memory EVM adapter for the demo / tests.
@@ -297,11 +300,12 @@ class MockCasperAdapter:
 # Cross-chain escrow record
 # ---------------------------------------------------------------------------
 
+
 class CrossChainStatus(str, enum.Enum):
-    PENDING = "pending"        # created on Casper, waiting for trigger event
-    SETTLED = "settled"        # trigger event confirmed, funds released
-    EXPIRED = "expired"        # trigger not seen within TTL, refunded
-    CANCELLED = "cancelled"    # manually cancelled by sender before trigger
+    PENDING = "pending"  # created on Casper, waiting for trigger event
+    SETTLED = "settled"  # trigger event confirmed, funds released
+    EXPIRED = "expired"  # trigger not seen within TTL, refunded
+    CANCELLED = "cancelled"  # manually cancelled by sender before trigger
 
 
 @dataclass
@@ -335,6 +339,7 @@ class CrossChainEscrow:
 # ---------------------------------------------------------------------------
 # Cross-chain registry
 # ---------------------------------------------------------------------------
+
 
 class CrossChainRegistry:
     """In-memory registry of cross-chain escrows.
@@ -384,9 +389,7 @@ class CrossChainRegistry:
 
             key = (trigger_chain, _normalize_tx_hash(trigger_tx_hash))
             if key in self._trigger_index:
-                raise CrossChainError(
-                    f"trigger event already bound to escrow {self._trigger_index[key]}"
-                )
+                raise CrossChainError(f"trigger event already bound to escrow {self._trigger_index[key]}")
 
             escrow_id = _derive_escrow_id(sender, receiver, trigger_chain, trigger_tx_hash)
             escrow = CrossChainEscrow(
@@ -441,24 +444,17 @@ class CrossChainRegistry:
             if escrow.status == CrossChainStatus.SETTLED:
                 return escrow  # idempotent
             if escrow.status != CrossChainStatus.PENDING:
-                raise CrossChainError(
-                    f"escrow {escrow_id} is {escrow.status.value}, cannot settle"
-                )
+                raise CrossChainError(f"escrow {escrow_id} is {escrow.status.value}, cannot settle")
 
             result = self.evm.verify_remote_tx(escrow.trigger_chain, escrow.trigger_tx_hash)
             if not result.confirmed or result.block_number == 0:
-                raise CrossChainError(
-                    f"trigger event not yet observed on {escrow.trigger_chain.value}"
-                )
+                raise CrossChainError(f"trigger event not yet observed on {escrow.trigger_chain.value}")
             if result.confirmations < escrow.min_confirmations:
                 raise CrossChainError(
-                    f"insufficient confirmations: {result.confirmations} < "
-                    f"{escrow.min_confirmations}"
+                    f"insufficient confirmations: {result.confirmations} < " f"{escrow.min_confirmations}"
                 )
             if escrow.trigger_topic and escrow.trigger_topic not in result.topics:
-                raise CrossChainError(
-                    f"topic {escrow.trigger_topic} not in event topics {result.topics}"
-                )
+                raise CrossChainError(f"topic {escrow.trigger_topic} not in event topics {result.topics}")
 
             # Simulate Casper release tx.
             casper_tx = _fake_casper_tx(escrow_id, result.tx_hash)
@@ -477,9 +473,7 @@ class CrossChainRegistry:
             if escrow.sender != caller:
                 raise CrossChainError("only the sender can cancel")
             if escrow.status != CrossChainStatus.PENDING:
-                raise CrossChainError(
-                    f"escrow {escrow_id} is {escrow.status.value}, cannot cancel"
-                )
+                raise CrossChainError(f"escrow {escrow_id} is {escrow.status.value}, cannot cancel")
             escrow.status = CrossChainStatus.CANCELLED
             return escrow
 
@@ -500,6 +494,7 @@ class CrossChainRegistry:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _normalize_tx_hash(tx_hash: str) -> str:
     """Lowercase, strip 0x prefix, validate hex."""

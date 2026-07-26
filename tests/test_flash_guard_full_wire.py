@@ -25,7 +25,6 @@ from server.app import app, get_config, get_sandbox
 from server.config import Config
 from server.sandbox import SandboxStore
 
-
 RECEIVER_HEX = "a" * 64
 
 
@@ -68,9 +67,7 @@ class TestRefundGuard:
             json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
             params={"sender": "alice"},
         )
-        resp = guarded_client.post(
-            "/refund", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/refund", json={"service_hash": h}, params={"sender": "alice"})
         assert resp.status_code == 422
         detail = resp.json()["detail"]
         assert "flash guard (refund)" in detail
@@ -93,9 +90,7 @@ class TestRefundGuard:
         )
         rec = sandbox_store._escrows[h]
         rec["created_at"] -= flash_guard.MIN_HOLD_PERIOD_SECS + 1
-        resp = guarded_client.post(
-            "/refund", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/refund", json={"service_hash": h}, params={"sender": "alice"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "refunded"
 
@@ -114,9 +109,7 @@ class TestRefundGuard:
         # inside the flash-guard's hold-period window from "now".
         rec["created_at"] -= 120  # 2 min old
         rec["ttl"] = 60  # ttl already elapsed
-        resp = guarded_client.post(
-            "/refund", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/refund", json={"service_hash": h}, params={"sender": "alice"})
         # Expired refund path may resolve to refunded OR expired (both are
         # acceptable per the FSM); the point is the guard did not block.
         assert resp.status_code == 200, resp.text
@@ -139,9 +132,7 @@ class TestDisputeGuard:
             json={"receiver": RECEIVER_HEX, "amount": 100, "service_hash": h},
             params={"sender": "alice"},
         )
-        resp = guarded_client.post(
-            "/dispute", json=_dispute_body(h), params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/dispute", json=_dispute_body(h), params={"sender": "alice"})
         assert resp.status_code == 422
         assert "flash guard (dispute)" in resp.json()["detail"]
 
@@ -159,17 +150,13 @@ class TestDisputeGuard:
         )
         rec = sandbox_store._escrows[h]
         rec["created_at"] -= flash_guard.MIN_HOLD_PERIOD_SECS + 1
-        resp = guarded_client.post(
-            "/dispute", json=_dispute_body(h), params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/dispute", json=_dispute_body(h), params={"sender": "alice"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "disputed"
 
 
 class TestBlockDelayHalf:
-    def test_block_delay_blocks_release_when_hold_period_ok(
-        self, guarded_client, sandbox_store
-    ):
+    def test_block_delay_blocks_release_when_hold_period_ok(self, guarded_client, sandbox_store):
         # Hold period satisfied but funded_block=100, current=101 →
         # block-delay half must still block the release.
         h = _hash("block-delay-block")
@@ -187,9 +174,7 @@ class TestBlockDelayHalf:
         rec["created_at"] -= flash_guard.MIN_HOLD_PERIOD_SECS + 1  # hold OK
         rec["funded_block"] = 100
         event_monitor._LAST_KNOWN_BLOCK_HEIGHT = 101  # only 1 block later
-        resp = guarded_client.post(
-            "/release", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/release", json={"service_hash": h}, params={"sender": "alice"})
         assert resp.status_code == 422
         detail = resp.json()["detail"]
         assert "block delay not met" in detail
@@ -211,15 +196,11 @@ class TestBlockDelayHalf:
         rec["created_at"] -= flash_guard.MIN_HOLD_PERIOD_SECS + 1
         rec["funded_block"] = 100
         event_monitor._LAST_KNOWN_BLOCK_HEIGHT = 100 + flash_guard.MIN_BLOCK_DELAY
-        resp = guarded_client.post(
-            "/release", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/release", json={"service_hash": h}, params={"sender": "alice"})
         assert resp.status_code == 200
         assert resp.json()["status"] == "released"
 
-    def test_unknown_block_context_skips_block_delay_half(
-        self, guarded_client, sandbox_store
-    ):
+    def test_unknown_block_context_skips_block_delay_half(self, guarded_client, sandbox_store):
         # funded_block=0 (unknown) → block-delay half is skipped, so hold
         # period alone controls the outcome. This preserves the sandbox
         # happy-path for anyone who never populated funded_block.
@@ -238,9 +219,7 @@ class TestBlockDelayHalf:
         rec["created_at"] -= flash_guard.MIN_HOLD_PERIOD_SECS + 1
         rec["funded_block"] = 0  # unknown
         event_monitor._LAST_KNOWN_BLOCK_HEIGHT = 999999  # anything
-        resp = guarded_client.post(
-            "/release", json={"service_hash": h}, params={"sender": "alice"}
-        )
+        resp = guarded_client.post("/release", json={"service_hash": h}, params={"sender": "alice"})
         assert resp.status_code == 200
 
 

@@ -174,9 +174,7 @@ class TestArbiterSigningE2E:
         )
         assert r.status_code == 200, r.text
 
-    def test_sdk_signs_pem_and_resolves_disputed_escrow_end_to_end(
-        self, five_arbiter_panel_cfg
-    ):
+    def test_sdk_signs_pem_and_resolves_disputed_escrow_end_to_end(self, five_arbiter_panel_cfg):
         """Happy path: SDK helper signs 3 votes from PKCS8 PEMs, SDK client
         POSTs `/resolve`, escrow moves disputed → resolved.
 
@@ -193,9 +191,7 @@ class TestArbiterSigningE2E:
             self._seed_disputed(sync_client, service_hash)
 
             async def _run():
-                votes = [
-                    sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)
-                ]
+                votes = [sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)]
                 submitted_pubkeys = [pk for pk, _ in votes]
                 submitted_signatures = [sig for _, sig in votes]
 
@@ -220,9 +216,7 @@ class TestArbiterSigningE2E:
         assert result["status"] == "resolved", result
         assert result["service_hash"] == service_hash
 
-    def test_broadcast_emits_both_escrow_resolved_and_arbitration_complete(
-        self, five_arbiter_panel_cfg
-    ):
+    def test_broadcast_emits_both_escrow_resolved_and_arbitration_complete(self, five_arbiter_panel_cfg):
         """A5 spec alias: /resolve must fan out `escrow_resolved` AND
         `arbitration_complete`. Drops either name silently and older SSE
         consumers (or the AE402 Agent Spec) break — but no test would
@@ -235,9 +229,7 @@ class TestArbiterSigningE2E:
         try:
             with TestClient(app) as sync_client:
                 self._seed_disputed(sync_client, service_hash)
-                votes = [
-                    sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)
-                ]
+                votes = [sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)]
                 resp = sync_client.post(
                     "/resolve",
                     json={
@@ -265,9 +257,7 @@ class TestArbiterSigningE2E:
         assert any(e["service_hash"] == service_hash for e in resolved), resolved
         assert any(e["service_hash"] == service_hash for e in arb_done), arb_done
 
-    def test_e2e_rejects_forged_signatures_from_unregistered_panel(
-        self, five_arbiter_panel_cfg
-    ):
+    def test_e2e_rejects_forged_signatures_from_unregistered_panel(self, five_arbiter_panel_cfg):
         """Full-stack forgery reject: sign with PEMs whose pubkeys are NOT
         in the on-chain arbiter list. Same tag-prefix, same message
         format, same SDK path — must still 422.
@@ -286,10 +276,7 @@ class TestArbiterSigningE2E:
             self._seed_disputed(sync_client, service_hash)
 
             async def _run():
-                votes = [
-                    sign_arbiter_vote(pem, service_hash, "receiver")
-                    for pem in outsider_pems
-                ]
+                votes = [sign_arbiter_vote(pem, service_hash, "receiver") for pem in outsider_pems]
                 sdk, http = _sdk_with_asgi()
                 try:
                     with pytest.raises(httpx.HTTPStatusError) as exc_info:
@@ -320,9 +307,7 @@ class TestArbiterSigningE2E:
             self._seed_disputed(sync_client, service_hash)
 
             async def _run():
-                votes = [
-                    sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)
-                ]
+                votes = [sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)]
                 sdk, http = _sdk_with_asgi()
                 try:
                     with pytest.raises(httpx.HTTPStatusError) as exc_info:
@@ -353,9 +338,7 @@ class TestArbiterSigningE2E:
         try:
             with TestClient(app) as sync_client:
                 self._seed_disputed(sync_client, service_hash)
-                votes = [
-                    sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)
-                ]
+                votes = [sign_arbiter_vote(pems[i], service_hash, "receiver") for i in range(3)]
                 r = sync_client.post(
                     "/resolve",
                     json={
@@ -371,10 +354,7 @@ class TestArbiterSigningE2E:
             cap.detach()
 
         arb_events = [
-            e
-            for e in cap.events
-            if e["type"] == "arbitration_complete"
-            and e.get("service_hash") == service_hash
+            e for e in cap.events if e["type"] == "arbitration_complete" and e.get("service_hash") == service_hash
         ]
         assert arb_events, [e for e in cap.events if e["type"] == "arbitration_complete"]
         payload = arb_events[0]

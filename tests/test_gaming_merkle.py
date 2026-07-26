@@ -15,12 +15,9 @@ Covers:
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from server.gaming_merkle import (
-    MerkleProof,
     compute_root_and_proofs,
     verify_proof,
 )

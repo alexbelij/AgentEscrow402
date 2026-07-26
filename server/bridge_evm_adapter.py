@@ -49,9 +49,7 @@ DEFAULT_RPC_URLS = [
     "https://sepolia.gateway.tenderly.co",
 ]
 
-_DEPLOYMENT_RECORD = (
-    Path(__file__).resolve().parent.parent / "docs" / "tier3" / "T3.4-B-deployment.json"
-)
+_DEPLOYMENT_RECORD = Path(__file__).resolve().parent.parent / "docs" / "tier3" / "T3.4-B-deployment.json"
 
 
 class EvmAdapterError(Exception):
@@ -73,9 +71,7 @@ _CUSTOM_ERROR_NAMES = [
     "ZeroRecipient()",
     "TimelockInPast()",
 ]
-_SELECTOR_TO_NAME = {
-    keccak(text=sig)[:4].hex(): sig.split("(")[0] for sig in _CUSTOM_ERROR_NAMES
-}
+_SELECTOR_TO_NAME = {keccak(text=sig)[:4].hex(): sig.split("(")[0] for sig in _CUSTOM_ERROR_NAMES}
 
 
 def _decode_revert(exc: Exception) -> str:
@@ -108,8 +104,7 @@ def load_deployment() -> Dict[str, Any]:
     scripts/deploy_htlc_sepolia.py."""
     if not _DEPLOYMENT_RECORD.exists():
         raise EvmAdapterError(
-            f"no deployment record at {_DEPLOYMENT_RECORD} — run "
-            "scripts/deploy_htlc_sepolia.py first"
+            f"no deployment record at {_DEPLOYMENT_RECORD} — run " "scripts/deploy_htlc_sepolia.py first"
         )
     return json.loads(_DEPLOYMENT_RECORD.read_text())
 

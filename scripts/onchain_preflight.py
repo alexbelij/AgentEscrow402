@@ -56,8 +56,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
-import struct
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -169,8 +167,7 @@ class PreflightReport:
         return {
             "all_passed": self.all_passed,
             "checks": [
-                {"name": c.name, "passed": c.passed, "detail": c.detail, "findings": c.findings}
-                for c in self.checks
+                {"name": c.name, "passed": c.passed, "detail": c.detail, "findings": c.findings} for c in self.checks
             ],
             "packaged_wasms": self.packaged_wasms,
             "contract_wasms": self.contract_wasms,
@@ -210,9 +207,7 @@ def _magic_check(paths: Iterable[Path]) -> CheckResult:
         with p.open("rb") as fh:
             head = fh.read(len(_WASM_MAGIC))
         if head != _WASM_MAGIC:
-            findings.append(
-                f"{p.name}: WASM magic mismatch — first {len(_WASM_MAGIC)} bytes = {head.hex()}"
-            )
+            findings.append(f"{p.name}: WASM magic mismatch — first {len(_WASM_MAGIC)} bytes = {head.hex()}")
     return CheckResult(
         name="magic_bytes",
         passed=not findings,
@@ -221,9 +216,7 @@ def _magic_check(paths: Iterable[Path]) -> CheckResult:
     )
 
 
-def _entrypoints_check(
-    packaged: dict[str, dict], contract_build: dict[str, dict]
-) -> CheckResult:
+def _entrypoints_check(packaged: dict[str, dict], contract_build: dict[str, dict]) -> CheckResult:
     findings: list[str] = []
 
     # Packaged tx wasms (session code) must export `call`.
@@ -309,17 +302,13 @@ def _manifest_check(manifest_path: Path, packaged: dict[str, dict]) -> tuple[Che
             findings.append(f"{cname}: contract_hash is not hex ({ch_raw!r})")
             continue
         if len(ch) != 64:
-            findings.append(
-                f"{cname}: contract_hash length {len(ch)} != 64 (expected 32 bytes hex)"
-            )
+            findings.append(f"{cname}: contract_hash length {len(ch)} != 64 (expected 32 bytes hex)")
         hashes_seen.setdefault(ch.lower(), []).append(cname)
 
     # Duplicate-hash detection.
     for h, owners in hashes_seen.items():
         if len(owners) > 1:
-            findings.append(
-                f"duplicate contract_hash {h} shared by {len(owners)} contracts: {owners}"
-            )
+            findings.append(f"duplicate contract_hash {h} shared by {len(owners)} contracts: {owners}")
 
     return (
         CheckResult(
@@ -411,9 +400,7 @@ def _render_tty(report: PreflightReport, verbose: bool) -> str:
             for f in c.findings:
                 lines.append(f"      · {f}")
     lines.append("")
-    lines.append(
-        color("Result: PASS", "32") if report.all_passed else color("Result: FAIL", "31")
-    )
+    lines.append(color("Result: PASS", "32") if report.all_passed else color("Result: FAIL", "31"))
     if verbose:
         lines.append("")
         lines.append(f"packaged wasms: {list(report.packaged_wasms)}")

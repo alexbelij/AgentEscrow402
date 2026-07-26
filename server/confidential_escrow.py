@@ -104,9 +104,7 @@ def seal_amount(amount: int, service_hash: str, bits: int = ESCROW_RANGE_BITS) -
         commitment, blinding = _commit_only(amount, bits)
         C, proof = prove_range(amount, blinding, transcript=service_hash.encode("utf-8"), bits=bits)
     except ZKError as exc:
-        raise ConfidentialEscrowError(
-            f"cannot seal amount {amount} as confidential (bits={bits}): {exc}"
-        ) from exc
+        raise ConfidentialEscrowError(f"cannot seal amount {amount} as confidential (bits={bits}): {exc}") from exc
     return {
         "commitment": C.C,
         "range_proof": proof.to_dict(),

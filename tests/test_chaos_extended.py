@@ -31,7 +31,7 @@ matter specifically for dispute arbitration correctness:
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -59,12 +59,8 @@ def _client() -> TestClient:
 def _reset_vrf_state() -> None:
     vrf_mod._registered_arbiters.clear()
     vrf_mod._election_results.clear()
-    vrf_mod._registered_arbiters["arbiter_alpha"] = ReputationRecord(
-        agent="arbiter_alpha", score=85.0, completed=12
-    )
-    vrf_mod._registered_arbiters["arbiter_beta"] = ReputationRecord(
-        agent="arbiter_beta", score=72.0, completed=8
-    )
+    vrf_mod._registered_arbiters["arbiter_alpha"] = ReputationRecord(agent="arbiter_alpha", score=85.0, completed=12)
+    vrf_mod._registered_arbiters["arbiter_beta"] = ReputationRecord(agent="arbiter_beta", score=72.0, completed=8)
 
 
 def make_client_with_endpoints(endpoints: list[tuple[str, dict[str, str]]]) -> CasperClient:
@@ -214,9 +210,7 @@ class TestSplitBrainElectionRace:
             return_exceptions=True,
         )
 
-        elected_ids = {
-            r.elected_arbiter.arbiter_id for r in results if hasattr(r, "elected_arbiter")
-        }
+        elected_ids = {r.elected_arbiter.arbiter_id for r in results if hasattr(r, "elected_arbiter")}
         # Convergence: whichever request(s) succeeded, they must all agree
         # on the SAME elected arbiter -- no split-brain divergence.
         assert len(elected_ids) == 1
@@ -342,9 +336,10 @@ class TestDoubleJudgeReplay:
         second_arbiter = second.json()["panel_election"]["elected_arbiter"]["arbiter_id"]
         third_arbiter = third.json()["panel_election"]["elected_arbiter"]["arbiter_id"]
 
-        assert first.json()["escalation_reason"].startswith("abstain") or first.json()[
-            "escalation_reason"
-        ] == "abstain_verdict"
+        assert (
+            first.json()["escalation_reason"].startswith("abstain")
+            or first.json()["escalation_reason"] == "abstain_verdict"
+        )
         assert second.json()["escalation_reason"] == "prior_election_reused"
         assert third.json()["escalation_reason"] == "prior_election_reused"
 

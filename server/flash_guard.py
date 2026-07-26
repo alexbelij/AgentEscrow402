@@ -100,8 +100,7 @@ def enforce(
     delay = check_block_delay(funded_block, current_block)
     if hold.blocked and delay.blocked:
         raise FlashGuardError(
-            f"{hold.reason}; {delay.reason} "
-            f"(need +{hold.remaining_seconds}s, +{delay.remaining_blocks} blocks)"
+            f"{hold.reason}; {delay.reason} " f"(need +{hold.remaining_seconds}s, +{delay.remaining_blocks} blocks)"
         )
     if hold.blocked:
         raise FlashGuardError(f"{hold.reason} (need +{hold.remaining_seconds}s)")

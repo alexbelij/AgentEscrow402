@@ -37,7 +37,7 @@ import sys
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -131,8 +131,7 @@ class PricedMarketDataTool:
         """Produce the 402 payment challenge for a symbol."""
         nonce = secrets.token_hex(16)
         service_hash = hashlib.sha256(
-            f"market-data|{symbol}|{HOSTED_DEMO_SENDER}|{self._seller}|"
-            f"{self.PRICE_PER_CALL}|{nonce}".encode()
+            f"market-data|{symbol}|{HOSTED_DEMO_SENDER}|{self._seller}|" f"{self.PRICE_PER_CALL}|{nonce}".encode()
         ).hexdigest()
         return {
             "amount": self.PRICE_PER_CALL,
@@ -184,9 +183,7 @@ class AutonomousAgent:
 
     def _x402_header(self, service_hash: str, amount: int, nonce: str) -> dict:
         ts = str(int(time.time()))
-        payment = ";".join([
-            X402_VERSION, service_hash, str(amount), HOSTED_DEMO_SENDER, ts, nonce, HOSTED_DEMO_SIG
-        ])
+        payment = ";".join([X402_VERSION, service_hash, str(amount), HOSTED_DEMO_SENDER, ts, nonce, HOSTED_DEMO_SIG])
         return {"X-Payment": payment, "X-AE402-Demo-Identity": "hosted-console"}
 
     def _create_escrow(self, challenge: dict) -> str:
@@ -198,9 +195,7 @@ class AutonomousAgent:
             "nonce": challenge["nonce"],
             "service_hash": challenge["service_hash"],
         }
-        headers = self._x402_header(
-            challenge["service_hash"], challenge["amount"], challenge["nonce"]
-        )
+        headers = self._x402_header(challenge["service_hash"], challenge["amount"], challenge["nonce"])
         r = self._client.post("/escrow", json=body, headers=headers)
         if r.status_code not in (200, 201):
             raise RuntimeError(f"escrow create failed: {r.status_code} {r.text[:200]}")
@@ -289,16 +284,20 @@ def _setup_stubs() -> None:
     """
     try:
         from server import app as _sapp
+
         if getattr(_sapp, "_casper", None) is None:
+
             class _StubCasper:
                 async def close(self):
                     return None
+
             _sapp._casper = _StubCasper()
     except Exception:
         pass
 
     try:
         from server.config import get_config
+
         cfg = get_config()
         cfg.allow_hosted_demo_identity = True
         # Some code paths read the raw env var each request instead of the
@@ -321,6 +320,7 @@ def main() -> int:
 
     _setup_stubs()
     from fastapi.testclient import TestClient
+
     from server.app import app  # noqa: E402
 
     seller_hex = hashlib.sha256(b"autonomous-agent-sample-seller").hexdigest()

@@ -43,9 +43,7 @@ from typing import Any
 
 # A per-request UUID (or client-supplied X-Request-ID). Any log record
 # emitted during a request handler will include this via JsonFormatter.
-_correlation_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "correlation_id", default=None
-)
+_correlation_id: contextvars.ContextVar[str | None] = contextvars.ContextVar("correlation_id", default=None)
 
 
 def get_correlation_id() -> str | None:
@@ -76,10 +74,29 @@ class JsonFormatter(logging.Formatter):
 
     _RESERVED_ATTRS: frozenset[str] = frozenset(
         {
-            "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-            "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-            "created", "msecs", "relativeCreated", "thread", "threadName",
-            "processName", "process", "message", "asctime", "taskName",
+            "name",
+            "msg",
+            "args",
+            "levelname",
+            "levelno",
+            "pathname",
+            "filename",
+            "module",
+            "exc_info",
+            "exc_text",
+            "stack_info",
+            "lineno",
+            "funcName",
+            "created",
+            "msecs",
+            "relativeCreated",
+            "thread",
+            "threadName",
+            "processName",
+            "process",
+            "message",
+            "asctime",
+            "taskName",
         }
     )
 
@@ -145,7 +162,17 @@ def configure_json_logging(level: int = logging.INFO) -> None:
 # with a shape suited to REST APIs; adjust if the profile of AE402
 # requests shifts significantly.
 _DEFAULT_BUCKETS_SECONDS: tuple[float, ...] = (
-    0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
+    0.005,
+    0.01,
+    0.025,
+    0.05,
+    0.1,
+    0.25,
+    0.5,
+    1.0,
+    2.5,
+    5.0,
+    10.0,
 )
 
 

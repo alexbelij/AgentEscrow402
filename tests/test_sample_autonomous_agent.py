@@ -31,11 +31,13 @@ def _setup_env(monkeypatch_module=None):
 def _import_sample():
     """Import the sample after env is set."""
     from sdk.samples import autonomous_agent
+
     return autonomous_agent
 
 
 def _make_test_client():
     from fastapi.testclient import TestClient
+
     from server.app import app
 
     return TestClient(app)
@@ -110,6 +112,7 @@ def test_full_agent_run_creates_and_releases_escrow(monkeypatch):
     # so we get a fresh Config from the env we just monkeypatched.
     import server.app as _sapp
     import server.middleware as _smw
+
     _sapp.get_config.cache_clear()
     for fn_name in ("get_config",):
         fn = getattr(_smw, fn_name, None)
@@ -145,9 +148,7 @@ def test_cli_produces_json_receipt(tmp_path):
         text=True,
         timeout=45,
     )
-    assert result.returncode == 0, (
-        f"CLI failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"CLI failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     # The JSON receipt is the entire stdout (or the last block starting
     # with '{' if the sandbox prints warnings first). Find the first line
     # that is exactly '{' and parse from there.
@@ -157,4 +158,4 @@ def test_cli_produces_json_receipt(tmp_path):
     receipt = json.loads("\n".join(lines[start:]))
     assert receipt["escrows_created"] == 1
     assert receipt["total_paid"] > 0
-    assert receipt["turns"] >= 3   # thought + 402 + escrow + retry + data + answer path
+    assert receipt["turns"] >= 3  # thought + 402 + escrow + retry + data + answer path

@@ -86,7 +86,10 @@ def run(token_type: str = "cspr", amount: int = 1_000_000_000, refund: bool = Fa
     # user running this back-to-back doesn't hit 429 on the third try.
     try:
         from server import app as _sapp
-        _sapp._rate_limits = type("_NL", (dict,), {"__setitem__": lambda self, k, v: None, "get": lambda self, k, d=None: None})()
+
+        _sapp._rate_limits = type(
+            "_NL", (dict,), {"__setitem__": lambda self, k, v: None, "get": lambda self, k, d=None: None}
+        )()
     except Exception:
         pass
 
@@ -94,6 +97,7 @@ def run(token_type: str = "cspr", amount: int = 1_000_000_000, refund: bool = Fa
     # case it was already cached at module-load time.
     try:
         from server.config import get_config
+
         cfg = get_config()
         cfg.allow_hosted_demo_identity = True
     except Exception:
@@ -108,6 +112,7 @@ def run(token_type: str = "cspr", amount: int = 1_000_000_000, refund: bool = Fa
 
     try:
         from server import app as _sapp3
+
         if getattr(_sapp3, "_casper", None) is None:
             _sapp3._casper = _StubCasper()
     except Exception:

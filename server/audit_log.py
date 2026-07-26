@@ -201,8 +201,8 @@ def verify_checkpoint_signature(checkpoint: SignedCheckpoint) -> bool:
     ):
         return False
     try:
-        pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex(checkpoint.pubkey_hex[len(ED25519_TAG_HEX):]))
-        signature = bytes.fromhex(checkpoint.signature_hex[len(ED25519_TAG_HEX):])
+        pubkey = Ed25519PublicKey.from_public_bytes(bytes.fromhex(checkpoint.pubkey_hex[len(ED25519_TAG_HEX) :]))
+        signature = bytes.fromhex(checkpoint.signature_hex[len(ED25519_TAG_HEX) :])
     except ValueError:
         return False
     message = _checkpoint_message(checkpoint.root, checkpoint.start_seq, checkpoint.end_seq)

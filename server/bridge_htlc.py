@@ -66,7 +66,7 @@ import enum
 import hashlib
 import secrets
 import threading
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, List, Optional
 
 
@@ -77,8 +77,8 @@ class Side(str, enum.Enum):
 
 class HTLCStatus(str, enum.Enum):
     PROPOSED = "proposed"  # side declared, hashlock committed, funds not yet escrowed
-    LOCKED = "locked"      # funds escrowed on this side
-    CLAIMED = "claimed"    # preimage revealed, funds released to counterparty
+    LOCKED = "locked"  # funds escrowed on this side
+    CLAIMED = "claimed"  # preimage revealed, funds released to counterparty
     REFUNDED = "refunded"  # timelock expired, funds returned to initiator
 
 
@@ -112,17 +112,17 @@ class HTLCLeg:
 
     leg_id: str
     side: Side
-    initiator: str            # who locks funds on THIS side
-    counterparty: str         # who can claim by revealing preimage
-    amount: int               # motes on Casper, wei on EVM
-    hashlock_hex: str         # sha256(preimage) in lowercase hex
-    timelock_ms: int          # absolute deadline; refund allowed at/after this ms
+    initiator: str  # who locks funds on THIS side
+    counterparty: str  # who can claim by revealing preimage
+    amount: int  # motes on Casper, wei on EVM
+    hashlock_hex: str  # sha256(preimage) in lowercase hex
+    timelock_ms: int  # absolute deadline; refund allowed at/after this ms
     status: HTLCStatus = HTLCStatus.PROPOSED
-    preimage_hex: Optional[str] = None    # revealed on claim
+    preimage_hex: Optional[str] = None  # revealed on claim
     locked_at_ms: Optional[int] = None
     claimed_at_ms: Optional[int] = None
     refunded_at_ms: Optional[int] = None
-    lock_tx_hash: Optional[str] = None    # deterministic mock tx hash
+    lock_tx_hash: Optional[str] = None  # deterministic mock tx hash
     claim_tx_hash: Optional[str] = None
     refund_tx_hash: Optional[str] = None
 
@@ -468,9 +468,8 @@ class HTLCRegistry:
             evm_status = swap.evm_leg.status.value if swap.evm_leg else None
             both_claimed = casper_status == "claimed" and evm_status == "claimed"
             both_refunded = casper_status == "refunded" and evm_status == "refunded"
-            mixed = (
-                (casper_status == "claimed" and evm_status == "refunded")
-                or (casper_status == "refunded" and evm_status == "claimed")
+            mixed = (casper_status == "claimed" and evm_status == "refunded") or (
+                casper_status == "refunded" and evm_status == "claimed"
             )
             return {
                 "swap_id": swap_id,
@@ -478,11 +477,7 @@ class HTLCRegistry:
                 "casper_status": casper_status,
                 "evm_status": evm_status,
                 "revealed_preimage_hex": revealed,
-                "atomic_outcome": (
-                    "completed" if both_claimed
-                    else "aborted" if both_refunded
-                    else "in_progress"
-                ),
+                "atomic_outcome": ("completed" if both_claimed else "aborted" if both_refunded else "in_progress"),
                 "safety_violation": mixed,
             }
 

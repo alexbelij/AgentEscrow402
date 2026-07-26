@@ -14,8 +14,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from server.threshold_secret import (
-    build_threshold_release,
     ThresholdReleaseBundle,
+    build_threshold_release,
 )
 
 router = APIRouter(prefix="/threshold", tags=["threshold"])

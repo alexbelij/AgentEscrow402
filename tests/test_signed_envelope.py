@@ -26,15 +26,14 @@ import tempfile
 import time
 
 import pytest
-
-from cryptography.hazmat.primitives import serialization, hashes
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, utils
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from server.signed_envelope import (
     DEFAULT_REPLAY_WINDOW_SECONDS,
-    DomainSeparator,
     KNOWN_PURPOSES,
+    DomainSeparator,
     PersistentNonceStore,
     SignedEnvelope,
     build_signing_bytes,
@@ -42,17 +41,15 @@ from server.signed_envelope import (
     verify_envelope,
 )
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 def _fresh_ed25519() -> tuple[bytes, bytes]:
     sk = os.urandom(32)
     priv = Ed25519PrivateKey.from_private_bytes(sk)
-    pk = priv.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    )
+    pk = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     return sk, pk
 
 
@@ -92,6 +89,7 @@ def payload() -> dict:
 # ---------------------------------------------------------------------------
 # Happy paths
 # ---------------------------------------------------------------------------
+
 
 def test_happy_path_ed25519(domain, keys, payload):
     sk, pk = keys
@@ -141,6 +139,7 @@ def test_happy_path_secp256k1(domain, payload):
 # ---------------------------------------------------------------------------
 # Cross-domain replay
 # ---------------------------------------------------------------------------
+
 
 def test_cross_chain_replay_rejected(domain, keys, payload):
     sk, pk = keys
@@ -231,6 +230,7 @@ def test_cross_protocol_replay_rejected(domain, keys, payload):
 # Timestamp window
 # ---------------------------------------------------------------------------
 
+
 def test_timestamp_stale_rejected(domain, keys, payload):
     sk, pk = keys
     old_ts = int(time.time()) - DEFAULT_REPLAY_WINDOW_SECONDS - 5
@@ -266,6 +266,7 @@ def test_timestamp_future_rejected(domain, keys, payload):
 # ---------------------------------------------------------------------------
 # Nonce store
 # ---------------------------------------------------------------------------
+
 
 def test_nonce_reuse_rejected_in_memory(domain, keys, payload):
     sk, pk = keys
@@ -342,6 +343,7 @@ def test_failed_verify_does_not_burn_nonce(domain, keys, payload):
 # ---------------------------------------------------------------------------
 # Tamper detection
 # ---------------------------------------------------------------------------
+
 
 def test_tampered_payload_rejected(domain, keys, payload):
     sk, pk = keys
@@ -424,6 +426,7 @@ def test_tampered_nonce_rejected(domain, keys, payload):
 # Format-level rejections
 # ---------------------------------------------------------------------------
 
+
 def test_unknown_purpose_rejected(domain, keys, payload):
     sk, pk = keys
     weird = DomainSeparator(
@@ -474,6 +477,7 @@ def test_domain_forbids_control_chars():
 # ---------------------------------------------------------------------------
 # Determinism / round-trip
 # ---------------------------------------------------------------------------
+
 
 def test_envelope_json_roundtrip(domain, keys, payload):
     sk, pk = keys

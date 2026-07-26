@@ -12,7 +12,6 @@ from server.merkle_provenance import (
     leaf_hash,
 )
 
-
 client = TestClient(app)
 
 

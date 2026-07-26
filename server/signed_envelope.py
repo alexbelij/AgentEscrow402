@@ -53,19 +53,19 @@ import json
 import sqlite3
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Literal
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import utils
 from cryptography.hazmat.primitives.asymmetric.ec import (
-    EllipticCurvePublicKey,
-    SECP256K1,
     ECDSA,
+    SECP256K1,
+    EllipticCurvePublicKey,
 )
-from cryptography.hazmat.primitives.asymmetric import ec, utils
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 # ---------------------------------------------------------------------------
 # Protocol constants
@@ -122,6 +122,7 @@ KNOWN_PURPOSES: frozenset[str] = frozenset(
 # DomainSeparator
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class DomainSeparator:
     """The 4-tuple that binds an envelope to *one specific* protocol,
@@ -140,22 +141,15 @@ class DomainSeparator:
         for field_name in ("protocol", "version", "chain_id", "purpose"):
             value = getattr(self, field_name)
             if not isinstance(value, str) or not value:
-                raise ValueError(
-                    f"DomainSeparator.{field_name} must be a non-empty string"
-                )
+                raise ValueError(f"DomainSeparator.{field_name} must be a non-empty string")
             # Reject separators that could collide with our record
             # separators or line-based framing.
             if any(ch in value for ch in (";", "\n", "\r", "\x00")):
-                raise ValueError(
-                    f"DomainSeparator.{field_name} must not contain ';', "
-                    "newline, or NUL"
-                )
+                raise ValueError(f"DomainSeparator.{field_name} must not contain ';', " "newline, or NUL")
 
     def canonical_bytes(self) -> bytes:
         """Deterministic byte representation of the separator."""
-        payload = (
-            f"{self.protocol};{self.version};{self.chain_id};{self.purpose}"
-        )
+        payload = f"{self.protocol};{self.version};{self.chain_id};{self.purpose}"
         return payload.encode("utf-8")
 
     def digest(self) -> bytes:
@@ -179,6 +173,7 @@ class DomainSeparator:
 # ---------------------------------------------------------------------------
 # SignedEnvelope
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class SignedEnvelope:
@@ -287,6 +282,7 @@ class SignedEnvelope:
 # Canonical signing bytes
 # ---------------------------------------------------------------------------
 
+
 def build_signing_bytes(envelope: SignedEnvelope) -> bytes:
     """Deterministic bytes that the signer signed / the verifier checks.
 
@@ -328,6 +324,7 @@ def build_signing_bytes(envelope: SignedEnvelope) -> bytes:
 # ---------------------------------------------------------------------------
 # Verification
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class VerifyResult:
@@ -440,13 +437,9 @@ def verify_envelope(
     # 7. Signature verification against the canonical bytes.
     signing_bytes = build_signing_bytes(envelope)
     if envelope.algorithm == "ed25519":
-        sig_ok = _verify_ed25519(
-            envelope.signer_pubkey_hex, signing_bytes, envelope.signature_hex
-        )
+        sig_ok = _verify_ed25519(envelope.signer_pubkey_hex, signing_bytes, envelope.signature_hex)
     else:
-        sig_ok = _verify_secp256k1(
-            envelope.signer_pubkey_hex, signing_bytes, envelope.signature_hex
-        )
+        sig_ok = _verify_secp256k1(envelope.signer_pubkey_hex, signing_bytes, envelope.signature_hex)
     if not sig_ok:
         return VerifyResult(False, "bad_signature")
 
@@ -463,6 +456,7 @@ def verify_envelope(
 # Persistent nonce store
 # ---------------------------------------------------------------------------
 
+
 class PersistentNonceStore:
     """SQLite-backed nonce store.
 
@@ -475,10 +469,7 @@ class PersistentNonceStore:
     """
 
     _SCHEMA: ClassVar[str] = (
-        "CREATE TABLE IF NOT EXISTS nonces ("
-        "  nonce TEXT PRIMARY KEY,"
-        "  ts    INTEGER NOT NULL"
-        ")"
+        "CREATE TABLE IF NOT EXISTS nonces (" "  nonce TEXT PRIMARY KEY," "  ts    INTEGER NOT NULL" ")"
     )
 
     def __init__(
@@ -526,9 +517,7 @@ class PersistentNonceStore:
     def contains(self, nonce: str) -> bool:
         """Return True iff ``nonce`` has been remembered and not yet pruned."""
         with self._lock, self._connect() as conn:
-            row = conn.execute(
-                "SELECT 1 FROM nonces WHERE nonce = ? LIMIT 1", (nonce,)
-            ).fetchone()
+            row = conn.execute("SELECT 1 FROM nonces WHERE nonce = ? LIMIT 1", (nonce,)).fetchone()
             return row is not None
 
     def remember(self, nonce: str, timestamp: int) -> None:
@@ -561,6 +550,7 @@ class PersistentNonceStore:
 # ---------------------------------------------------------------------------
 # Convenience: build+sign helper (test/dev only)
 # ---------------------------------------------------------------------------
+
 
 def sign_envelope_ed25519(
     *,

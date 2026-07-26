@@ -25,9 +25,6 @@ from server.regime_shift import (
     page_hinkley_stream,
 )
 from server.risk_premium import (
-    DEFAULT_ALPHA0,
-    DEFAULT_BETA0,
-    DEFAULT_CI_LEVEL,
     RiskPremiumRequest,
     RiskPremiumResponse,
     compute_premium,
@@ -363,14 +360,10 @@ async def regime_shift_cusum(req: RegimeShiftRequest) -> dict[str, Any]:
     if len(req.values) == 0:
         raise HTTPException(status_code=400, detail="empty stream")
     try:
-        results = cusum_stream(
-            req.values, mu0=req.mu0, sigma=req.sigma, k=req.cusum_k, h=req.cusum_h
-        )
+        results = cusum_stream(req.values, mu0=req.mu0, sigma=req.sigma, k=req.cusum_k, h=req.cusum_h)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
-    first_alarm = next(
-        (i for i, r in enumerate(results) if r.alarm_upper or r.alarm_lower), None
-    )
+    first_alarm = next((i for i, r in enumerate(results) if r.alarm_upper or r.alarm_lower), None)
     return {
         "n_samples": len(results),
         "first_alarm_idx": first_alarm,

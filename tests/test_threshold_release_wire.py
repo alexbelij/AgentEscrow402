@@ -24,7 +24,6 @@ from fastapi.testclient import TestClient
 from server.app import app, get_sandbox
 from server.sandbox import SandboxStore
 
-
 RECEIVER_HEX = "b" * 64
 
 

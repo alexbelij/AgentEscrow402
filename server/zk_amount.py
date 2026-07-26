@@ -176,6 +176,7 @@ def _scalar_mul(k: int, P: Point) -> Point:
 # Point encoding: SEC-1 compressed (33 bytes, 0x02/0x03 prefix + x)
 # ---------------------------------------------------------------------------
 
+
 def _encode_point(P: Point) -> bytes:
     """Encode an EC point in SEC-1 compressed form.
 
@@ -275,6 +276,7 @@ def generator_H() -> bytes:
 # Scalar helpers
 # ---------------------------------------------------------------------------
 
+
 def _scalar_from_hash(*chunks: bytes) -> int:
     """Hash chunks to a scalar in [1, _N-1]. Uses SHA-512, reduces mod _N."""
     h = hashlib.sha512()
@@ -310,6 +312,7 @@ def _decode_scalar(b: bytes) -> int:
 # ---------------------------------------------------------------------------
 # Pedersen commitments
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class Commitment:
@@ -369,6 +372,7 @@ def verify_open(commitment: Commitment, amount: int, blinding: int) -> bool:
 # Homomorphism
 # ---------------------------------------------------------------------------
 
+
 def add_commitments(a: Commitment, b: Commitment) -> Commitment:
     """C(v1) + C(v2) = C(v1 + v2). Blinding factors compose as r1 + r2."""
     C = _point_add(a.to_point(), b.to_point())
@@ -390,6 +394,7 @@ def sum_commitments(commitments: List[Commitment]) -> Commitment:
 # ---------------------------------------------------------------------------
 # Range proof — Chaum-Pedersen OR of {v_i = 0, v_i = 1} per bit
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class ORProofBit:
@@ -417,8 +422,7 @@ class RangeProof:
         return {
             "bit_commitments": list(self.bit_commitments),
             "or_proofs": [
-                {"a0": p.a0, "a1": p.a1, "e0": p.e0, "e1": p.e1, "z0": p.z0, "z1": p.z1}
-                for p in self.or_proofs
+                {"a0": p.a0, "a1": p.a1, "e0": p.e0, "e1": p.e1, "z0": p.z0, "z1": p.z1} for p in self.or_proofs
             ],
         }
 
@@ -473,9 +477,12 @@ def _prove_or_bit(bit: int, r_bit: int, C_bit: Point, transcript_ctx: bytes) -> 
         raise ZKError(f"bit must be 0 or 1, got {bit}")
 
     return ORProofBit(
-        a0=_encode_point(a0).hex(), a1=_encode_point(a1).hex(),
-        e0=_encode_scalar(e0).hex(), e1=_encode_scalar(e1).hex(),
-        z0=_encode_scalar(z0).hex(), z1=_encode_scalar(z1).hex(),
+        a0=_encode_point(a0).hex(),
+        a1=_encode_point(a1).hex(),
+        e0=_encode_scalar(e0).hex(),
+        e1=_encode_scalar(e1).hex(),
+        z0=_encode_scalar(z0).hex(),
+        z1=_encode_scalar(z1).hex(),
     )
 
 
@@ -662,6 +669,7 @@ def _range_ctx(transcript: bytes, C_bits: List[Point]) -> bytes:
 # High-level convenience: full "confidential amount" record
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class ConfidentialAmount:
     """A confidential amount = commitment + range proof + private opening."""
@@ -691,6 +699,4 @@ def confidential(amount: int, transcript: bytes = b"") -> ConfidentialAmount:
     """
     _, blinding = commit(amount)
     C, proof = prove_range(amount, blinding, transcript=transcript)
-    return ConfidentialAmount(
-        commitment=C, range_proof=proof, _amount=amount, _blinding=blinding
-    )
+    return ConfidentialAmount(commitment=C, range_proof=proof, _amount=amount, _blinding=blinding)

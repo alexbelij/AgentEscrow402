@@ -18,7 +18,6 @@ from server.threshold_secret import (
     split_secret,
 )
 
-
 # ---------- split_secret / reconstruct_secret ----------
 
 
@@ -34,6 +33,7 @@ class TestSplitReconstruct:
         shares = split_secret(secret, threshold=3, total_shares=5)
         # Try all combos of 3 out of 5 — all must reconstruct
         from itertools import combinations
+
         for combo in combinations(range(5), 3):
             subset = [shares[i] for i in combo]
             assert reconstruct_secret(subset) == secret, f"combo {combo} failed"
@@ -50,6 +50,7 @@ class TestSplitReconstruct:
 
     def test_share_values_are_in_field(self):
         from server.threshold_secret import _PRIME
+
         shares = split_secret(os.urandom(32), threshold=3, total_shares=5)
         for s in shares:
             assert 0 <= s.value < _PRIME

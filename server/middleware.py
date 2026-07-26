@@ -283,9 +283,9 @@ def compute_service_hash(sender: str, receiver: str, amount: int, nonce: str) ->
 # ---------------------------------------------------------------------------
 
 import inspect as _inspect
-import typing
 import json as _json  # local alias to avoid touching the top-of-file imports
 import os as _os
+import typing
 from functools import lru_cache, wraps
 
 from server.signed_envelope import (
@@ -372,11 +372,7 @@ def require_signed_envelope(
             f"extend KNOWN_PURPOSES in server.signed_envelope first"
         )
 
-    window = (
-        replay_window_seconds
-        if replay_window_seconds is not None
-        else DEFAULT_REPLAY_WINDOW_SECONDS
-    )
+    window = replay_window_seconds if replay_window_seconds is not None else DEFAULT_REPLAY_WINDOW_SECONDS
 
     def decorator(fn: Callable) -> Callable:
         # Resolve string annotations (this module uses
@@ -389,16 +385,13 @@ def require_signed_envelope(
         # query params.
         sig = _inspect.signature(fn)
         try:
-            resolved_hints = typing.get_type_hints(
-                fn, globalns=getattr(fn, "__globals__", {}), include_extras=True
-            )
+            resolved_hints = typing.get_type_hints(fn, globalns=getattr(fn, "__globals__", {}), include_extras=True)
         except Exception:
             resolved_hints = {}
         if resolved_hints:
             sig = sig.replace(
                 parameters=[
-                    p.replace(annotation=resolved_hints.get(p.name, p.annotation))
-                    for p in sig.parameters.values()
+                    p.replace(annotation=resolved_hints.get(p.name, p.annotation)) for p in sig.parameters.values()
                 ]
             )
         accepts_envelope = "envelope" in sig.parameters
@@ -449,9 +442,7 @@ def require_signed_envelope(
                     },
                 )
 
-            resolved_chain = (
-                chain_id if chain_id is not None else _chain_id_from_env()
-            )
+            resolved_chain = chain_id if chain_id is not None else _chain_id_from_env()
             if not resolved_chain:
                 # Refuse to run without a configured chain id — better
                 # to 500 than to accept envelopes for an unknown chain.
@@ -473,12 +464,17 @@ def require_signed_envelope(
                 nonce_store=_default_nonce_store(),
             )
             if not result.ok:
-                status = 401 if result.reason in {
-                    "bad_signature",
-                    "nonce_reused",
-                    "timestamp_stale",
-                    "timestamp_future",
-                } else 400
+                status = (
+                    401
+                    if result.reason
+                    in {
+                        "bad_signature",
+                        "nonce_reused",
+                        "timestamp_stale",
+                        "timestamp_future",
+                    }
+                    else 400
+                )
                 return JSONResponse(
                     status_code=status,
                     content={"error": "envelope_rejected", "reason": result.reason},
@@ -494,9 +490,7 @@ def require_signed_envelope(
         # Rewrite the wrapper's signature so that FastAPI's dependency
         # resolver only sees the parameters the underlying handler
         # actually declares (minus ``envelope`` — we inject that).
-        new_params = [
-            p for name, p in sig.parameters.items() if name != "envelope"
-        ]
+        new_params = [p for name, p in sig.parameters.items() if name != "envelope"]
         wrapper.__signature__ = sig.replace(parameters=new_params)
         return wrapper
 
@@ -548,11 +542,7 @@ def verify_signed_envelope_if_present(
             f"extend KNOWN_PURPOSES in server.signed_envelope first"
         )
 
-    window = (
-        replay_window_seconds
-        if replay_window_seconds is not None
-        else DEFAULT_REPLAY_WINDOW_SECONDS
-    )
+    window = replay_window_seconds if replay_window_seconds is not None else DEFAULT_REPLAY_WINDOW_SECONDS
 
     def decorator(fn: Callable) -> Callable:
         # Resolve string annotations (this module uses
@@ -565,16 +555,13 @@ def verify_signed_envelope_if_present(
         # query params.
         sig = _inspect.signature(fn)
         try:
-            resolved_hints = typing.get_type_hints(
-                fn, globalns=getattr(fn, "__globals__", {}), include_extras=True
-            )
+            resolved_hints = typing.get_type_hints(fn, globalns=getattr(fn, "__globals__", {}), include_extras=True)
         except Exception:
             resolved_hints = {}
         if resolved_hints:
             sig = sig.replace(
                 parameters=[
-                    p.replace(annotation=resolved_hints.get(p.name, p.annotation))
-                    for p in sig.parameters.values()
+                    p.replace(annotation=resolved_hints.get(p.name, p.annotation)) for p in sig.parameters.values()
                 ]
             )
         accepts_envelope = "envelope" in sig.parameters
@@ -637,9 +624,7 @@ def verify_signed_envelope_if_present(
                     },
                 )
 
-            resolved_chain = (
-                chain_id if chain_id is not None else _chain_id_from_env()
-            )
+            resolved_chain = chain_id if chain_id is not None else _chain_id_from_env()
             if not resolved_chain:
                 return JSONResponse(
                     status_code=500,
@@ -658,12 +643,17 @@ def verify_signed_envelope_if_present(
                 nonce_store=_default_nonce_store(),
             )
             if not result.ok:
-                status = 401 if result.reason in {
-                    "bad_signature",
-                    "nonce_reused",
-                    "timestamp_stale",
-                    "timestamp_future",
-                } else 400
+                status = (
+                    401
+                    if result.reason
+                    in {
+                        "bad_signature",
+                        "nonce_reused",
+                        "timestamp_stale",
+                        "timestamp_future",
+                    }
+                    else 400
+                )
                 return JSONResponse(
                     status_code=status,
                     content={"error": "envelope_rejected", "reason": result.reason},
@@ -674,9 +664,7 @@ def verify_signed_envelope_if_present(
             request.state.ae402_envelope = envelope
             return await fn(*args, **kwargs)
 
-        new_params = [
-            p for name, p in sig.parameters.items() if name != "envelope"
-        ]
+        new_params = [p for name, p in sig.parameters.items() if name != "envelope"]
         wrapper.__signature__ = sig.replace(parameters=new_params)
         return wrapper
 

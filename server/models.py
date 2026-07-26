@@ -147,8 +147,8 @@ class EscrowRecord(BaseModel):
     # requesting receiver appears in the result tree at least once (i.e.
     # they won at least one payout leaf).  Empty root string = the escrow
     # is not a gaming escrow (default, backward-compatible).
-    escrow_type: str = "standard"       # one of: standard | gaming
-    gaming_result_root: str = ""        # hex sha256 Merkle root (32 bytes)
+    escrow_type: str = "standard"  # one of: standard | gaming
+    gaming_result_root: str = ""  # hex sha256 Merkle root (32 bytes)
     # C13: threshold-gated release. When set, /release requires the caller
     # to present >=threshold_n Shamir shares whose reconstructed 32-byte
     # secret hashes (sha256) to threshold_commitment_hex. Empty string →

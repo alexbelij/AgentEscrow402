@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
 
 from server.risk_premium import (
@@ -17,7 +15,6 @@ from server.risk_premium import (
     compute_posterior,
     compute_premium,
 )
-
 
 # ---------------------------------------------------------------------------
 # Beta quantile

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import os
+
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from server import bridge_htlc as htlc
-
 
 # ── Fixtures / helpers ────────────────────────────────────────────────
 
@@ -23,8 +24,8 @@ def _mk_swap(
     reg: htlc.HTLCRegistry,
     *,
     preimage: bytes | None = None,
-    casper_timelock: int = T0 + 3600_000,   # T_a: farther
-    evm_timelock: int = T0 + 1800_000,      # T_b: nearer (T_b < T_a required)
+    casper_timelock: int = T0 + 3600_000,  # T_a: farther
+    evm_timelock: int = T0 + 1800_000,  # T_b: nearer (T_b < T_a required)
     casper_amount: int = 1_000_000,
     evm_amount: int = 500_000,
     now_ms: int = T0,
@@ -115,10 +116,14 @@ def test_initiate_rejects_bad_hashlock_length():
     with pytest.raises(htlc.HTLCError) as e:
         reg.initiate_swap(
             hashlock_hex="dead",
-            casper_initiator="a", casper_counterparty="b",
-            casper_amount=1, casper_timelock_ms=T0 + 100,
-            evm_initiator="a", evm_counterparty="b",
-            evm_amount=1, evm_timelock_ms=T0 + 50,
+            casper_initiator="a",
+            casper_counterparty="b",
+            casper_amount=1,
+            casper_timelock_ms=T0 + 100,
+            evm_initiator="a",
+            evm_counterparty="b",
+            evm_amount=1,
+            evm_timelock_ms=T0 + 50,
             now_ms=T0,
         )
     assert e.value.code == htlc.RejectCode.INVALID_HASHLOCK
@@ -313,8 +318,8 @@ def test_atomic_swap_full_flow():
     reg = _fresh()
     swap, preimage = _mk_swap(reg)
 
-    reg.lock(swap.casper_leg.leg_id, now_ms=T0)         # step 1: Alice locks A
-    reg.lock(swap.evm_leg.leg_id, now_ms=T0 + 60_000)   # step 2: Bob locks B (later)
+    reg.lock(swap.casper_leg.leg_id, now_ms=T0)  # step 1: Alice locks A
+    reg.lock(swap.evm_leg.leg_id, now_ms=T0 + 60_000)  # step 2: Bob locks B (later)
 
     # step 3: Alice claims B by revealing s
     reg.claim(swap.evm_leg.leg_id, preimage.hex(), now_ms=T0 + 120_000)

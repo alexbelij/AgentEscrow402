@@ -15,7 +15,6 @@ from server.app import app, get_sandbox
 from server.gaming_merkle import compute_root_and_proofs
 from server.sandbox import SandboxStore
 
-
 RECEIVER_HEX = "c" * 64
 
 

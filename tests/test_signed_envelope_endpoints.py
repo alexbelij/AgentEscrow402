@@ -17,14 +17,13 @@ Two rollout modes:
 from __future__ import annotations
 
 import json
-import os
 import time
 from contextlib import contextmanager
 from typing import Iterator
 
 import pytest
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
 from server import app as app_module
@@ -35,10 +34,8 @@ from server.middleware import (
 )
 from server.signed_envelope import (
     DomainSeparator,
-    SignedEnvelope,
     sign_envelope_ed25519,
 )
-
 
 CHAIN_ID = "casper-test"
 
@@ -137,9 +134,7 @@ def test_advisory_missing_header_allows_request(client: TestClient) -> None:
 
 def test_advisory_present_valid_envelope_passes(client: TestClient) -> None:
     header = _make_envelope("escrow.deposit", nonce="nonce-advisory-1")
-    resp = client.post(
-        "/escrow", json=_valid_escrow_body(), headers={ENVELOPE_HEADER: header}
-    )
+    resp = client.post("/escrow", json=_valid_escrow_body(), headers={ENVELOPE_HEADER: header})
     assert resp.status_code != 401, resp.text
     if resp.status_code >= 400:
         try:
@@ -169,9 +164,7 @@ def test_advisory_wrong_purpose_rejected(client: TestClient) -> None:
     """An envelope with purpose=escrow.release presented at /escrow (deposit)
     must be rejected — domain separation prevents cross-endpoint replay."""
     header = _make_envelope("escrow.release", nonce="nonce-wrongpurp")
-    resp = client.post(
-        "/escrow", json=_valid_escrow_body(), headers={ENVELOPE_HEADER: header}
-    )
+    resp = client.post("/escrow", json=_valid_escrow_body(), headers={ENVELOPE_HEADER: header})
     assert resp.status_code == 400, resp.text
     assert resp.json()["reason"] == "domain_mismatch"
 
@@ -196,18 +189,14 @@ def test_advisory_replayed_nonce_rejected(client: TestClient) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_strict_missing_header_returns_401(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_missing_header_returns_401(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     with _enforce_on(monkeypatch):
         resp = client.post("/escrow", json=_valid_escrow_body())
     assert resp.status_code == 401
     assert resp.json()["reason"] == "envelope_missing"
 
 
-def test_strict_valid_envelope_passes(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_strict_valid_envelope_passes(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
     header = _make_envelope("escrow.deposit", nonce="nonce-strict-ok")
     with _enforce_on(monkeypatch):
         resp = client.post(
@@ -249,18 +238,14 @@ def _body_for(path: str) -> dict:
         ("/dispute", "escrow.dispute", "wire-nonce-dispute"),
     ],
 )
-def test_all_four_endpoints_wired(
-    client: TestClient, path: str, purpose: str, nonce: str
-) -> None:
+def test_all_four_endpoints_wired(client: TestClient, path: str, purpose: str, nonce: str) -> None:
     """Sanity: every endpoint accepts its own purpose and rejects a wrong one."""
     body = _body_for(path)
     ok_header = _make_envelope(purpose, nonce=nonce + "-ok")
     r_ok = client.post(path, json=body, headers={ENVELOPE_HEADER: ok_header})
     if r_ok.status_code == 401:
         try:
-            assert r_ok.json().get("reason") not in _envelope_reason_codes(), (
-                path, r_ok.text
-            )
+            assert r_ok.json().get("reason") not in _envelope_reason_codes(), (path, r_ok.text)
         except ValueError:
             pytest.fail(f"unexpected 401 body: {r_ok.text}")
 

@@ -8,7 +8,8 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
-from server import arbiter_crypto, batch_guard as bg
+from server import arbiter_crypto
+from server import batch_guard as bg
 from server.app import app, get_casper, get_config, get_sandbox
 from server.config import Config
 from server.sandbox import SandboxStore

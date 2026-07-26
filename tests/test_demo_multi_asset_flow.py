@@ -38,9 +38,7 @@ def _parse_json(stdout: str) -> dict:
 
 def test_default_run_produces_released_receipt():
     result = _run("--json")
-    assert result.returncode == 0, (
-        f"demo failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"demo failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     receipt = _parse_json(result.stdout)
     assert receipt["token_type"] == "cspr"
     assert receipt["created_status"] == "pending"
@@ -53,9 +51,7 @@ def test_default_run_produces_released_receipt():
 
 def test_refund_flag_produces_refunded_receipt():
     result = _run("--refund", "--json")
-    assert result.returncode == 0, (
-        f"demo --refund failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"demo --refund failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     receipt = _parse_json(result.stdout)
     assert receipt["final_status"] == "refunded"
     assert receipt["terminal_http"] == 200

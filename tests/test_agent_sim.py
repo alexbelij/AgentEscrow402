@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
+import random
+
 import pytest
 
 from server.agent_sim import (
+    STRATEGY_REGISTRY,
     AgentAction,
     AgentRole,
     SimulatedEscrow,
     SimulationConfig,
-    STRATEGY_REGISTRY,
     register_strategy,
     run_simulation,
 )
 from server.models import EscrowStatus
-import random
 
 
 def _escrow(status: EscrowStatus, round_no: int = 0) -> SimulatedEscrow:
@@ -58,7 +59,7 @@ class TestSimulationConfig:
 # ---------------------------------------------------------------------------
 
 
-class TestHonestStrategy():
+class TestHonestStrategy:
     def test_sender_releases_when_pending(self):
         fn = STRATEGY_REGISTRY["honest"]
         assert fn(AgentRole.SENDER, _escrow(EscrowStatus.PENDING), random.Random(0)) == AgentAction.RELEASE
@@ -86,9 +87,7 @@ class TestWithholdingStrategy:
     def test_receiver_does_not_dispute_on_round_zero(self):
         # gives the honest counterpart a chance to release first
         fn = STRATEGY_REGISTRY["withholding"]
-        assert fn(AgentRole.RECEIVER, _escrow(EscrowStatus.PENDING, round_no=0), random.Random(0)) == (
-            AgentAction.NOOP
-        )
+        assert fn(AgentRole.RECEIVER, _escrow(EscrowStatus.PENDING, round_no=0), random.Random(0)) == (AgentAction.NOOP)
 
 
 class TestDisputeSpamStrategy:
@@ -100,9 +99,7 @@ class TestDisputeSpamStrategy:
 
     def test_receiver_floods_evidence_once_disputed(self):
         fn = STRATEGY_REGISTRY["dispute_spam"]
-        assert fn(AgentRole.RECEIVER, _escrow(EscrowStatus.DISPUTED), random.Random(0)) == (
-            AgentAction.SUBMIT_EVIDENCE
-        )
+        assert fn(AgentRole.RECEIVER, _escrow(EscrowStatus.DISPUTED), random.Random(0)) == (AgentAction.SUBMIT_EVIDENCE)
 
     def test_sender_side_is_noop(self):
         fn = STRATEGY_REGISTRY["dispute_spam"]
@@ -144,7 +141,9 @@ class TestRegisterStrategy:
 
 class TestHonestVsHonest:
     def test_all_escrows_release_within_one_round(self):
-        report = run_simulation(SimulationConfig(num_escrows=50, sender_strategy="honest", receiver_strategy="honest", seed=1))
+        report = run_simulation(
+            SimulationConfig(num_escrows=50, sender_strategy="honest", receiver_strategy="honest", seed=1)
+        )
         assert len(report.outcomes) == 50
         assert all(o.final_status == EscrowStatus.RELEASED for o in report.outcomes)
         assert all(o.rounds_taken == 1 for o in report.outcomes)
@@ -220,7 +219,9 @@ class TestUnresponsiveBothSidesExpires:
 
 class TestDeterminism:
     def test_same_seed_same_hash(self):
-        cfg = SimulationConfig(num_escrows=40, sender_strategy="flaky_network", receiver_strategy="dispute_spam", seed=99)
+        cfg = SimulationConfig(
+            num_escrows=40, sender_strategy="flaky_network", receiver_strategy="dispute_spam", seed=99
+        )
         r1 = run_simulation(cfg)
         r2 = run_simulation(cfg)
         assert r1.report_hash == r2.report_hash
@@ -280,7 +281,9 @@ class TestReportHelpers:
 class TestScale:
     def test_thousand_escrows_completes_and_all_terminal(self):
         report = run_simulation(
-            SimulationConfig(num_escrows=1000, sender_strategy="withholding", receiver_strategy="dispute_spam", seed=11, max_rounds=6)
+            SimulationConfig(
+                num_escrows=1000, sender_strategy="withholding", receiver_strategy="dispute_spam", seed=11, max_rounds=6
+            )
         )
         assert len(report.outcomes) == 1000
         terminal = {EscrowStatus.RESOLVED, EscrowStatus.EXPIRED, EscrowStatus.RELEASED, EscrowStatus.REFUNDED}

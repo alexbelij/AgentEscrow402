@@ -2,12 +2,7 @@
 
 from __future__ import annotations
 
-import os
-
-import pytest
-
 from server.ops_health import (
-    OpsSnapshot,
     ProviderState,
     RetryStats,
     build_snapshot,

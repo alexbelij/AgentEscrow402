@@ -52,9 +52,8 @@ from enum import Enum
 from typing import Callable, Final
 
 from server.ai_arbitration import DisputeEvidence, _heuristic
-from server.escrow_fsm import EscrowAction, EscrowFSM, InvalidTransitionError
+from server.escrow_fsm import EscrowAction, EscrowFSM
 from server.models import EscrowStatus
-
 
 # ---------------------------------------------------------------------------
 # Agent-facing vocabulary
@@ -74,11 +73,11 @@ class AgentAction(str, Enum):
     `EscrowFSM.transition` calls plus any dispute-evidence bookkeeping.
     """
 
-    RELEASE = "release"          # sender releases funds to receiver
-    REFUND = "refund"            # sender takes a refund
+    RELEASE = "release"  # sender releases funds to receiver
+    REFUND = "refund"  # sender takes a refund
     RAISE_DISPUTE = "raise_dispute"
     SUBMIT_EVIDENCE = "submit_evidence"
-    NOOP = "noop"                # agent does nothing this round (delay/drop)
+    NOOP = "noop"  # agent does nothing this round (delay/drop)
 
 
 @dataclass(frozen=True)
@@ -231,9 +230,7 @@ class SimulationReport:
         """Stable hash over the outcome sequence — two runs with the same
         seed/config must produce the same hash; used by the regression test
         to assert determinism without comparing full dataclass equality."""
-        payload = "|".join(
-            f"{o.escrow_id}:{o.final_status.value}:{o.rounds_taken}:{o.disputed}" for o in self.outcomes
-        )
+        payload = "|".join(f"{o.escrow_id}:{o.final_status.value}:{o.rounds_taken}:{o.disputed}" for o in self.outcomes)
         return hashlib.sha256(payload.encode()).hexdigest()
 
     def summary(self) -> str:
@@ -286,9 +283,7 @@ def _run_one_escrow(
             if sender_action is AgentAction.REFUND and EscrowFSM.can_transition(status, EscrowAction.REFUND):
                 status = EscrowFSM.transition(status, EscrowAction.REFUND)
                 break
-            if receiver_action is AgentAction.RAISE_DISPUTE and EscrowFSM.can_transition(
-                status, EscrowAction.DISPUTE
-            ):
+            if receiver_action is AgentAction.RAISE_DISPUTE and EscrowFSM.can_transition(status, EscrowAction.DISPUTE):
                 status = EscrowFSM.transition(status, EscrowAction.DISPUTE)
                 disputed = True
                 continue

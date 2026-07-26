@@ -18,7 +18,7 @@ this demo build; a real deployment would gate them behind admin auth).
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -31,6 +31,7 @@ router = APIRouter(prefix="/crosschain", tags=["cross-chain"])
 # ---------------------------------------------------------------------------
 # Request/response models
 # ---------------------------------------------------------------------------
+
 
 class CreateCrossChainRequest(BaseModel):
     sender: str = Field(..., min_length=1, max_length=140)
@@ -82,6 +83,7 @@ class SupportedChainsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/escrow", response_model=EscrowResponse, status_code=status.HTTP_201_CREATED)
 def create_escrow(req: CreateCrossChainRequest) -> EscrowResponse:

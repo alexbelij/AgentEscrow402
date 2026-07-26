@@ -51,9 +51,7 @@ def _load_wallet() -> tuple[Account, str]:
 def _compile() -> tuple[list, str]:
     solcx.install_solc("0.8.20")
     solcx.set_solc_version("0.8.20")
-    compiled = solcx.compile_source(
-        CONTRACT_SOURCE.read_text(), output_values=["abi", "bin"], solc_version="0.8.20"
-    )
+    compiled = solcx.compile_source(CONTRACT_SOURCE.read_text(), output_values=["abi", "bin"], solc_version="0.8.20")
     key = next(k for k in compiled if k.endswith(":HTLC"))
     return compiled[key]["abi"], compiled[key]["bin"]
 

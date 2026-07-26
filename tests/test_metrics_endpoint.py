@@ -13,8 +13,8 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from server.app import app
 from server import metrics as metrics_mod
+from server.app import app
 
 
 @pytest.fixture(autouse=True)

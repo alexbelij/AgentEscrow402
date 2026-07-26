@@ -28,10 +28,11 @@ from server.casper_client import CasperClient
 from server.config import Config
 from server.escrow_fsm import InvalidTransitionError
 from server.event_monitor import EventMonitor
+from server.gaming_reward_api import router as gaming_reward_router
 from server.identity_registry_api import _registry as _id_registry
 from server.identity_registry_api import router as identity_registry_router
-from server.intent_chain_api import router as intent_chain_router
 from server.insurance import router as insurance_router
+from server.intent_chain_api import router as intent_chain_router
 from server.macaroon_api import router as macaroon_router
 from server.mcp_playground_api import router as mcp_playground_router
 from server.middleware import (
@@ -72,7 +73,6 @@ from server.telegram_api import (
     shutdown_bridge as _telegram_shutdown,
 )
 from server.threshold_api import router as threshold_router
-from server.gaming_reward_api import router as gaming_reward_router
 from server.timelock_api import router as timelock_router
 from server.vc_api import router as vc_router
 from server.vrf_election import router as vrf_router
@@ -319,6 +319,7 @@ app.add_middleware(
 # Observability middleware (C2 — request-latency histograms + correlation-id)
 # ---------------------------------------------------------------------------
 import os as _os
+
 from server.observability import observability_middleware as _obs_mw
 
 app.middleware("http")(_obs_mw)
@@ -327,6 +328,7 @@ app.middleware("http")(_obs_mw)
 # so local dev / existing log-scrape wiring is untouched.
 if _os.getenv("AE402_JSON_LOGS", "0") == "1":
     from server.observability import configure_json_logging as _cfg_json_logs
+
     _cfg_json_logs()
 
 
@@ -413,25 +415,31 @@ app.include_router(gaming_reward_router)  # T3.2 — Gaming-reward escrow with M
 
 # T3.3 — Deterministic batch cap/quorum guard (dry-run preview endpoint).
 from server.batch_guard_api import router as batch_guard_router  # noqa: E402
+
 app.include_router(batch_guard_router)
 
 # W.3 (Tier Wow) — Cross-chain escrow demo (mocked EVM adapter).
 from server.cross_chain_api import router as cross_chain_router  # noqa: E402
+
 app.include_router(cross_chain_router)
 
 # W.2 (Tier Wow) — Zero-knowledge amount privacy (opt-in demo/audit surface).
 from server.zk_amount_api import router as zk_amount_router  # noqa: E402
+
 app.include_router(zk_amount_router)
 
 from server.bridge_htlc_api import router as bridge_htlc_router  # noqa: E402
+
 app.include_router(bridge_htlc_router)  # T3.4-A — deterministic HTLC atomic-swap bridge (mock)
 
 # T3.5 — Agent-vs-Agent simulation framework (testing tool).
 from server.agent_sim_api import router as agent_sim_router  # noqa: E402
+
 app.include_router(agent_sim_router)
 
 # T3.7 — Compliance framework for regulated jurisdictions.
 from server.compliance_api import router as compliance_router  # noqa: E402
+
 app.include_router(compliance_router)
 
 # AE-M1 — multi-hop A2A choreography (chain_escrow / attest_hop).
@@ -554,7 +562,8 @@ def _enforce_threshold_release(escrow: EscrowRecord, shares_hex: list[str]) -> N
     """
     import hashlib as _hashlib
 
-    from server.threshold_secret import Share as _Share, reconstruct_secret as _reconstruct
+    from server.threshold_secret import Share as _Share
+    from server.threshold_secret import reconstruct_secret as _reconstruct
 
     n = int(getattr(escrow, "threshold_n", 0) or 0)
     commitment = str(getattr(escrow, "threshold_commitment_hex", "") or "")
@@ -589,6 +598,7 @@ def hmac_compare(a: str, b: str) -> bool:
     """Constant-time hex-string comparison. Prevents timing side-channels
     on the threshold-commitment check above."""
     import hmac as _hmac
+
     return _hmac.compare_digest(a.encode(), b.encode())
 
 
@@ -645,7 +655,6 @@ async def metrics(cfg: Config = Depends(get_config)):
     from starlette.responses import Response
 
     from server.metrics import build_metrics_text, openmetrics_content_type
-
     from server.observability import render_request_families
 
     body = build_metrics_text(
@@ -851,7 +860,10 @@ async def demo_three_step(req: ThreeStepRequest):
                 verify_link=None,
             ),
         ],
-        outro="On abstain/low-confidence the LLM verdict is superseded by a VRF-elected human/agent panel; the escalation rule is one function in server/app.py.",
+        outro=(
+            "On abstain/low-confidence the LLM verdict is superseded by a VRF-elected "
+            "human/agent panel; the escalation rule is one function in server/app.py."
+        ),
     )
 
 
@@ -1232,9 +1244,7 @@ async def create_escrow(
     return result_dict
 
 
-def _seal_confidential_response(
-    result_dict: dict, amount: int, service_hash: str, store: SandboxStore
-) -> dict:
+def _seal_confidential_response(result_dict: dict, amount: int, service_hash: str, store: SandboxStore) -> dict:
     """W.2: commit+prove `amount`, persist the seal privately, redact the wire dict.
 
     Shared by both the sandbox and live-chain branches of `create_escrow` so
@@ -1294,8 +1304,7 @@ def _try_register_hop_for_intent(req: EscrowRequest, sender: str) -> None:
         )
     except Exception as exc:  # noqa: BLE001 -- non-fatal by design
         logger.warning(
-            "intent-chain hop registration failed (non-fatal, escrow already created): "
-            "intent=%s hop=%s err=%s",
+            "intent-chain hop registration failed (non-fatal, escrow already created): " "intent=%s hop=%s err=%s",
             req.parent_intent_id,
             req.hop_index,
             exc,
@@ -2286,7 +2295,7 @@ class VerifyEvidenceStep(BaseModel):
 
 
 class VerifyEvidenceRequest(BaseModel):
-    leaf: str          # already-hashed leaf (sha256 hex, 64 chars)
+    leaf: str  # already-hashed leaf (sha256 hex, 64 chars)
     siblings: list[VerifyEvidenceStep]
     expected_root: str  # sha256 hex, 64 chars
 

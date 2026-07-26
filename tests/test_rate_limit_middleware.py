@@ -112,9 +112,9 @@ def test_rate_limit_cache_is_bounded():
     _hit(client)  # triggers the eviction path
     # After eviction, cache must be significantly smaller than 5100.
     # The middleware evicts all entries with reset < now-120.
-    assert len(app_module._rate_limits) < 5100, (
-        f"cache did not prune expired entries; size={len(app_module._rate_limits)}"
-    )
+    assert (
+        len(app_module._rate_limits) < 5100
+    ), f"cache did not prune expired entries; size={len(app_module._rate_limits)}"
 
 
 def test_rate_limit_counts_only_hits_not_misses():

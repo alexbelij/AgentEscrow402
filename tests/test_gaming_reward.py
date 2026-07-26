@@ -12,18 +12,15 @@ Coverage:
 
 from __future__ import annotations
 
-from dataclasses import replace
-
 import hashlib
+from dataclasses import replace
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from server.gaming_reward import (
-    ClaimResult,
     ProofStep,
-    RewardInclusionProof,
     RewardLeaf,
     build_claim_proof,
     commit_results,
@@ -31,7 +28,6 @@ from server.gaming_reward import (
     leaf_hash,
     verify_claim,
 )
-
 
 # ---------------------------------------------------------------------------
 # Determinism / golden vectors

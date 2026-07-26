@@ -31,10 +31,9 @@ the SDK-driven gap next to the raw-HTTP coverage that already existed.
 from __future__ import annotations
 
 import asyncio
-import hashlib
 import tempfile
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import httpx
 import pytest
@@ -256,16 +255,14 @@ class TestVrfSelectionE2E:
                 )
                 assert election["method"] in ("local_csprng", "onchain_vrf"), election
                 elected_id = election["elected_arbiter"]["arbiter_id"]
-                assert elected_id == arbiter_account_hash, (
-                    f"VRF must pick the only registered arbiter, got {elected_id}"
-                )
+                assert (
+                    elected_id == arbiter_account_hash
+                ), f"VRF must pick the only registered arbiter, got {elected_id}"
 
                 # Step 4: elected arbiter signs the release vote off-chain.
                 # sign_arbiter_vote returns (pubkey_hex, signature_hex) tuple.
                 # `in_favor_of` matches the /resolve enum: sender|receiver.
-                signed_pubkey, signed_sig = sign_arbiter_vote(
-                    pem_path, service_hash, "receiver"
-                )
+                signed_pubkey, signed_sig = sign_arbiter_vote(pem_path, service_hash, "receiver")
                 assert signed_pubkey == pubkey_hex
 
                 # Step 5: SDK-driven /resolve with the signed vote.
@@ -333,9 +330,11 @@ class TestVrfSelectionE2E:
         # /vrf/elect signals "no eligible arbiters" as 503 (Service Unavailable)
         # -- the pool exists but everyone in it is a dispute party. Any non-2xx
         # would satisfy INVARIANT 5; we lock the current server behaviour.
-        assert resp.status_code in (404, 422, 503), (
-            f"Election with dispute party as only candidate must 4xx/503, got {resp.status_code}: {resp.text}"
-        )
+        assert resp.status_code in (
+            404,
+            422,
+            503,
+        ), f"Election with dispute party as only candidate must 4xx/503, got {resp.status_code}: {resp.text}"
 
     def test_reelection_is_idempotent_via_sdk(self, client_factory, sandbox):
         """Second /vrf/elect for the same dispute_id must NOT allocate a
@@ -386,9 +385,7 @@ class TestVrfSelectionE2E:
         else:
             assert payload == 409, f"expected 200 or 409, got {payload}"
 
-    def test_escalation_from_abstain_verdict_triggers_vrf_via_analyze(
-        self, client_factory, sandbox
-    ):
+    def test_escalation_from_abstain_verdict_triggers_vrf_via_analyze(self, client_factory, sandbox):
         """POST /arbitration/analyze with sender_account+receiver_account,
         when the LLM (mocked) returns 'abstain', must:
           1. mark escalated_to_panel = True
@@ -425,18 +422,6 @@ class TestVrfSelectionE2E:
 
         async def _fake_none(_prompt: str) -> None:
             return None
-
-        abstain_result = arb_mod.ArbitrationRecommendation(
-            dispute_id="dispute-abstain",
-            recommendation="abstain",
-            confidence=0.5,
-            reasoning="conflict of interest",
-            risk_factors=[],
-            suggested_split_pct=50.0,
-            analysis_hash="ab" * 32,
-            provider="mock",
-            evidence_root="",
-        )
 
         with (
             patch.object(arb_mod, "_try_groq", _fake_none),
@@ -489,9 +474,7 @@ class TestVrfSelectionE2E:
         assert res.status_code == 200, res.text
         body = res.json()
         assert body["recommendation"] == "abstain"
-        assert body["escalated_to_panel"] is True, (
-            f"abstain verdict with party accounts must escalate; got {body}"
-        )
+        assert body["escalated_to_panel"] is True, f"abstain verdict with party accounts must escalate; got {body}"
         assert body["panel_election"] is not None
         picked = body["panel_election"]["elected_arbiter"]["arbiter_id"]
         # INVARIANT 5 through the escalation edge — critical because the

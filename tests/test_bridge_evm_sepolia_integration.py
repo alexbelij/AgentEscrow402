@@ -13,6 +13,7 @@ ground-truth proof that bridge_evm_adapter.py actually drives a real
 chain, diff-tested against the deterministic mock's semantics from
 T3.4-A (same preimage/hashlock logic, same accept/reject decisions).
 """
+
 import json
 import time
 from pathlib import Path
@@ -187,9 +188,9 @@ def test_forged_preimage_rejected_on_chain(w3, acct):
     # which our adapter wraps as EvmAdapterError.
     with pytest.raises(evm.EvmAdapterError) as excinfo:
         evm.evm_claim(w3, acct, target, b"wrong-secret-entirely-not-preimage")
-    assert "PreimageMismatch" in str(excinfo.value) or "0x6f43bb63" in str(excinfo.value), (
-        f"expected PreimageMismatch revert, got: {excinfo.value}"
-    )
+    assert "PreimageMismatch" in str(excinfo.value) or "0x6f43bb63" in str(
+        excinfo.value
+    ), f"expected PreimageMismatch revert, got: {excinfo.value}"
 
     status_after = evm.evm_status(target)
     assert status_after["status"] == "LOCKED", "forged preimage must NOT change state off LOCKED"

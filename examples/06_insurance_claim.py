@@ -35,7 +35,6 @@ import time
 
 from sdk.client import EscrowClient
 
-
 COOLDOWN_POLL_INTERVAL_S = 3
 COOLDOWN_MAX_WAIT_S = 90  # sandbox cooldown is short; production is much longer
 
@@ -60,11 +59,11 @@ async def main() -> None:
     escrow_id = escrow["id"]
     print(f"      → escrow_id={escrow_id} insurance_fee_motes={escrow.get('insurance_fee_motes')}")
 
-    print(f"[2/6] Buyer disputes on delivery failure")
+    print("[2/6] Buyer disputes on delivery failure")
     dispute = await buyer.dispute(escrow_id, reason="content_never_delivered")
     print(f"      → dispute_id={dispute.get('dispute_id')} status={dispute.get('status')}")
 
-    print(f"[3/6] Poll dispute status until arbitration terminal state")
+    print("[3/6] Poll dispute status until arbitration terminal state")
     deadline = time.time() + COOLDOWN_MAX_WAIT_S
     terminal_status = None
     while time.time() < deadline:
@@ -86,10 +85,10 @@ async def main() -> None:
     print(f"[4/6] Terminal state: {terminal_status}")
 
     if terminal_status != "insurance_eligible":
-        print(f"      escrow resolved without insurance path — nothing to claim")
+        print("      escrow resolved without insurance path — nothing to claim")
         return
 
-    print(f"[5/6] Claiming from insurance pool")
+    print("[5/6] Claiming from insurance pool")
     try:
         claim = await buyer.claim_insurance(escrow_id)
         print(f"      → claim_tx={claim.get('deploy_hash')} amount={claim.get('amount_motes')}")
@@ -103,7 +102,7 @@ async def main() -> None:
             claim = r.json()
             print(f"      → claim_tx={claim.get('deploy_hash')} amount={claim.get('amount_motes')}")
 
-    print(f"[6/6] Verify tombstone: second claim must be rejected")
+    print("[6/6] Verify tombstone: second claim must be rejected")
     try:
         import httpx
 
@@ -112,7 +111,7 @@ async def main() -> None:
             if r.status_code >= 400:
                 print(f"      → replay correctly rejected ({r.status_code}): {r.json().get('detail', r.text[:100])}")
             else:
-                print(f"      ⚠ WARNING: replay was NOT rejected — on-chain tombstone may not be wired")
+                print("      ⚠ WARNING: replay was NOT rejected — on-chain tombstone may not be wired")
     except Exception as exc:
         print(f"      → replay attempt raised: {exc.__class__.__name__}")
 

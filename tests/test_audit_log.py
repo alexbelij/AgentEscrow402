@@ -32,7 +32,9 @@ from server.audit_log import (
 
 
 def _make_entry(seq: int, event_type: str, payload_hash: str, timestamp: int, prev_hash: str) -> AuditLogEntry:
-    return AuditLogEntry(seq=seq, event_type=event_type, payload_hash=payload_hash, timestamp=timestamp, prev_hash=prev_hash)
+    return AuditLogEntry(
+        seq=seq, event_type=event_type, payload_hash=payload_hash, timestamp=timestamp, prev_hash=prev_hash
+    )
 
 
 class TestHashChain:

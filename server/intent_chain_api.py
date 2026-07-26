@@ -50,8 +50,7 @@ class DeclareIntentRequest(BaseModel):
     intent_id: str | None = Field(
         default=None,
         max_length=128,
-        description="Caller-supplied intent id. Omit to have the server "
-        "generate one (uuid4 hex).",
+        description="Caller-supplied intent id. Omit to have the server " "generate one (uuid4 hex).",
     )
     agent_path: list[str] = Field(
         ...,
@@ -174,9 +173,7 @@ async def chain_escrow(intent_id: str, req: ChainEscrowRequest):
     return _to_view(intent)
 
 
-async def _try_anchor_hop_on_chain(
-    *, intent_id: str, intent, child_hop_index: int
-) -> None:
+async def _try_anchor_hop_on_chain(*, intent_id: str, intent, child_hop_index: int) -> None:
     """Best-effort on-chain anchoring of (parent, child) linkage.
 
     Reads the on-chain client lazily from server.app so unit tests
@@ -222,4 +219,3 @@ async def attest_hop(intent_id: str, hop_index: int, req: AttestHopRequest):
     except IntentChainError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return _to_view(intent)
-

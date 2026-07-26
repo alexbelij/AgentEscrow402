@@ -27,11 +27,14 @@ def test_prove_verify_roundtrip_small_bits():
     assert "blinding" in proof_body
     assert len(proof_body["blinding"]) == 64  # 32 bytes hex
 
-    v = client.post("/zk/verify", json={
-        "commitment": proof_body["commitment"],
-        "range_proof": proof_body["range_proof"],
-        "transcript": "escrow-1",
-    })
+    v = client.post(
+        "/zk/verify",
+        json={
+            "commitment": proof_body["commitment"],
+            "range_proof": proof_body["range_proof"],
+            "transcript": "escrow-1",
+        },
+    )
     assert v.status_code == 200
     assert v.json()["valid"] is True
     assert v.json()["bits"] == 8
@@ -40,11 +43,14 @@ def test_prove_verify_roundtrip_small_bits():
 def test_verify_wrong_transcript_fails():
     r = client.post("/zk/prove", json={"amount": 100, "transcript": "escrow-1", "bits": 8})
     body = r.json()
-    v = client.post("/zk/verify", json={
-        "commitment": body["commitment"],
-        "range_proof": body["range_proof"],
-        "transcript": "escrow-2",
-    })
+    v = client.post(
+        "/zk/verify",
+        json={
+            "commitment": body["commitment"],
+            "range_proof": body["range_proof"],
+            "transcript": "escrow-2",
+        },
+    )
     assert v.status_code == 200
     assert v.json()["valid"] is False
 
@@ -53,20 +59,26 @@ def test_open_commitment():
     r = client.post("/zk/prove", json={"amount": 500, "bits": 16})
     assert r.status_code == 200, r.text
     body = r.json()
-    o = client.post("/zk/open", json={
-        "commitment": body["commitment"],
-        "amount": 500,
-        "blinding": body["blinding"],
-    })
+    o = client.post(
+        "/zk/open",
+        json={
+            "commitment": body["commitment"],
+            "amount": 500,
+            "blinding": body["blinding"],
+        },
+    )
     assert o.status_code == 200
     assert o.json()["valid"] is True
 
     # Wrong amount
-    o_bad = client.post("/zk/open", json={
-        "commitment": body["commitment"],
-        "amount": 501,
-        "blinding": body["blinding"],
-    })
+    o_bad = client.post(
+        "/zk/open",
+        json={
+            "commitment": body["commitment"],
+            "amount": 501,
+            "blinding": body["blinding"],
+        },
+    )
     assert o_bad.json()["valid"] is False
 
 
@@ -77,16 +89,22 @@ def test_aggregate_endpoint():
         r = client.post("/zk/prove", json={"amount": amt, "bits": 8})
         commits.append(r.json()["commitment"])
 
-    a = client.post("/zk/aggregate", json={
-        "commitments": [{"commitment": c} for c in commits],
-    })
+    a = client.post(
+        "/zk/aggregate",
+        json={
+            "commitments": [{"commitment": c} for c in commits],
+        },
+    )
     assert a.status_code == 200
     d = a.json()
     assert d["count"] == 3
     # Aggregate is deterministic given the same commitments (order matters).
-    a2 = client.post("/zk/aggregate", json={
-        "commitments": [{"commitment": c} for c in commits],
-    })
+    a2 = client.post(
+        "/zk/aggregate",
+        json={
+            "commitments": [{"commitment": c} for c in commits],
+        },
+    )
     assert a2.json()["aggregate"] == d["aggregate"]
 
 
@@ -105,17 +123,23 @@ def test_prove_rejects_negative():
 def test_transcript_hex_and_utf8():
     # Both hex and utf-8 transcripts should round-trip.
     r_hex = client.post("/zk/prove", json={"amount": 7, "transcript": "0xdeadbeef", "bits": 8})
-    v_hex = client.post("/zk/verify", json={
-        "commitment": r_hex.json()["commitment"],
-        "range_proof": r_hex.json()["range_proof"],
-        "transcript": "0xdeadbeef",
-    })
+    v_hex = client.post(
+        "/zk/verify",
+        json={
+            "commitment": r_hex.json()["commitment"],
+            "range_proof": r_hex.json()["range_proof"],
+            "transcript": "0xdeadbeef",
+        },
+    )
     assert v_hex.json()["valid"] is True
 
     r_utf = client.post("/zk/prove", json={"amount": 7, "transcript": "hello", "bits": 8})
-    v_utf = client.post("/zk/verify", json={
-        "commitment": r_utf.json()["commitment"],
-        "range_proof": r_utf.json()["range_proof"],
-        "transcript": "hello",
-    })
+    v_utf = client.post(
+        "/zk/verify",
+        json={
+            "commitment": r_utf.json()["commitment"],
+            "range_proof": r_utf.json()["range_proof"],
+            "transcript": "hello",
+        },
+    )
     assert v_utf.json()["valid"] is True

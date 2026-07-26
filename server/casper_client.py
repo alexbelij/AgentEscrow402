@@ -18,6 +18,8 @@ import re
 @functools.lru_cache(maxsize=1)
 def _re_compile_hex64() -> re.Pattern[str]:
     return re.compile(r"^[0-9a-f]{64}$")
+
+
 from typing import Any
 
 import httpx

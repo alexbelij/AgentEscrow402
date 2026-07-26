@@ -81,10 +81,7 @@ class Intent:
 
     @property
     def is_complete(self) -> bool:
-        return (
-            self.planned_hop_count > 0
-            and self.attested_hop_count == self.planned_hop_count
-        )
+        return self.planned_hop_count > 0 and self.attested_hop_count == self.planned_hop_count
 
     def ordered_attestation_event_ids(self) -> list[str]:
         """Attestation event_ids in hop order. A gap (a hop not yet
@@ -120,14 +117,9 @@ class IntentChainStore:
         if intent_id in self._intents:
             raise IntentChainError(f"intent {intent_id!r} already declared")
         if len(agent_path) < 2:
-            raise IntentChainError(
-                "agent_path must have at least 2 agents (>=1 hop), "
-                f"got {agent_path!r}"
-            )
+            raise IntentChainError("agent_path must have at least 2 agents (>=1 hop), " f"got {agent_path!r}")
         if len(set(agent_path)) != len(agent_path):
-            raise IntentChainError(
-                f"agent_path must not repeat an agent: {agent_path!r}"
-            )
+            raise IntentChainError(f"agent_path must not repeat an agent: {agent_path!r}")
 
         event = audit_trace.emit_event(
             event_type="intent_declared",
@@ -166,9 +158,7 @@ class IntentChainStore:
                 f"{intent_id!r} (planned {intent.planned_hop_count} hops)"
             )
         if hop_index in intent.hops:
-            raise IntentChainError(
-                f"hop {hop_index} already chained for intent {intent_id!r}"
-            )
+            raise IntentChainError(f"hop {hop_index} already chained for intent {intent_id!r}")
         if hop_index > 0 and (hop_index - 1) not in intent.hops:
             raise IntentChainError(
                 f"hop {hop_index} chained out of order for intent "
@@ -205,8 +195,7 @@ class IntentChainStore:
         hop = intent.hops.get(hop_index)
         if hop is None:
             raise IntentChainError(
-                f"hop {hop_index} not chained yet for intent {intent_id!r} "
-                "-- call chain_escrow first"
+                f"hop {hop_index} not chained yet for intent {intent_id!r} " "-- call chain_escrow first"
             )
         if hop.service_hash != service_hash:
             raise IntentChainError(
@@ -215,9 +204,7 @@ class IntentChainStore:
                 f"attested={service_hash!r}"
             )
         if hop.attested:
-            raise IntentChainError(
-                f"hop {hop_index} of intent {intent_id!r} already attested"
-            )
+            raise IntentChainError(f"hop {hop_index} of intent {intent_id!r} already attested")
 
         event = audit_trace.emit_event(
             event_type="hop_attested",
@@ -232,9 +219,7 @@ class IntentChainStore:
         hop.attestation_event_id = event.event_id
         return hop
 
-    def record_on_chain_link(
-        self, intent_id: str, hop_index: int, tx_hash: str
-    ) -> Hop:
+    def record_on_chain_link(self, intent_id: str, hop_index: int, tx_hash: str) -> Hop:
         """Record the tx hash of the `escrow-manager.link_escrows` call
         that anchored hop `hop_index` on-chain. Called by the API layer
         *after* the on-chain tx is submitted (see intent_chain_api.py).
@@ -250,14 +235,9 @@ class IntentChainStore:
         intent = self.get_intent(intent_id)
         hop = intent.hops.get(hop_index)
         if hop is None:
-            raise IntentChainError(
-                f"hop {hop_index} not chained for intent {intent_id!r}"
-            )
+            raise IntentChainError(f"hop {hop_index} not chained for intent {intent_id!r}")
         if hop_index == 0:
-            raise IntentChainError(
-                "hop 0 has no parent; on-chain link_escrows is only defined "
-                "for hop_index >= 1"
-            )
+            raise IntentChainError("hop 0 has no parent; on-chain link_escrows is only defined " "for hop_index >= 1")
         if hop.on_chain_link_tx_hash is not None:
             raise IntentChainError(
                 f"hop {hop_index} of intent {intent_id!r} already anchored "

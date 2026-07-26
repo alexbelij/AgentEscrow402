@@ -51,10 +51,9 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
-
 
 # ---------------------------------------------------------------------------
 # Redaction / PII guard
@@ -318,9 +317,7 @@ def emit_event(
       inputs produce the same id in any language.
     """
     if event_type not in ALLOWED_EVENT_TYPES:
-        raise ValueError(
-            f"unknown event_type: {event_type!r} (allowed: {sorted(ALLOWED_EVENT_TYPES)})"
-        )
+        raise ValueError(f"unknown event_type: {event_type!r} (allowed: {sorted(ALLOWED_EVENT_TYPES)})")
     if decision is not None and decision not in ALLOWED_DECISIONS:
         raise ValueError(f"unknown decision: {decision!r}")
     if provider is not None and provider not in ALLOWED_PROVIDERS:

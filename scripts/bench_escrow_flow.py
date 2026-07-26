@@ -32,15 +32,13 @@ import concurrent.futures
 import contextlib
 import json
 import math
-import os
 import random
-import statistics
 import sys
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
@@ -48,7 +46,7 @@ sys.path.insert(0, str(REPO_ROOT))
 # ---- Profiles ---------------------------------------------------------------
 
 PROFILES: dict[str, dict[str, int]] = {
-    "fast":  {"iterations": 200,  "concurrency": 8},
+    "fast": {"iterations": 200, "concurrency": 8},
     "normal": {"iterations": 1000, "concurrency": 16},
     "heavy": {"iterations": 5000, "concurrency": 32},
 }
@@ -205,10 +203,10 @@ def _build_scenarios(client, iterations: int, concurrency: int) -> list[tuple[st
         )
 
     return [
-        ("GET  /health",   health),
-        ("GET  /stats",    stats),
-        ("GET  /metrics",  metrics),
-        ("POST /escrow",   create_escrow),
+        ("GET  /health", health),
+        ("GET  /stats", stats),
+        ("GET  /metrics", metrics),
+        ("POST /escrow", create_escrow),
     ]
 
 
@@ -219,9 +217,7 @@ def _git_commit() -> str | None:
     try:
         import subprocess
 
-        out = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, timeout=2
-        )
+        out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT, timeout=2)
         return out.decode().strip()
     except Exception:
         return None
@@ -262,7 +258,9 @@ async def _bench_async(profile_cfg: dict, out_path: Path | None, print_md: bool)
     _orig_limits = None
     try:
         from server import app as _server_app_mod  # noqa: E402
+
         _orig_limits = _server_app_mod._rate_limits
+
         # Replace with a dict-subclass that auto-caps count so the >60 check
         # inside the middleware never trips.
         class _NoLimitDict(dict):
@@ -363,8 +361,7 @@ def main() -> int:
         # nonce on the second /escrow call). We only bark; caller decides
         # what to do.
         print(
-            f"::warning::bench encountered errors in some scenarios; "
-            f"see error_samples in the JSON report",
+            "::warning::bench encountered errors in some scenarios; " "see error_samples in the JSON report",
             file=sys.stderr,
         )
     return 0

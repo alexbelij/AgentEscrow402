@@ -39,7 +39,6 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -151,11 +150,11 @@ def scenario_happy(app_client, report: dict[str, Any]) -> bool:
     if r.status_code != 200:
         _fail(f"GET /escrow/<h> returned {r.status_code}")
         return False
-    _ok(f"escrow reads back status=pending")
+    _ok("escrow reads back status=pending")
 
     # Seller "delivers work" (out-of-band in this demo).
     seller.note("delivered work")
-    _step(f"seller delivered work (out-of-band)")
+    _step("seller delivered work (out-of-band)")
 
     r = app_client.post(
         "/release",
@@ -169,7 +168,7 @@ def scenario_happy(app_client, report: dict[str, Any]) -> bool:
     if released["status"] != "released":
         _fail(f"released status is {released['status']}, expected 'released'")
         return False
-    _ok(f"escrow released — funds credited to seller")
+    _ok("escrow released — funds credited to seller")
     buyer.note("released")
 
     r = app_client.get(f"/escrow/{service_hash}/history", params={"sender": buyer.id_hex})
@@ -242,7 +241,7 @@ def scenario_refund(app_client, report: dict[str, Any]) -> bool:
     if refunded["status"] != "refunded":
         _fail(f"refunded status is {refunded['status']}, expected 'refunded'")
         return False
-    _ok(f"escrow refunded — funds returned to buyer")
+    _ok("escrow refunded — funds returned to buyer")
 
     r = app_client.get(f"/escrow/{service_hash}/history", params={"sender": buyer.id_hex})
     history = r.json()
@@ -272,7 +271,7 @@ def main() -> int:
     args = ap.parse_args()
 
     print(_color("AgentEscrow402 · in-process agent-flow demo (C3)", _C_BOLD))
-    print(f"  time budget: ~1 second, no network, no Docker, no NCTL.")
+    print("  time budget: ~1 second, no network, no Docker, no NCTL.")
 
     # Boot the FastAPI app in-process. All requests go through the real
     # backend surface (routes, middleware, sandbox store).

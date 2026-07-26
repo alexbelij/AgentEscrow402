@@ -28,11 +28,10 @@ lines and mechanically verified against the original papers' formulas.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Iterable
 
 from pydantic import BaseModel, ConfigDict, Field
-
 
 # ---------------------------------------------------------------------------
 # CUSUM — two-sided

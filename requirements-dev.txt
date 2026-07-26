@@ -8,3 +8,4 @@ httpx>=0.28
 pytest-asyncio>=0.23
 hypothesis>=6.161.5
 pyyaml>=6.0  # scripts/gen_openapi.py --check / regen (tests/test_gen_openapi.py)
+mcp>=0.9  # sdk/mcp_server.py + tests/test_mcp_server_security.py (T27)

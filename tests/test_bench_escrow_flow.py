@@ -32,9 +32,7 @@ def _run(args: list[str], timeout: int = 60) -> subprocess.CompletedProcess:
 def test_fast_profile_runs_and_all_scenarios_succeed(tmp_path):
     out = tmp_path / "bench.json"
     result = _run(["--profile", "fast", "--iterations", "30", "--concurrency", "4", "--out", str(out)])
-    assert result.returncode == 0, (
-        f"bench script failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-    )
+    assert result.returncode == 0, f"bench script failed.\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
     assert out.exists(), f"expected JSON at {out}"
 
     report = json.loads(out.read_text())

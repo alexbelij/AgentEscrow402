@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from server import arbiter_crypto, batch_guard as bg
-
+from server import arbiter_crypto
+from server import batch_guard as bg
 
 # ── Helpers ────────────────────────────────────────────────────────────
 

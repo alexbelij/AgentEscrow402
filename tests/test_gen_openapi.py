@@ -55,9 +55,9 @@ def test_normalise_walks_lists_and_nested():
     gen = _load_script()
     schema = {
         "oneOf": [
-            {"default": 1785000000},   # timestamp-shaped
-            {"default": "hello"},       # string default — untouched
-            {"default": 0},             # small int — untouched
+            {"default": 1785000000},  # timestamp-shaped
+            {"default": "hello"},  # string default — untouched
+            {"default": 0},  # small int — untouched
         ]
     }
     gen._normalise_time_defaults(schema)

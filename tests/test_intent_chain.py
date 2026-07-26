@@ -203,6 +203,7 @@ def test_four_agent_three_hop_choreography(store):
 
 # ── record_on_chain_link ──────────────────────────────────────────────────
 
+
 def test_record_on_chain_link_stores_tx_hash(store):
     store.declare_intent("i1", ["A", "B", "C"])
     store.chain_escrow("i1", SH0, 0)

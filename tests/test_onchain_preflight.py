@@ -63,7 +63,7 @@ def _wasm_with_exports(names: Iterable[str]) -> bytes:
         name_bytes = name.encode("utf-8")
         export_entries += _leb128_u32(len(name_bytes))
         export_entries += name_bytes
-        export_entries += b"\x00"       # kind=function
+        export_entries += b"\x00"  # kind=function
         export_entries += _leb128_u32(0)  # index 0
 
     section = bytearray()
@@ -259,15 +259,9 @@ class TestRunPreflight:
         contracts_dir.mkdir()
 
         (packaged_dir / "escrow_funder.wasm").write_bytes(_wasm_with_exports(["call"]))
-        (contracts_dir / "escrow_manager.wasm").write_bytes(
-            _wasm_with_exports(["_ep_release", "_ep_refund"])
-        )
+        (contracts_dir / "escrow_manager.wasm").write_bytes(_wasm_with_exports(["_ep_release", "_ep_refund"]))
         manifest_path = tmp_path / "manifest.json"
-        manifest_path.write_text(
-            json.dumps(
-                {"contracts": {"escrow_manager": {"contract_hash": "hash-" + "aa" * 32}}}
-            )
-        )
+        manifest_path.write_text(json.dumps({"contracts": {"escrow_manager": {"contract_hash": "hash-" + "aa" * 32}}}))
 
         report = PF.run_preflight(
             packaged_dir=packaged_dir,
@@ -305,9 +299,7 @@ class TestRunPreflight:
         contracts_dir.mkdir()
 
         # Legal magic + 800 KiB of zeros → over 700 KiB ceiling.
-        (packaged_dir / "huge.wasm").write_bytes(
-            _wasm_with_exports(["call"]) + b"\x00" * (800 * 1024)
-        )
+        (packaged_dir / "huge.wasm").write_bytes(_wasm_with_exports(["call"]) + b"\x00" * (800 * 1024))
         (contracts_dir / "small.wasm").write_bytes(_wasm_with_exports(["_ep_ok"]))
 
         report = PF.run_preflight(
@@ -345,9 +337,7 @@ class TestRunPreflight:
 class TestRealArtefacts:
     def test_current_main_wasms_pass(self) -> None:
         packaged = REPO_ROOT / "server" / "casper_tx"
-        contracts_target = (
-            REPO_ROOT / "contracts" / "target" / "wasm32-unknown-unknown" / "release"
-        )
+        contracts_target = REPO_ROOT / "contracts" / "target" / "wasm32-unknown-unknown" / "release"
         manifest = REPO_ROOT / "deploy-out" / "onchain.json"
 
         if not packaged.exists() or not contracts_target.exists():

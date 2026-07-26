@@ -24,7 +24,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 
-
 _LEAF_TAG = b"leaf:"
 _NODE_TAG = b"node:"
 

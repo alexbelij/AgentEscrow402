@@ -8,13 +8,11 @@ from datetime import datetime, timezone
 import pytest
 
 from server.audit_trace import (
-    AuditEvent,
     LineageLink,
     compute_chain_root,
     compute_lineage_root,
     emit_event,
 )
-
 
 TS = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -277,6 +275,7 @@ def test_lineage_step_order_matters():
 
 def test_full_arbitration_trace_reproducible():
     """A judge running the same scenario twice gets the same chain root."""
+
     def run_scenario():
         e1 = emit_event(
             event_type="arbitration_start",

@@ -103,7 +103,7 @@ def _dump_yaml(schema: dict) -> str:
         default_flow_style=False,
         sort_keys=True,
         allow_unicode=True,
-        width=100_000,   # avoid arbitrary line wrapping mid-string
+        width=100_000,  # avoid arbitrary line wrapping mid-string
         indent=2,
     )
     text = buf.getvalue()
@@ -136,10 +136,7 @@ def main() -> int:
         try:
             current = out_path.read_text()
         except FileNotFoundError:
-            print(
-                f"::error::{out_path} does not exist; "
-                "run `python scripts/gen_openapi.py` and commit it."
-            )
+            print(f"::error::{out_path} does not exist; " "run `python scripts/gen_openapi.py` and commit it.")
             return 1
         # Tolerate trailing-newline drift (some editors strip it).
         try:
@@ -156,6 +153,7 @@ def main() -> int:
         )
         # Show a compact diff-line summary in CI logs.
         import difflib
+
         diff = list(
             difflib.unified_diff(
                 current.splitlines(keepends=True),

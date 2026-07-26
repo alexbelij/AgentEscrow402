@@ -21,9 +21,9 @@ still applies (60 req/min per IP).
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from server import zk_amount
@@ -34,6 +34,7 @@ router = APIRouter(prefix="/zk", tags=["zk-amount"])
 # ---------------------------------------------------------------------------
 # Request/response models
 # ---------------------------------------------------------------------------
+
 
 class ProveRequest(BaseModel):
     amount: int = Field(..., ge=0, lt=1 << zk_amount.AMOUNT_BITS)
@@ -88,6 +89,7 @@ class OpenResponse(BaseModel):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 def _decode_transcript(t: str) -> bytes:
     """Accept either hex (`0x...` or pure hex string) or UTF-8 text."""
     if not t:
@@ -115,13 +117,12 @@ def prove(req: ProveRequest) -> ProveResponse:
     be opened later), and prove timing.
     """
     import time
+
     transcript = _decode_transcript(req.transcript)
     t0 = time.perf_counter()
     try:
         _, blinding = zk_amount.commit(req.amount)
-        C, proof = zk_amount.prove_range(
-            req.amount, blinding, transcript=transcript, bits=req.bits
-        )
+        C, proof = zk_amount.prove_range(req.amount, blinding, transcript=transcript, bits=req.bits)
     except zk_amount.ZKError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     dt_ms = (time.perf_counter() - t0) * 1000
@@ -138,6 +139,7 @@ def prove(req: ProveRequest) -> ProveResponse:
 def verify(req: VerifyRequest) -> VerifyResponse:
     """Verify a range proof against a commitment."""
     import time
+
     transcript = _decode_transcript(req.transcript)
     try:
         commitment = zk_amount.Commitment(C=req.commitment)

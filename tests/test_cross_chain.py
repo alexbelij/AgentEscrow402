@@ -21,6 +21,7 @@ def _fresh_registry(monkeypatch):
 # ChainId + adapter behavior
 # ---------------------------------------------------------------------------
 
+
 class TestMockEVMAdapter:
     def test_supported_chains(self):
         a = cc.MockEVMAdapter()
@@ -116,33 +117,44 @@ class TestCreateCrossChainEscrow:
         reg = _make_registry()
         with pytest.raises(cc.CrossChainError, match="amount_motes"):
             reg.create_cross_chain_escrow(
-                sender="s", receiver="r", amount_motes=0,
+                sender="s",
+                receiver="r",
+                amount_motes=0,
                 service_hash=VALID_SVC_HASH,
                 trigger_chain=cc.ChainId.ETHEREUM,
-                trigger_tx_hash="0xdead", trigger_topic="0xT",
+                trigger_tx_hash="0xdead",
+                trigger_topic="0xT",
             )
 
     def test_rejects_unsupported_chain(self):
         reg = _make_registry()
         with pytest.raises(cc.CrossChainError, match="not supported"):
             reg.create_cross_chain_escrow(
-                sender="s", receiver="r", amount_motes=1,
+                sender="s",
+                receiver="r",
+                amount_motes=1,
                 service_hash=VALID_SVC_HASH,
                 trigger_chain=cc.ChainId.CASPER_TESTNET,  # not EVM
-                trigger_tx_hash="0xdead", trigger_topic="",
+                trigger_tx_hash="0xdead",
+                trigger_topic="",
             )
 
     def test_rejects_double_binding_same_trigger(self):
         reg = _make_registry()
         reg.create_cross_chain_escrow(
-            sender="s1", receiver="r", amount_motes=1,
+            sender="s1",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xabc", trigger_topic="",
+            trigger_tx_hash="0xabc",
+            trigger_topic="",
         )
         with pytest.raises(cc.CrossChainError, match="already bound"):
             reg.create_cross_chain_escrow(
-                sender="s2", receiver="r", amount_motes=1,
+                sender="s2",
+                receiver="r",
+                amount_motes=1,
                 service_hash=VALID_SVC_HASH,
                 trigger_chain=cc.ChainId.ETHEREUM,
                 trigger_tx_hash="0xABC",  # same, case-insensitive
@@ -152,10 +164,13 @@ class TestCreateCrossChainEscrow:
     def test_deterministic_escrow_id(self):
         reg = _make_registry()
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1,
+            sender="s",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xabc", trigger_topic="",
+            trigger_tx_hash="0xabc",
+            trigger_topic="",
         )
         # Same binding data → same id
         expected = cc._derive_escrow_id("s", "r", cc.ChainId.ETHEREUM, "0xabc")
@@ -166,7 +181,9 @@ class TestSettleOnEVMEvent:
     def test_full_happy_path(self):
         reg = _make_registry(initial_height=100)
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1000,
+            sender="s",
+            receiver="r",
+            amount_motes=1000,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
             trigger_tx_hash="0xdeadc0de",
@@ -175,8 +192,10 @@ class TestSettleOnEVMEvent:
         )
         # Trigger event lands at head, needs 6 confirmations.
         reg.evm.record_event(
-            cc.ChainId.ETHEREUM, "0xdeadc0de",
-            topics=["0xTransfer"], block_offset=0,
+            cc.ChainId.ETHEREUM,
+            "0xdeadc0de",
+            topics=["0xTransfer"],
+            block_offset=0,
         )
         # Not enough confirmations yet.
         with pytest.raises(cc.CrossChainError, match="insufficient"):
@@ -192,10 +211,13 @@ class TestSettleOnEVMEvent:
     def test_idempotent_settle(self):
         reg = _make_registry(initial_height=100)
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1000,
+            sender="s",
+            receiver="r",
+            amount_motes=1000,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead0001", trigger_topic="",
+            trigger_tx_hash="0xdead0001",
+            trigger_topic="",
             min_confirmations=1,
         )
         reg.evm.record_event(cc.ChainId.ETHEREUM, "0xdead0001", topics=[], block_offset=10)
@@ -212,10 +234,13 @@ class TestSettleOnEVMEvent:
     def test_settle_without_event_fails(self):
         reg = _make_registry(initial_height=100)
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1000,
+            sender="s",
+            receiver="r",
+            amount_motes=1000,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead0001", trigger_topic="",
+            trigger_tx_hash="0xdead0001",
+            trigger_topic="",
             min_confirmations=1,
         )
         with pytest.raises(cc.CrossChainError, match="not yet observed"):
@@ -224,10 +249,13 @@ class TestSettleOnEVMEvent:
     def test_settle_topic_mismatch(self):
         reg = _make_registry(initial_height=100)
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1000,
+            sender="s",
+            receiver="r",
+            amount_motes=1000,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead0001", trigger_topic="0xExpected",
+            trigger_tx_hash="0xdead0001",
+            trigger_topic="0xExpected",
             min_confirmations=1,
         )
         reg.evm.record_event(cc.ChainId.ETHEREUM, "0xdead0001", topics=["0xOther"], block_offset=10)
@@ -244,10 +272,13 @@ class TestCancel:
     def test_sender_can_cancel_pending(self):
         reg = _make_registry()
         e = reg.create_cross_chain_escrow(
-            sender="s1", receiver="r", amount_motes=1,
+            sender="s1",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead02", trigger_topic="",
+            trigger_tx_hash="0xdead02",
+            trigger_topic="",
         )
         cancelled = reg.cancel(e.escrow_id, caller="s1")
         assert cancelled.status == cc.CrossChainStatus.CANCELLED
@@ -255,10 +286,13 @@ class TestCancel:
     def test_non_sender_cannot_cancel(self):
         reg = _make_registry()
         e = reg.create_cross_chain_escrow(
-            sender="s1", receiver="r", amount_motes=1,
+            sender="s1",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead02", trigger_topic="",
+            trigger_tx_hash="0xdead02",
+            trigger_topic="",
         )
         with pytest.raises(cc.CrossChainError, match="only the sender"):
             reg.cancel(e.escrow_id, caller="attacker")
@@ -266,10 +300,13 @@ class TestCancel:
     def test_cannot_cancel_settled(self):
         reg = _make_registry(initial_height=100)
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1,
+            sender="s",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead02", trigger_topic="",
+            trigger_tx_hash="0xdead02",
+            trigger_topic="",
             min_confirmations=1,
         )
         reg.evm.record_event(cc.ChainId.ETHEREUM, "0xdead02", topics=[], block_offset=5)
@@ -282,10 +319,13 @@ class TestExpire:
     def test_expire_after_ttl(self, monkeypatch):
         reg = _make_registry()
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1,
+            sender="s",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead02", trigger_topic="",
+            trigger_tx_hash="0xdead02",
+            trigger_topic="",
         )
         # Rewind escrow created_at.
         e.created_at = int(time.time()) - 3600
@@ -295,10 +335,13 @@ class TestExpire:
     def test_expire_before_ttl_raises(self):
         reg = _make_registry()
         e = reg.create_cross_chain_escrow(
-            sender="s", receiver="r", amount_motes=1,
+            sender="s",
+            receiver="r",
+            amount_motes=1,
             service_hash=VALID_SVC_HASH,
             trigger_chain=cc.ChainId.ETHEREUM,
-            trigger_tx_hash="0xdead02", trigger_topic="",
+            trigger_tx_hash="0xdead02",
+            trigger_topic="",
         )
         with pytest.raises(cc.CrossChainError, match="not yet expired"):
             reg.expire(e.escrow_id, ttl_seconds=3600)
@@ -308,10 +351,13 @@ class TestExpire:
 # API endpoints
 # ---------------------------------------------------------------------------
 
+
 class TestAPI:
     def test_full_lifecycle_via_api(self):
         from fastapi.testclient import TestClient
+
         from server.app import app
+
         client = TestClient(app)
 
         cc.reset_registry()
@@ -324,16 +370,19 @@ class TestAPI:
         assert "casper-testnet" in chains["casper"]
 
         # 2. Create escrow.
-        r = client.post("/crosschain/escrow", json={
-            "sender": "0xSender",
-            "receiver": "0xReceiver",
-            "amount_motes": 1_000_000,
-            "service_hash": "b" * 64,
-            "trigger_chain": "ethereum",
-            "trigger_tx_hash": "0xdead0abc",
-            "trigger_topic": "0xTransfer",
-            "min_confirmations": 3,
-        })
+        r = client.post(
+            "/crosschain/escrow",
+            json={
+                "sender": "0xSender",
+                "receiver": "0xReceiver",
+                "amount_motes": 1_000_000,
+                "service_hash": "b" * 64,
+                "trigger_chain": "ethereum",
+                "trigger_tx_hash": "0xdead0abc",
+                "trigger_topic": "0xTransfer",
+                "min_confirmations": 3,
+            },
+        )
         assert r.status_code == 201, r.text
         escrow = r.json()["escrow"]
         assert escrow["status"] == "pending"
@@ -345,12 +394,15 @@ class TestAPI:
         assert "not yet observed" in r.json()["detail"]
 
         # 4. Inject mock event 5 blocks ago.
-        r = client.post("/crosschain/mock/event", json={
-            "chain": "ethereum",
-            "tx_hash": "0xdead0abc",
-            "topics": ["0xTransfer"],
-            "block_offset": 5,
-        })
+        r = client.post(
+            "/crosschain/mock/event",
+            json={
+                "chain": "ethereum",
+                "tx_hash": "0xdead0abc",
+                "topics": ["0xTransfer"],
+                "block_offset": 5,
+            },
+        )
         assert r.status_code == 200
 
         # 5. Settle — should succeed (5 >= 3 confirmations).
@@ -377,13 +429,12 @@ class TestAPI:
 
     def test_advance_blocks_endpoint(self):
         from fastapi.testclient import TestClient
+
         from server.app import app
+
         client = TestClient(app)
         cc.reset_registry()
-
-        # Get initial height.
         reg = cc.get_registry()
-        initial = reg.evm.remote_block_height(cc.ChainId.ETHEREUM)
 
         r = client.post("/crosschain/mock/advance", json={"chain": "polygon", "blocks": 100})
         assert r.status_code == 200

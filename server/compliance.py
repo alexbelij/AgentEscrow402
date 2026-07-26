@@ -133,7 +133,9 @@ class ComplianceDecision:
 DEFAULT_JURISDICTION_TABLE: dict[str, JurisdictionPolicy] = {
     p.country_code: p
     for p in [
-        JurisdictionPolicy("US", JurisdictionRegime.UNRESTRICTED, notes="Illustrative default — not a real determination."),
+        JurisdictionPolicy(
+            "US", JurisdictionRegime.UNRESTRICTED, notes="Illustrative default — not a real determination."
+        ),
         JurisdictionPolicy("GB", JurisdictionRegime.UNRESTRICTED),
         JurisdictionPolicy("SG", JurisdictionRegime.UNRESTRICTED),
         JurisdictionPolicy(
@@ -160,8 +162,12 @@ DEFAULT_JURISDICTION_TABLE: dict[str, JurisdictionPolicy] = {
             max_daily_volume_motes=5_000 * 10**9,
             notes="Illustrative: high-friction regime — FULL KYC + tight caps.",
         ),
-        JurisdictionPolicy("KP", JurisdictionRegime.PROHIBITED, notes="Illustrative OFAC-comprehensive-sanctions stand-in."),
-        JurisdictionPolicy("IR", JurisdictionRegime.PROHIBITED, notes="Illustrative OFAC-comprehensive-sanctions stand-in."),
+        JurisdictionPolicy(
+            "KP", JurisdictionRegime.PROHIBITED, notes="Illustrative OFAC-comprehensive-sanctions stand-in."
+        ),
+        JurisdictionPolicy(
+            "IR", JurisdictionRegime.PROHIBITED, notes="Illustrative OFAC-comprehensive-sanctions stand-in."
+        ),
     ]
 }
 

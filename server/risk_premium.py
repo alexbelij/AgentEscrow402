@@ -34,15 +34,14 @@ from typing import Iterable
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
-DEFAULT_ALPHA0 = 0.2   # ~1% dispute prior
+DEFAULT_ALPHA0 = 0.2  # ~1% dispute prior
 DEFAULT_BETA0 = 19.8
 DEFAULT_CI_LEVEL = 0.95
 # Risk-premium curve: linear in posterior UCB, capped and floored.
-MIN_PREMIUM_BPS = 5      # 5 bps floor (0.05%) — covers oracle + gas overhead
-MAX_PREMIUM_BPS = 2500   # 25% ceiling — anything worse and we refuse the escrow
+MIN_PREMIUM_BPS = 5  # 5 bps floor (0.05%) — covers oracle + gas overhead
+MAX_PREMIUM_BPS = 2500  # 25% ceiling — anything worse and we refuse the escrow
 UCB_SLOPE_BPS = 10000.0  # 1 unit of UCB ~ 100% dispute prob → 100% premium
-                         # (i.e. UCB=0.10 → 1000 bps → clipped to MAX)
+# (i.e. UCB=0.10 → 1000 bps → clipped to MAX)
 
 
 # ---------------------------------------------------------------------------
@@ -68,13 +67,7 @@ def _betainc_regularized(a: float, b: float, x: float) -> float:
     if x > (a + 1.0) / (a + b + 2.0):
         return 1.0 - _betainc_regularized(b, a, 1.0 - x)
 
-    log_bt = (
-        math.lgamma(a + b)
-        - math.lgamma(a)
-        - math.lgamma(b)
-        + a * math.log(x)
-        + b * math.log(1.0 - x)
-    )
+    log_bt = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log(1.0 - x)
     bt = math.exp(log_bt)
 
     # Continued fraction

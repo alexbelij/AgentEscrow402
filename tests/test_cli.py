@@ -155,7 +155,9 @@ class TestReadOnlyCommandsAgainstMockedBackend:
     and would fail loudly if `_request` ever regains a hard requirement.
     """
 
-    def _install_mock_transport(self, monkeypatch: pytest.MonkeyPatch, response_json: dict) -> list[tuple[str, str, dict]]:
+    def _install_mock_transport(
+        self, monkeypatch: pytest.MonkeyPatch, response_json: dict
+    ) -> list[tuple[str, str, dict]]:
         import httpx
 
         calls: list[tuple[str, str, dict]] = []
@@ -168,7 +170,9 @@ class TestReadOnlyCommandsAgainstMockedBackend:
         monkeypatch.setattr(httpx.AsyncClient, "request", fake_request)
         return calls
 
-    def test_stats_no_kwargs_regression(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_stats_no_kwargs_regression(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         calls = self._install_mock_transport(monkeypatch, {"total": 0, "pending": 0})
         code = cli.main(["--api-url", "http://mock.local", "--sandbox", "--sender", "agent", "stats"])
         assert code == 0, capsys.readouterr()
@@ -178,13 +182,22 @@ class TestReadOnlyCommandsAgainstMockedBackend:
         assert method == "GET"
         assert url == "http://mock.local/stats"
 
-    def test_list_escrows_forwards_params(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_list_escrows_forwards_params(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         calls = self._install_mock_transport(monkeypatch, {"escrows": []})
-        code = cli.main([
-            "--api-url", "http://mock.local",
-            "--sandbox", "--sender", "agent",
-            "list-escrows", "--limit", "50",
-        ])
+        code = cli.main(
+            [
+                "--api-url",
+                "http://mock.local",
+                "--sandbox",
+                "--sender",
+                "agent",
+                "list-escrows",
+                "--limit",
+                "50",
+            ]
+        )
         assert code == 0, capsys.readouterr()
         assert len(calls) == 1
         method, url, kw = calls[0]
@@ -194,7 +207,9 @@ class TestReadOnlyCommandsAgainstMockedBackend:
         assert kw["params"] is not None
         assert str(kw["params"].get("limit")) == "50"
 
-    def test_mcp_tools_no_kwargs_regression(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_mcp_tools_no_kwargs_regression(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         calls = self._install_mock_transport(monkeypatch, {"tools": []})
         code = cli.main(["--api-url", "http://mock.local", "--sandbox", "--sender", "agent", "mcp-tools"])
         assert code == 0, capsys.readouterr()
@@ -204,11 +219,18 @@ class TestReadOnlyCommandsAgainstMockedBackend:
 
     def test_get_history_regression(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         calls = self._install_mock_transport(monkeypatch, {"events": []})
-        code = cli.main([
-            "--api-url", "http://mock.local",
-            "--sandbox", "--sender", "agent",
-            "get-history", "--service-hash", "ab" * 32,
-        ])
+        code = cli.main(
+            [
+                "--api-url",
+                "http://mock.local",
+                "--sandbox",
+                "--sender",
+                "agent",
+                "get-history",
+                "--service-hash",
+                "ab" * 32,
+            ]
+        )
         assert code == 0, capsys.readouterr()
         assert len(calls) == 1
         _, url, _ = calls[0]
@@ -216,11 +238,19 @@ class TestReadOnlyCommandsAgainstMockedBackend:
 
     def test_mcp_call_uses_json_body(self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
         calls = self._install_mock_transport(monkeypatch, {"result": "ok"})
-        code = cli.main([
-            "--api-url", "http://mock.local",
-            "--sandbox", "--sender", "agent",
-            "mcp-call", "echo", "--arguments-json", '{"msg":"hi"}',
-        ])
+        code = cli.main(
+            [
+                "--api-url",
+                "http://mock.local",
+                "--sandbox",
+                "--sender",
+                "agent",
+                "mcp-call",
+                "echo",
+                "--arguments-json",
+                '{"msg":"hi"}',
+            ]
+        )
         assert code == 0, capsys.readouterr()
         assert len(calls) == 1
         method, url, kw = calls[0]
@@ -286,11 +316,18 @@ class TestReplayCommand:
             },
         )
 
-        code = cli.main([
-            "--api-url", "http://mock.local",
-            "--sandbox", "--sender", "agent",
-            "replay", "--service-hash", h,
-        ])
+        code = cli.main(
+            [
+                "--api-url",
+                "http://mock.local",
+                "--sandbox",
+                "--sender",
+                "agent",
+                "replay",
+                "--service-hash",
+                h,
+            ]
+        )
         assert code == 0, capsys.readouterr()
 
         # Both endpoints must be hit exactly once each.
@@ -305,7 +342,7 @@ class TestReplayCommand:
         captured = capsys.readouterr()
         import json as _json
 
-            # Skip lines before the JSON blob if any (e.g. warnings).
+        # Skip lines before the JSON blob if any (e.g. warnings).
         stdout = captured.out.strip()
         # _emit writes indented JSON — find the first "{" and parse from there.
         start = stdout.find("{")
@@ -336,11 +373,18 @@ class TestReplayCommand:
                 },
             },
         )
-        code = cli.main([
-            "--api-url", "http://mock.local",
-            "--sandbox", "--sender", "agent",
-            "replay", "--service-hash", h,
-        ])
+        code = cli.main(
+            [
+                "--api-url",
+                "http://mock.local",
+                "--sandbox",
+                "--sender",
+                "agent",
+                "replay",
+                "--service-hash",
+                h,
+            ]
+        )
         assert code == 0, capsys.readouterr()
         import json as _json
 

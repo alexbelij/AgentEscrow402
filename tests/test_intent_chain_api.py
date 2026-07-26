@@ -103,9 +103,7 @@ def test_chain_escrow_out_of_order_is_422(client):
 
 def test_attest_without_chain_is_422(client):
     client.post("/intents", json={"intent_id": "i1", "agent_path": ["A", "B"]})
-    resp = client.post(
-        "/intents/i1/hops/0/attest", json={"service_hash": _hash("sh0")}
-    )
+    resp = client.post("/intents/i1/hops/0/attest", json={"service_hash": _hash("sh0")})
     assert resp.status_code == 422
 
 
@@ -213,9 +211,7 @@ def test_hop_registered_with_wrong_parent_intent_is_rejected(client):
 
     # And attesting a hop under the wrong (but real) intent, for a
     # service_hash that was never chained there, must also be rejected.
-    resp = client.post(
-        "/intents/real-intent/hops/0/attest", json={"service_hash": sh}
-    )
+    resp = client.post("/intents/real-intent/hops/0/attest", json={"service_hash": sh})
     assert resp.status_code == 422
 
 
@@ -229,9 +225,7 @@ def test_create_escrow_with_intent_registers_hop(client):
     the escrow as that hop of the intent in a single call (no separate
     POST /intents/{id}/hops needed)."""
     # Declare intent A->B->C first.
-    intent_resp = client.post(
-        "/intents", json={"intent_id": "int-1", "agent_path": ["A", "B", "C"]}
-    )
+    intent_resp = client.post("/intents", json={"intent_id": "int-1", "agent_path": ["A", "B", "C"]})
     assert intent_resp.status_code == 200
 
     # Hop 0 escrow: create with parent_intent_id + hop_index.
@@ -303,9 +297,7 @@ def test_create_escrow_intent_end_to_end_two_hops(client):
     both hops implicitly through /escrow (no explicit /intents/{id}/hops
     calls), then attest each after release. chain_root_hash must fold
     the two attestations deterministically."""
-    client.post(
-        "/intents", json={"intent_id": "int-e2e", "agent_path": ["A", "B", "C"]}
-    )
+    client.post("/intents", json={"intent_id": "int-e2e", "agent_path": ["A", "B", "C"]})
 
     sh0 = _hash("e2e-hop-0")
     sh1 = _hash("e2e-hop-1")
@@ -327,9 +319,7 @@ def test_create_escrow_intent_end_to_end_two_hops(client):
     assert r.status_code == 200, r.text
     r = client.post("/release", json={"service_hash": sh0}, params={"sender": "agentA"})
     assert r.status_code == 200, r.text
-    r = client.post(
-        "/intents/int-e2e/hops/0/attest", json={"service_hash": sh0}
-    )
+    r = client.post("/intents/int-e2e/hops/0/attest", json={"service_hash": sh0})
     assert r.status_code == 200, r.text
 
     # Hop 1: same pattern.
@@ -347,9 +337,7 @@ def test_create_escrow_intent_end_to_end_two_hops(client):
     assert r.status_code == 200, r.text
     r = client.post("/release", json={"service_hash": sh1}, params={"sender": "agentB"})
     assert r.status_code == 200, r.text
-    r = client.post(
-        "/intents/int-e2e/hops/1/attest", json={"service_hash": sh1}
-    )
+    r = client.post("/intents/int-e2e/hops/1/attest", json={"service_hash": sh1})
     assert r.status_code == 200, r.text
 
     # Final state: intent is complete, chain_root_hash covers both
@@ -361,6 +349,4 @@ def test_create_escrow_intent_end_to_end_two_hops(client):
     assert len(intent["attestation_event_ids"]) == 2
     from server import audit_trace
 
-    assert intent["chain_root_hash"] == audit_trace.compute_chain_root(
-        intent["attestation_event_ids"]
-    )
+    assert intent["chain_root_hash"] == audit_trace.compute_chain_root(intent["attestation_event_ids"])

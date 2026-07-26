@@ -16,16 +16,14 @@ gated behind `pytest.mark.slow` for CI.
 
 from __future__ import annotations
 
-import copy
-
 import pytest
 
 from server import zk_amount as z
 
-
 # ---------------------------------------------------------------------------
 # Generators
 # ---------------------------------------------------------------------------
+
 
 class TestGenerators:
     def test_G_is_deterministic(self):
@@ -52,6 +50,7 @@ class TestGenerators:
 # ---------------------------------------------------------------------------
 # Commitments
 # ---------------------------------------------------------------------------
+
 
 class TestCommitments:
     def test_commit_returns_commitment_and_blinding(self):
@@ -112,6 +111,7 @@ class TestCommitments:
 # Homomorphism
 # ---------------------------------------------------------------------------
 
+
 class TestHomomorphism:
     def test_two_way_sum(self):
         c1, r1 = z.commit(100)
@@ -149,6 +149,7 @@ class TestHomomorphism:
 # ---------------------------------------------------------------------------
 # Range proofs — small bit widths (fast)
 # ---------------------------------------------------------------------------
+
 
 class TestRangeProof:
     def test_valid_proof_verifies_8bit(self):
@@ -241,6 +242,7 @@ class TestRangeProof:
 # Wire (de)serialization
 # ---------------------------------------------------------------------------
 
+
 class TestSerialization:
     def test_roundtrip(self):
         c, r = z.commit(42)
@@ -276,6 +278,7 @@ class TestSerialization:
 # ---------------------------------------------------------------------------
 # Slow tests — full 64-bit end-to-end
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.slow
 class TestFullRange64:

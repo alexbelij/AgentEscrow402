@@ -21,15 +21,13 @@ import os
 import time
 
 import pytest
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
-from server.middleware import ENVELOPE_HEADER, require_signed_envelope, _default_nonce_store
+from server.middleware import ENVELOPE_HEADER, _default_nonce_store, require_signed_envelope
 from server.signed_envelope import DomainSeparator, sign_envelope_ed25519
-
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
 
 CHAIN_ID = "casper-testnet"
 
@@ -50,9 +48,7 @@ def _env(monkeypatch, tmp_path):
 def keys():
     sk = os.urandom(32)
     priv = Ed25519PrivateKey.from_private_bytes(sk)
-    pk = priv.public_key().public_bytes(
-        serialization.Encoding.Raw, serialization.PublicFormat.Raw
-    )
+    pk = priv.public_key().public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
     return sk, pk
 
 
@@ -104,6 +100,7 @@ def _post(client, envelope):
 
 
 # ---------------------------------------------------------------------------
+
 
 def test_happy_path(client, keys):
     sk, pk = keys

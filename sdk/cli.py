@@ -171,9 +171,7 @@ async def _cmd_replay(args: argparse.Namespace) -> None:
     client = _make_client(args)
     try:
         escrow = await client.get_escrow(args.service_hash)
-        history = await client._request(  # noqa: SLF001
-            "GET", f"/escrow/{args.service_hash}/history"
-        )
+        history = await client._request("GET", f"/escrow/{args.service_hash}/history")  # noqa: SLF001
         events = history.get("events", []) if isinstance(history, dict) else []
         # Enrich each event with a delta_seconds from the create event, so
         # a reader can see the shape of the lifecycle at a glance.
@@ -188,11 +186,7 @@ async def _cmd_replay(args: argparse.Namespace) -> None:
             "receiver": escrow.get("receiver") if isinstance(escrow, dict) else None,
             "sender": escrow.get("sender") if isinstance(escrow, dict) else None,
             "events": events,
-            "terminal": (
-                events[-1]["action"] in ("released", "refunded", "expired", "disputed")
-                if events
-                else False
-            ),
+            "terminal": (events[-1]["action"] in ("released", "refunded", "expired", "disputed") if events else False),
         }
         _emit(replay)
     finally:

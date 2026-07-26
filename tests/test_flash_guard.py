@@ -15,7 +15,6 @@ from hypothesis import strategies as st
 
 from server import flash_guard as fg
 
-
 # --- constants parity ---------------------------------------------------------
 
 

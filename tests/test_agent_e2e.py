@@ -78,9 +78,9 @@ def _create_sandbox_escrow(
     assert r.status_code in (200, 201), f"expected 2xx, got {r.status_code}: {r.text[:200]}"
     body = r.json()
     assert "service_hash" in body, f"missing service_hash in {body}"
-    assert body["service_hash"] == service_hash, (
-        f"server-returned hash {body['service_hash']} != client-computed {service_hash}"
-    )
+    assert (
+        body["service_hash"] == service_hash
+    ), f"server-returned hash {body['service_hash']} != client-computed {service_hash}"
     return body
 
 

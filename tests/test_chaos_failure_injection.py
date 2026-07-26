@@ -60,9 +60,7 @@ class TestRpcServer500Fallback:
         def handler(request: httpx.Request) -> httpx.Response:
             if "primary" in str(request.url):
                 return httpx.Response(500, json={"error": "internal"})
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": {"ok": True}}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": {"ok": True}})
 
         # Replace the client's HTTPX transport with our mock.
         await client._http.aclose()
@@ -105,9 +103,7 @@ class TestRpcServer500Fallback:
         def handler(request: httpx.Request) -> httpx.Response:
             if "cdn" in str(request.url):
                 return httpx.Response(502)
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": "hash123"}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "hash123"})
 
         await client._http.aclose()
         client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -143,9 +139,7 @@ class TestRpcErrorBodyFallback:
                         "error": {"code": -32601, "message": "method not found"},
                     },
                 )
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": "success"}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "success"})
 
         await client._http.aclose()
         client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -193,9 +187,7 @@ class TestNetworkTimeout:
         def handler(request: httpx.Request) -> httpx.Response:
             if "dead" in str(request.url):
                 raise httpx.ConnectError("connection refused")
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": "ok"}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "ok"})
 
         await client._http.aclose()
         client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -262,7 +254,6 @@ class TestDbStallLifecycle:
         """If db.commit() raises, the lifecycle raises and no partial
         'released' escrow is left."""
         # Import lazily to keep test module light.
-        from server import db as dbmod
 
         # Fake session that fails on commit.
         class FailingSession:
@@ -302,6 +293,7 @@ class TestDbStallLifecycle:
     @pytest.mark.asyncio
     async def test_no_double_commit_on_retry(self):
         """After a rollback, retry must not accidentally double-add."""
+
         class OnceFailingSession:
             def __init__(self):
                 self.added = 0
@@ -357,9 +349,7 @@ class TestCombinedChaos:
                 return httpx.Response(500)
             if "nownodes" in url:
                 raise httpx.TimeoutException("nownodes timed out")
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": "resilient"}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "resilient"})
 
         await client._http.aclose()
         client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
@@ -393,9 +383,7 @@ class TestRecoveryAfterFallback:
             call_log.append(url)
             if "flaky" in url:
                 return httpx.Response(500)
-            return httpx.Response(
-                200, json={"jsonrpc": "2.0", "id": 1, "result": "ok"}
-            )
+            return httpx.Response(200, json={"jsonrpc": "2.0", "id": 1, "result": "ok"})
 
         await client._http.aclose()
         client._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))

@@ -45,9 +45,7 @@ def test_cusum_endpoint_stationary(client: TestClient) -> None:
     assert r.status_code == 200
     body = r.json()
     assert body["n_samples"] == 200
-    total_alarms = sum(
-        1 for res in body["results"] if res["alarm_upper"] or res["alarm_lower"]
-    )
+    total_alarms = sum(1 for res in body["results"] if res["alarm_upper"] or res["alarm_lower"])
     # With h=8 on N(0,1), expect ~0 alarms in 200 samples.
     assert total_alarms <= 5, f"too many false alarms on stationary noise: {total_alarms}"
 

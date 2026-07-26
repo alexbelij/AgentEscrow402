@@ -4,7 +4,8 @@ engine for regulated jurisdictions (T3.7)."""
 from __future__ import annotations
 
 import pytest
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from server.compliance import (
     ComplianceEngine,
@@ -219,8 +220,12 @@ def test_list_jurisdictions_stable_sorted_order(engine: ComplianceEngine):
 
 
 def test_evaluate_is_pure_same_inputs_same_output(engine: ComplianceEngine):
-    d1 = engine.evaluate("NG", VerificationLevel.BASIC, amount_motes=3_000 * MOTES, prior_volume_today_motes=1_000 * MOTES)
-    d2 = engine.evaluate("NG", VerificationLevel.BASIC, amount_motes=3_000 * MOTES, prior_volume_today_motes=1_000 * MOTES)
+    d1 = engine.evaluate(
+        "NG", VerificationLevel.BASIC, amount_motes=3_000 * MOTES, prior_volume_today_motes=1_000 * MOTES
+    )
+    d2 = engine.evaluate(
+        "NG", VerificationLevel.BASIC, amount_motes=3_000 * MOTES, prior_volume_today_motes=1_000 * MOTES
+    )
     assert d1 == d2
 
 

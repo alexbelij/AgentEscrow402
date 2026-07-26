@@ -132,13 +132,13 @@ class TestRequestObservability:
 
         obs = RequestObservability(buckets=(0.1, 0.5, 1.0))
         obs.observe("/x", "GET", "2xx", 0.05)  # ≤ 0.1, 0.5, 1.0
-        obs.observe("/x", "GET", "2xx", 0.7)   # ≤ 1.0 only
+        obs.observe("/x", "GET", "2xx", 0.7)  # ≤ 1.0 only
 
         hist, _ = obs.snapshot()
         s = hist[("/x", "GET", "2xx")]
-        assert s.buckets[0.1] == 1   # 0.05
-        assert s.buckets[0.5] == 1   # 0.05
-        assert s.buckets[1.0] == 2   # 0.05, 0.7
+        assert s.buckets[0.1] == 1  # 0.05
+        assert s.buckets[0.5] == 1  # 0.05
+        assert s.buckets[1.0] == 2  # 0.05, 0.7
 
     def test_multiple_keys_kept_separate(self) -> None:
         from server.observability import RequestObservability
@@ -225,9 +225,9 @@ class TestMiddlewareEndToEnd:
         body = r.text
 
         # +Inf bucket must equal _count.
-        route_lines = [l for l in body.splitlines() if 'route="/health"' in l and 'duration_seconds' in l]
-        inf_line = next(l for l in route_lines if 'le="+Inf"' in l)
-        count_line = next(l for l in route_lines if l.startswith("ae402_http_request_duration_seconds_count"))
+        route_lines = [ln for ln in body.splitlines() if 'route="/health"' in ln and "duration_seconds" in ln]
+        inf_line = next(ln for ln in route_lines if 'le="+Inf"' in ln)
+        count_line = next(ln for ln in route_lines if ln.startswith("ae402_http_request_duration_seconds_count"))
 
         inf_val = int(inf_line.split()[-1])
         count_val = int(count_line.split()[-1])
