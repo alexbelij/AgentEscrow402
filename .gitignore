@@ -1,42 +1,23 @@
-!demo/test-arbiter-keys/*.pem
-# (unfunded testnet keypairs, single-purpose, see demo/test-arbiter-keys/README.md)
-# Exception: intentionally-committed throwaway test-only arbiter demo keys
-*$py.class
-*.bak
-*.egg-info/
-*.env.local
-*.pem
-*.py[cod]
-*.secret
-*.swo
-*.swp
-*.wasm
-*~
-.DS_Store
-.coverage
-.eggs/
-.env
-.idea/
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.venv/
-.vscode/
-Cargo.lock
-Thumbs.db
+# Existing entries + libFuzzer output (C12/C13)
 __pycache__/
-build/
-dist/
-env/
-htmlcov/
-keys/
-landing/
-node_modules/
-target/
+*.pyc
+.pytest_cache/
+.coverage
+.venv/
 venv/
-graphify-out/
+node_modules/
+dist/
+build/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+target/
 
-# local test virtualenv (not part of repo)
-.venv-ae/
-.venv-ae2/
-.venv-lint/
+# cargo-fuzz output
+contracts/fuzz/target/
+contracts/fuzz/corpus/
+contracts/fuzz/artifacts/
+
+# secrets / local
+.env
+.env.*
