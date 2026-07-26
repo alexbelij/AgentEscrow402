@@ -3,7 +3,7 @@
 ## System Overview
 
 AE402 is a full-stack payment infrastructure for autonomous AI agents on the Casper blockchain.
-The system comprises **8 smart contracts**, a **FastAPI backend** (66 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
+The system comprises **9 smart contracts live on testnet (13 total in `main`, 4 code-complete pending deploy)**, a **FastAPI backend** (140 endpoints — see `GET /openapi.json` for the exact, always-current count), a **React
 frontend** (12 console pages), a **Python SDK** with **LangChain** and **MCP** (26 tools)
 integrations, and on-chain evidence of 369+ real testnet transactions.
 
@@ -23,7 +23,7 @@ graph TB
     MCP --> SDK_C
     LC --> SDK_C
 
-    subgraph Backend [FastAPI Backend — 62 endpoints]
+    subgraph Backend [FastAPI Backend — 140 endpoints]
         API[app.py<br/>Core routes]
         MA[multi_asset.py<br/>CEP-18/CEP-78/streaming/HTLC]
         INS[insurance.py<br/>Pool & claims]
@@ -41,7 +41,7 @@ graph TB
     API --> DB
     API --> SB
 
-    subgraph Casper [Casper Testnet — 8 contracts]
+    subgraph Casper [Casper Testnet — 9 contracts live (13 total)]
         ESC[Core Escrow<br/>14 entry points]
         MGR[Escrow Manager<br/>5 entry points]
         INSC[Insurance Pool<br/>7 entry points]
@@ -211,7 +211,7 @@ this by creating + funding purses natively inside the VM:
 
 ## Backend (Python, `server/`)
 
-FastAPI application with 66 endpoints across 19 route files (see `GET /openapi.json` for the exact, live count -- the module map below lists the highest-route-count files, not every route file). Runs in two modes:
+FastAPI application with 140 endpoints across 19 route files (see `GET /openapi.json` for the exact, live count -- the module map below lists the highest-route-count files, not every route file). Runs in two modes:
 - **Live mode** (`SANDBOX=false`): all operations hit the real Casper testnet via `CasperClient`
 - **Sandbox mode** (`SANDBOX=true`): in-memory simulation via `SandboxStore` for zero-cost demos
 
@@ -219,7 +219,7 @@ FastAPI application with 66 endpoints across 19 route files (see `GET /openapi.j
 
 ```mermaid
 graph LR
-    subgraph Routes [Route files — 66 endpoints total, highest-count files shown]
+    subgraph Routes [Route files — 140 endpoints total, highest-count files shown]
         app[app.py<br/>22 routes]
         multi[multi_asset.py<br/>11 routes]
         idr[identity_registry_api.py<br/>10 routes]
@@ -313,7 +313,7 @@ graph TB
         ESC_P[Escrows<br/>List + detail + lifecycle]
         AGT[Agents<br/>Agent cards + registration]
         ARBI[Arbitration<br/>Dispute + VRF election + arbiter register]
-        CON[Contracts<br/>8 contracts + live actions]
+        CON[Contracts<br/>9 contracts + live actions]
         INS_P[Insurance<br/>Pool stats + deposit + claim]
         ID[Identity Registry<br/>DID agents + stake + capabilities]
         RISK_P[Risk<br/>Risk heatmap + scoring]
@@ -650,8 +650,8 @@ AgentEscrow402/
 │   ├── pool-funder/            # Session WASM: insurance pool funding
 │   ├── id-registry-funder/     # Session WASM: identity stake funding
 │   ├── arbiter-registrar/      # Session WASM: VRF arbiter registration
-│   └── tests/                  # 40 Rust tests (unit + property-based)
-├── server/                     # FastAPI backend (66 endpoints)
+│   └── tests/                  # 250 Rust tests (unit + property-based)
+├── server/                     # FastAPI backend (140 endpoints)
 │   ├── app.py                  # Core routes (22)
 │   ├── multi_asset.py          # Multi-asset/streaming/HTLC (11)
 │   ├── identity_registry_api.py# Identity registry (10)
@@ -674,7 +674,7 @@ AgentEscrow402/
 │   ├── langchain_tool.py       # LangChain tool
 │   ├── mcp_server.py           # 26 MCP tools
 │   └── arbiter_signing.py      # Ed25519 signing helpers
-├── tests/                      # 450 Python tests
+├── tests/                      # 2081 Python tests
 ├── docs/                       # Documentation
 │   ├── openapi.yaml            # OpenAPI spec snapshot (curated; GET /openapi.json is always exact)
 │   ├── SDK.md                  # SDK documentation

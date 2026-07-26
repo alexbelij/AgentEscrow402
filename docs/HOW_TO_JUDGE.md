@@ -24,7 +24,7 @@ judging criteria is satisfied.
 |---|-----------|---------------|
 | 1 | **Casper-native architecture** | `contracts/` — Rust WASM contracts deployed to testnet: escrow, manager, insurance pool, agent identity registry. Verify hashes at `/contracts`. |
 | 2 | **Working demo on testnet** | Guided demo on ae402.xyz. Each step emits a real testnet tx; hashes are visible in the UI and pinned in `docs/evidence/`. |
-| 3 | **Technical correctness** | 624 tests across contract Rust (`contracts/tests/`) and server Python (`tests/`). Suites include: escrow FSM invariants, VRF election, 3-of-5 arbiter recovery, Merkle inclusion proofs, insurance replay guards, redacted audit trace. |
+| 3 | **Technical correctness** | 2081 Python + 250 Rust tests across contract Rust (`contracts/tests/`) and server Python (`tests/`). Suites include: escrow FSM invariants, VRF election, 3-of-5 arbiter recovery, Merkle inclusion proofs, insurance replay guards, redacted audit trace. |
 | 4 | **Novelty / originality** | `docs/originality-statement.md` (roadmap): agent-first escrow with LLM arbitration + on-chain Merkle evidence provenance + auto-escalation to VRF-elected panel on abstain/low-conf. See also §Originality below. |
 | 5 | **Documentation quality** | `README.md`, `docs/ARCHITECTURE.md`, `docs/API_SDK_MCP.md`, `docs/SDK.md`, `docs/AUDIT_TRACE_AND_LINEAGE.md`, `docs/MERKLE_PROVENANCE.md`, `docs/FSM.md`, `docs/CSPR_UNITS.md`, `docs/OPERATOR_RUNBOOK.md`. |
 | 6 | **Security posture** | `docs/RED_TEAM.tmp` (15 attack vectors self-audit); `SECURITY.md`; escrow FSM = deny-by-default; detached signatures with nonce + domain separation; insurance replay guards; supply-chain audit in `docs/BUILD_AUDIT.md`. |
@@ -77,10 +77,12 @@ surface without navigating the whole app.
 
 ## Limitations we admit up front
 
-- Legacy `/zk/verify-*` endpoints are hash-based simulations. **Real**
-  BN254 Groth16 is at `/zk/groth16-real/*` (Gate 4 CP handoff — CP
-  side is the primary user of ZK proofs; AE402 only consumes them for
-  optional arbitration attestations).
+- Range-proof privacy (`/zk/*`, `contracts/range-proof-registry`) uses a
+  Pedersen commitment + 2048-bit safe-prime range proof computed
+  off-chain in `sdk/range_proof.py` — the contract itself only stores
+  the opaque commitment, a proof hash, and arbiter attestation
+  signatures (Casper's WASM host has no native big-integer mod-exp).
+  See `docs/RANGE_PROOFS.md` for the full math.
 - Live deployment currently targets **testnet**. Mainnet migration is
   a separate hardening pass (see `docs/DEPLOYMENT_LESSONS.md`).
 - Some evidence pages in `docs/evidence/` predate the CSPR / motes

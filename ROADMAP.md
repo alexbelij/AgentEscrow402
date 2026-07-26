@@ -2,19 +2,20 @@
 
 > x402-compatible payment middleware for AI agents on Casper Network
 
-*Last verified against commit `e19f865` / testnet contract v9 (`612cead2...ddd9ec`), 2026-07-07.*
+*Last verified against commit `7bec8ac` / testnet contract v10 (`07527a37...39ef1`), 2026-07-26.*
 
 ---
 
 ## Current State (Hackathon submission)
 
-- [x] **8 smart contracts deployed on Casper testnet** — Core Escrow (v9), Escrow Manager,
+- [x] **9 smart contracts deployed on Casper testnet (13 total in `main`, 4 code-complete pending deploy)** — Core Escrow (v10), Escrow Manager,
       Insurance Pool (hardened), VRF Arbiter, Agent Identity Registry (v2), MultiAssetEscrow,
-      AETUSD + AEMAT test tokens
+      AETUSD + AEMAT test tokens; Challenge Arbiter, Range Proof Registry, Governance DAO,
+      Two-Key Account are code-complete but not yet deployed — see `TX_MANIFEST.md`
 - [x] FastAPI backend with PostgreSQL (Neon) persistence
 - [x] Python SDK (`EscrowClient`) + LangChain `EscrowPaymentTool`
 - [x] MCP server exposing **26** escrow/identity/risk/arbitration tools (`sdk/mcp_server.py`)
-- [x] React console at ae402.xyz/console — 12 tabs, all live-wired
+- [x] React console at ae402.xyz/console — 19 tabs, all live-wired
 - [x] Reputation scoring with exponential decay + staking-aware slashing, integrated with escrow lifecycle
 - [x] Insurance pool (configurable fee on release)
 - [x] EscrowManager Factory with batch create/release/cancel (server-side cap/quorum guard)
@@ -30,13 +31,13 @@
       (`POST /escrow/{hash}/stream-claim` triggers real `release()` when 100% vested)
 - [x] ML risk scoring (IsolationForest) — `/risk/dashboard`, `/risk/score/{agent}`
 - [x] Post-quantum ML-KEM metadata encryption
-- [x] **450 Python + 40 Rust automated tests** (490 total, incl. Hypothesis/proptest property-based
+- [x] **2081 Python + 250 Rust automated tests** (2331 total, incl. Hypothesis/proptest property-based
       invariant tests); see [Testing](README.md#-testing)
 - [x] CI/CD via GitHub Actions
 - [x] Property-based testing — 9 proptest + 3 Hypothesis invariant checks
 - [x] Gas benchmark report — [docs/GAS_BENCHMARK.md](docs/GAS_BENCHMARK.md)
 - [x] MCP JSON-Schema registry — [docs/mcp_tools_schema.json](docs/mcp_tools_schema.json)
-- [x] 349 real testnet transactions as on-chain evidence
+- [x] 369 real testnet transactions as on-chain evidence
 
 ## Post-Hackathon Roadmap
 
@@ -82,8 +83,11 @@
 
 ### Phase 3 — Ecosystem
 
-- [ ] Multi-chain escrow bridge (Casper ↔ EVM chains)
-- [ ] Agent discovery marketplace UI
+- [x] Multi-chain escrow bridge (Casper ↔ EVM chains) — mock relayer + mode-selector +
+      diff-test shipped (`server/bridge_htlc.py`, `bridge_relayer.py`, `bridge_mode.py`);
+      a real live Sepolia HTLC lock/claim path (`server/bridge_evm_adapter.py`) has also
+      landed on `main` as a bonus proof-of-execution on top of the mock.
+- [x] Agent discovery marketplace UI — `frontend/src/components/console/Marketplace.tsx`
 - [x] Formal verification (TLA+ specification for state machine invariants) —
       `docs/formal/AE402Escrow.tla` models the escrow FSM. TLC proves 5
       safety invariants (valid-transition, no-double-release, no-refund-
@@ -91,7 +95,8 @@
       liveness property (pending eventually terminal) over 27k distinct
       states in ~5s. CI job `.github/workflows/tla.yml` guards drift
       between the model and `server/app.py`.
-- [ ] Compliance framework for regulated jurisdictions
+- [x] Compliance framework for regulated jurisdictions — baseline policy engine shipped
+      (`server/compliance.py`, `server/compliance_api.py`, `docs/tier3/T3.7-compliance-framework.md`)
 
 ## Prepared Infrastructure
 
