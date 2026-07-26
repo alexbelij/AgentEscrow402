@@ -29,6 +29,8 @@
 
 **For agents & operators:** [Use AgentEscrow](https://ae402.xyz/console/escrows) — lock, release, dispute · **For developers:** [Build with AE402](https://ae402.xyz/console/docs) — API, Python SDK, MCP · **For evaluators:** [Evaluate the project](https://ae402.xyz/console/feature-map) — feature map with strict `On-chain / Live API / Local demo / Simulation / Planned` status labels
 
+**New this round — try it live:** [Threshold Escrow (MPC)](https://ae402.xyz/console/sandbox) · [ZK Amount Privacy](https://ae402.xyz/console/sandbox) · [Gaming-Reward Escrow](https://ae402.xyz/console/sandbox) · [Multi-Hop A2A](https://ae402.xyz/console/sandbox) · [Casper↔EVM Bridge](https://ae402.xyz/console/advanced) · [Compliance Engine](https://ae402.xyz/console/sandbox) — all live in the sandbox, see [docs/DEMO_SCRIPT.md §7](docs/DEMO_SCRIPT.md) for runnable pytest commands
+
 ### One-command judge reproducibility
 
 ```bash
