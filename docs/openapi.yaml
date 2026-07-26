@@ -323,8 +323,7 @@ components:
           type: string
         panel_election:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: object
           - type: 'null'
           title: Panel Election
         provider:
@@ -390,6 +389,18 @@ components:
       - token
       - caveats
       title: AttenuateResponse
+      type: object
+    AttestHopRequest:
+      properties:
+        service_hash:
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-f]{64}$
+          title: Service Hash
+          type: string
+      required:
+      - service_hash
+      title: AttestHopRequest
       type: object
     BatchEscrowItem:
       description: A single escrow spec within a batch-create request.
@@ -572,7 +583,6 @@ components:
           title: Code
           type: string
         detail:
-          additionalProperties: true
           title: Detail
           type: object
         message:
@@ -620,6 +630,23 @@ components:
       - alarm_lower
       - direction
       title: CUSUMResult
+      type: object
+    ChainEscrowRequest:
+      properties:
+        hop_index:
+          minimum: 0.0
+          title: Hop Index
+          type: integer
+        service_hash:
+          maxLength: 64
+          minLength: 64
+          pattern: ^[0-9a-f]{64}$
+          title: Service Hash
+          type: string
+      required:
+      - service_hash
+      - hop_index
+      title: ChainEscrowRequest
       type: object
     ChainId:
       description: 'Supported blockchain targets for cross-chain operations.
@@ -790,6 +817,27 @@ components:
       - trigger_chain
       - trigger_tx_hash
       title: CreateCrossChainRequest
+      type: object
+    DeclareIntentRequest:
+      properties:
+        agent_path:
+          description: Ordered agent identifiers, e.g. ['A', 'B', 'C'] for a 2-hop A->B->C choreography. len(agent_path) - 1 hops planned.
+          items:
+            type: string
+          maxItems: 17
+          minItems: 2
+          title: Agent Path
+          type: array
+        intent_id:
+          anyOf:
+          - maxLength: 128
+            type: string
+          - type: 'null'
+          description: Caller-supplied intent id. Omit to have the server generate one (uuid4 hex).
+          title: Intent Id
+      required:
+      - agent_path
+      title: DeclareIntentRequest
       type: object
     DelegateCapabilityRequest:
       description: Request to delegate a capability from one agent to another.
@@ -987,7 +1035,6 @@ components:
           type: integer
         escrows:
           items:
-            additionalProperties: true
             type: object
           title: Escrows
           type: array
@@ -1057,6 +1104,18 @@ components:
           - type: string
           - type: 'null'
           title: Deploy Hash
+        escrow_type:
+          default: standard
+          title: Escrow Type
+          type: string
+        funded_block:
+          default: 0
+          title: Funded Block
+          type: integer
+        gaming_result_root:
+          default: ''
+          title: Gaming Result Root
+          type: string
         mlkem_algorithm:
           anyOf:
           - type: string
@@ -1088,6 +1147,18 @@ components:
           type: string
         status:
           $ref: '#/components/schemas/EscrowStatus'
+        threshold_commitment_hex:
+          default: ''
+          title: Threshold Commitment Hex
+          type: string
+        threshold_m:
+          default: 0
+          title: Threshold M
+          type: integer
+        threshold_n:
+          default: 0
+          title: Threshold N
+          type: integer
         ttl:
           title: Ttl
           type: integer
@@ -1114,6 +1185,21 @@ components:
           description: Opt-in zero-knowledge amount privacy (Tier Wow W.2). When true, amount is hidden behind a Pedersen commitment + range proof in every API response; use POST /escrows/{service_hash}/reveal with the blinding factor to disclose it.
           title: Confidential
           type: boolean
+        hop_index:
+          anyOf:
+          - minimum: 0.0
+            type: integer
+          - type: 'null'
+          description: Zero-based position of this escrow in its intent's hop chain. Required when parent_intent_id is set; ignored otherwise.
+          title: Hop Index
+        parent_intent_id:
+          anyOf:
+          - maxLength: 128
+            minLength: 1
+            type: string
+          - type: 'null'
+          description: Intent id this escrow belongs to for multi-hop A2A choreography. Must be declared first via POST /intents.
+          title: Parent Intent Id
         receiver:
           description: Casper account hash of the receiver (raw 64-hex or account-hash- prefixed)
           pattern: ^(account-hash-)?[0-9a-fA-F]{64}$
@@ -1155,7 +1241,6 @@ components:
     EscrowResponse:
       properties:
         escrow:
-          additionalProperties: true
           title: Escrow
           type: object
       required:
@@ -1253,7 +1338,8 @@ components:
           title: Prior Volume Today Motes
           type: integer
         verification_level:
-          $ref: '#/components/schemas/VerificationLevel'
+          allOf:
+          - $ref: '#/components/schemas/VerificationLevel'
           default: UNVERIFIED
       required:
       - country_code
@@ -1294,6 +1380,35 @@ components:
           title: Service Hashes
       title: FilterModel
       type: object
+    GamingArmRequest:
+      description: 'C14: arm an already-created escrow with a gaming result Merkle root.
+
+
+        The caller — typically the tournament organiser or the game backend —
+
+        computes the Merkle root off-chain over every payout leaf (leaf value =
+
+        `receiver_pubkey` bytes, sha256-tagged — see server/gaming_merkle.py)
+
+        and calls this endpoint with the resulting hex root.  Individual
+
+        winners then submit inclusion proofs against this root at /release.'
+      properties:
+        result_root_hex:
+          maxLength: 64
+          minLength: 64
+          title: Result Root Hex
+          type: string
+        service_hash:
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+          type: string
+      required:
+      - service_hash
+      - result_root_hex
+      title: GamingArmRequest
+      type: object
     HTTPValidationError:
       properties:
         detail:
@@ -1330,7 +1445,6 @@ components:
           title: Status
           type: string
         strict_mode:
-          additionalProperties: true
           default: {}
           title: Strict Mode
           type: object
@@ -1343,6 +1457,36 @@ components:
           title: Version
           type: string
       title: HealthResponse
+      type: object
+    HopView:
+      properties:
+        attested:
+          title: Attested
+          type: boolean
+        from_agent:
+          title: From Agent
+          type: string
+        hop_index:
+          title: Hop Index
+          type: integer
+        on_chain_link_tx_hash:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: On Chain Link Tx Hash
+        service_hash:
+          title: Service Hash
+          type: string
+        to_agent:
+          title: To Agent
+          type: string
+      required:
+      - hop_index
+      - service_hash
+      - from_agent
+      - to_agent
+      - attested
+      title: HopView
       type: object
     InitiateSwapRequest:
       properties:
@@ -1455,6 +1599,49 @@ components:
       - amount_motes
       title: InsuranceDepositRequest
       type: object
+    IntentView:
+      properties:
+        agent_path:
+          items:
+            type: string
+          title: Agent Path
+          type: array
+        attestation_event_ids:
+          items:
+            type: string
+          title: Attestation Event Ids
+          type: array
+        attested_hop_count:
+          title: Attested Hop Count
+          type: integer
+        chain_root_hash:
+          title: Chain Root Hash
+          type: string
+        hops:
+          items:
+            $ref: '#/components/schemas/HopView'
+          title: Hops
+          type: array
+        intent_id:
+          title: Intent Id
+          type: string
+        is_complete:
+          title: Is Complete
+          type: boolean
+        planned_hop_count:
+          title: Planned Hop Count
+          type: integer
+      required:
+      - intent_id
+      - agent_path
+      - planned_hop_count
+      - attested_hop_count
+      - is_complete
+      - chain_root_hash
+      - attestation_event_ids
+      - hops
+      title: IntentView
+      type: object
     IssueRequest:
       properties:
         amount_motes:
@@ -1476,8 +1663,7 @@ components:
           type: string
         extra_claims:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: object
           - type: 'null'
           title: Extra Claims
         issuance_ts:
@@ -1506,11 +1692,9 @@ components:
     IssueResponse:
       properties:
         credential:
-          additionalProperties: true
           title: Credential
           type: object
         summary:
-          additionalProperties: true
           title: Summary
           type: object
       required:
@@ -1787,7 +1971,8 @@ components:
           title: Service Hash
           type: string
         token:
-          $ref: '#/components/schemas/TokenIdentifier'
+          allOf:
+          - $ref: '#/components/schemas/TokenIdentifier'
           description: Details of the token being escrowed
         ttl:
           default: 300
@@ -2077,7 +2262,6 @@ components:
           title: Prove Ms
           type: number
         range_proof:
-          additionalProperties: true
           title: Range Proof
           type: object
       required:
@@ -2095,7 +2279,6 @@ components:
           title: Action Type
           type: string
         params:
-          additionalProperties: true
           title: Params
           type: object
       required:
@@ -2329,11 +2512,25 @@ components:
             type: string
           title: Arbiter Signatures
           type: array
+        gaming_leaf_hex:
+          default: ''
+          title: Gaming Leaf Hex
+          type: string
+        gaming_proof_hex:
+          items:
+            type: string
+          title: Gaming Proof Hex
+          type: array
         service_hash:
           maxLength: 64
           minLength: 64
           title: Service Hash
           type: string
+        threshold_shares_hex:
+          items:
+            type: string
+          title: Threshold Shares Hex
+          type: array
         wallet_tx_hash:
           anyOf:
           - maxLength: 128
@@ -2783,7 +2980,8 @@ components:
           title: Start Time
           type: integer
         token:
-          $ref: '#/components/schemas/TokenIdentifier'
+          allOf:
+          - $ref: '#/components/schemas/TokenIdentifier'
           description: Details of the token being streamed
       required:
       - receiver
@@ -3010,8 +3208,7 @@ components:
       properties:
         body:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: object
           - type: 'null'
           title: Body
         expected_status:
@@ -3041,6 +3238,77 @@ components:
       - path
       - expected_status
       title: ThreeStepStep
+      type: object
+    ThresholdArmRequest:
+      description: 'C13: arm an already-created escrow with a Shamir n-of-m release gate.
+
+
+        The caller (typically the sender) chooses n and m, calls this endpoint,
+
+        and receives back the shares in the response — exactly once. The server
+
+        stores only the sha256 commitment; the shares are the caller''s problem
+
+        to distribute over independent channels.
+
+
+        Idempotency: arming an already-armed escrow is refused (409). Change of
+
+        parameters requires a fresh escrow.'
+      properties:
+        service_hash:
+          maxLength: 64
+          minLength: 64
+          title: Service Hash
+          type: string
+        threshold:
+          description: Shares needed to release (n)
+          maximum: 255.0
+          minimum: 2.0
+          title: Threshold
+          type: integer
+        total:
+          description: Total shares generated (m)
+          maximum: 255.0
+          minimum: 2.0
+          title: Total
+          type: integer
+      required:
+      - service_hash
+      - threshold
+      - total
+      title: ThresholdArmRequest
+      type: object
+    ThresholdArmResponse:
+      properties:
+        service_hash:
+          title: Service Hash
+          type: string
+        shares_hex:
+          items:
+            type: string
+          title: Shares Hex
+          type: array
+        threshold_commitment_hex:
+          title: Threshold Commitment Hex
+          type: string
+        threshold_m:
+          title: Threshold M
+          type: integer
+        threshold_n:
+          title: Threshold N
+          type: integer
+        warning:
+          default: These shares are shown ONCE and never stored server-side. Distribute them over independent channels to independent holders immediately; losing more than (m - n) of them makes the escrow un-releasable.
+          title: Warning
+          type: string
+      required:
+      - service_hash
+      - threshold_commitment_hex
+      - threshold_n
+      - threshold_m
+      - shares_hex
+      title: ThresholdArmResponse
       type: object
     ThresholdConfig:
       properties:
@@ -3099,7 +3367,6 @@ components:
     ToolCallRequest:
       properties:
         arguments:
-          additionalProperties: true
           title: Arguments
           type: object
       title: ToolCallRequest
@@ -3120,11 +3387,6 @@ components:
       type: object
     ValidationError:
       properties:
-        ctx:
-          title: Context
-          type: object
-        input:
-          title: Input
         loc:
           items:
             anyOf:
@@ -3399,7 +3661,6 @@ components:
           title: Discharges
           type: array
         facts:
-          additionalProperties: true
           title: Facts
           type: object
         now:
@@ -3470,7 +3731,6 @@ components:
     server__vc_api__VerifyRequest:
       properties:
         credential:
-          additionalProperties: true
           title: Credential
           type: object
         expected_issuer:
@@ -3497,8 +3757,7 @@ components:
           title: Error Type
         summary:
           anyOf:
-          - additionalProperties: true
-            type: object
+          - type: object
           - type: 'null'
           title: Summary
         valid:
@@ -3514,7 +3773,6 @@ components:
           title: Commitment
           type: string
         range_proof:
-          additionalProperties: true
           title: Range Proof
           type: object
         transcript:
@@ -4634,7 +4892,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Get Cep18 Permit Nonce Escrow Cep18 Permit Nonce Get
                 type: object
           description: Successful Response
@@ -4693,7 +4950,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Dispute Multi Asset Escrow Escrow Multi Asset  Service Hash  Dispute Post
                 type: object
           description: Successful Response
@@ -4723,7 +4979,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Refund Multi Asset Escrow Escrow Multi Asset  Service Hash  Refund Post
                 type: object
           description: Successful Response
@@ -4759,7 +5014,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Release Multi Asset Escrow Escrow Multi Asset  Service Hash  Release Post
                 type: object
           description: Successful Response
@@ -4795,7 +5049,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Resolve Multi Asset Escrow Escrow Multi Asset  Service Hash  Resolve Post
                 type: object
           description: Successful Response
@@ -4864,6 +5117,46 @@ paths:
                 $ref: '#/components/schemas/HTTPValidationError'
           description: Validation Error
       summary: Get Escrow
+  /escrow/{service_hash}/gaming-arm:
+    post:
+      description: 'C14: convert a pending standard escrow into a gaming-reward escrow.
+
+
+        Idempotency: re-arming with the same root is fine (no state change);
+
+        re-arming with a different root is refused so a race between two
+
+        organisers cannot silently overwrite the committed result.'
+      operationId: gaming_arm_escrow__service_hash__gaming_arm_post
+      parameters:
+      - in: path
+        name: service_hash
+        required: true
+        schema:
+          title: Service Hash
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GamingArmRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EscrowRecord'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Gaming Arm
+      tags:
+      - gaming
   /escrow/{service_hash}/history:
     get:
       description: Transaction timeline for a specific escrow.
@@ -4970,7 +5263,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Claim Streamed Escrow Escrow  Service Hash  Stream Claim Post
                 type: object
           description: Successful Response
@@ -5012,6 +5304,48 @@ paths:
       tags:
       - multi-asset
       - streaming
+  /escrow/{service_hash}/threshold-arm:
+    post:
+      description: 'C13: gate a pending escrow''s /release behind an n-of-m Shamir bundle.
+
+
+        Deterministic effect on state: computes commitment = sha256(secret) and
+
+        writes {threshold_commitment_hex, threshold_n, threshold_m} onto the
+
+        escrow row. Shares are returned in the response only — they are never
+
+        logged, never persisted, and cannot be recovered from the server.'
+      operationId: threshold_arm_escrow__service_hash__threshold_arm_post
+      parameters:
+      - in: path
+        name: service_hash
+        required: true
+        schema:
+          title: Service Hash
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThresholdArmRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThresholdArmResponse'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Threshold Arm
+      tags:
+      - threshold
   /escrows:
     get:
       description: List escrows with optional filters and pagination.
@@ -5487,8 +5821,10 @@ paths:
         name: min_verification
         required: false
         schema:
-          $ref: '#/components/schemas/VerificationLevel'
+          allOf:
+          - $ref: '#/components/schemas/VerificationLevel'
           default: UNVERIFIED
+          title: Min Verification
       responses:
         '200':
           content:
@@ -5516,7 +5852,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Registry Statistics Identity Registry Stats Summary Get
                 type: object
           description: Successful Response
@@ -5934,6 +6269,127 @@ paths:
       summary: Get Premium Quote
       tags:
       - insurance
+  /intents:
+    post:
+      operationId: declare_intent_intents_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeclareIntentRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentView'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Declare Intent
+      tags:
+      - intent-chain
+  /intents/{intent_id}:
+    get:
+      operationId: get_intent_intents__intent_id__get
+      parameters:
+      - in: path
+        name: intent_id
+        required: true
+        schema:
+          title: Intent Id
+          type: string
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentView'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Get Intent
+      tags:
+      - intent-chain
+  /intents/{intent_id}/hops:
+    post:
+      operationId: chain_escrow_intents__intent_id__hops_post
+      parameters:
+      - in: path
+        name: intent_id
+        required: true
+        schema:
+          title: Intent Id
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChainEscrowRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentView'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Chain Escrow
+      tags:
+      - intent-chain
+  /intents/{intent_id}/hops/{hop_index}/attest:
+    post:
+      operationId: attest_hop_intents__intent_id__hops__hop_index__attest_post
+      parameters:
+      - in: path
+        name: intent_id
+        required: true
+        schema:
+          title: Intent Id
+          type: string
+      - in: path
+        name: hop_index
+        required: true
+        schema:
+          title: Hop Index
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttestHopRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentView'
+          description: Successful Response
+        '422':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+          description: Validation Error
+      summary: Attest Hop
+      tags:
+      - intent-chain
   /macaroons/add-third-party:
     post:
       description: Bind a third-party caveat onto an existing token (client-side operation).
@@ -6066,7 +6522,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Policy Macaroons Policy Get
                 type: object
           description: Successful Response
@@ -6112,7 +6567,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response List Tools Mcp Tools Get
                 type: object
           description: Successful Response
@@ -6426,7 +6880,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Regime Shift Cusum Risk Regime Shift Cusum Post
                 type: object
           description: Successful Response
@@ -6454,7 +6907,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Regime Shift Page Hinkley Risk Regime Shift Page Hinkley Post
                 type: object
           description: Successful Response
@@ -6565,7 +7017,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Get Status Telegram Status Get
                 type: object
           description: Successful Response
@@ -6614,7 +7065,6 @@ paths:
               schema:
                 additionalProperties:
                   items:
-                    additionalProperties: true
                     type: object
                   type: array
                 title: Response List Subscriptions Telegram Subscriptions Get
@@ -6667,7 +7117,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Test Send Telegram Test Post
                 type: object
           description: Successful Response
@@ -6707,7 +7156,6 @@ paths:
         content:
           application/json:
             schema:
-              additionalProperties: true
               title: Update
               type: object
         required: true
@@ -6716,7 +7164,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Webhook Telegram Webhook  Secret  Post
                 type: object
           description: Successful Response
@@ -6809,7 +7256,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response List Actions Timelock Actions Get
                 type: object
           description: Successful Response
@@ -6845,7 +7291,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Get Action Timelock Actions  Action Id  Get
                 type: object
           description: Successful Response
@@ -6889,7 +7334,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Cancel Action Timelock Cancel  Action Id  Post
                 type: object
           description: Successful Response
@@ -6925,7 +7369,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Execute Action Timelock Execute  Action Id  Post
                 type: object
           description: Successful Response
@@ -6961,7 +7404,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Queue Action Timelock Queue Post
                 type: object
           description: Successful Response
@@ -6996,7 +7438,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Renounce Admin Timelock Renounce Post
                 type: object
           description: Successful Response
@@ -7026,7 +7467,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Get Status Timelock Status Get
                 type: object
           description: Successful Response
@@ -7275,7 +7715,6 @@ paths:
           content:
             application/json:
               schema:
-                additionalProperties: true
                 title: Response Generators Zk Generators Get
                 type: object
           description: Successful Response

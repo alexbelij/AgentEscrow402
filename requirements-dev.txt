@@ -4,3 +4,4 @@ black>=24.0
 httpx>=0.28
 pytest-asyncio>=0.23
 hypothesis>=6.100
+pyyaml>=6.0  # scripts/gen_openapi.py --check / regen (tests/test_gen_openapi.py)
