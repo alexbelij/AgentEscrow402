@@ -98,7 +98,7 @@ The [x402 protocol](https://www.x402.org/) defines machine-to-machine payments v
 | **Sybil-resistant agent identity** | ✅ DID registry, staking + slashing | ❌ None | — |
 | **Post-quantum metadata confidentiality** | ✅ ML-KEM-768 hybrid encryption | ❌ None | — |
 | **Confidential/private amounts (ZK)** | ✅ Two complementary layers — [on-chain fraud-dispute range proofs](docs/RANGE_PROOFS.md) + [off-chain confidential-amount escrows](docs/ZK_AMOUNT_PRIVACY.md) | ❌ None | ❌ None |
-| **Multi-hop A2A choreography** | ✅ Chained agent-to-agent escrows (A→B→C→...) under one auditable `parent_intent_id`, tamper-evident `chain_root_hash` — see [API reference](#-api-reference) | ❌ None | ❌ None |
+| **Multi-hop A2A choreography** | ✅ Chained agent-to-agent escrows (A→B→C→...) under one auditable `parent_intent_id`, tamper-evident `chain_root_hash` — anchored on-chain via `escrow-manager.link_escrows` (append-only, zero fund movement) so a judge can trustlessly verify the choreography end-to-end. See [API reference](#-api-reference). | ❌ None | ❌ None |
 | **Production maturity / ecosystem adoption** | ⚠️ Hackathon-stage, testnet only | ✅ Live, mainnet, adopted by real facilitators | ✅ Universally understood |
 
 See [what's real vs. simulated](#-what-is-real-vs-simulated) for exactly which of these are live
@@ -581,6 +581,7 @@ Full OpenAPI spec → [docs/openapi.yaml](docs/openapi.yaml) (hand-curated snaps
 | `GET` | `/intents/{id}` | Full choreography state + `chain_root_hash` |
 | `POST` | `/intents/{id}/hops` | Register a hop's escrow `service_hash`, in order |
 | `POST` | `/intents/{id}/hops/{n}/attest` | Attest a released hop into the chain root |
+| `POST` | `/escrow` | *(existing)* Accepts optional `parent_intent_id` + `hop_index` — registers this escrow as that hop of an already-declared intent in one call. See [`KNOWN_LIMITATIONS.md`](KNOWN_LIMITATIONS.md) for on-chain anchoring semantics. |
 | **AI arbitration** | | |
 | `POST` | `/arbitration/analyze` | AI-assisted dispute evidence analysis |
 | `GET` | `/arbitration/history` | Recent arbitration recommendations |

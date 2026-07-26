@@ -77,6 +77,7 @@ class HopView(BaseModel):
     from_agent: str
     to_agent: str
     attested: bool
+    on_chain_link_tx_hash: str | None = None
 
 
 class IntentView(BaseModel):
@@ -98,6 +99,7 @@ def _to_view(intent) -> IntentView:
             from_agent=h.from_agent,
             to_agent=h.to_agent,
             attested=h.attested,
+            on_chain_link_tx_hash=h.on_chain_link_tx_hash,
         )
         for h in sorted(intent.hops.values(), key=lambda h: h.hop_index)
     ]
@@ -139,7 +141,77 @@ async def chain_escrow(intent_id: str, req: ChainEscrowRequest):
         intent = _store.get_intent(intent_id)
     except IntentChainError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+    # Anchor (parent, child) linkage on-chain via escrow-manager.link_escrows
+    # when: (a) hop_index >= 1 (hop 0 has no parent), (b) a Casper client
+    # is wired in and configured with a manager_contract_hash + key, and
+    # (c) all three hashes are canonical 64-lower-hex (validated by our
+    # own field regex + IntentChainStore, so this is just the guardrail
+    # before spending gas).
+    #
+    # If any prerequisite is missing we silently skip anchoring -- the
+    # in-memory chain_root_hash still reconstructs deterministically from
+    # the ordered attestation event_ids, and KNOWN_LIMITATIONS.md is
+    # honest that on-chain anchoring is opt-in. Never let a failing
+    # anchoring call regress the in-memory chain (which is what a judge
+    # will replay from the audit trail regardless).
+    if req.hop_index >= 1:
+        try:
+            await _try_anchor_hop_on_chain(
+                intent_id=intent_id,
+                intent=intent,
+                child_hop_index=req.hop_index,
+            )
+        except Exception as exc:  # noqa: BLE001 -- best-effort, never regress hop
+            logger.warning(
+                "link_escrows on-chain anchoring failed for intent=%s hop=%s: %s",
+                intent_id,
+                req.hop_index,
+                exc,
+            )
+
+    intent = _store.get_intent(intent_id)
     return _to_view(intent)
+
+
+async def _try_anchor_hop_on_chain(
+    *, intent_id: str, intent, child_hop_index: int
+) -> None:
+    """Best-effort on-chain anchoring of (parent, child) linkage.
+
+    Reads the on-chain client lazily from server.app so unit tests
+    (which don't wire up a Casper client) exercise the pure Python path
+    unchanged. Any exception here is logged and swallowed in the caller.
+    """
+    try:
+        from server.app import get_casper as get_casper_client  # local import, cycle-safe
+    except Exception:  # pragma: no cover -- import cycle guard
+        return
+    casper = get_casper_client() if callable(get_casper_client) else None
+    if casper is None:
+        return
+    if not getattr(casper, "_manager_contract_hash", None):
+        return
+
+    parent_hop = intent.hops.get(child_hop_index - 1)
+    child_hop = intent.hops.get(child_hop_index)
+    if parent_hop is None or child_hop is None:
+        return
+
+    # Chain root as of *this* moment -- the child hop is chained but not
+    # yet attested, so the root covers attested-prefix events only. This
+    # is exactly what we want on-chain: an immutable snapshot of
+    # attestations preceding the child hop. Attestations *after* this
+    # linkage don't retroactively rewrite what's on-chain -- they get
+    # anchored again when the *next* hop is chained.
+    chain_root_hash = intent.chain_root_hash
+    tx_hash = await casper.link_escrows(
+        parent_service_hash=parent_hop.service_hash,
+        child_service_hash=child_hop.service_hash,
+        chain_root_hash=chain_root_hash,
+        hop_index=child_hop_index,
+    )
+    _store.record_on_chain_link(intent_id, child_hop_index, tx_hash)
 
 
 @router.post("/{intent_id}/hops/{hop_index}/attest", response_model=IntentView)

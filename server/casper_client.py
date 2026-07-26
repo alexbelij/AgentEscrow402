@@ -7,10 +7,17 @@ and direct JSON-RPC for read operations.
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import logging
 import os
 import pathlib
+import re
+
+
+@functools.lru_cache(maxsize=1)
+def _re_compile_hex64() -> re.Pattern[str]:
+    return re.compile(r"^[0-9a-f]{64}$")
 from typing import Any
 
 import httpx
@@ -38,6 +45,7 @@ _POOL_FUNDER_WASM = _SCRIPT_DIR / "pool_funder.wasm"
 _CREATE_BATCH_SCRIPT = _SCRIPT_DIR / "create_batch.mjs"
 _BATCH_FUNDER_WASM = _SCRIPT_DIR / "batch_funder.wasm"
 _BATCH_LIFECYCLE_SCRIPT = _SCRIPT_DIR / "batch_lifecycle.mjs"
+_LINK_ESCROWS_SCRIPT = _SCRIPT_DIR / "link_escrows.mjs"
 _REGISTER_ARBITER_SCRIPT = _SCRIPT_DIR / "register_arbiter.mjs"
 _ARBITER_REGISTRAR_WASM = _SCRIPT_DIR / "arbiter_registrar.wasm"
 _SELECT_ARBITERS_SCRIPT = _SCRIPT_DIR / "select_arbiters.mjs"
@@ -278,6 +286,59 @@ class CasperClient:
         Full refund to sender (no fee deduction on cancel).
         """
         return await self._batch_lifecycle("batch_cancel", service_hashes)
+
+    async def link_escrows(
+        self,
+        parent_service_hash: str,
+        child_service_hash: str,
+        chain_root_hash: str,
+        hop_index: int,
+    ) -> str:
+        """Submit escrow-manager.link_escrows() -- on-chain multi-hop A2A
+        chain-linkage record.
+
+        Append-only: registers that `child_service_hash` follows
+        `parent_service_hash` at position `hop_index` in an intent chain
+        whose folded attestation root is `chain_root_hash`. Zero fund
+        movement, zero mutation of escrow records; on-chain source of
+        truth for choreography verification (see `link_escrows` docstring
+        in contracts/escrow-manager/src/main.rs).
+
+        Returns the tx hash. Reverts on-chain with:
+          - ERROR_LINK_INVALID_HASH (15) — any hash not 64-lower-hex, or
+            parent == child.
+          - ERROR_LINK_ALREADY_EXISTS (14) — this (parent, child) pair was
+            already linked (immutability guarantee).
+        """
+        if not self._manager_contract_hash:
+            raise RuntimeError("manager_contract_hash not configured")
+        if not self._key_path:
+            raise RuntimeError("private key not configured")
+        _HEX64 = _re_compile_hex64()
+        for name, value in (
+            ("parent_service_hash", parent_service_hash),
+            ("child_service_hash", child_service_hash),
+            ("chain_root_hash", chain_root_hash),
+        ):
+            if not _HEX64.match(value or ""):
+                raise ValueError(f"{name} must be 64 lowercase hex chars")
+        if parent_service_hash == child_service_hash:
+            raise ValueError("parent_service_hash == child_service_hash")
+        if not isinstance(hop_index, int) or hop_index < 0:
+            raise ValueError("hop_index must be a non-negative int")
+        return await self._run_node_script(
+            _LINK_ESCROWS_SCRIPT,
+            {
+                "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
+                "PARENT_SERVICE_HASH": parent_service_hash,
+                "CHILD_SERVICE_HASH": child_service_hash,
+                "CHAIN_ROOT_HASH": chain_root_hash,
+                "HOP_INDEX": str(hop_index),
+                "PEM_PATH": self._key_path,
+                "KEY_ALGO": "secp256k1",
+                "CASPER_RPC": self._rpc_url,
+            },
+        )
 
     async def _batch_lifecycle(self, entry_point: str, service_hashes: list[str]) -> str:
         """Common helper for escrow-manager batch operations."""

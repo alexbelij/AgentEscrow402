@@ -51,6 +51,15 @@ class Hop:
     to_agent: str
     attested: bool = False
     attestation_event_id: Optional[str] = None
+    # On-chain evidence: the tx hash of the `escrow-manager.link_escrows`
+    # call that anchored (parent.service_hash -> self.service_hash) with
+    # this intent's chain_root_hash. Set by IntentChainStore.record_on_chain_link
+    # after the API layer submits the tx. `None` = never anchored on-chain
+    # (either hop_index == 0 which has no parent, or the anchoring call was
+    # skipped/failed -- read `chain_root_hash` off-chain in that case, and
+    # KNOWN_LIMITATIONS.md documents that IntentChainStore is a cache, not
+    # the source of truth).
+    on_chain_link_tx_hash: Optional[str] = None
 
 
 @dataclass
@@ -221,4 +230,38 @@ class IntentChainStore:
         )
         hop.attested = True
         hop.attestation_event_id = event.event_id
+        return hop
+
+    def record_on_chain_link(
+        self, intent_id: str, hop_index: int, tx_hash: str
+    ) -> Hop:
+        """Record the tx hash of the `escrow-manager.link_escrows` call
+        that anchored hop `hop_index` on-chain. Called by the API layer
+        *after* the on-chain tx is submitted (see intent_chain_api.py).
+
+        Idempotent guard: overwriting an already-recorded tx_hash raises,
+        because a hop can only be anchored once on-chain (the manager
+        contract itself enforces `ERROR_LINK_ALREADY_EXISTS` on duplicate
+        link_escrows calls -- a second tx would revert, so recording it
+        here would be a lie).
+        """
+        if not tx_hash:
+            raise IntentChainError("tx_hash must be non-empty")
+        intent = self.get_intent(intent_id)
+        hop = intent.hops.get(hop_index)
+        if hop is None:
+            raise IntentChainError(
+                f"hop {hop_index} not chained for intent {intent_id!r}"
+            )
+        if hop_index == 0:
+            raise IntentChainError(
+                "hop 0 has no parent; on-chain link_escrows is only defined "
+                "for hop_index >= 1"
+            )
+        if hop.on_chain_link_tx_hash is not None:
+            raise IntentChainError(
+                f"hop {hop_index} of intent {intent_id!r} already anchored "
+                f"on-chain (tx {hop.on_chain_link_tx_hash!r})"
+            )
+        hop.on_chain_link_tx_hash = tx_hash
         return hop

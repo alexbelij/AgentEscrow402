@@ -83,6 +83,32 @@ class EscrowRequest(BaseModel):
         ),
     )
 
+    # Multi-hop A2A choreography (AE-M1) -- optional. When both are set,
+    # server/app.py's create_escrow handler registers this escrow as
+    # hop `hop_index` of intent `parent_intent_id` after the escrow row
+    # exists on-chain (via IntentChainStore.chain_escrow). If the intent
+    # doesn't exist or the hop_index is out of range, escrow creation
+    # itself is not rolled back -- the escrow is a first-class object,
+    # the chain-linkage is metadata, and the caller can retry the hop
+    # registration through POST /intents/{intent_id}/hops.
+    parent_intent_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=128,
+        description=(
+            "Intent id this escrow belongs to for multi-hop A2A choreography. "
+            "Must be declared first via POST /intents."
+        ),
+    )
+    hop_index: int | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Zero-based position of this escrow in its intent's hop chain. "
+            "Required when parent_intent_id is set; ignored otherwise."
+        ),
+    )
+
 
 class EscrowRecord(BaseModel):
     """On-chain escrow record.

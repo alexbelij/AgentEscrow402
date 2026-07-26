@@ -40,3 +40,6 @@ graphify-out/
 .venv-ae/
 .venv-ae2/
 .venv-lint/
+
+# judge demo runtime artifact (see server/judge_scenario_demo.py)
+judge_demo_output.json

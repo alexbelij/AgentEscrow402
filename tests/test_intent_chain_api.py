@@ -217,3 +217,150 @@ def test_hop_registered_with_wrong_parent_intent_is_rejected(client):
         "/intents/real-intent/hops/0/attest", json={"service_hash": sh}
     )
     assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# POST /escrow: parent_intent_id + hop_index integration
+# ---------------------------------------------------------------------------
+
+
+def test_create_escrow_with_intent_registers_hop(client):
+    """POST /escrow carrying parent_intent_id + hop_index should register
+    the escrow as that hop of the intent in a single call (no separate
+    POST /intents/{id}/hops needed)."""
+    # Declare intent A->B->C first.
+    intent_resp = client.post(
+        "/intents", json={"intent_id": "int-1", "agent_path": ["A", "B", "C"]}
+    )
+    assert intent_resp.status_code == 200
+
+    # Hop 0 escrow: create with parent_intent_id + hop_index.
+    sh0 = _hash("hop-0-svc")
+    resp = client.post(
+        "/escrow",
+        json={
+            "receiver": RECEIVER_HEX,
+            "amount": 1_000_000_000,
+            "service_hash": sh0,
+            "parent_intent_id": "int-1",
+            "hop_index": 0,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+
+    # Verify hop was registered on the intent.
+    intent = client.get("/intents/int-1").json()
+    assert len(intent["hops"]) == 1
+    assert intent["hops"][0]["hop_index"] == 0
+    assert intent["hops"][0]["service_hash"] == sh0
+    assert intent["hops"][0]["from_agent"] == "A"
+    assert intent["hops"][0]["to_agent"] == "B"
+
+
+def test_create_escrow_without_intent_metadata_is_unchanged(client):
+    """Escrow creation without parent_intent_id/hop_index must behave
+    exactly as before (non-regression)."""
+    sh = _hash("no-intent")
+    resp = client.post(
+        "/escrow",
+        json={
+            "receiver": RECEIVER_HEX,
+            "amount": 1_000_000_000,
+            "service_hash": sh,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["service_hash"] == sh
+    # No intents were created as a side-effect.
+    got = client.get("/intents/anything")
+    assert got.status_code == 404
+
+
+def test_create_escrow_with_unknown_intent_still_succeeds(client):
+    """If parent_intent_id refers to an intent that doesn't exist,
+    escrow creation itself must NOT be rolled back -- the escrow row is
+    a first-class object, chain-linkage is metadata. The caller can
+    retry hop registration via POST /intents/{id}/hops later."""
+    sh = _hash("orphan-hop")
+    resp = client.post(
+        "/escrow",
+        json={
+            "receiver": RECEIVER_HEX,
+            "amount": 1_000_000_000,
+            "service_hash": sh,
+            "parent_intent_id": "does-not-exist",
+            "hop_index": 0,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    # Escrow was created, but the (non-existent) intent still 404s.
+    assert client.get("/intents/does-not-exist").status_code == 404
+
+
+def test_create_escrow_intent_end_to_end_two_hops(client):
+    """Full two-hop path via POST /escrow with intent metadata: register
+    both hops implicitly through /escrow (no explicit /intents/{id}/hops
+    calls), then attest each after release. chain_root_hash must fold
+    the two attestations deterministically."""
+    client.post(
+        "/intents", json={"intent_id": "int-e2e", "agent_path": ["A", "B", "C"]}
+    )
+
+    sh0 = _hash("e2e-hop-0")
+    sh1 = _hash("e2e-hop-1")
+
+    # Hop 0: escrow + release + attest, all through the real endpoints.
+    # `?sender=agentA` makes agentA the escrow's sender, which is the
+    # identity /release checks against (see existing choreography e2e).
+    r = client.post(
+        "/escrow",
+        json={
+            "receiver": RECEIVER_HEX,
+            "amount": 1_000_000_000,
+            "service_hash": sh0,
+            "parent_intent_id": "int-e2e",
+            "hop_index": 0,
+        },
+        params={"sender": "agentA"},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post("/release", json={"service_hash": sh0}, params={"sender": "agentA"})
+    assert r.status_code == 200, r.text
+    r = client.post(
+        "/intents/int-e2e/hops/0/attest", json={"service_hash": sh0}
+    )
+    assert r.status_code == 200, r.text
+
+    # Hop 1: same pattern.
+    r = client.post(
+        "/escrow",
+        json={
+            "receiver": RECEIVER_HEX_2,
+            "amount": 2_000_000_000,
+            "service_hash": sh1,
+            "parent_intent_id": "int-e2e",
+            "hop_index": 1,
+        },
+        params={"sender": "agentB"},
+    )
+    assert r.status_code == 200, r.text
+    r = client.post("/release", json={"service_hash": sh1}, params={"sender": "agentB"})
+    assert r.status_code == 200, r.text
+    r = client.post(
+        "/intents/int-e2e/hops/1/attest", json={"service_hash": sh1}
+    )
+    assert r.status_code == 200, r.text
+
+    # Final state: intent is complete, chain_root_hash covers both
+    # attestations, and a judge can independently recompute it from
+    # attestation_event_ids using audit_trace.compute_chain_root.
+    intent = client.get("/intents/int-e2e").json()
+    assert intent["is_complete"] is True
+    assert intent["attested_hop_count"] == 2
+    assert len(intent["attestation_event_ids"]) == 2
+    from server import audit_trace
+
+    assert intent["chain_root_hash"] == audit_trace.compute_chain_root(
+        intent["attestation_event_ids"]
+    )

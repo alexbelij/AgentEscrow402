@@ -199,3 +199,56 @@ def test_four_agent_three_hop_choreography(store):
     final = store.get_intent("i1")
     assert final.is_complete is True
     assert len(final.ordered_attestation_event_ids()) == 3
+
+
+# ── record_on_chain_link ──────────────────────────────────────────────────
+
+def test_record_on_chain_link_stores_tx_hash(store):
+    store.declare_intent("i1", ["A", "B", "C"])
+    store.chain_escrow("i1", SH0, 0)
+    store.chain_escrow("i1", SH1, 1)
+
+    tx = "d" * 64
+    hop = store.record_on_chain_link("i1", 1, tx)
+    assert hop.on_chain_link_tx_hash == tx
+    # Round-trip via get_intent
+    assert store.get_intent("i1").hops[1].on_chain_link_tx_hash == tx
+    # Hop 0 never gets an on-chain link (no parent)
+    assert store.get_intent("i1").hops[0].on_chain_link_tx_hash is None
+
+
+def test_record_on_chain_link_rejects_hop_zero(store):
+    store.declare_intent("i1", ["A", "B"])
+    store.chain_escrow("i1", SH0, 0)
+    with pytest.raises(IntentChainError, match="hop 0 has no parent"):
+        store.record_on_chain_link("i1", 0, "d" * 64)
+
+
+def test_record_on_chain_link_rejects_double_record(store):
+    store.declare_intent("i1", ["A", "B", "C"])
+    store.chain_escrow("i1", SH0, 0)
+    store.chain_escrow("i1", SH1, 1)
+    store.record_on_chain_link("i1", 1, "d" * 64)
+    with pytest.raises(IntentChainError, match="already anchored on-chain"):
+        store.record_on_chain_link("i1", 1, "e" * 64)
+
+
+def test_record_on_chain_link_rejects_unchained_hop(store):
+    store.declare_intent("i1", ["A", "B", "C"])
+    store.chain_escrow("i1", SH0, 0)
+    # hop 1 not yet chained
+    with pytest.raises(IntentChainError, match="not chained"):
+        store.record_on_chain_link("i1", 1, "d" * 64)
+
+
+def test_record_on_chain_link_rejects_empty_tx_hash(store):
+    store.declare_intent("i1", ["A", "B", "C"])
+    store.chain_escrow("i1", SH0, 0)
+    store.chain_escrow("i1", SH1, 1)
+    with pytest.raises(IntentChainError, match="tx_hash must be non-empty"):
+        store.record_on_chain_link("i1", 1, "")
+
+
+def test_record_on_chain_link_unknown_intent(store):
+    with pytest.raises(IntentChainError, match="not found"):
+        store.record_on_chain_link("nope", 1, "d" * 64)

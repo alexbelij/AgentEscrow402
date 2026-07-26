@@ -974,6 +974,8 @@ async def create_escrow(
             # bookkeeping) — this only affects what crosses the wire from here.
             if req.confidential:
                 result_dict = _seal_confidential_response(result_dict, net_amount, req.service_hash, store)
+            # AE-M1: register hop for multi-hop A2A choreography (non-fatal).
+            _try_register_hop_for_intent(req, sender)
             return result_dict
         except ValueError as exc:
             logger.warning("create_escrow validation failed: %s", exc)
@@ -1050,6 +1052,8 @@ async def create_escrow(
     # rationale — identical treatment here for the live-chain path).
     if req.confidential:
         result_dict = _seal_confidential_response(result_dict, net_amount, req.service_hash, store)
+    # AE-M1: register hop for multi-hop A2A choreography (non-fatal).
+    _try_register_hop_for_intent(req, sender)
     return result_dict
 
 
@@ -1084,6 +1088,43 @@ def _seal_confidential_response(
     result_dict["commitment"] = sealed["commitment"]
     result_dict["range_proof_bits"] = sealed["range_proof_bits"]
     return confidential_escrow.redact_amount_field(result_dict)
+
+
+def _try_register_hop_for_intent(req: EscrowRequest, sender: str) -> None:
+    """If `req` carries multi-hop A2A metadata (parent_intent_id + hop_index),
+    register this escrow as the given hop of the intent -- non-fatal.
+
+    The escrow itself is already created on-chain at this point, so any
+    IntentChainStore failure is a bookkeeping mismatch, not a lifecycle
+    regression. Log and move on; the caller can retry the registration
+    by POST /intents/{intent_id}/hops directly with the same service_hash.
+    """
+    if not req.parent_intent_id or req.hop_index is None:
+        return
+    try:
+        # Local import to avoid a module-import cycle at server.app load
+        # time (intent_chain_api imports server.app.get_casper below).
+        from server.intent_chain_api import _store as _intent_store  # noqa: WPS433
+
+        _intent_store.chain_escrow(
+            intent_id=req.parent_intent_id,
+            service_hash=req.service_hash,
+            hop_index=req.hop_index,
+        )
+        logger.info(
+            "intent-chain hop registered: intent=%s hop=%s service_hash=%s",
+            req.parent_intent_id,
+            req.hop_index,
+            req.service_hash[:16],
+        )
+    except Exception as exc:  # noqa: BLE001 -- non-fatal by design
+        logger.warning(
+            "intent-chain hop registration failed (non-fatal, escrow already created): "
+            "intent=%s hop=%s err=%s",
+            req.parent_intent_id,
+            req.hop_index,
+            exc,
+        )
 
 
 @app.post("/escrows/batch", response_model=BatchEscrowResponse)
