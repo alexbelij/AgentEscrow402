@@ -23,6 +23,13 @@
 .venv/
 .vscode/
 Cargo.lock
+# cargo-fuzz output (C12): corpus and crash artifacts must never be committed;
+# corpus is transient (regenerated per run) and artifacts are the exact
+# byte sequences a real bug triggered — keep them in local investigation
+# only, not in git history.
+contracts/fuzz/target/
+contracts/fuzz/corpus/
+contracts/fuzz/artifacts/
 Thumbs.db
 __pycache__/
 build/
