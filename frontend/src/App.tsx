@@ -21,6 +21,7 @@ import Overview from './components/console/Overview'
 import Escrows from './components/console/Escrows'
 import Agents from './components/console/Agents'
 import Insurance from './components/console/Insurance'
+import InsuranceDemo from './components/console/InsuranceDemo'
 import Risk from './components/console/Risk'
 import Contracts from './components/console/Contracts'
 import AgentDemo from './components/console/AgentDemo'
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="escrows" element={<Escrows />} />
             <Route path="agents" element={<Agents />} />
             <Route path="insurance" element={<Insurance />} />
+            <Route path="insurance-demo" element={<InsuranceDemo />} />
             <Route path="risk" element={<Risk />} />
             <Route path="contracts" element={<Contracts />} />
             <Route path="agent-demo" element={<AgentDemo />} />

@@ -73,6 +73,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Operations',
     items: [
       { name: 'Insurance', path: '/console/insurance', icon: Shield },
+      { name: 'Insurance Demo', path: '/console/insurance-demo', icon: Sparkles },
       { name: 'Risk', path: '/console/risk', icon: Activity },
       { name: 'Contracts', path: '/console/contracts', icon: FileText },
     ],
