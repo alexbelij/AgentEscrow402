@@ -24,7 +24,7 @@ judging criteria is satisfied.
 |---|-----------|---------------|
 | 1 | **Casper-native architecture** | `contracts/` — Rust WASM contracts deployed to testnet: escrow, manager, insurance pool, agent identity registry. Verify hashes at `/contracts`. |
 | 2 | **Working demo on testnet** | Guided demo on ae402.xyz. Each step emits a real testnet tx; hashes are visible in the UI and pinned in `docs/evidence/`. |
-| 3 | **Technical correctness** | 624 tests across contract Rust (`contracts/tests/`) and server Python (`tests/`). Suites include: escrow FSM invariants, VRF election, 3-of-5 arbiter recovery, Merkle inclusion proofs, insurance replay guards, redacted audit trace. |
+| 3 | **Technical correctness** | 2081 Python + 250 Rust tests across contract Rust (`contracts/tests/`) and server Python (`tests/`). Suites include: escrow FSM invariants, VRF election, 3-of-5 arbiter recovery, Merkle inclusion proofs, insurance replay guards, redacted audit trace. |
 | 4 | **Novelty / originality** | `docs/originality-statement.md` (roadmap): agent-first escrow with LLM arbitration + on-chain Merkle evidence provenance + auto-escalation to VRF-elected panel on abstain/low-conf. See also §Originality below. |
 | 5 | **Documentation quality** | `README.md`, `docs/ARCHITECTURE.md`, `docs/API_SDK_MCP.md`, `docs/SDK.md`, `docs/AUDIT_TRACE_AND_LINEAGE.md`, `docs/MERKLE_PROVENANCE.md`, `docs/FSM.md`, `docs/CSPR_UNITS.md`, `docs/OPERATOR_RUNBOOK.md`. |
 | 6 | **Security posture** | `docs/RED_TEAM.tmp` (15 attack vectors self-audit); `SECURITY.md`; escrow FSM = deny-by-default; detached signatures with nonce + domain separation; insurance replay guards; supply-chain audit in `docs/BUILD_AUDIT.md`. |

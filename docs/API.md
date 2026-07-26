@@ -17,7 +17,7 @@ Legend:
 - ⚡ — admin/deployer key required
 - `$BASE` — export `BASE=http://localhost:8000` before running the snippets
 
-Endpoint count: **64** (verified via `grep '@(app|router)\.' server/*.py`).
+Endpoint count: **140 total** (see `GET /openapi.json` for the live, always-current count). This document is a curated walkthrough of the core sections, not an exhaustive 1:1 listing of all 140 routes.
 
 ---
 
@@ -29,7 +29,6 @@ Endpoint count: **64** (verified via `grep '@(app|router)\.' server/*.py`).
 | GET | `/health` | | server/app.py |
 | GET | `/stats` | | server/app.py |
 | GET | `/contracts` | | server/app.py |
-| GET | `/dashboard` | | server/app.py |
 | GET | `/wasm/escrow_funder` | | server/app.py |
 | GET | `/events` | | server/app.py |
 | GET | `/api/v1/events/stream` | | alias of `/events` |
@@ -150,7 +149,8 @@ curl -s "$BASE/escrow/cep18-permit-nonce?owner=<account_hash>&token=AETUSD" | jq
 | POST | `/insurance/claim` | 🔐 |
 | GET | `/insurance/pool-stats` | |
 | GET | `/insurance/premium-quote` | |
-| POST | `/insurance/configure-fee` | ⚡ |
+
+Fee configuration for the insurance pool is set via `POST /admin/configure-fee` (section 12), not under `/insurance/*`.
 
 ```bash
 curl -s -X POST $BASE/insurance/deposit \
@@ -214,27 +214,22 @@ curl -s $BASE/vrf/election/<dispute_id> | jq
 | Method | Path | Auth |
 |--------|------|------|
 | POST | `/identity/register` | 🔐 |
-| GET | `/identity/{did}` | |
-| POST | `/identity/{did}/verify` | 🔐 |
-| POST | `/identity/{did}/capabilities` | 🔐 |
-| POST | `/identity/{did}/reputation` | 🔐 |
-| POST | `/identity/{did}/slash` | ⚡ |
-| POST | `/identity/{did}/decay` | ⚡ |
+| GET | `/identity/{agent_id}` | |
+| POST | `/identity/delegate` | 🔐 |
+| GET | `/identity/capabilities/{agent_id}` | |
 
 ```bash
 curl -s -X POST $BASE/identity/register \
   -H 'X-Payment: ...' -H 'Content-Type: application/json' \
-  -d '{"did":"did:casper:...","pubkey":"...","capabilities":["escrow","arbiter"]}' | jq
+  -d '{"agent_id":"agent-...","pubkey":"...","capabilities":["escrow","arbiter"]}' | jq
 
-curl -s $BASE/identity/did:casper:<account_hash> | jq
+curl -s $BASE/identity/agent-abc123 | jq
 
-curl -s -X POST $BASE/identity/<did>/verify \
+curl -s -X POST $BASE/identity/delegate \
   -H 'X-Payment: ...' -H 'Content-Type: application/json' \
-  -d '{"proof":"..."}' | jq
+  -d '{"agent_id":"agent-abc123","capability":"dispute","delegate_to":"agent-xyz"}' | jq
 
-curl -s -X POST $BASE/identity/<did>/capabilities \
-  -H 'X-Payment: ...' -H 'Content-Type: application/json' \
-  -d '{"add":["dispute"],"remove":[]}' | jq
+curl -s $BASE/identity/capabilities/agent-abc123 | jq
 ```
 
 ---
@@ -244,11 +239,14 @@ curl -s -X POST $BASE/identity/<did>/capabilities \
 | Method | Path | Auth |
 |--------|------|------|
 | POST | `/identity-registry/register` | 🔐 |
-| GET | `/identity-registry/{agent_id}` | |
-| GET | `/identity-registry/capabilities/{agent_id}` | |
+| GET | `/identity-registry/{did}` | |
 | GET | `/identity-registry/by-account/{account_hash}` | |
+| POST | `/identity-registry/{did}/verify` | 🔐 |
+| POST | `/identity-registry/{did}/capabilities` | 🔐 |
+| POST | `/identity-registry/{did}/reputation` | 🔐 |
+| POST | `/identity-registry/{did}/slash` | ⚡ |
+| POST | `/identity-registry/{did}/decay` | ⚡ |
 | GET | `/identity-registry/search/agents` | |
-| POST | `/identity-registry/delegate` | 🔐 |
 | GET | `/identity-registry/stats/summary` | |
 
 ```bash
@@ -256,8 +254,7 @@ curl -s -X POST $BASE/identity-registry/register \
   -H 'X-Payment: ...' -H 'Content-Type: application/json' \
   -d '{"agent_id":"agent-...","account_hash":"...","capabilities":["escrow"]}' | jq
 
-curl -s $BASE/identity-registry/agent-abc123 | jq
-curl -s $BASE/identity-registry/capabilities/agent-abc123 | jq
+curl -s $BASE/identity-registry/did:casper:<account_hash> | jq
 curl -s $BASE/identity-registry/by-account/<account_hash> | jq
 curl -s "$BASE/identity-registry/search/agents?capability=arbiter&limit=10" | jq
 curl -s $BASE/identity-registry/stats/summary | jq
@@ -370,4 +367,4 @@ Status codes:
 
 ---
 
-*Core REST surface documented: 64 endpoints across sections 1-12, generated 2026-07-18. Section 13 lists 4 feature areas added later (own docs, not duplicated here). Last reviewed for accuracy 2026-07-24.*
+*Core REST surface documented: curated walkthrough of the main sections (of 140 total live endpoints), generated 2026-07-18. Section 13 lists feature areas added later (own docs, not duplicated here). Last reviewed for accuracy 2026-07-26.*
