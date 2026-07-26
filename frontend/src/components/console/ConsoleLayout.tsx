@@ -75,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       { name: 'Insurance', path: '/console/insurance', icon: Shield },
       { name: 'Risk', path: '/console/risk', icon: Activity },
       { name: 'Contracts', path: '/console/contracts', icon: FileText },
+      { name: 'Operator', path: '/console/operator', icon: Activity },
     ],
   },
   {
@@ -191,6 +192,11 @@ const SECTION_INFO: Record<string, SectionInfo> = {
     title: 'MCP Playground',
     desc: 'Browse and dry-run the 26-tool MCP server AE402 ships with. Each tool dispatches in-process to its underlying REST endpoint, so the same x402 payment fence, Observer/Driver policy, and rate limits apply here as everywhere else — there is no bypass path. Read-only tools work in Observer mode; writes require Driver.',
     source: 'tool',
+  },
+  '/console/operator': {
+    title: 'Operator',
+    desc: 'Live snapshot of the /ops/health surface — dependency status, retry-queue depth, LLM provider circuit-breaker state, and mode / strict-mode flags. This is the surface a human operator (or a judge evaluating operator UX) would look at when deciding whether the system is safe to leave running. Zero secrets, polled every 30s.',
+    source: 'live',
   },
 };
 

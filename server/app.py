@@ -2248,8 +2248,37 @@ async def arbitrate_dispute(req: ArbitrateRequest):
             verdict.confidence,
         )
 
+        # AE-J8: broadcast a verdict-emitted event so any live subscribers of
+        # /events (frontend Overview “Live (SSE)” indicator, Telegram bridge,
+        # third-party watchers) can react to arbitration outcomes without
+        # polling /arbitration/history. Non-blocking; a broken listener never
+        # crashes the request.
+        _broadcast_event(
+            {
+                "type": "arbitration_verdict",
+                "dispute_id": req.dispute_id,
+                "recommendation": verdict.recommendation,
+                "confidence": round(float(verdict.confidence), 4),
+                "provider": verdict.provider,
+                "ts": int(time.time()),
+            }
+        )
+
         if _should_escalate(verdict):
             await _try_escalate_to_panel(verdict, req)
+            # AE-J8: after the panel-election helper mutates the verdict in
+            # place, emit a second event if we did escalate. Keeps arbitration
+            # SSE story symmetric: one event for the base verdict, one for the
+            # escalation.
+            if getattr(verdict, "escalated_to_panel", False):
+                _broadcast_event(
+                    {
+                        "type": "arbitration_escalated",
+                        "dispute_id": req.dispute_id,
+                        "reason": getattr(verdict, "escalation_reason", None),
+                        "ts": int(time.time()),
+                    }
+                )
 
         return verdict
     except HTTPException:
