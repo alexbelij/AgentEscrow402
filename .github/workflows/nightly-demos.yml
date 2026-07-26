@@ -1,0 +1,67 @@
+name: nightly-demos
+
+# Runs every demo/*_showcase.py end-to-end every night against main.
+# A demo failing here is a regression signal even when the unit tests
+# stay green — the showcases are the exact scripts we walk judges
+# through, so keeping them ever-executable is a prod-adjacent SLO.
+#
+# Deliberately NOT run on every PR: those already exercise the demo
+# scripts via `demo/*_showcase.py` being unit-invoked from the test
+# suite. Nightly is a safety net against slow env drift.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'  # 03:17 UTC daily, offset from the ecosystem noise
+  workflow_dispatch:
+
+jobs:
+  run-showcases:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-nightly-${{ hashFiles('requirements*.txt', 'pyproject.toml') }}
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Run all demo showcases
+        env:
+          AE402_BOOTSTRAP_MODE: '1'
+          AE402_DEMO_MODE: '1'
+          AE402_BRIDGE_MODE: 'mock'
+        run: |
+          fail=0
+          for f in demo/*_showcase.py; do
+            if [ -f "$f" ]; then
+              echo "::group::$(basename "$f")"
+              if ! PYTHONPATH=. python "$f"; then
+                fail=$((fail+1))
+                echo "::error file=$f::showcase exit != 0"
+              fi
+              echo "::endgroup::"
+            fi
+          done
+          if [ -f demo/prompt_injection_demo.py ]; then
+            echo "::group::prompt_injection_demo"
+            PYTHONPATH=. python demo/prompt_injection_demo.py || fail=$((fail+1))
+            echo "::endgroup::"
+          fi
+          if [ "$fail" -gt 0 ]; then
+            echo "Nightly showcases: $fail failures"
+            exit 1
+          fi
+          echo "Nightly showcases: all green"
