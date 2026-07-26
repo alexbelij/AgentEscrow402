@@ -38,9 +38,7 @@ from server import bridge_htlc as mock
 VAULT_PATH = Path.home() / ".vault" / "vault.json"
 
 CASPER_RPC = "https://node.testnet.casper.network/rpc"
-DEPLOYER_ACCOUNT_HASH = (
-    "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8"
-)
+DEPLOYER_ACCOUNT_HASH = "74c96cd0073c4c973b70e7925adca8a4ba58ffcb9737304631381b82695007a8"
 
 pytestmark = pytest.mark.network
 
@@ -86,8 +84,7 @@ def _fresh_hashlock():
     preimage = secrets.token_bytes(32)
     hashlock_hex = csp.sha256_hashlock(preimage)
     assert hashlock_hex == mock.compute_hashlock(preimage), (
-        "adapter/mock must agree on the hashlock primitive — otherwise a "
-        "swap cannot be atomic across legs"
+        "adapter/mock must agree on the hashlock primitive — otherwise a " "swap cannot be atomic across legs"
     )
     return preimage, hashlock_hex
 
@@ -275,10 +272,7 @@ def test_forged_preimage_rejected_on_chain(pem_path, api_key, contract_hash):
         )
     msg = str(excinfo.value).lower()
     assert (
-        "preimage" in msg
-        or "mismatch" in msg
-        or "user error: 3" in msg  # ERR_PREIMAGE_MISMATCH
-        or "user error" in msg
+        "preimage" in msg or "mismatch" in msg or "user error: 3" in msg or "user error" in msg  # ERR_PREIMAGE_MISMATCH
     ), f"expected preimage-mismatch revert, got: {excinfo.value}"
 
     still_locked = csp.casper_status(
@@ -287,9 +281,7 @@ def test_forged_preimage_rejected_on_chain(pem_path, api_key, contract_hash):
         rpc_url=CASPER_RPC,
         api_key=api_key,
     )
-    assert still_locked["status"] == "LOCKED", (
-        "forged preimage must NOT change state off LOCKED — atomic-swap safety"
-    )
+    assert still_locked["status"] == "LOCKED", "forged preimage must NOT change state off LOCKED — atomic-swap safety"
 
     # Clean up: reveal the real preimage so the leg finalizes and the
     # deployer's funds don't sit tied up on the shared contract.

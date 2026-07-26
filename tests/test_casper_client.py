@@ -716,9 +716,7 @@ class TestConcurrencySafety:
 
         client._rpc = fake_rpc
 
-        results = await asyncio.gather(
-            *[client._get_cep18_named_keys(contract_hash) for _ in range(16)]
-        )
+        results = await asyncio.gather(*[client._get_cep18_named_keys(contract_hash) for _ in range(16)])
 
         assert rpc_calls == 1, f"expected 1 RPC hit under lock, got {rpc_calls}"
         # All 16 tasks got the SAME dict object (cache-populated once)
@@ -748,9 +746,7 @@ class TestConcurrencySafety:
 
         client._rpc = fake_rpc
 
-        results = await asyncio.gather(
-            *[client._get_cep18_named_keys(contract_hash) for _ in range(32)]
-        )
+        results = await asyncio.gather(*[client._get_cep18_named_keys(contract_hash) for _ in range(32)])
         assert rpc_calls == 0
         assert all(r is prewarm for r in results)
 
@@ -769,15 +765,7 @@ class TestConcurrencySafety:
             ch = params["entity_identifier"]["ContractHash"]
             rpc_calls.append(ch)
             await asyncio.sleep(0.01)
-            return {
-                "entity": {
-                    "Contract": {
-                        "contract": {
-                            "named_keys": [{"name": f"key-for-{ch[-4:]}", "key": "u"}]
-                        }
-                    }
-                }
-            }
+            return {"entity": {"Contract": {"contract": {"named_keys": [{"name": f"key-for-{ch[-4:]}", "key": "u"}]}}}}
 
         client._rpc = fake_rpc
 

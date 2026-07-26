@@ -56,7 +56,7 @@ _ONCHAIN_JSON = Path(__file__).resolve().parent.parent / "deploy-out" / "onchain
 # are the well-known safe values from existing lifecycle scripts. Lock
 # needs a real purse-to-purse transfer + dictionary write; claim/refund
 # do a purse-to-account transfer + dictionary write.
-_PAYMENT_LOCK = "10000000000"   # 10 CSPR
+_PAYMENT_LOCK = "10000000000"  # 10 CSPR
 _PAYMENT_CLAIM = "10000000000"  # 10 CSPR
 _PAYMENT_REFUND = "10000000000"  # 10 CSPR
 
@@ -109,6 +109,7 @@ def sha256_hashlock(preimage: bytes) -> str:
 
 
 # ── Deploy submission ────────────────────────────────────────────────
+
 
 def _run_lifecycle(env: Dict[str, str]) -> DeployResult:
     """Invoke the node-side lifecycle script (which owns casper-js-sdk)
@@ -199,16 +200,18 @@ def casper_lock(
       deploy is accepted by the RPC.
     """
     env = _base_env(key_path=key_path, key_algo=key_algo, rpc_url=rpc_url, api_key=api_key)
-    env.update({
-        "ACTION": "lock",
-        "CONTRACT_HASH": contract_hash,
-        "HASHLOCK_HEX": hashlock_hex,
-        "TIMELOCK_MS": str(timelock_ms),
-        "RECEIVER_HEX": receiver_hex,
-        "AMOUNT_MOTES": str(amount_motes),
-        "PAYMENT_MOTES": _PAYMENT_LOCK,
-        "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
-    })
+    env.update(
+        {
+            "ACTION": "lock",
+            "CONTRACT_HASH": contract_hash,
+            "HASHLOCK_HEX": hashlock_hex,
+            "TIMELOCK_MS": str(timelock_ms),
+            "RECEIVER_HEX": receiver_hex,
+            "AMOUNT_MOTES": str(amount_motes),
+            "PAYMENT_MOTES": _PAYMENT_LOCK,
+            "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
+        }
+    )
     return _run_lifecycle(env)
 
 
@@ -229,14 +232,16 @@ def casper_claim(
     — funds always go to the `receiver` recorded at lock time regardless
     of who submits claim."""
     env = _base_env(key_path=key_path, key_algo=key_algo, rpc_url=rpc_url, api_key=api_key)
-    env.update({
-        "ACTION": "claim",
-        "CONTRACT_HASH": contract_hash,
-        "HASHLOCK_HEX": hashlock_hex,
-        "PREIMAGE_HEX": preimage.hex(),
-        "PAYMENT_MOTES": _PAYMENT_CLAIM,
-        "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
-    })
+    env.update(
+        {
+            "ACTION": "claim",
+            "CONTRACT_HASH": contract_hash,
+            "HASHLOCK_HEX": hashlock_hex,
+            "PREIMAGE_HEX": preimage.hex(),
+            "PAYMENT_MOTES": _PAYMENT_CLAIM,
+            "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
+        }
+    )
     return _run_lifecycle(env)
 
 
@@ -255,13 +260,15 @@ def casper_refund(
     LOCKED state. Refund always returns funds to the `sender` recorded
     at lock time regardless of caller."""
     env = _base_env(key_path=key_path, key_algo=key_algo, rpc_url=rpc_url, api_key=api_key)
-    env.update({
-        "ACTION": "refund",
-        "CONTRACT_HASH": contract_hash,
-        "HASHLOCK_HEX": hashlock_hex,
-        "PAYMENT_MOTES": _PAYMENT_REFUND,
-        "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
-    })
+    env.update(
+        {
+            "ACTION": "refund",
+            "CONTRACT_HASH": contract_hash,
+            "HASHLOCK_HEX": hashlock_hex,
+            "PAYMENT_MOTES": _PAYMENT_REFUND,
+            "WAIT_FOR_INCLUSION": "1" if wait_for_inclusion else "0",
+        }
+    )
     return _run_lifecycle(env)
 
 
