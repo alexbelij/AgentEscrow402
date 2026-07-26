@@ -1,0 +1,141 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Backend up",
+      "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "targets": [
+        {"expr": "min(ae402_uptime_seconds > 0)", "legendFormat": "up", "refId": "A"}
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}}}],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}]}
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "type": "stat",
+      "title": "DB connected",
+      "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "targets": [{"expr": "ae402_db_connected", "refId": "A"}],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}}},
+            {"type": "value", "options": {"1": {"text": "UP", "color": "green"}}}
+          ]
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "type": "stat",
+      "title": "Sandbox mode",
+      "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "targets": [{"expr": "ae402_sandbox_mode", "refId": "A"}],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"type": "value", "options": {"0": {"text": "LIVE", "color": "green"}}},
+            {"type": "value", "options": {"1": {"text": "SANDBOX", "color": "orange"}}}
+          ]
+        }
+      },
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "background"}
+    },
+    {
+      "type": "stat",
+      "title": "Deployed contracts",
+      "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "targets": [{"expr": "ae402_deployed_contracts", "refId": "A"}],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}}
+    },
+    {
+      "type": "timeseries",
+      "title": "Escrow lifecycle counters (rate/min)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "id": 5,
+      "targets": [
+        {"expr": "rate(ae402_escrow_created_total[5m]) * 60", "legendFormat": "created", "refId": "A"},
+        {"expr": "rate(ae402_escrow_released_total[5m]) * 60", "legendFormat": "released", "refId": "B"},
+        {"expr": "rate(ae402_escrow_refunded_total[5m]) * 60", "legendFormat": "refunded", "refId": "C"},
+        {"expr": "rate(ae402_escrow_disputed_total[5m]) * 60", "legendFormat": "disputed", "refId": "D"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP requests (rate/s, by route)",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "id": 6,
+      "targets": [
+        {"expr": "sum by (route) (rate(ae402_http_requests_total[5m]))", "legendFormat": "{{route}}", "refId": "A"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP p50 / p95 / p99 latency (all routes)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "id": 7,
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(ae402_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(ae402_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(ae402_http_request_duration_seconds_bucket[5m])))", "legendFormat": "p99", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP p95 by route",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "id": 8,
+      "targets": [
+        {"expr": "histogram_quantile(0.95, sum by (le, route) (rate(ae402_http_request_duration_seconds_bucket[5m])))", "legendFormat": "{{route}} p95", "refId": "A"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s"}}
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP error rate (4xx + 5xx per route)",
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "id": 9,
+      "targets": [
+        {"expr": "sum by (route) (rate(ae402_http_requests_total{status=~\"4xx|5xx\"}[5m]))", "legendFormat": "{{route}} errors/s", "refId": "A"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Arbiter quorum success vs miss",
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "id": 10,
+      "targets": [
+        {"expr": "rate(ae402_arbiter_quorum_met_total[5m])", "legendFormat": "met", "refId": "A"},
+        {"expr": "rate(ae402_arbiter_quorum_missing_total[5m])", "legendFormat": "missing", "refId": "B"}
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["ae402", "observability", "c2"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "AgentEscrow402 — Overview",
+  "uid": "ae402-overview",
+  "version": 1,
+  "weekStart": ""
+}

@@ -315,6 +315,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ---------------------------------------------------------------------------
+# Observability middleware (C2 — request-latency histograms + correlation-id)
+# ---------------------------------------------------------------------------
+import os as _os
+from server.observability import observability_middleware as _obs_mw
+
+app.middleware("http")(_obs_mw)
+
+# Optional: opt-in JSON structured logs via AE402_JSON_LOGS=1. Off by default
+# so local dev / existing log-scrape wiring is untouched.
+if _os.getenv("AE402_JSON_LOGS", "0") == "1":
+    from server.observability import configure_json_logging as _cfg_json_logs
+    _cfg_json_logs()
+
 
 # ---------------------------------------------------------------------------
 # Strict-mode exception handler
@@ -482,6 +496,8 @@ async def metrics(cfg: Config = Depends(get_config)):
 
     from server.metrics import build_metrics_text, openmetrics_content_type
 
+    from server.observability import render_request_families
+
     body = build_metrics_text(
         started_at=_started_at,
         db_connected=pgdb.is_connected(),
@@ -494,6 +510,15 @@ async def metrics(cfg: Config = Depends(get_config)):
         },
         sandbox_mode=cfg.sandbox,
     )
+    # Append request-observability families (C2 — latency histograms + per-route counters).
+    # Body from build_metrics_text ends with "# EOF\n"; we strip it, append,
+    # and re-add so OpenMetrics 1.0.0 conformance is preserved.
+    if body.endswith("# EOF\n"):
+        body = body[: -len("# EOF\n")]
+    extras = [f for f in render_request_families() if f.strip()]
+    if extras:
+        body += "\n".join(extras).rstrip() + "\n"
+    body += "# EOF\n"
     return Response(content=body, media_type=openmetrics_content_type())
 
 
