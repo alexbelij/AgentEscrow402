@@ -49,7 +49,9 @@ graph TB
         IDC[Identity Registry<br/>9 entry points]
         MAC[MultiAssetEscrow<br/>10 entry points]
         TOK[AEMAT<br/>CEP-18 token]
+        TOK2[AETUSD<br/>CEP-18 token]
         NFT[AETNFT<br/>CEP-78 NFT]
+        HTLC[Casper HTLC<br/>bridge leg]
     end
 
     API -->|create/release/refund<br/>dispute/resolve| ESC

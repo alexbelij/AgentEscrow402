@@ -510,6 +510,8 @@ Deployed on Casper Testnet:
 | MultiAssetEscrow (CEP-18) | `52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a` (package: `a3207e9bb29f6cec6c5017e6c7538626f92f001d35cda22585dff9f76a488044`) — real contract-custody escrow for CEP-18 tokens, full lifecycle verified on-chain | [view](https://testnet.cspr.live/contract/52db09a146158ba2a07b5da07587046985ce8ca3be094fca9ad63cb6b9ecd12a) |
 | CEP-18 test token (AETUSD) | `177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754` | [view](https://testnet.cspr.live/contract/177ca5d88f72e1ca72fbe94a24ba34b03830dd1fe63d90d3d719cd6e6d4de754) |
 | CEP-18 test token (AEMAT) | `8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5` (package: `5caa324c3073a8b9fc05076a01e9d4d658cb08a1b4839fa0aa93dac39213e3fd`) — custody-compatible token (uses `get_immediate_caller`) | [view](https://testnet.cspr.live/contract/8ba7df6fd9a12c71de903a915717537eeff4f04adf33f4ed8abf16c254e300a5) |
+| CEP-78 test NFT (AETNFT) | `c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a` (package: `ac38003d1ffe4550aa2ec82cbcd14fc938a078fafc43e111176e7ed6c9a8e85c`) — multi-asset escrow custody for NFTs | [view](https://testnet.cspr.live/contract/c2dee0f1f40c3dae3f3106f70d69b8768d7426758b43040673f68e271f2bf70a) |
+| Casper HTLC (bridge Casper leg, ROADMAP L85) | `5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435` (package: `93f970abd3b13061c0c80986e3c5323ea30b9f2b099f5d12ef785e09b6b2a542`) | [view](https://testnet.cspr.live/contract/5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435) |
 
 | Entry point | Description |
 |---|---|
