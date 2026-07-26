@@ -704,9 +704,7 @@ def _manifest_sanity_snapshot(env_hash: str) -> dict[str, object]:
         else:
             with manifest_path.open() as fh:
                 data = _json.load(fh)
-            _MANIFEST_CACHE.update(
-                path=str(manifest_path), mtime=st.st_mtime, data=data
-            )
+            _MANIFEST_CACHE.update(path=str(manifest_path), mtime=st.st_mtime, data=data)
     except (OSError, _json.JSONDecodeError) as exc:  # pragma: no cover — unreadable manifest
         return {
             "status": "manifest_unreadable",
@@ -715,10 +713,7 @@ def _manifest_sanity_snapshot(env_hash: str) -> dict[str, object]:
             "actual": env_norm or None,
             "note": f"could not parse manifest: {exc}",
         }
-    expected_raw = (
-        (data.get("contracts", {}).get("escrow_manager_v9") or {}).get("contract_hash")
-        or ""
-    )
+    expected_raw = (data.get("contracts", {}).get("escrow_manager_v9") or {}).get("contract_hash") or ""
     expected = _resolve_env(expected_raw)
     if not env_norm:
         return {

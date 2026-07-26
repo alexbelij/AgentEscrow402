@@ -92,6 +92,4 @@ def test_manifest_has_all_9_contracts(manifest_path: Path) -> None:
         "cep18_test_token_aemat",
         "cep78_test_token_aetnft",
     }
-    assert required.issubset(contracts.keys()), (
-        f"missing contract keys: {required - set(contracts.keys())}"
-    )
+    assert required.issubset(contracts.keys()), f"missing contract keys: {required - set(contracts.keys())}"

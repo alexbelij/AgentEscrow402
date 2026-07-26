@@ -8,14 +8,13 @@ assert the two arbitration-specific event names + payload shape.
 
 from __future__ import annotations
 
-import time
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from server.app import app
 from server.ai_arbitration import ArbitrationRecommendation
+from server.app import app
 
 
 @pytest.fixture()
@@ -52,8 +51,9 @@ async def test_verdict_broadcasts_arbitration_verdict_event(client: TestClient) 
 
     verdict = _fake_verdict("dispute-abc")
 
-    with patch("server.app._arbitration_agent.analyze_dispute", return_value=verdict), patch(
-        "server.app._broadcast_event", side_effect=_capture
+    with (
+        patch("server.app._arbitration_agent.analyze_dispute", return_value=verdict),
+        patch("server.app._broadcast_event", side_effect=_capture),
     ):
         r = client.post(
             "/arbitration/analyze",
@@ -92,9 +92,11 @@ async def test_abstain_verdict_emits_verdict_plus_escalated_event(client: TestCl
         v.escalated_to_panel = True
         v.escalation_reason = "abstain — routed to VRF panel"
 
-    with patch("server.app._arbitration_agent.analyze_dispute", return_value=verdict), patch(
-        "server.app._try_escalate_to_panel", side_effect=_fake_escalate
-    ), patch("server.app._broadcast_event", side_effect=_capture):
+    with (
+        patch("server.app._arbitration_agent.analyze_dispute", return_value=verdict),
+        patch("server.app._try_escalate_to_panel", side_effect=_fake_escalate),
+        patch("server.app._broadcast_event", side_effect=_capture),
+    ):
         r = client.post(
             "/arbitration/analyze",
             json={
@@ -126,8 +128,9 @@ def test_broadcast_never_crashes_on_arbitration_failure(client: TestClient) -> N
     async def _boom(*a, **kw):
         raise RuntimeError("simulated provider failure inside analyze_dispute")
 
-    with patch("server.app._arbitration_agent.analyze_dispute", side_effect=_boom), patch(
-        "server.app._broadcast_event", side_effect=_capture
+    with (
+        patch("server.app._arbitration_agent.analyze_dispute", side_effect=_boom),
+        patch("server.app._broadcast_event", side_effect=_capture),
     ):
         r = client.post(
             "/arbitration/analyze",

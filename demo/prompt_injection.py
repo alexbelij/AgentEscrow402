@@ -38,13 +38,14 @@ import argparse
 import asyncio
 import hashlib
 import json
-import sys
-import time
-from typing import Any
 
 # Force heuristic path — set BEFORE importing ai_arbitration so it sees the
 # empty env-vars and never actually calls out.
 import os
+import sys
+import time
+from typing import Any
+
 for k in ("GROQ_API_KEY", "NVIDIA_API_KEY", "ZAI_API_KEY", "OPENROUTER_API_KEY"):
     os.environ.pop(k, None)
 
@@ -55,7 +56,6 @@ from server.ai_arbitration import (  # noqa: E402
     ArbitrationRecommendation,
     DisputeEvidence,
 )
-
 
 # ---------------------------------------------------------------------------
 # Adversarial payload catalogue
