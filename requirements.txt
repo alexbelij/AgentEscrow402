@@ -8,5 +8,5 @@ cryptography>=43.0
 # OpenTelemetry observability — see server/telemetry.py + docker-compose.signoz.yml
 opentelemetry-api==1.44.*
 opentelemetry-sdk==1.44.*
-opentelemetry-exporter-otlp==1.28.*
+opentelemetry-exporter-otlp==1.44.*
 opentelemetry-instrumentation-fastapi==0.65b0
