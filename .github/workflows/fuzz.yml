@@ -1,0 +1,74 @@
+name: fuzz-smoke
+
+# C12: smoke-fuzz — runs each libFuzzer target under contracts/fuzz for a
+# short time on every push to main and on manual dispatch. This is NOT a
+# long-running campaign; it's the tightest safety net that will catch a
+# fresh regression (e.g. reintroducing the u64 overflow in EscrowType::
+# default_timeout_secs) within a couple of minutes of merge.
+#
+# For proper campaigns run cargo fuzz locally with a longer --max_total_time.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/fuzz/**"
+      - "contracts/stubs/**"
+      - ".github/workflows/fuzz.yml"
+  pull_request:
+    paths:
+      - "contracts/fuzz/**"
+      - "contracts/stubs/**"
+      - ".github/workflows/fuzz.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fuzz-smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned nightly toolchain
+        # libFuzzer requires nightly; we reuse the same pin the on-chain
+        # crates use (contracts/rust-toolchain.toml) so a single toolchain
+        # covers both the fuzz harness and the WASM contracts.
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          toolchain: nightly-2025-01-01
+          components: rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: contracts/fuzz -> target
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+
+      - name: Build fuzz targets
+        working-directory: contracts/fuzz
+        run: cargo fuzz build
+
+      - name: Smoke-fuzz each target (30s each)
+        working-directory: contracts/fuzz
+        run: |
+          set -euo pipefail
+          for t in flash_guard_hold_period flash_guard_block_delay \
+                   flash_guard_both_halves escrow_types_status \
+                   threshold_config_validate; do
+            echo "::group::$t"
+            cargo fuzz run "$t" -- -max_total_time=30 -print_final_stats=1
+            echo "::endgroup::"
+          done
+
+      - name: Upload crash artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-artifacts
+          path: contracts/fuzz/artifacts/
+          retention-days: 14

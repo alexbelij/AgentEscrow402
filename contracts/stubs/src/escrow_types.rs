@@ -18,6 +18,32 @@ pub enum EscrowType {
     Streaming { interval_secs: u64, installments: u32 },
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn streaming_timeout_saturates_on_overflow() {
+        // Regression: fuzz target `escrow_types_status` found the naive
+        // `interval_secs * installments as u64` panicked with attempt-to-
+        // multiply-with-overflow. The fix uses saturating_mul; verify.
+        let et = EscrowType::Streaming {
+            interval_secs: u64::MAX,
+            installments: u32::MAX,
+        };
+        assert_eq!(et.default_timeout_secs(), u64::MAX);
+    }
+
+    #[test]
+    fn streaming_timeout_normal_multiplies() {
+        let et = EscrowType::Streaming {
+            interval_secs: 100,
+            installments: 5,
+        };
+        assert_eq!(et.default_timeout_secs(), 500);
+    }
+}
+
 impl EscrowType {
     pub fn default_timeout_secs(&self) -> u64 {
         match self {
@@ -26,7 +52,12 @@ impl EscrowType {
             EscrowType::Conditional { .. } => 86400 * 14, // 14 days
             EscrowType::Gaming { .. } => 86400 * 3,   // 3 days
             EscrowType::Streaming { interval_secs, installments } => {
-                interval_secs * (*installments as u64)
+                // C12: `interval_secs * installments` panics in debug builds
+                // (attempt to multiply with overflow) for large enough pairs
+                // — discovered by the escrow_types_status fuzz target. Use
+                // saturating_mul so the timeout maxes out at u64::MAX rather
+                // than aborting the whole enclosing contract call.
+                interval_secs.saturating_mul(*installments as u64)
             }
         }
     }

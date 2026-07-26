@@ -53,7 +53,11 @@
 - [ ] Flash loan protection (min_hold_period + block_delay checks)
 - [ ] Gaming-reward escrow type with Merkle proof of results
 - [ ] Agent-vs-Agent simulation testing framework
-- [ ] Fuzz testing for smart contracts (cargo fuzz)
+- [x] Fuzz testing (cargo fuzz) — 5 libFuzzer targets over pure-Rust stubs
+      (flash_guard × 3, escrow_types, threshold_config) + smoke CI job.
+      First run already found an overflow panic in
+      `EscrowType::Streaming::default_timeout_secs` (fixed, regression test
+      added). See `contracts/fuzz/`.
 
 ### Phase 3 — Ecosystem
 

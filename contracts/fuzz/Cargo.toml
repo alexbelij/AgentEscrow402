@@ -1,0 +1,62 @@
+[workspace]
+# Explicitly a leaf workspace so cargo-fuzz doesn't try to attach us to
+# the parent contract workspace (whose members are all no_std WASM crates).
+
+[package]
+name = "ae402-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Kept OUT of the top-level workspace so it can be a std binary crate
+# (libfuzzer-sys targets are always std), while the on-chain crates
+# stay `#![no_std]` for Casper WASM compatibility.
+#
+# The pinned toolchain (nightly-2025-01-01) is a hard constraint of the
+# on-chain wasm build; libFuzzer requires nightly anyway, so this crate
+# reuses the same toolchain — no split.
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = { version = "0.4", features = ["arbitrary-derive"] }
+arbitrary = { version = "1", features = ["derive"] }
+ae402-stubs = { path = "../stubs" }
+
+[[bin]]
+name = "flash_guard_hold_period"
+path = "fuzz_targets/flash_guard_hold_period.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "flash_guard_block_delay"
+path = "fuzz_targets/flash_guard_block_delay.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "flash_guard_both_halves"
+path = "fuzz_targets/flash_guard_both_halves.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "escrow_types_status"
+path = "fuzz_targets/escrow_types_status.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "threshold_config_validate"
+path = "fuzz_targets/threshold_config_validate.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
