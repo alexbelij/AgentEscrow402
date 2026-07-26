@@ -51,20 +51,32 @@ These are intentional design choices, not gaps:
 - **Multi-worker deployment** — `casper_client` is task-safe for concurrent async calls (asyncio.Lock guards on `_rpc_url` fallback promotion and `_cep18_named_keys_cache` populate; deploy submissions are correctness-safe by construction because Casper 2.0 identifies deploys by `sha256(header || body)`). For `uvicorn --workers N` each worker gets its own DI-scoped client; shared caching across workers would move to Redis, deferred as separate infra work.
 - **VRF with small arbiter pool** — 4 arbiters registered, `count=3` per election. Rare edge case: all drawn candidates are dispute parties → local CSPRNG fallback fires. More arbiters reduce this probability.
 
-## 🗺 Post-Hackathon Roadmap
+## ✅ Shipped since this table was last written (2026-07-27 correction)
+
+Seven of the ten items below were still listed as "Post-Hackathon Roadmap"
+(i.e. not yet built) even though they shipped during the final-round
+hardening push. Corrected here rather than left as stale future-tense claims:
+
+| Feature | Status |
+|---|---|
+| Threshold escrow (MPC) | **Shipped.** Shamir Secret Sharing, n-of-m release — `/threshold/*`, 37 tests. |
+| Flash loan protection | **Shipped.** FlashGuard fully wired onto release/refund/dispute. |
+| Multi-chain bridge | **Shipped.** Casper HTLC ↔ Sepolia EVM atomic bridge, live on testnet. |
+| Agent discovery marketplace | **Shipped.** `/console/marketplace` — live registry, capabilities/pricing/reputation. |
+| Formal verification | **Shipped.** TLA+ specification, `docs/formal/AE402Escrow.tla` + `specs/escrow_spec.tla`. |
+| Compliance framework | **Shipped.** Jurisdiction checks + KYC tiering + reporting-threshold flags, inline on escrow creation. |
+| Fuzz testing | **Shipped.** `cargo fuzz` smoke over pure-Rust stubs (found and fixed one overflow bug). |
+
+## 🗺 Post-Hackathon Roadmap (genuinely remaining)
 
 | Priority | Feature | Notes |
 |---|---|---|
 | P1 | Security audit | Third-party firm review before mainnet. |
-| P1 | Mainnet deployment | With governance multisig for upgrades. |
+| P1 | Mainnet deployment | With governance multisig for upgrades, after the audit above. |
 | P2 | On-chain batch cap/quorum guard | Contract upgrade to enforce server-side logic on-chain. |
-| P2 | Threshold escrow (MPC) | Shamir Secret Sharing, n-of-m release. |
-| P2 | Flash loan protection | `min_hold_period` + block delay checks. |
-| P3 | Multi-chain bridge | Casper ↔ EVM atomic bridge. |
-| P3 | Agent discovery marketplace | Full marketplace UI for agent services. |
-| P3 | Formal verification | TLA+ specification for state machine invariants. |
-| P3 | Compliance framework | Regulated jurisdiction support. |
-| P3 | Fuzz testing | `cargo fuzz` for smart contracts. |
+| P2 | Deploy the 4 code-complete contracts | Challenge Arbiter, Range Proof Registry, Governance DAO, Two-Key Account — tests green on main, queued for testnet deploy. |
+| P3 | Advanced risk models | Graph-based counterparty risk, cross-agent contagion scoring — beyond the live IsolationForest model. |
+| P3 | Prediction markets | Extending the live Merkle-proof gaming-reward escrow to open agent-vs-agent wager markets. |
 
 ## 📋 Codebase Infrastructure (ready for extension)
 

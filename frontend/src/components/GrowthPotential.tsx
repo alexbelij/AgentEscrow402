@@ -1,4 +1,37 @@
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, CheckCircle2 } from 'lucide-react'
+
+// Six of the eight items originally listed here as roadmap/"growth potential"
+// (Threshold Escrow, Formal Verification, Flash Loan Protection, Multi-Chain
+// Bridge, Agent Discovery Marketplace, Enterprise Compliance) were actually
+// shipped during the final-round hardening push and are now live in the
+// console (see Capabilities.tsx / feature-map). Reframed below as delivered
+// velocity instead of leaving them as stale future-tense claims.
+const SHIPPED_SINCE_TIER1 = [
+  {
+    title: 'Threshold Escrow (MPC)',
+    desc: 'Shamir Secret Sharing for n-of-m release, shipped — no single party holds the unlock key.',
+  },
+  {
+    title: 'Formal Verification',
+    desc: 'TLA+ specification for state machine invariants, proving escrow safety properties mathematically.',
+  },
+  {
+    title: 'Flash Loan Protection (FlashGuard)',
+    desc: 'Min hold period + block delay checks, fully wired onto release/refund/dispute, shipped.',
+  },
+  {
+    title: 'Multi-Chain Bridge',
+    desc: 'Casper ↔ EVM (Sepolia) HTLC atomic bridge — same sha256 hashlock on both legs, live on testnet.',
+  },
+  {
+    title: 'Agent Discovery Marketplace',
+    desc: 'Live registry where agents publish capabilities, pricing and reputation — see /console/marketplace.',
+  },
+  {
+    title: 'Enterprise Compliance',
+    desc: 'Jurisdiction checks, KYC tiering and reporting-threshold flags, live on every escrow creation.',
+  },
+]
 
 const VERTICALS = [
   {
@@ -7,20 +40,16 @@ const VERTICALS = [
     borderColor: 'border-purple-500/20',
     items: [
       {
-        title: 'Threshold Escrow (MPC)',
-        desc: 'Shamir Secret Sharing for n-of-m release — no single party holds the unlock key.',
-      },
-      {
-        title: 'Formal Verification',
-        desc: 'TLA+ specification for state machine invariants, proving escrow safety properties mathematically.',
-      },
-      {
-        title: 'Flash Loan Protection',
-        desc: 'Min hold period + block delay checks prevent manipulation of escrow state within a single block.',
-      },
-      {
         title: 'Advanced Risk Models',
-        desc: 'Graph-based counterparty risk, cross-agent contagion scoring, real-time anomaly detection.',
+        desc: 'Graph-based counterparty risk, cross-agent contagion scoring, real-time anomaly detection — beyond the live IsolationForest model.',
+      },
+      {
+        title: 'On-chain batch cap/quorum guard',
+        desc: 'Contract upgrade to enforce the server-side batch cap and arbiter quorum logic on-chain instead of in the API layer.',
+      },
+      {
+        title: 'Security audit',
+        desc: 'Third-party firm review of all contracts before any mainnet deployment.',
       },
     ],
   },
@@ -30,20 +59,16 @@ const VERTICALS = [
     borderColor: 'border-cyan-500/20',
     items: [
       {
-        title: 'Multi-Chain Bridge',
-        desc: 'Casper ↔ EVM atomic bridge — agents on Ethereum, Polygon, or Arbitrum can transact through the same escrow lifecycle.',
+        title: 'Challenge Arbiter, Range Proof Registry, Governance DAO, Two-Key Account',
+        desc: 'Code-complete and tests green on main; queued for testnet deploy — see the Feature Map for status on each.',
       },
       {
-        title: 'Agent Discovery Marketplace',
-        desc: 'A registry where agents publish capabilities, pricing, and reputation scores — other agents query and transact autonomously.',
+        title: 'Prediction markets',
+        desc: 'Extending the live Merkle-proof gaming-reward escrow from tournament payouts to open agent-vs-agent wager markets.',
       },
       {
-        title: 'Enterprise Compliance',
-        desc: 'Regulated jurisdiction support, KYC/AML hooks for enterprise agent deployments, audit trail export.',
-      },
-      {
-        title: 'Gaming & Prediction Markets',
-        desc: 'Merkle-proof result escrow for competitive AI, tournament payouts, and agent-vs-agent simulation wagers.',
+        title: 'Mainnet deployment',
+        desc: 'With a governance-multisig upgrade path, after the security audit above.',
       },
     ],
   },
@@ -73,6 +98,24 @@ export default function GrowthPotential() {
           </p>
         </div>
 
+        <div className="mb-10 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-2xl p-7">
+          <div className="flex items-center gap-2 mb-6">
+            <CheckCircle2 size={18} className="text-emerald-400" />
+            <h3 className="text-white font-bold text-lg">Shipped since the Tier-1 baseline</h3>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {SHIPPED_SINCE_TIER1.map((item) => (
+              <div key={item.title} className="flex gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 shrink-0" />
+                <div>
+                  <div className="text-white font-semibold text-sm mb-0.5">{item.title}</div>
+                  <p className="text-gray-400 text-xs leading-relaxed">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="grid lg:grid-cols-2 gap-6">
           {VERTICALS.map((v) => (
             <div key={v.label} className={`bg-gradient-to-br ${v.color} border ${v.borderColor} rounded-2xl p-7`}>
@@ -99,11 +142,11 @@ export default function GrowthPotential() {
         {/* Infrastructure readiness note */}
         <div className="mt-8 bg-ae-card/40 border border-ae-border/60 rounded-xl p-5 text-center">
           <p className="text-xs text-gray-400 leading-relaxed max-w-2xl mx-auto">
-            <span className="text-white font-semibold">Infrastructure already in place:</span>{' '}
-            <code className="text-ae-accent/80">ChainAdapter</code> trait for multi-chain abstraction,{' '}
-            <code className="text-ae-accent/80">ThresholdConfig</code> for MPC parameters,{' '}
+            <span className="text-white font-semibold">Also live under the hood:</span>{' '}
+            <code className="text-ae-accent/80">ChainAdapter</code> trait backing the multi-chain bridge,{' '}
+            <code className="text-ae-accent/80">ThresholdConfig</code> driving the shipped MPC escrow,{' '}
             <code className="text-ae-accent/80">EscrowType</code> enum for extensible escrow categories,{' '}
-            <code className="text-ae-accent/80">FlashGuard</code> module for anti-manipulation checks.
+            <code className="text-ae-accent/80">FlashGuard</code> module wired onto release/refund/dispute.
           </p>
         </div>
       </div>

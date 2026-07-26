@@ -25,6 +25,7 @@ const EVIDENCE_ORDER: { key: keyof typeof CONTRACTS; label: string }[] = [
   { key: 'cep18TestTokenAemat', label: 'AEMAT (CEP-18 test token)' },
   { key: 'cep18TestTokenAetusd', label: 'AETUSD (CEP-18 test token)' },
   { key: 'cep78TestTokenAetnft', label: 'AETNFT (CEP-78 test NFT)' },
+  { key: 'casperHtlc', label: 'Casper HTLC bridge (L85)' },
 ]
 
 const EVIDENCE = EVIDENCE_ORDER.map(({ key, label }) => {

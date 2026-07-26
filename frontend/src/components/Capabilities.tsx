@@ -9,6 +9,9 @@ import {
   Repeat,
   EyeOff,
   ScrollText,
+  KeyRound,
+  Trophy,
+  Link2,
 } from 'lucide-react'
 
 const CAPABILITIES = [
@@ -71,6 +74,24 @@ const CAPABILITIES = [
     title: 'Compliance & travel-rule engine',
     desc: 'Deterministic jurisdiction checks, KYC tiering from the identity registry, and reporting-threshold flags — separate from the permit/reject decision.',
     href: '/console/docs',
+  },
+  {
+    icon: KeyRound,
+    title: 'Threshold escrow (Shamir MPC)',
+    desc: 'Split a release secret into n shares with m-of-n reconstruction — a coalition below the threshold learns nothing, so no single signer can unilaterally release funds.',
+    href: '/console/sandbox',
+  },
+  {
+    icon: Trophy,
+    title: 'Gaming-reward escrow',
+    desc: 'Operator commits a reward sheet by publishing only its Merkle root; each winner claims independently with an O(log N) inclusion proof — losers\' scores stay private.',
+    href: '/console/sandbox',
+  },
+  {
+    icon: Link2,
+    title: 'Multi-hop A2A choreography',
+    desc: 'Chain an escrow across N agent hops with a running hash-chain of attestations, so anyone can independently confirm no hop was skipped or reordered.',
+    href: '/console/sandbox',
   },
 ]
 
