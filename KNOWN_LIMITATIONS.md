@@ -81,8 +81,11 @@ pointing at `main.rs` line ranges).
 The *real-WASM VM* regression test for `link_escrows` (compile
 `escrow-manager.wasm`, drive through `LmdbWasmTestBuilder`, like
 `insurance_replay_onchain_vm_tests.rs`) is still pending — tracked
-as **P0.1.6** — and belongs bundled with the deploy-gate before the
-first redeploy that actually exposes `link_escrows` on testnet.
+as **P0.1.6**. Post-redeploy (v11, 2026-07-26) it is no longer a
+deploy-gate but a defence-in-depth test bench for regressions of
+the *append-only* / *hop-index monotonicity* invariants. Landing it
+next to `fsm_property_tests.rs` remains valuable and is tracked as
+follow-up work.
 
 ### README stale counters (docs bug, not code bug)
 
