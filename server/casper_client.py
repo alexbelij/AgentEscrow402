@@ -219,7 +219,55 @@ class CasperClient:
 
         return data["hash"]
 
-    # ── Write operations (via Node.js subprocess) ──────────────────────────
+    async def _run_node_script_with_fallback(self, script: pathlib.Path, env_extra: dict[str, str]) -> str:
+        """Run a Node.js tx write with the same RPC fallback chain used for reads.
+
+        `_rpc()` (reads) already loops over `self._rpc_endpoints` and promotes the
+        first working URL. Writes went through the Node subprocess scripts using a
+        single hardcoded `CASPER_RPC=self._rpc_url` with no retry: if the very first
+        write of a process's lifetime hit an endpoint that rejects it (e.g. CSPR.cloud
+        401'ing requests from a given host), the write failed outright with no
+        fallback, even though `self._rpc_endpoints` lists working alternatives.
+
+        This wraps `_run_node_script` in the same try-next-endpoint loop, always
+        including the official unauthenticated testnet node as the guaranteed final
+        rung (no API key, no allowlist). NowNodes uses an `api-key` header the .mjs
+        scripts don't understand yet (they only read `CSPR_CLOUD_API_KEY` as an
+        `Authorization` header) -- it's still attempted, but as a plain unauthenticated
+        request, so it commonly falls through to the official node. Full NowNodes
+        write support would need the .mjs scripts' auth handling generalized; tracked
+        as a follow-up, not a blocker since the official node covers the failure mode
+        seen in practice.
+        """
+        last_err: Exception | None = None
+        seen: set[str] = set()
+        ordered = [(self._rpc_url, None)] + [
+            (url, headers) for url, headers in self._rpc_endpoints if url != self._rpc_url
+        ]
+        for url, headers in ordered:
+            if url in seen:
+                continue
+            seen.add(url)
+            if headers is None:
+                headers = next((h for u, h in self._rpc_endpoints if u == url), {})
+            env = dict(env_extra)
+            env["CASPER_RPC"] = url
+            env["CSPR_CLOUD_API_KEY"] = headers.get("Authorization", "")
+            try:
+                result = await self._run_node_script(script, env)
+            except Exception as exc:
+                logger.warning("Write via %s failed, trying next RPC endpoint: %s", url, exc)
+                last_err = exc
+                continue
+            if url != self._rpc_url:
+                async with self._rpc_url_lock:
+                    if url != self._rpc_url:
+                        logger.info("RPC fallback (write path): %s -> %s", self._rpc_url, url)
+                        self._rpc_url = url
+            return result
+        raise RuntimeError("All RPC endpoints failed for write") from last_err
+
+    # ── Write operations (via Node.js subprocess) ───────────────────────
 
     async def create_escrow(
         self,
@@ -240,7 +288,7 @@ class CasperClient:
         if len(receiver_hex) != 64:
             raise ValueError(f"receiver must be 64-char hex account hash, got: {receiver!r}")
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CREATE_SCRIPT,
             {
                 "CONTRACT_HASH": self._contract_hash,
@@ -290,7 +338,7 @@ class CasperClient:
         # ~1.02 CSPR/escrow for the n=5 live test); rounds up for safety.
         payment_motes = 4_000_000_000 + n * 1_500_000_000
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CREATE_BATCH_SCRIPT,
             {
                 "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
@@ -362,7 +410,7 @@ class CasperClient:
             raise ValueError("parent_service_hash == child_service_hash")
         if not isinstance(hop_index, int) or hop_index < 0:
             raise ValueError("hop_index must be a non-negative int")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _LINK_ESCROWS_SCRIPT,
             {
                 "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
@@ -387,7 +435,7 @@ class CasperClient:
             raise ValueError("service_hashes must be non-empty")
         if n > 50:
             raise ValueError("batch size exceeds contract MAX_BATCH_SIZE (50)")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _BATCH_LIFECYCLE_SCRIPT,
             {
                 "MANAGER_CONTRACT_HASH": self._manager_contract_hash,
@@ -450,7 +498,7 @@ class CasperClient:
         if len(arbiter_pubkeys) != len(arbiter_signatures):
             raise ValueError("arbiter_pubkeys and arbiter_signatures must have the same length")
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _RESOLVE_SCRIPT,
             {
                 "CONTRACT_HASH": self._contract_hash,
@@ -486,7 +534,7 @@ class CasperClient:
         if entry_point == "release":
             env["ARBITER_PUBKEYS_JSON"] = json.dumps(arbiter_pubkeys or [])
             env["ARBITER_SIGNATURES_JSON"] = json.dumps(arbiter_signatures or [])
-        return await self._run_node_script(_LIFECYCLE_SCRIPT, env)
+        return await self._run_node_script_with_fallback(_LIFECYCLE_SCRIPT, env)
 
     async def commit_swap(self, service_hash: str, commit_hash: str) -> str:
         """Submit on-chain `commit_swap` tx (HTLC atomic-swap first step).
@@ -499,7 +547,7 @@ class CasperClient:
             raise RuntimeError("contract_hash not configured")
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _SWAP_LIFECYCLE_SCRIPT,
             {
                 "CONTRACT_HASH": self._contract_hash,
@@ -532,7 +580,7 @@ class CasperClient:
             raise RuntimeError("contract_hash not configured")
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _SWAP_LIFECYCLE_SCRIPT,
             {
                 "CONTRACT_HASH": self._contract_hash,
@@ -589,7 +637,7 @@ class CasperClient:
             raise RuntimeError("contract_hash not configured")
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _ADMIN_OPS_SCRIPT,
             {
                 "CONTRACT_HASH": self._contract_hash,
@@ -621,7 +669,7 @@ class CasperClient:
         if not _ARBITER_REGISTRAR_WASM.exists():
             logger.error("arbiter-registrar wasm not found at %s", _ARBITER_REGISTRAR_WASM)
             raise RuntimeError("arbiter-registrar wasm not found (deployment misconfigured)")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _REGISTER_ARBITER_SCRIPT,
             {
                 "WASM_PATH": str(_ARBITER_REGISTRAR_WASM),
@@ -649,7 +697,7 @@ class CasperClient:
             raise RuntimeError("vrf_contract_hash not configured")
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _SELECT_ARBITERS_SCRIPT,
             {
                 "CONTRACT_HASH": self._vrf_contract_hash,
@@ -723,7 +771,7 @@ class CasperClient:
             # caller (only to server-side logs/ops).
             logger.error("pool-funder wasm not found at %s", _POOL_FUNDER_WASM)
             raise RuntimeError("pool-funder wasm not found (deployment misconfigured)")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _FUND_POOL_SCRIPT,
             {
                 "WASM_PATH": str(_POOL_FUNDER_WASM),
@@ -758,7 +806,7 @@ class CasperClient:
             raise RuntimeError("private key not configured")
         if not arbiter_pubkeys or len(arbiter_pubkeys) != len(arbiter_signatures):
             raise ValueError("arbiter_pubkeys and arbiter_signatures must be non-empty and equal length")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _INSURANCE_CLAIM_SCRIPT,
             {
                 "CONTRACT_HASH": self._insurance_contract_hash,
@@ -1062,7 +1110,7 @@ class CasperClient:
         if len(recipient_hex) != 64:
             raise ValueError(f"recipient must be 64-char hex account hash, got: {recipient_hex!r}")
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CEP18_TRANSFER_SCRIPT,
             {
                 "CONTRACT_HASH": contract_hash,
@@ -1211,7 +1259,7 @@ class CasperClient:
         deadline has passed, or the public key doesn't hash to `owner`."""
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CEP18_PERMIT_SCRIPT,
             {
                 "CONTRACT_HASH": contract_hash,
@@ -1240,7 +1288,7 @@ class CasperClient:
         (here: this client's own operator key, the relayer)."""
         if not self._key_path:
             raise RuntimeError("private key not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CEP18_TRANSFER_FROM_SCRIPT,
             {
                 "CONTRACT_HASH": contract_hash,
@@ -1280,7 +1328,7 @@ class CasperClient:
         if len(owner_hex) != 64:
             raise ValueError(f"owner must be 64-char hex account hash, got: {owner_hex!r}")
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CEP78_MINT_SCRIPT,
             {
                 "CONTRACT_HASH": contract_hash,
@@ -1307,7 +1355,7 @@ class CasperClient:
         if len(source_hex) != 64 or len(target_hex) != 64:
             raise ValueError("source/target must be 64-char hex account hashes")
 
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _CEP78_TRANSFER_SCRIPT,
             {
                 "CONTRACT_HASH": contract_hash,
@@ -1410,7 +1458,7 @@ class CasperClient:
         """Approve the MultiAssetEscrow contract as spender for `amount` tokens."""
         if not self._multi_asset_escrow_package_hash:
             raise RuntimeError("multi_asset_escrow_package_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "approve",
@@ -1437,7 +1485,7 @@ class CasperClient:
         """Create an escrow on the MultiAssetEscrow contract."""
         if not self._multi_asset_escrow_contract_hash:
             raise RuntimeError("multi_asset_escrow_contract_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "create_escrow",
@@ -1465,7 +1513,7 @@ class CasperClient:
         """Release escrowed tokens to the receiver."""
         if not self._multi_asset_escrow_contract_hash:
             raise RuntimeError("multi_asset_escrow_contract_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "release",
@@ -1485,7 +1533,7 @@ class CasperClient:
         """Refund escrowed tokens back to the sender."""
         if not self._multi_asset_escrow_contract_hash:
             raise RuntimeError("multi_asset_escrow_contract_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "refund",
@@ -1503,7 +1551,7 @@ class CasperClient:
         """Dispute an active multi-asset escrow."""
         if not self._multi_asset_escrow_contract_hash:
             raise RuntimeError("multi_asset_escrow_contract_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "dispute",
@@ -1527,7 +1575,7 @@ class CasperClient:
         """Resolve a disputed multi-asset escrow via arbiter quorum."""
         if not self._multi_asset_escrow_contract_hash:
             raise RuntimeError("multi_asset_escrow_contract_hash not configured")
-        return await self._run_node_script(
+        return await self._run_node_script_with_fallback(
             _MULTI_ASSET_LIFECYCLE_SCRIPT,
             {
                 "ACTION": "resolve",

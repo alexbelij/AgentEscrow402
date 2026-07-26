@@ -776,3 +776,70 @@ class TestConcurrencySafety:
         assert len(rpc_calls) == 2
         assert r1 != r2
         assert len(client._cep18_named_keys_cache) == 2
+
+
+class TestWriteRpcFallback:
+    """Writes (Node subprocess tx scripts) previously had no retry across
+    `self._rpc_endpoints` — unlike reads (`_rpc()`), which already promote the
+    first working endpoint. A write hitting a rejecting primary endpoint (e.g.
+    CSPR.cloud 401'ing a given host) failed outright with no fallback. Covers
+    `_run_node_script_with_fallback`.
+    """
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_next_endpoint_on_failure(self, monkeypatch):
+        client = make_client()
+        assert len(client._rpc_endpoints) >= 2
+        primary_url = client._rpc_endpoints[0][0]
+        secondary_url = client._rpc_endpoints[1][0]
+        calls = []
+
+        async def fake_run(script, env):
+            calls.append(env["CASPER_RPC"])
+            if env["CASPER_RPC"] == primary_url:
+                raise RuntimeError("Casper tx failed: 401 Unauthorized")
+            return "deadbeef"
+
+        client._run_node_script = fake_run
+        result = await client._run_node_script_with_fallback("script.mjs", {"FOO": "bar"})
+
+        assert result == "deadbeef"
+        assert calls[0] == primary_url
+        assert secondary_url in calls
+        # Successful fallback endpoint is promoted to primary for future writes.
+        assert client._rpc_url == secondary_url
+
+    @pytest.mark.asyncio
+    async def test_official_node_is_always_in_the_chain_as_last_resort(self):
+        client = make_client()
+        urls = [u for u, _ in client._rpc_endpoints]
+        assert "https://node.testnet.casper.network/rpc" in urls
+
+    @pytest.mark.asyncio
+    async def test_raises_when_all_endpoints_fail(self, monkeypatch):
+        client = make_client()
+
+        async def fake_run(script, env):
+            raise RuntimeError("boom")
+
+        client._run_node_script = fake_run
+        with pytest.raises(RuntimeError, match="All RPC endpoints failed for write"):
+            await client._run_node_script_with_fallback("script.mjs", {})
+
+    @pytest.mark.asyncio
+    async def test_does_not_leak_stale_auth_header_to_unauthenticated_endpoint(self, monkeypatch):
+        client = make_client()
+        seen_envs = []
+
+        async def fake_run(script, env):
+            seen_envs.append(dict(env))
+            if env["CASPER_RPC"].endswith("cspr.cloud/rpc"):
+                raise RuntimeError("401 Unauthorized")
+            return "ok"
+
+        client._run_node_script = fake_run
+        await client._run_node_script_with_fallback("script.mjs", {})
+
+        official = [e for e in seen_envs if e["CASPER_RPC"] == "https://node.testnet.casper.network/rpc"]
+        assert official, "expected an attempt against the official testnet node"
+        assert official[0]["CSPR_CLOUD_API_KEY"] == ""
