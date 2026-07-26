@@ -7,6 +7,8 @@ import {
   Layers,
   Lock,
   Repeat,
+  EyeOff,
+  ScrollText,
 } from 'lucide-react'
 
 const CAPABILITIES = [
@@ -57,6 +59,18 @@ const CAPABILITIES = [
     title: 'ML-KEM metadata privacy',
     desc: 'Post-quantum encryption for escrow metadata, so job details stay private even on a public ledger.',
     href: '/console/escrows',
+  },
+  {
+    icon: EyeOff,
+    title: 'Confidential escrow amounts',
+    desc: 'Opt-in Pedersen commitment + range proof seals the amount behind a blinding factor — every API response redacts it unless you hold the key.',
+    href: '/console/docs',
+  },
+  {
+    icon: ScrollText,
+    title: 'Compliance & travel-rule engine',
+    desc: 'Deterministic jurisdiction checks, KYC tiering from the identity registry, and reporting-threshold flags — separate from the permit/reject decision.',
+    href: '/console/docs',
   },
 ]
 
