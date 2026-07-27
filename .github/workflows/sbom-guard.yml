@@ -40,7 +40,13 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install 'cyclonedx-bom>=4,<5'
-          npm install --global '@cyclonedx/cyclonedx-npm@^2'
+          # Pinned exact (not ^2): a routine 2.x patch release changed how
+          # purls are rendered (dropped the `?vcs_url=` qualifier), which
+          # made every run of this guard fail on pure formatting drift with
+          # zero actual dependency changes -- see key_set() below for the
+          # matching purl-normalization fix, which is the real fix; this
+          # pin just keeps the two npm SBOM steps reproducible run-to-run.
+          npm install --global '@cyclonedx/cyclonedx-npm@2.1.0'
 
       - name: Regenerate Python SBOM (requirements.txt)
         # cyclonedx-py 5.x renamed --output-file/--output-format to -o/--of;
@@ -80,6 +86,13 @@ jobs:
           set -e
           # Compare only the set of components (name+version+purl), not
           # generation timestamps or serial numbers which change every run.
+          #
+          # purl is normalized to drop any query string (e.g. `?vcs_url=...`)
+          # before comparing: cyclonedx-npm 2.x has changed exactly what it
+          # appends there across minor releases with zero actual dependency
+          # change, which made this guard fail on pure tool-formatting drift.
+          # name+version+bare-purl is what actually identifies "did the
+          # dependency set change", which is this guard's real job.
           compare_sbom() {
             local checked_in="$1"
             local regenerated="$2"
@@ -88,7 +101,16 @@ jobs:
           import json, sys
           def key_set(path):
               d = json.load(open(path))
-              return {(c.get('name'), c.get('version'), c.get('purl'))
+              def norm_purl(c):
+                  p = c.get('purl')
+                  if not p:
+                      return p
+                  # Strip both the query string (?vcs_url=...) and any
+                  # subpath fragment (#packages/foo) -- both have been seen
+                  # to vary purely by cyclonedx-npm version, with the exact
+                  # same underlying dependency.
+                  return p.split('?', 1)[0].split('#', 1)[0]
+              return {(c.get('name'), c.get('version'), norm_purl(c))
                       for c in d.get('components', [])}
           checked = key_set("$checked_in")
           regen   = key_set("$regenerated")
