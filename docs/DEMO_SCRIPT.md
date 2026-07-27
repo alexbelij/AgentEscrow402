@@ -25,7 +25,7 @@ Everything below then runs offline against the in-memory FastAPI
 seller does the work; escrow settles.
 
 ```bash
-PYTHONPATH=. python demo/x402_agent_showcase.py
+PYTHONPATH=. python -m demo.agent_flow
 ```
 
 You'll see:
@@ -132,7 +132,7 @@ pytest tests/test_arbiter_commit_reveal.py tests/test_slashing.py \
 via evidence text. The safety filter blocks it.
 
 ```bash
-PYTHONPATH=. python demo/prompt_injection_demo.py
+PYTHONPATH=. python demo/prompt_injection.py
 ```
 
 12 payloads, exit 0. The dispute rubric itself is a pure function —

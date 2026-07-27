@@ -55,9 +55,19 @@ jobs:
               echo "::endgroup::"
             fi
           done
-          if [ -f demo/prompt_injection_demo.py ]; then
-            echo "::group::prompt_injection_demo"
-            PYTHONPATH=. python demo/prompt_injection_demo.py || fail=$((fail+1))
+          # agent_flow.py and prompt_injection.py don't match the
+          # *_showcase.py glob above but are the exact scripts
+          # docs/DEMO_SCRIPT.md walks judges through (sections 1 and 6) --
+          # they were silently never run here before (wrong filenames:
+          # x402_agent_showcase.py / prompt_injection_demo.py never existed).
+          if [ -f demo/agent_flow.py ]; then
+            echo "::group::agent_flow"
+            PYTHONPATH=. python -m demo.agent_flow || { fail=$((fail+1)); echo "::error file=demo/agent_flow.py::exit != 0"; }
+            echo "::endgroup::"
+          fi
+          if [ -f demo/prompt_injection.py ]; then
+            echo "::group::prompt_injection"
+            PYTHONPATH=. python demo/prompt_injection.py || { fail=$((fail+1)); echo "::error file=demo/prompt_injection.py::exit != 0"; }
             echo "::endgroup::"
           fi
           if [ "$fail" -gt 0 ]; then

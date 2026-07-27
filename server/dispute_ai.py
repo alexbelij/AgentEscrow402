@@ -31,7 +31,7 @@ absent from the rubric — those go to the arbiter panel, not the rubric.
 Related:
 - server/arbiter_crypto.py    (arbiter quorum + signature verification)
 - server/agentic_safety.py    (LLM safety filter)
-- demo/prompt_injection_demo.py
+- demo/prompt_injection.py
 - docs/AGENTIC_SAFETY.md
 """
 
