@@ -50,17 +50,43 @@ export async function registerPWA(): Promise<void> {
         // signature/broadcast isn't destroyed by a page swap.
         dispatch('ae402:pwa:need-refresh', {
           activate: async () => {
-            // `updateSW(true)` only posts SKIP_WAITING and *relies* on the
-            // browser firing a `controlling` change event to reload — that
-            // event can be missed/delayed (multiple tabs, timing quirks),
-            // which made the button look like it did nothing. Force the
-            // reload ourselves unconditionally so the click always has a
-            // visible effect.
-            try {
-              await updateSW(true)
-            } finally {
+            // `updateSW(true)` (vite-plugin-pwa's registerSW, `prompt` mode)
+            // only posts SKIP_WAITING to the waiting worker; it resolves as
+            // soon as the message is sent, well before the new worker has
+            // actually activated and taken control of this page. A previous
+            // version force-reloaded in a `finally` block right after that
+            // await, which fired the reload *before* the new SW controlled
+            // the page: the browser re-requested the app shell, which was
+            // still served by the OLD (about-to-be-replaced) worker/cache,
+            // referencing that old build's hashed JS filenames. Those files
+            // no longer exist on the latest Vercel deployment, so the
+            // request 404s, falls through to the SPA catch-all rewrite, and
+            // comes back as `index.html` (text/html) where a JS module was
+            // expected -> "Failed to load module script" -> black screen
+            // that only cleared on a *second*, manual reload (by which time
+            // the new SW really was in control).
+            //
+            // registerSW's own internal `controlling` listener (registered
+            // when the "update available" prompt was first shown) already
+            // calls `window.location.reload()` for us, but only once the
+            // browser actually reports the new worker as in control -- so
+            // we let that fire instead of racing it. We still guard with a
+            // one-shot fallback timer in case `controllerchange` never
+            // fires (seen in some multi-tab setups), but give it enough
+            // headroom to not repeat the same race.
+            let reloaded = false
+            const reloadOnce = () => {
+              if (reloaded) return
+              reloaded = true
               window.location.reload()
             }
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.addEventListener('controllerchange', reloadOnce, { once: true })
+            }
+            await updateSW(true)
+            // Fallback only — gives the browser time to actually hand
+            // control to the new worker before we force it ourselves.
+            setTimeout(reloadOnce, 5000)
           },
         })
       },
