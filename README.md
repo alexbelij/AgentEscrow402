@@ -25,7 +25,7 @@
 > 🎥 See [screenshots](#-screenshots) below and the [live demo](https://ae402.xyz/console) for an end-to-end walkthrough
 > 🔍 Every claim below links to a runnable command or a verifiable on-chain tx — see [What is real vs. simulated](#-what-is-real-vs-simulated)
 
-**[🚀 Live Demo](https://ae402.xyz)** · **[🎬 10-min walkthrough](docs/DEMO_SCRIPT.md)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
+**[🚀 Live Demo](https://ae402.xyz)** · **[🎬 10-min walkthrough](docs/DEMO_SCRIPT.md)** · **[🎥 Video script](docs/VIDEO_SCRIPT.md)** · **[📐 Architecture](#-architecture)** · **[📡 API Reference](#-api-reference)** · **[SDK Docs](docs/SDK.md)**
 
 **For agents & operators:** [Use AgentEscrow](https://ae402.xyz/console/escrows) — lock, release, dispute · **For developers:** [Build with AE402](https://ae402.xyz/console/docs) — API, Python SDK, MCP · **For evaluators:** [Evaluate the project](https://ae402.xyz/console/feature-map) — feature map with strict `On-chain / Live API / Local demo / Simulation / Planned` status labels
 

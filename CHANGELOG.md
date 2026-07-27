@@ -7,6 +7,46 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [Unreleased] — Post-Deadline Review Pass (2026-07-27)
+
+Full review/reconciliation pass across docs, site, and CI, done after the
+07-26 hardening block above and its own review agent ran out of budget
+mid-audit. Found and fixed real, live-facing issues, not just doc drift.
+
+### Fixed
+
+- **Landing page staleness (live browser walkthrough)**: `TrustSignals.tsx`'s
+  "Verify on Testnet" evidence list was missing the Casper HTLC bridge (9 of
+  10 contracts shown). `GrowthPotential.tsx` presented 6 already-shipped
+  features (threshold escrow, formal verification, FlashGuard, multi-chain
+  bridge, agent marketplace, compliance) as future roadmap; rewritten into a
+  "Shipped since Tier-1" section plus a corrected, genuinely-remaining
+  roadmap. `Capabilities.tsx` was missing 3 live features (threshold escrow,
+  gaming-reward escrow, multi-hop A2A) despite claiming to list every live
+  module. Same roadmap staleness fixed in `docs/STATUS_AND_ROADMAP.md`.
+- **Test-count drift**: my own RPC-fallback commit added 4 tests
+  (2081→2085) but only the README badge was updated at the time; swept the
+  repo and fixed 8 more files still quoting 2081/2331, including 3 live
+  frontend components (`Hero.tsx`, `TrustSignals.tsx`, `WhyAE402.tsx`).
+- **README screenshots were completely stale** — `docs/screenshots/01-homepage.png`
+  showed an old landing-page design (different nav, "4 Deployed Contracts")
+  that no longer exists on ae402.xyz. Regenerated all 5 gallery screenshots
+  from the live site.
+- Added a "try it live" CTA line linking each new-this-round feature to its
+  console page, and a new `docs/VIDEO_SCRIPT_v3.md` reflecting current
+  contract/test/endpoint counts (old script had been deleted from history
+  in an earlier docs cleanup and quoted 8 contracts / 62 API / 13 pages).
+
+### Verified (no action needed)
+
+- Vercel auto-deploy and Render backend deploy both healthy and current.
+- All demo scripts (`demo.agent_flow`, `demo.insurance_showcase`,
+  `demo.multi_asset_flow`, `demo.agent_vs_agent_showcase`,
+  `demo.bridge_e2e_showcase`) run clean end-to-end against the live API.
+- No CasperProver/anna-stolbovskaja cross-contamination found in AE402 docs.
+
+---
+
 ## [Unreleased] — Final-Round Hardening (2026-07-26)
 
 Continuation of the submission block below: the four post-hackathon contracts
