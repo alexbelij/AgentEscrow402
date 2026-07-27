@@ -1,11 +1,13 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
-# Install Node.js 22 for Casper tx scripts (casper-js-sdk)
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* && \
-    npm install -g npm@12
+# Install Node.js for Casper tx scripts (casper-js-sdk).
+# NodeSource's deb.nodesource.com/setup_X.x bootstrap script now returns
+# HTTP 403 (NodeSource deprecated it) so the previous curl-based install
+# broke every fresh/cache-cold build. Install nodejs+npm straight from the
+# Debian bookworm repo instead -- older (18.x) but fully sufficient for the
+# casper-js-sdk-only scripts here, and has no external-URL dependency.
+RUN apt-get update && apt-get install -y --no-install-recommends nodejs npm && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
