@@ -7,6 +7,22 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [Unreleased] — 2026-07-28
+
+### Docs
+
+- `docs/BLOCKERS.md` was stale: it still listed Blocker 2 (AE-2 v2, real
+  on-chain VM tests via `casper-engine-test-support`) as open, but it was
+  actually resolved by commit `8e5ac03` on 2026-07-27
+  (`insurance_replay_onchain_vm_tests.rs` +
+  `insurance_cooldown_replay_e2e_tests.rs`, ~840 lines, real WASM execution
+  in the Casper VM). Marked resolved. Blockers 1 (`amount_motes` DB
+  migration) and 3 (`AE402:v1:` domain-tag versioning) confirmed still open
+  in code — both are breaking changes that need an owner decision on
+  migration/rollout strategy before any work starts.
+
+---
+
 ## [Unreleased] — Post-Deadline Review Pass (2026-07-27)
 
 Full review/reconciliation pass across docs, site, and CI, done after the

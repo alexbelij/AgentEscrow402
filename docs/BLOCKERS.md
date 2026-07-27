@@ -1,6 +1,15 @@
 # AE402 — Оставшиеся блокеры после Batch 2
 
-Статус: 2026-07-24. Автор коммита: alexbelij <aliaksandr.khrol@gmail.com>.
+Статус: 2026-07-24, актуализировано 2026-07-28. Автор коммита: alexbelij <aliaksandr.khrol@gmail.com>.
+
+**Обновление 2026-07-28:** Блокер 2 (AE-2 v2 — реальные on-chain VM тесты через
+`casper-engine-test-support`) закрыт коммитом `8e5ac03` ("T3.4 AE-2: real
+on-chain VM regression test for insurance-pool replay + fix production bug it
+caught") — файлы `contracts/tests/src/insurance_replay_onchain_vm_tests.rs` и
+`insurance_cooldown_replay_e2e_tests.rs` (~840 строк) реально исполняют
+контракт в Casper VM через `casper-engine-test-support = "8.1.1"`. Этот файл
+ниже больше не отражал это; актуализировано. Блокеры 1 и 3 остаются открытыми
+без изменений — оба ждут решения owner-а (см. ниже).
 
 В batch 2 закрыты **4 из 7** заявленных gap-ов:
 
@@ -33,7 +42,18 @@
 
 ---
 
-## Блокер 2 — AE-2 v2: реальный Odra on-chain test с `casper-engine-test-support`
+## ~~Блокер 2 — AE-2 v2: реальный Odra on-chain test с `casper-engine-test-support`~~ — ЗАКРЫТ 2026-07-28
+
+**Закрыто коммитом `8e5ac03`** ("T3.4 AE-2: real on-chain VM regression test
+for insurance-pool replay + fix production bug it caught"). Реальные
+WASM-execution тесты через `casper-engine-test-support = "8.1.1"` существуют
+в `contracts/tests/src/insurance_replay_onchain_vm_tests.rs` (421 строка) и
+`insurance_cooldown_replay_e2e_tests.rs` (419 строк) — не hypothesis-based
+host-mirror fuzz, а реальное исполнение контракта в Casper VM. Build/toolchain
+concerns ниже — исторический контекст, больше не блокер.
+
+<details>
+<summary>Исходное описание блокера (для истории)</summary>
 
 **Что осталось:** заменить hypothesis-based host-mirror fuzz (PR #20) на реальные WASM-execution тесты, которые исполняют скомпилированный контракт в Casper VM через `casper-engine-test-support = "7"`.
 
@@ -46,6 +66,8 @@
 - Явное "да, начинай build, я подожду" — либо предложение вынести build в CI job (например nightly matrix), где 30-минутный run приемлем.
 
 **Оценка при получении добра:** 1 PR, ~2–4 часа работы (build + test authoring), при условии что toolchain compileется без issues на первой попытке.
+
+</details>
 
 ---
 
@@ -88,7 +110,8 @@
 
 Из 7 gap-ов batch 2:
 - **4 закрыто** (PR #17–#20, open, ждут review).
-- **3 блокировано** — нужен твой input по каждому (сколько строк выше).
-- **2 отложены** без блокеров, но не сделаны — беру в следующую сессию.
+- **2026-07-28 обновление: ещё 1 закрыт** — Блокер 2 (AE-2 v2, real on-chain VM тесты) резолвнут коммитом `8e5ac03`, см. выше.
+- **Реально открыто: 2** — Блокер 1 (`amount_motes` DB-миграция) и Блокер 3 (`AE402:v1:` domain tag, breaking) — оба требуют input owner-а по стратегии/окну, не чинятся in-session без риска.
+- **2 отложены** без блокеров, но не сделаны — беру в следующую сессию (AE-1c additive unit tests, AE-3 v2 additive domain-tag infra).
 
-Ping когда готов дать ТЗ по любому из 3 блокеров.
+Ping когда готов дать ТЗ по Блокеру 1 или 3.
