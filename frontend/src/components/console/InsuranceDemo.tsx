@@ -34,7 +34,11 @@ function SourceBadge({ source, note }: { source: string; note?: string }) {
  * text is advisory, not evidence.
  */
 
-const API = (import.meta as any).env?.VITE_API_URL ?? ''
+// Requests go through the Vercel proxy (/backend/*), matching src/lib/api.ts's
+// BASE_URL. VITE_API_URL is never set in production, so this previously
+// resolved to '' and hit the SPA's own domain (405 / HTML-not-JSON) instead
+// of the real backend.
+const API = (import.meta as any).env?.VITE_API_URL ?? '/backend'
 
 type PricingResp = {
   escrow_amount_motes: number

@@ -52,8 +52,12 @@ interface OpsSnapshot {
 const POLL_MS = 30_000;
 
 function apiBase(): string {
+  // Requests go through the Vercel proxy (/backend/*), matching
+  // src/lib/api.ts's BASE_URL. VITE_API_BASE is never set in production,
+  // so this previously resolved to '' and hit the SPA's own domain
+  // (index.html, not JSON) instead of the real backend.
   const meta = (import.meta as any).env ?? {};
-  return meta.VITE_API_BASE ?? '';
+  return meta.VITE_API_BASE ?? '/backend';
 }
 
 function fmtUptime(seconds: number): string {

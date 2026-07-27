@@ -15,6 +15,7 @@ const CATEGORY_ICONS: Record<string, React.ElementType> = {
   identity: BadgeCheck,
   'multi-asset': Layers,
   token: Coins,
+  bridge: Shuffle,
 };
 
 const FALLBACK_CONTRACTS = [
@@ -71,6 +72,12 @@ const FALLBACK_CONTRACTS = [
     hash: CONTRACTS.cep78TestTokenAetnft.contractHash,
     role: 'CEP-78 enhanced NFT collection for multi-asset escrow NFT demos (Transferable, Public minting, Ordinal IDs).',
     category: 'token',
+  },
+  {
+    name: 'Casper HTLC (bridge leg)',
+    hash: CONTRACTS.casperHtlc.contractHash,
+    role: 'Casper-side leg of the ROADMAP L85 cross-chain atomic-swap bridge (lock / claim / refund via sha256 hashlock, mirrors the EVM leg).',
+    category: 'bridge',
   },
 ];
 

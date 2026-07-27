@@ -1121,6 +1121,15 @@ async def contracts(cfg: Config = Depends(get_config)):
                 ),
                 "category": "token",
             },
+            {
+                "name": "Casper HTLC (bridge leg)",
+                "hash": cfg.htlc_contract_hash,
+                "role": (
+                    "Casper-side leg of the ROADMAP L85 cross-chain atomic-swap bridge "
+                    "(lock / claim / refund via sha256 hashlock, mirrors the EVM leg)."
+                ),
+                "category": "bridge",
+            },
         ]
     }
 

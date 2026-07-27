@@ -55,6 +55,11 @@ class Config:
     # deployed contract hash here is env-overridable so a redeploy never
     # requires a code change.
     agent_identity_contract_hash: str = ""
+    # Casper leg of the ROADMAP L85 multi-chain HTLC bridge. Deployed
+    # 2026-07-26 (see deploy-out/onchain.json "casper_htlc") but never wired
+    # into this Config or the /contracts response, so the console's
+    # "Contracts" tab silently showed 9/10 live contracts instead of 10/10.
+    htlc_contract_hash: str = ""
     vrf_onchain_select_count: int = 3
     allow_hosted_demo_identity: bool = False
     # Hex-encoded (tag-prefixed) Ed25519 public keys of the registered
@@ -224,6 +229,11 @@ class Config:
                 # Key-fix redeploy 2026-07-24 (into_entity_hash_addr for Casper
                 # 2.0 compat, fix commit a9d7071); see deploy-out/onchain.json.
                 "345c179cd28eae46bfcda5cd4d8b9192d631593f936af85ccfe3a2cece5c7b1f",
+            ),
+            htlc_contract_hash=os.getenv(
+                "HTLC_CONTRACT_HASH",
+                # Deployed 2026-07-26; see deploy-out/onchain.json "casper_htlc".
+                "5d5a8d79bd37841234cc9c814937609974715fce214ac814e78eb7528ea0a435",
             ),
             vrf_onchain_select_count=int(os.getenv("VRF_ONCHAIN_SELECT_COUNT", "3")),
             allow_hosted_demo_identity=os.getenv("ALLOW_HOSTED_DEMO_IDENTITY", "false").lower() == "true",
