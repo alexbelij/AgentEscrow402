@@ -7,7 +7,12 @@ import { SignerProvider } from './lib/signer'
 import { ToastProvider } from './lib/toast'
 import { RoleProvider } from './lib/role'
 import { registerPWA, trackLastPathForOfflineFallback } from './lib/pwa'
+import { installDevConsoleEasterEgg } from './lib/devConsole'
 import './index.css'
+
+// Purely cosmetic devtools banner + `window.ae402` helper — no state, no
+// secrets, read-only. See lib/devConsole.ts.
+installDevConsoleEasterEgg()
 
 // Fire-and-forget: register the service worker (no-op in dev / when SW is
 // unavailable). Captures registration failures on its own.
