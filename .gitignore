@@ -57,3 +57,6 @@ contracts/fuzz/target/
 contracts/fuzz/corpus/
 contracts/fuzz/artifacts/
 .env.*
+
+# cargo-cyclonedx output (checked-in copies live under sbom/rust-contracts/)
+contracts/*/*.cdx.json

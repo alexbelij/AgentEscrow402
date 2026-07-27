@@ -36,16 +36,25 @@ All contracts below are the **currently live** versions serving the hosted conso
 
 ---
 
-## 2. Post-hackathon contracts (developed under Tier 1 roadmap)
+## 2. Merged, not yet deployed (developed under Tier 1 roadmap)
 
-New contracts landed on-branch, awaiting merge into `main` and (re)deploy to testnet at submission time. Contract package hashes will be minted at deploy — package IDs below marked `TBA` will be filled by the per-contract deploy scripts in `server/casper_tx/` (or the `casper-client` recipes in `docs/ONCHAIN_DEPLOY.md`) and reflected by hand in `deploy-out/onchain.json` (see § 6 below for the exact verify/regenerate steps).
+All 4 contracts below are **already merged into `main`** (via the PRs
+listed) — code-complete, tested, and part of the current codebase — but
+have **not yet been redeployed to Casper testnet**, so they have no
+live contract hash and are not reachable from the console today.
+Contract package hashes will be minted at deploy — package IDs below
+marked `TBA` will be filled by the per-contract deploy scripts in
+`server/casper_tx/` (or the `casper-client` recipes in
+`docs/ONCHAIN_DEPLOY.md`) and reflected by hand in
+`deploy-out/onchain.json` (see § 6 below for the exact verify/regenerate
+steps).
 
-| # | Contract | Branch | PR | WASM size | Status |
-|---|----------|--------|----|-----------|--------|
-| 11 | **Challenge Arbiter (commit-reveal + bond/slash)** | `feat/ae402-challenge-arbiter` | [#55](https://github.com/alexbelij/AgentEscrow402/pull/55) | ~160 KB | code merged locally, testnet deploy `TBA` |
-| 12 | **Range Proof Registry (mod-exp on 3072-bit prime, threshold-attested)** | `feat/ae402-range-proofs` | [#62](https://github.com/alexbelij/AgentEscrow402/pull/62) | ~180 KB | code + tests green, testnet deploy `TBA` |
-| 13 | **Governance DAO (ported RWA-S primitives + AE402 action layer)** | `feat/ae402-governance-dao` | [#63](https://github.com/alexbelij/AgentEscrow402/pull/63) | 159 KB | code + tests green, testnet deploy `TBA` |
-| 14 | **Two-Key Account (cold/hot key AA-style account)** | merged to `main` 2026-07-24 | — | — | code + tests green, testnet deploy `TBA` — see [docs/TWO_KEY_ACCOUNT.md](docs/TWO_KEY_ACCOUNT.md) |
+| # | Contract | Merged via | WASM size | Status |
+|---|----------|-----------|-----------|--------|
+| 11 | **Challenge Arbiter (commit-reveal + bond/slash)** | [#55](https://github.com/alexbelij/AgentEscrow402/pull/55) (merged) | ~160 KB | merged to `main`, **not yet deployed** to testnet |
+| 12 | **Range Proof Registry (mod-exp on 3072-bit prime, threshold-attested)** | [#62](https://github.com/alexbelij/AgentEscrow402/pull/62) (merged) | ~180 KB | merged to `main`, **not yet deployed** to testnet |
+| 13 | **Governance DAO (ported RWA-S primitives + AE402 action layer)** | [#63](https://github.com/alexbelij/AgentEscrow402/pull/63) (merged) | 159 KB | merged to `main`, **not yet deployed** to testnet |
+| 14 | **Two-Key Account (cold/hot key AA-style account)** | merged to `main` 2026-07-24 | — | merged to `main`, **not yet deployed** to testnet — see [docs/TWO_KEY_ACCOUNT.md](docs/TWO_KEY_ACCOUNT.md) |
 
 **Test coverage for post-hackathon block:**
 - Challenge Arbiter: 26 Rust property tests + 31 Python parity tests

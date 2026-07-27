@@ -106,7 +106,7 @@ against the actual `main` HEAD at the time. Re-verified against
   `cargo test --release` still cannot run directly (pre-existing
   `casper-contract`/`std` feature-unification conflict, unrelated to
   the fix here) — CI and this count both work around it per-package.
-- **9 contracts live on `casper-test`, 13 total in `main`** (4 more —
+- **10 contracts live on `casper-test`, 14 total in `main`** (4 more —
   Challenge Arbiter, Range Proof Registry, Governance DAO, Two-Key
   Account — are code-complete and tested but not yet redeployed;
   tracked in `TX_MANIFEST.md` section 2).
@@ -116,35 +116,28 @@ for the prior audit that first flagged this drift.
 
 ## SDK / CLI
 
-### P0.2 — `ae402` CLI broken on every non-`health` subcommand 🔴
+### P0.2 — `ae402` CLI broken on every non-`health` subcommand — RESOLVED
 
 **Discovered by** the live-verified pass on 2026-07-26 (see
 [`docs/defence/README_STATIC_AUDIT.md`](docs/defence/README_STATIC_AUDIT.md) §9.4).
 
-`sdk/client.py::EscrowClient._request()` now requires
-`escrow_hash: str` and `amount: int` as **required** kw-only args
-(for X-Payment signature construction). But `sdk/cli.py` still
-calls `_request("GET", "/stats")`, `_request("GET", "/escrows", params=…)`,
-`_request("GET", "/mcp/tools")`, `_request("GET", f"/escrow/{sh}/history")`
-without those args — so every non-`health` CLI subcommand fails at
-runtime:
+`sdk/client.py::EscrowClient._request()` used to require
+`escrow_hash: str` and `amount: int` as required kw-only args (for
+X-Payment signature construction), while `sdk/cli.py` called
+`_request()` without them on every non-`health` subcommand
+(`stats`, `list-escrows`, `history`, `mcp-tools`).
+
+**Fixed**: `escrow_hash` and `amount` are now optional (default `""`
+/ `0`); `X-Payment` is only constructed when both are provided, so
+unsigned GET calls take the sandbox `?sender=` path. Re-verified live:
 
 ```
-$ ae402 --api-url http://localhost:8000 stats
-ae402: TypeError: EscrowClient._request() missing 2 required
-       keyword-only arguments: 'escrow_hash' and 'amount'
+$ uv run python -m sdk.cli --api-url https://agentescrow402-api-ywm8.onrender.com stats
+{ "total": 83, "pending": 12, ... }
 ```
 
-**Working**: `ae402 health` (uses a separate `self._http.get("/health")` path).
-
-**Broken**: `ae402 stats`, `ae402 list-escrows`, `ae402 mcp-tools`,
-`ae402 history`, and every other CLI subcommand advertised in
-`README.md` line 320–324.
-
-**Fix scope**: ~5 lines in `sdk/client.py::_request()` — make
-`escrow_hash` and `amount` **optional** (default `None`), and only
-inject `X-Payment` when both are provided; unsigned GET calls take
-the sandbox `?sender=` path.
+All CLI subcommands advertised in `README.md` are confirmed working
+against the live API.
 
 ### P0.1.5 — real-WASM VM regression test for `link_escrows` (deferred)
 

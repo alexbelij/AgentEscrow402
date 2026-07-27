@@ -53,7 +53,7 @@ Boots a local Casper 2.0 network, deploys `escrow_funder.wasm`, and drives creat
 | 🎥 **Demo Video** | _coming soon_ |
 | 📚 **Docs** | [API](docs/API_SDK_MCP.md) · [SDK](docs/SDK.md) · [Architecture](docs/ARCHITECTURE.md) |
 | 🧪 **Tests** | 450 functions · 70%+ coverage |
-| 🏗️ **Contracts** | 8 deployed on Casper Testnet (v9) |
+| 🏗️ **Contracts** | 10 deployed on Casper Testnet (14 total in `main`, 4 code-complete pending deploy) |
 
 ---
 
