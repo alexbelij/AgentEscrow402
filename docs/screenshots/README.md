@@ -1,6 +1,6 @@
 # Screenshots
 
-Real screenshots captured from the live deployment at ae402.xyz (2026-07-05), not mockups.
+Real screenshots captured from the live deployment at ae402.xyz (2026-07-27), not mockups.
 
 ## 01-homepage.png
 Landing page: HTTP 402 x Casper positioning, "Inspect live console" CTA, deployed-contract count.
