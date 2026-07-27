@@ -13,25 +13,18 @@
     ],
     "component": {
       "type": "application",
-      "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/multi-asset-escrow#0.1.0",
-      "name": "multi-asset-escrow",
+      "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/challenge-arbiter#0.1.0",
+      "name": "challenge-arbiter",
       "version": "0.1.0",
       "scope": "required",
-      "purl": "pkg:cargo/multi-asset-escrow@0.1.0?download_url=file://.",
+      "purl": "pkg:cargo/challenge-arbiter@0.1.0?download_url=file://.",
       "components": [
         {
-          "type": "library",
-          "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/multi-asset-escrow#0.1.0 bin-target-0",
-          "name": "multi_asset_escrow",
-          "version": "0.1.0",
-          "purl": "pkg:cargo/multi-asset-escrow@0.1.0?download_url=file://.#src/lib.rs"
-        },
-        {
           "type": "application",
-          "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/multi-asset-escrow#0.1.0 bin-target-1",
-          "name": "multi-asset-escrow",
+          "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/challenge-arbiter#0.1.0 bin-target-0",
+          "name": "challenge-arbiter",
           "version": "0.1.0",
-          "purl": "pkg:cargo/multi-asset-escrow@0.1.0?download_url=file://.#src/main.rs"
+          "purl": "pkg:cargo/challenge-arbiter@0.1.0?download_url=file://.#src/main.rs"
         }
       ]
     },
@@ -4447,7 +4440,7 @@
   ],
   "dependencies": [
     {
-      "ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/multi-asset-escrow#0.1.0",
+      "ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/challenge-arbiter#0.1.0",
       "dependsOn": [
         "registry+https://github.com/rust-lang/crates.io-index#casper-contract@5.1.1",
         "registry+https://github.com/rust-lang/crates.io-index#casper-types@7.0.0"

@@ -1,0 +1,44 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.3",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2022-01-01T05:00:00.000000000Z",
+    "tools": [
+      {
+        "vendor": "CycloneDX",
+        "name": "cargo-cyclonedx",
+        "version": "0.5.9"
+      }
+    ],
+    "component": {
+      "type": "library",
+      "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/stubs#ae402-stubs@0.1.0",
+      "name": "ae402-stubs",
+      "version": "0.1.0",
+      "scope": "required",
+      "purl": "pkg:cargo/ae402-stubs@0.1.0?download_url=file://.",
+      "components": [
+        {
+          "type": "library",
+          "bom-ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/stubs#ae402-stubs@0.1.0 bin-target-0",
+          "name": "ae402_stubs",
+          "version": "0.1.0",
+          "purl": "pkg:cargo/ae402-stubs@0.1.0?download_url=file://.#src/lib.rs"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "cdx:rustc:sbom:target:triple",
+        "value": "x86_64-unknown-linux-gnu"
+      }
+    ]
+  },
+  "components": [],
+  "dependencies": [
+    {
+      "ref": "path+file:///__modal/volumes/vo-o9whCyqsLXIJ7HPLKPO0Ju/projects/ae402/contracts/stubs#ae402-stubs@0.1.0"
+    }
+  ]
+}
