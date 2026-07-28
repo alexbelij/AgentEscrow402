@@ -19,7 +19,7 @@ ae402-governance-dao = { path = "../ae402-governance-dao" }
 # (see ../rust-toolchain.toml — newer nightlies emit bulk-memory wasm ops
 # Casper testnet preprocessing rejects).
 casper-engine-test-support = "8.1.1"
-casper-execution-engine = "8.1.1"
+casper-execution-engine = "9.0.0"
 # Match casper-engine-test-support 8.1.1's requirement (casper-types ^6.0.1)
 # so we don’t pull in two versions of casper-types and produce E0308 across
 # AccountHash / URef / SecretKey.
