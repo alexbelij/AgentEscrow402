@@ -14,4 +14,4 @@ web3>=6.20,<7  # T3.4-B Sepolia HTLC bridge: server/bridge_evm_adapter.py, scrip
                # deselected by default). eth-account/eth-utils below are pulled in transitively by web3 —
                # do not pin eth-account>=0.13, web3 6.20.x requires eth-account<0.13.
 eth-account>=0.8,<0.13
-eth-utils>=4.0
+eth-utils>=6.0.0
