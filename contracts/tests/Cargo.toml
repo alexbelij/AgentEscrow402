@@ -27,7 +27,7 @@ casper-types = "6.1"
 hex = "0.4"
 # Seed ed25519 keys deterministically for the on-chain VM replay tests
 # (casper-types v6's SecretKey doesn't expose a crate-local RNG helper).
-getrandom = "0.2"
+getrandom = "0.4"
 
 [[test]]
 name = "integration_tests"

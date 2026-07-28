@@ -2018,7 +2018,7 @@ dependencies = [
  "casper-engine-test-support",
  "casper-execution-engine",
  "casper-types",
- "getrandom 0.2.17",
+ "getrandom 0.4.3",
  "hex",
  "proptest",
  "sha2 0.11.0",
