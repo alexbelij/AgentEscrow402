@@ -38,7 +38,7 @@ jobs:
 
       - name: Cache TLA+ toolbox jar
         id: cache-tla
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/tla
           key: tla-tools-latest-v1
