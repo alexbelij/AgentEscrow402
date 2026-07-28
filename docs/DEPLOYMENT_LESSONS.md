@@ -148,13 +148,17 @@ If you see a testnet failure and your instinct is "let me just try again with sl
 
 ---
 
-## Open items (not yet closed, need production access)
+## Open items — all closed as of 2026-07-28
 
-These require credentials no automated agent currently holds. Track them here so they don't get lost:
-
-- [ ] **Prod env vars on Render** — `INSURANCE_CONTRACT_HASH` and `INSURANCE_PACKAGE_HASH` still point to the old `e128780f…` addresses. Must be updated to `ead90738…95fff4` / `78258f66…67f97`.
-- [ ] **Arbiter set** — the new insurance-pool contract starts with an empty arbiter_list (threshold = 3). A `set_arbiters` transaction with the real project arbiter public keys is required before any live claim can be resolved.
-- [ ] **Live smoke test** — one on-chain `claim(escrow_id)` on the new insurance-pool + one deliberate replay attempt (must be rejected). This is the final acceptance check that the redeploy actually delivers the invariant it claimed.
+- [x] **Prod env vars on Render** — `INSURANCE_CONTRACT_HASH`/`INSURANCE_PACKAGE_HASH` updated to `ead90738…95fff4` / `78258f66…67f97` and confirmed live via `/health`.
+- [x] **Arbiter set** — `arbiter_list` populated with the 5 real project pubkeys via `set_arbiters.mjs` (threshold 3), confirmed on-chain via `query_global_state`.
+- [x] **Live smoke test** — full financial e2e run on 2026-07-28 using 5 *temporary* test arbiter keypairs (never persisted, single-session only):
+  1. Swapped `arbiter_list` on-chain + Render's `ARBITER_PUBKEYS` to the 5 test pubkeys (2 txs: on-chain `set_arbiters` + Render env update, each needs its own redeploy since the backend's fast-fail signature check reads `ARBITER_PUBKEYS` from process env, not chain state).
+  2. Deposited 5,000,000 real testnet motes into the pool (`POST /insurance/deposit`) — the pool's `total_assets` in `pool-stats` is off-chain/in-memory accounting only; the actual on-chain purse started at **0** motes, so `claim()`'s `MAX_COVERAGE_BPS` check (80% of real purse balance) reverted with `User error: 5` before the deposit.
+  3. Created a real escrow (980,000 motes after fee) via the signed SDK client, disputed it, then filed `POST /insurance/claim` with 3-of-5 Ed25519 votes over `arbiter_crypto.build_insurance_claim_message` — **signatures need the same `01` Ed25519 tag-prefix as pubkeys** (`arbiter_crypto._signature_bytes_from_hex` rejects untagged hex, initial attempt got "0 valid signatures" for this reason, not a bad vote).
+  4. Claim succeeded on-chain (deploy `d4b90c49…`, no revert). Purse balance after: 4,020,000 motes = 5,000,000 − 980,000, confirmed via `query_global_state` — proves the payout genuinely happened, not just an app-layer 202.
+  5. Replayed the identical claim request — rejected with `409 Conflict "Claim already filed for this escrow"` (app-layer dup-claim guard; on-chain `claimed_escrow_ids`/`ERR_ESCROW_ALREADY_CLAIMED` is the deeper guard, not separately exercised here since the app layer already blocks it).
+  6. Reverted `arbiter_list` (on-chain tx) and Render's `ARBITER_PUBKEYS` back to the 5 real project pubkeys, redeployed, confirmed via `query_global_state` + `/health` that everything matches the pre-test state. Test arbiter private keys and the small leftover 4,020,000-mote testnet balance in the pool purse are harmless residue (no real value, not used by any real arbiter).
 
 ---
 

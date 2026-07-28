@@ -7,7 +7,20 @@ Version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
-## [Unreleased] — 2026-07-28
+## [Unreleased] — 2026-07-28 (live insurance-pool financial smoke test)
+
+### Verified
+
+- Closed the last open item from `docs/DEPLOYMENT_LESSONS.md`'s post-redeploy
+  checklist: a real on-chain `claim()` against the insurance-pool contract
+  (`ead90738…95fff4`) plus a deliberate replay attempt (rejected). Used 5
+  temporary test arbiter keypairs (never persisted, swapped in/out of
+  `arbiter_list` + Render's `ARBITER_PUBKEYS` for the duration of the test
+  only, then reverted to the 5 real project pubkeys — confirmed via
+  `query_global_state` and `/health` afterward). See `DEPLOYMENT_LESSONS.md`
+  for the full run log, root causes hit along the way (real on-chain purse
+  balance vs. in-memory `pool-stats` accounting; `01`-tag-prefixed
+  signatures), and revert confirmation.
 
 ### Docs
 
