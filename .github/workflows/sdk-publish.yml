@@ -105,9 +105,11 @@ jobs:
           fi
           twine upload --repository-url https://test.pypi.org/legacy/ dist/*
 
-      # PROD publish — manual + confirmation gate + Trusted Publishing (no long-lived token).
-      # Requires configuring the project on PyPI to trust this workflow via OIDC:
-      # https://docs.pypi.org/trusted-publishers/
+      # PROD publish — manual + confirmation gate. Uses PYPI_API_TOKEN
+      # repository secret (long-lived scoped token) instead of OIDC Trusted
+      # Publishing so we don't need pypi.org project trust configuration.
+      # To switch to OIDC later: remove `password:` and configure trusted
+      # publisher on pypi.org per https://docs.pypi.org/trusted-publishers/
       - name: Publish to PyPI (PROD)
         if: >
           github.event_name == 'workflow_dispatch' &&
@@ -115,6 +117,7 @@ jobs:
           inputs.confirm == 'publish'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
           skip-existing: true
 
   typescript-sdk:
