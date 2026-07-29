@@ -134,7 +134,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'  # >=22.6 for `node --test --experimental-strip-types`
           registry-url: 'https://registry.npmjs.org'
 
       - name: Verify version consistency
