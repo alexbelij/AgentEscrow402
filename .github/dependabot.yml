@@ -1,18 +1,43 @@
 version: 2
 updates:
   # Backend (Python) — requirements.txt lives at repo root
+  # NOTE: mcp v2.0.0 (2026-07-28) is a breaking API rewrite — removed
+  # Tool.inputSchema + Server.list_tools decorator; sdk/mcp_server.py and
+  # tests/test_mcp_server_security.py rely on the v1 API. Ignore major
+  # bumps until the mcp v2 migration lands.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   # Frontend (npm)
+  # NOTE: @noble/ed25519 and @noble/hashes MAJOR bumps break demoSigner.ts
+  # (v3 dropped sha512Sync / randomPrivateKey / bytesToHex / concatBytes
+  # sync API in favor of async-only). Also react/react-dom major bumps are
+  # incompatible with pinned peer deps in the current UI stack. Ignore
+  # majors for these until migration lands.
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "@noble/ed25519"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@noble/hashes"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
 
   # Contracts (Rust / cargo)
   # NOTE: casper-types is pinned to 6.1 across all contract crates to match
