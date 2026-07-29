@@ -32,7 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 langchain = ["langchain>=0.1"]
-mcp = ["mcp>=0.9"]
+mcp = ["mcp>=0.9,<2"]  # see requirements-dev.txt
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",

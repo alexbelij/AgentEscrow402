@@ -1,11 +1,18 @@
 version: 2
 updates:
   # Backend (Python) — requirements.txt lives at repo root
+  # NOTE: mcp v2.0.0 (2026-07-28) is a breaking API rewrite — removed
+  # Tool.inputSchema + Server.list_tools decorator; sdk/mcp_server.py and
+  # tests/test_mcp_server_security.py rely on the v1 API. Ignore major
+  # bumps until the mcp v2 migration lands.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "mcp"
+        update-types: ["version-update:semver-major"]
 
   # Frontend (npm)
   # NOTE: @noble/ed25519 and @noble/hashes MAJOR bumps break demoSigner.ts
